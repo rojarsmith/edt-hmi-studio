@@ -1,6 +1,6 @@
 // Font Manager Component
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useResourceStore } from './resourceStore';
 import type { FontResource, CharsetType } from './types';
 import { toast } from '../components/Toast';
@@ -10,13 +10,40 @@ import {
   FONT_PREVIEW_TEXT,
   FONT_PREVIEW_TEXT_CJK,
   generateFontConvCommand,
+  generateFontSourceTemplate,
+  generateFontCCodeHeader,
   extractCharsFromText,
+  getCharsetRanges,
+  countGlyphs,
 } from './converters/fontConverter';
 import './FontManager.css';
 
 interface FontManagerProps {
   viewMode: 'grid' | 'list';
 }
+
+/** Track which @font-face rules we've already injected */
+const loadedFontFaces = new Set<string>();
+
+/**
+ * Dynamically inject a @font-face rule so the browser can render the uploaded font.
+ */
+function ensureFontFaceLoaded(font: FontResource): string {
+  const faceName = `ui-font-${font.id}`;
+  if (loadedFontFaces.has(faceName)) return faceName;
+
+  const format = font.data.startsWith('data:font/opentype') || font.name.toLowerCase().endsWith('.otf')
+    ? 'opentype' : 'truetype';
+
+  const rule = `@font-face { font-family: "${faceName}"; src: url("${font.data}") format("${format}"); font-display: swap; }`;
+  const style = document.createElement('style');
+  style.textContent = rule;
+  document.head.appendChild(style);
+  loadedFontFaces.add(faceName);
+  return faceName;
+}
+
+const BPP_OPTIONS: (1 | 2 | 4 | 8)[] = [1, 2, 4, 8];
 
 const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
   const {
@@ -32,9 +59,27 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showCommandModal, setShowCommandModal] = useState(false);
+  const [showHeaderModal, setShowHeaderModal] = useState(false);
   const [generatedCommand, setGeneratedCommand] = useState('');
+  const [generatedHeader, setGeneratedHeader] = useState('');
+  const [generatedSource, setGeneratedSource] = useState('');
   const [customCharsInput, setCustomCharsInput] = useState('');
+  // Map font id → CSS font-family name
+  const [fontFaceMap, setFontFaceMap] = useState<Record<string, string>>({});
   
+  // Load @font-face for all fonts
+  useEffect(() => {
+    const map: Record<string, string> = {};
+    for (const font of fonts) {
+      map[font.id] = ensureFontFaceLoaded(font);
+    }
+    setFontFaceMap(prev => {
+      // Only update if changed
+      const changed = fonts.some(f => prev[f.id] !== map[f.id]);
+      return changed ? { ...prev, ...map } : prev;
+    });
+  }, [fonts]);
+
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
@@ -81,21 +126,35 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
       updateFont(font.id, { sizes: newSizes });
     }
   };
+
+  const buildConvOptions = useCallback((font: FontResource) => ({
+    sizes: font.sizes,
+    charset: font.charset,
+    customChars: font.charset === 'custom' ? (font.customChars || customCharsInput) : undefined,
+    bpp: font.bpp,
+    compress: false,
+  }), [customCharsInput]);
   
   const handleGenerateCommand = (font: FontResource) => {
+    const ext = font.data.startsWith('data:font/opentype') ? '.otf' : '.ttf';
     const command = generateFontConvCommand(
-      font.name + '.ttf',
+      font.name + ext,
       font.cFontName,
-      {
-        sizes: font.sizes,
-        charset: font.charset,
-        customChars: font.charset === 'custom' ? customCharsInput : undefined,
-        bpp: 4,
-        compress: false,
-      }
+      buildConvOptions(font),
     );
     setGeneratedCommand(command);
     setShowCommandModal(true);
+  };
+
+  const handleGenerateHeader = (font: FontResource) => {
+    const opts = buildConvOptions(font);
+    // Generate header for the first selected size
+    const primarySize = font.sizes[0] || 16;
+    const header = generateFontCCodeHeader(font.cFontName, font.family, primarySize, opts);
+    const source = generateFontSourceTemplate(font.cFontName, font.family, font.style, primarySize, opts);
+    setGeneratedHeader(header);
+    setGeneratedSource(source);
+    setShowHeaderModal(true);
   };
   
   const handleExtractChars = () => {
@@ -103,15 +162,25 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
     setCustomCharsInput(chars);
   };
   
-  const handleCopyCommand = () => {
-    navigator.clipboard.writeText(generatedCommand);
-    toast.success('Command copied to clipboard');
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  };
+
+  const getFormatLabel = (font: FontResource): string => {
+    if (font.data.startsWith('data:font/opentype') || font.name.toLowerCase().endsWith('.otf')) return 'OTF';
+    return 'TTF';
   };
   
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getGlyphCount = (font: FontResource): number => {
+    const ranges = getCharsetRanges(font.charset, font.charset === 'custom' ? (font.customChars || customCharsInput) : undefined);
+    return countGlyphs(ranges);
   };
   
   const selectedFont = fonts.find(f => f.id === selectedResourceId);
@@ -155,16 +224,16 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
               <div className="font-preview">
                 <span 
                   className="preview-text"
-                  style={{ fontFamily: font.family }}
+                  style={{ fontFamily: fontFaceMap[font.id] || font.family }}
                 >
                   Aa
                 </span>
               </div>
               <div className="font-info">
                 <span className="font-name" title={font.name}>{font.name}</span>
-                <span className="font-family">{font.family}</span>
+                <span className="font-family">{font.family} {font.style}</span>
                 <span className="font-sizes">
-                  {font.sizes.join(', ')}px
+                  {font.sizes.join(', ')}px · {getFormatLabel(font)} · {formatFileSize(font.size)}
                 </span>
               </div>
               <button
@@ -183,6 +252,34 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
       {selectedFont && (
         <div className="font-details">
           <h4>Font Properties</h4>
+
+          {/* Metadata */}
+          <div className="font-meta-grid">
+            <div className="meta-item">
+              <span className="meta-label">File Name</span>
+              <span className="meta-value">{selectedFont.name}</span>
+            </div>
+            <div className="meta-item">
+              <span className="meta-label">Format</span>
+              <span className="meta-value">{getFormatLabel(selectedFont)}</span>
+            </div>
+            <div className="meta-item">
+              <span className="meta-label">Size</span>
+              <span className="meta-value">{formatFileSize(selectedFont.size)}</span>
+            </div>
+            <div className="meta-item">
+              <span className="meta-label">Font Family</span>
+              <span className="meta-value">{selectedFont.family}</span>
+            </div>
+            <div className="meta-item">
+              <span className="meta-label">Style</span>
+              <span className="meta-value">{selectedFont.style}</span>
+            </div>
+            <div className="meta-item">
+              <span className="meta-label">Glyph Count</span>
+              <span className="meta-value">{getGlyphCount(selectedFont).toLocaleString()}</span>
+            </div>
+          </div>
           
           <div className="detail-row">
             <label>Name:</label>
@@ -200,16 +297,6 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
               value={selectedFont.cFontName}
               onChange={(e) => updateFont(selectedFont.id, { cFontName: e.target.value })}
             />
-          </div>
-          
-          <div className="detail-row">
-            <label>Font Family:</label>
-            <span>{selectedFont.family}</span>
-          </div>
-          
-          <div className="detail-row">
-            <label>File Size:</label>
-            <span>{formatFileSize(selectedFont.size)}</span>
           </div>
           
           <div className="detail-section">
@@ -254,18 +341,41 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
               </button>
             </div>
           )}
+
+          <div className="detail-section">
+            <label>BPP (Antialiasing):</label>
+            <div className="bpp-grid">
+              {BPP_OPTIONS.map(bpp => (
+                <button
+                  key={bpp}
+                  className={`size-btn ${selectedFont.bpp === bpp ? 'active' : ''}`}
+                  onClick={() => updateFont(selectedFont.id, { bpp })}
+                >
+                  {bpp}
+                </button>
+              ))}
+            </div>
+            <span className="bpp-hint">
+              {selectedFont.bpp === 1 && '1-bit — No antialiasing, smallest size'}
+              {selectedFont.bpp === 2 && '2-bit — 4 grayscale levels'}
+              {selectedFont.bpp === 4 && '4-bit — 16 grayscale levels (recommended)'}
+              {selectedFont.bpp === 8 && '8-bit — 256 grayscale levels, highest quality'}
+            </span>
+          </div>
           
           <div className="font-preview-section">
             <label>Preview:</label>
             <div 
               className="preview-box"
-              style={{ fontFamily: selectedFont.family }}
+              style={{ fontFamily: fontFaceMap[selectedFont.id] || selectedFont.family }}
             >
-              <p style={{ fontSize: Math.min(...selectedFont.sizes) || 16 }}>
-                {FONT_PREVIEW_TEXT}
-              </p>
-              {selectedFont.charset === 'cjk-basic' && (
-                <p style={{ fontSize: Math.min(...selectedFont.sizes) || 16 }}>
+              {selectedFont.sizes.slice(0, 4).map(sz => (
+                <p key={sz} style={{ fontSize: sz }}>
+                  <span className="preview-size-tag">{sz}px</span> {FONT_PREVIEW_TEXT}
+                </p>
+              ))}
+              {(selectedFont.charset === 'cjk-basic' || selectedFont.charset === 'custom') && (
+                <p style={{ fontSize: selectedFont.sizes[0] || 16 }}>
                   {FONT_PREVIEW_TEXT_CJK}
                 </p>
               )}
@@ -275,6 +385,9 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
           <div className="detail-actions">
             <button onClick={() => handleGenerateCommand(selectedFont)}>
               🔧 Generate Conversion Command
+            </button>
+            <button onClick={() => handleGenerateHeader(selectedFont)}>
+              📄 Generate Header Template
             </button>
           </div>
         </div>
@@ -296,7 +409,35 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
               <pre className="command-preview">{generatedCommand}</pre>
             </div>
             <div className="modal-footer">
-              <button onClick={handleCopyCommand}>📋 Copy Command</button>
+              <button onClick={() => handleCopyText(generatedCommand)}>📋 Copy Command</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header Template Modal */}
+      {showHeaderModal && (
+        <div className="modal-overlay" onClick={() => setShowHeaderModal(false)}>
+          <div className="modal-content command-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Font File Template</h3>
+              <button className="close-btn" onClick={() => setShowHeaderModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="command-hint">Header file (.h):</p>
+              <pre className="command-preview">{generatedHeader}</pre>
+              <div className="template-copy-row">
+                <button onClick={() => handleCopyText(generatedHeader)}>📋 Copy Header</button>
+              </div>
+
+              <p className="command-hint" style={{ marginTop: 16 }}>Source file template (.c):</p>
+              <pre className="command-preview">{generatedSource}</pre>
+              <div className="template-copy-row">
+                <button onClick={() => handleCopyText(generatedSource)}>📋 Copy Source</button>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowHeaderModal(false)}>Close</button>
             </div>
           </div>
         </div>

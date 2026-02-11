@@ -5,6 +5,7 @@ import EventEditDialog from './EventEditDialog';
 import './EventPanel.css';
 
 // LVGL Event type definitions
+// eslint-disable-next-line react-refresh/only-export-components
 export const LVGL_EVENTS: { type: LvglEventType; label: string; description: string }[] = [
   { type: 'LV_EVENT_CLICKED', label: 'Clicked', description: 'Triggered when the component is clicked' },
   { type: 'LV_EVENT_PRESSED', label: 'Pressed', description: 'Triggered when the component is pressed' },

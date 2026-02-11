@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-11
+
+### Added
+- **Hierarchy panel wired into the design view** — HierarchyPanel mounted in the left panel, sharing it with the component panel; tree browsing, drag to reorder, rename, lock and visibility toggles
+- **Style state editing** — PropertyEditor gains default / pressed / focused / disabled state switching, with independent overrides and a clear action; a blue dot marks a state that has been overridden
+- **Complete widget rendering in the preview panel** — dedicated canvas rendering for 9 more widgets: line, spinner, chart (line and bar), table, calendar, tabview, tileview, window and obj (container)
+- **visible/locked feedback on the canvas** — hidden widgets render semi-transparent with a dashed border; locked widgets cannot be dragged or resized and their handles are hidden
+- **Animation editor** — Animation type definitions, the AnimationPanel UI (add, edit, delete), the AnimationEditDialog, and code generation of `lv_anim_t` initialisation with easing mapping
+- **Theme system** — Theme types, themeStore (light/dark presets), the ThemeSelector toolbar control, and generation of `lv_theme_default_init()`
+- **Image resources wired through** — PropertyEditor image picker with thumbnails, the actual image shown on the canvas, generated code referencing the C array name, and the ZIP export including the image C array files
+- **Font conversion completed** — real parsing of the TTF/OTF name table, in-browser font preview, BPP selector, `lv_font_conv` command generation, header and source template generation, and `LV_FONT_DECLARE` for custom fonts in generated code
+- **Animation playback in the preview panel** — requestAnimationFrame-based simulation (fade/slide/zoom with easing) and play, pause and reset controls
+- **Page switching in the preview panel** — a page tab bar along the bottom, click to switch the previewed page, and navigation from a widget's navigate event
+
+### Fixed
+- **Logic code generation rewritten** — if/else and switch now generate complete branch bodies recursively; the init function registers event callbacks and timers; set_value picks the correct API for the widget type; timers generate a real `lv_timer_create` callback
+- **focused/disabled states completed in code generation** — ui.c now emits `LV_STATE_FOCUSED` and `LV_STATE_DISABLED` style code
+- **logicGraphs passed to CodePreview/CodePanel** — the code preview and the export now correctly include the code generated from the logic graphs
+
 ## [1.0.0] - 2026-02-07 🎉 Production Ready
 
 ### 🎨 Phase 1 — Foundation

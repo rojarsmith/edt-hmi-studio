@@ -214,8 +214,9 @@ src/
 
 ## 🔧 Known limitations
 
-1. **Complex styles**: some advanced LVGL style properties are not yet supported.
-2. **Animation**: the animation editor is not implemented yet.
+1. **Font conversion**: the actual bitmap data is produced by the external `lv_font_conv` tool; the editor generates the template and the command.
+2. **LVGL v9**: code generation currently targets the LVGL v8 API.
+3. **Tests**: there are no unit or integration tests yet.
 
 ## 📝 Changelog
 
