@@ -1403,6 +1403,166 @@ function ComponentFontSelector({
   );
 }
 
+// Container layout properties editor
+function ContainerLayoutEditor({
+  props,
+  onChange,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  props: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+}): React.ReactNode {
+  return (
+    <div className="property-section">
+      <div className="section-header">Container Layout</div>
+      <div className="property-row">
+        <label>Scroll Direction</label>
+        <select
+          value={props.scrollDir || 'none'}
+          onChange={(e) => onChange('scrollDir', e.target.value)}
+        >
+          <option value="none">None</option>
+          <option value="hor">Horizontal</option>
+          <option value="ver">Vertical</option>
+          <option value="all">Both Directions</option>
+        </select>
+      </div>
+      <div className="property-row">
+        <label>Layout Mode</label>
+        <select
+          value={props.layout || 'none'}
+          onChange={(e) => onChange('layout', e.target.value)}
+        >
+          <option value="none">None</option>
+          <option value="flex">Flex</option>
+          <option value="grid">Grid</option>
+        </select>
+      </div>
+      {props.layout === 'flex' && (
+        <>
+          <div className="property-row">
+            <label>Direction</label>
+            <select
+              value={props.flexDirection || 'row'}
+              onChange={(e) => onChange('flexDirection', e.target.value)}
+            >
+              <option value="row">Horizontal</option>
+              <option value="column">Vertical</option>
+            </select>
+          </div>
+          <div className="property-row">
+            <label>Spacing</label>
+            <input
+              type="number"
+              value={props.gap || 0}
+              min={0}
+              onChange={(e) => onChange('gap', parseInt(e.target.value) || 0)}
+            />
+          </div>
+          <div className="property-row">
+            <label>Wrap</label>
+            <select
+              value={props.flexWrap || 'nowrap'}
+              onChange={(e) => onChange('flexWrap', e.target.value)}
+            >
+              <option value="nowrap">No Wrap</option>
+              <option value="wrap">Wrap</option>
+              <option value="wrap-reverse">Reverse Wrap</option>
+            </select>
+          </div>
+          <div className="property-row">
+            <label>Main-Axis Alignment</label>
+            <select
+              value={props.justifyContent || 'flex-start'}
+              onChange={(e) => onChange('justifyContent', e.target.value)}
+            >
+              <option value="flex-start">Start</option>
+              <option value="flex-end">End</option>
+              <option value="center">Center</option>
+              <option value="space-between">Space Between</option>
+              <option value="space-around">Space Around</option>
+              <option value="space-evenly">Space Evenly</option>
+            </select>
+          </div>
+          <div className="property-row">
+            <label>Cross-Axis Alignment</label>
+            <select
+              value={props.alignItems || 'flex-start'}
+              onChange={(e) => onChange('alignItems', e.target.value)}
+            >
+              <option value="flex-start">Start</option>
+              <option value="flex-end">End</option>
+              <option value="center">Center</option>
+              <option value="stretch">Stretch</option>
+            </select>
+          </div>
+          <div className="property-row">
+            <label>Multi-Line Alignment</label>
+            <select
+              value={props.alignContent || 'flex-start'}
+              onChange={(e) => onChange('alignContent', e.target.value)}
+            >
+              <option value="flex-start">Start</option>
+              <option value="flex-end">End</option>
+              <option value="center">Center</option>
+              <option value="stretch">Stretch</option>
+              <option value="space-between">Space Between</option>
+              <option value="space-around">Space Around</option>
+            </select>
+          </div>
+        </>
+      )}
+      {props.layout === 'grid' && (
+        <>
+          <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+            <label>Column Definitions</label>
+            <input
+              type="text"
+              value={props.gridColumns || '1fr 1fr 1fr'}
+              onChange={(e) => onChange('gridColumns', e.target.value)}
+              placeholder="Example: 1fr 2fr 1fr"
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+            <GridTemplatePreview value={props.gridColumns || '1fr 1fr 1fr'} />
+          </div>
+          <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+            <label>Row Definitions</label>
+            <input
+              type="text"
+              value={props.gridRows || '1fr 1fr'}
+              onChange={(e) => onChange('gridRows', e.target.value)}
+              placeholder="Example: 1fr 2fr"
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+            <GridTemplatePreview value={props.gridRows || '1fr 1fr'} />
+          </div>
+          <div className="property-row two-col">
+            <div className="property-field">
+              <label>Column Gap</label>
+              <input
+                type="number"
+                value={props.gridColumnGap || 0}
+                min={0}
+                onChange={(e) => onChange('gridColumnGap', parseInt(e.target.value) || 0)}
+              />
+            </div>
+            <div className="property-field">
+              <label>Line Spacing</label>
+              <input
+                type="number"
+                value={props.gridRowGap || 0}
+                min={0}
+                onChange={(e) => onChange('gridRowGap', parseInt(e.target.value) || 0)}
+              />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Render component-specific properties
 function renderComponentProps(
   component: LvglComponent,
@@ -1416,34 +1576,37 @@ function renderComponentProps(
   switch (type) {
     case 'btn':
       return (
-        <div className="property-section">
-          <div className="section-header">Button</div>
-          <div className="property-row">
-            <label>Text</label>
-            <input
-              type="text"
-              value={props.text || ''}
-              onChange={(e) => onChange('text', e.target.value)}
+        <>
+          <div className="property-section">
+            <div className="section-header">Button</div>
+            <div className="property-row">
+              <label>Text</label>
+              <input
+                type="text"
+                value={props.text || ''}
+                onChange={(e) => onChange('text', e.target.value)}
+              />
+            </div>
+            <ComponentFontSelector
+              fontResource={props.fontResource}
+              fontSize={props.fontSize}
+              onChange={onChange}
+              onBatchChange={onBatchChange}
             />
+            <div className="property-row">
+              <label>Text Alignment</label>
+              <select
+                value={props.textAlign || 'center'}
+                onChange={(e) => onChange('textAlign', e.target.value)}
+              >
+                <option value="left">Align Left</option>
+                <option value="center">Center</option>
+                <option value="right">Align Right</option>
+              </select>
+            </div>
           </div>
-          <ComponentFontSelector
-            fontResource={props.fontResource}
-            fontSize={props.fontSize}
-            onChange={onChange}
-            onBatchChange={onBatchChange}
-          />
-          <div className="property-row">
-            <label>Text Alignment</label>
-            <select
-              value={props.textAlign || 'center'}
-              onChange={(e) => onChange('textAlign', e.target.value)}
-            >
-              <option value="left">Align Left</option>
-              <option value="center">Center</option>
-              <option value="right">Align Right</option>
-            </select>
-          </div>
-        </div>
+          <ContainerLayoutEditor props={props} onChange={onChange} />
+        </>
       );
 
     case 'label':
@@ -1908,154 +2071,7 @@ function renderComponentProps(
       return <TileGridEditor props={props} onChange={onChange} />;
 
     case 'obj':
-      return (
-        <div className="property-section">
-          <div className="section-header">Container</div>
-          <div className="property-row">
-            <label>Scroll Direction</label>
-            <select
-              value={props.scrollDir || 'none'}
-              onChange={(e) => onChange('scrollDir', e.target.value)}
-            >
-              <option value="none">None</option>
-              <option value="hor">Horizontal</option>
-              <option value="ver">Vertical</option>
-              <option value="all">Both Directions</option>
-            </select>
-          </div>
-          <div className="property-row">
-            <label>Layout Mode</label>
-            <select
-              value={props.layout || 'none'}
-              onChange={(e) => onChange('layout', e.target.value)}
-            >
-              <option value="none">None</option>
-              <option value="flex">Flex</option>
-              <option value="grid">Grid</option>
-            </select>
-          </div>
-          {props.layout === 'flex' && (
-            <>
-              <div className="property-row">
-                <label>Direction</label>
-                <select
-                  value={props.flexDirection || 'row'}
-                  onChange={(e) => onChange('flexDirection', e.target.value)}
-                >
-                  <option value="row">Horizontal</option>
-                  <option value="column">Vertical</option>
-                </select>
-              </div>
-              <div className="property-row">
-                <label>Spacing</label>
-                <input
-                  type="number"
-                  value={props.gap || 0}
-                  min={0}
-                  onChange={(e) => onChange('gap', parseInt(e.target.value) || 0)}
-                />
-              </div>
-              <div className="property-row">
-                <label>Wrap</label>
-                <select
-                  value={props.flexWrap || 'nowrap'}
-                  onChange={(e) => onChange('flexWrap', e.target.value)}
-                >
-                  <option value="nowrap">No Wrap</option>
-                  <option value="wrap">Wrap</option>
-                  <option value="wrap-reverse">Reverse Wrap</option>
-                </select>
-              </div>
-              <div className="property-row">
-                <label>Main-Axis Alignment</label>
-                <select
-                  value={props.justifyContent || 'flex-start'}
-                  onChange={(e) => onChange('justifyContent', e.target.value)}
-                >
-                  <option value="flex-start">Start</option>
-                  <option value="flex-end">End</option>
-                  <option value="center">Center</option>
-                  <option value="space-between">Space Between</option>
-                  <option value="space-around">Space Around</option>
-                  <option value="space-evenly">Space Evenly</option>
-                </select>
-              </div>
-              <div className="property-row">
-                <label>Cross-Axis Alignment</label>
-                <select
-                  value={props.alignItems || 'flex-start'}
-                  onChange={(e) => onChange('alignItems', e.target.value)}
-                >
-                  <option value="flex-start">Start</option>
-                  <option value="flex-end">End</option>
-                  <option value="center">Center</option>
-                  <option value="stretch">Stretch</option>
-                </select>
-              </div>
-              <div className="property-row">
-                <label>Multi-Line Alignment</label>
-                <select
-                  value={props.alignContent || 'flex-start'}
-                  onChange={(e) => onChange('alignContent', e.target.value)}
-                >
-                  <option value="flex-start">Start</option>
-                  <option value="flex-end">End</option>
-                  <option value="center">Center</option>
-                  <option value="stretch">Stretch</option>
-                  <option value="space-between">Space Between</option>
-                  <option value="space-around">Space Around</option>
-                </select>
-              </div>
-            </>
-          )}
-          {props.layout === 'grid' && (
-            <>
-              <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
-                <label>Column Definitions</label>
-                <input
-                  type="text"
-                  value={props.gridColumns || '1fr 1fr 1fr'}
-                  onChange={(e) => onChange('gridColumns', e.target.value)}
-                  placeholder="Example: 1fr 2fr 1fr"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                />
-                <GridTemplatePreview value={props.gridColumns || '1fr 1fr 1fr'} />
-              </div>
-              <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
-                <label>Row Definitions</label>
-                <input
-                  type="text"
-                  value={props.gridRows || '1fr 1fr'}
-                  onChange={(e) => onChange('gridRows', e.target.value)}
-                  placeholder="Example: 1fr 2fr"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                />
-                <GridTemplatePreview value={props.gridRows || '1fr 1fr'} />
-              </div>
-              <div className="property-row two-col">
-                <div className="property-field">
-                  <label>Column Gap</label>
-                  <input
-                    type="number"
-                    value={props.gridColumnGap || 0}
-                    min={0}
-                    onChange={(e) => onChange('gridColumnGap', parseInt(e.target.value) || 0)}
-                  />
-                </div>
-                <div className="property-field">
-                  <label>Line Spacing</label>
-                  <input
-                    type="number"
-                    value={props.gridRowGap || 0}
-                    min={0}
-                    onChange={(e) => onChange('gridRowGap', parseInt(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      );
+      return <ContainerLayoutEditor props={props} onChange={onChange} />;
 
     default:
       return null;
