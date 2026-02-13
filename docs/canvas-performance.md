@@ -1,179 +1,113 @@
-# Canvas Performance Optimisation
+# Canvas Rendering Architecture
 
-## 1. Background
+## 1. Overview
 
-Dragging a widget on the design canvas stuttered noticeably. Every mousemove triggered several zustand state updates, which re-rendered the whole widget tree.
+The design canvas is the editor's main interaction surface. It renders the widgets, and handles dragging, resizing, rubber-band selection and alignment. The architecture is built around performance, so that interaction stays smooth on a page with many widgets.
 
-## 2. Where the time went
+## 2. Component structure
 
-### 2.1 The original problem
-
-Each mousemove made three zustand `set()` calls:
-1. `updateDrag()` — update drag.currentX/Y
-2. `moveComponent()` — deep-copy the whole pages array and walk the widget tree
-3. `startDrag()` — update drag.startX/Y
-
-Every `set()` re-renders every subscribed component.
-
-### 2.2 Store subscriptions were too coarse
-
-Canvas subscribed to the entire store by destructuring `useEditorStore()`:
-
-```typescript
-const { canvas, selection, drag, pages, ... } = useEditorStore();
+```
+Canvas (canvas container)
+├── Viewport layer (canvas-viewport) — pan transform
+│   └── Canvas layer (canvas) — zoom transform
+│       ├── Grid
+│       ├── CanvasComponent[] (widget rendering)
+│       │   └── CanvasComponent[] (children, recursive)
+│       ├── BoxSelection (rubber-band rectangle)
+│       └── AlignmentGuides
+└── ContextMenu (right-click menu)
 ```
 
-Any field changing — including the high-frequency drag state — re-rendered Canvas, and with it every CanvasComponent, recursively.
+## 3. State management
 
-### 2.3 React.memo was ineffective
+### 3.1 Store structure (editorStore)
 
-- `isSelected` and `isHovered` were computed inline by Canvas and passed down as props, so they were recomputed on every Canvas render
-- Even when the values did not change, React.memo's shallow comparison could not tell, because Canvas itself was re-rendering
+| State | Purpose | Update frequency |
+|-------|------|---------|
+| `canvas` | Canvas size, zoom, pan, grid configuration | Low |
+| `pages` | Page list and widget trees | Medium (the dragged widget updates every frame) |
+| `selection` | Ids of the selected and hovered widgets | Low |
+| `drag` | Drag state (whether dragging, start coordinates, current coordinates) | High (every frame while dragging) |
+| `alignmentGuides` | Alignment guides | Low |
 
-### 2.4 Widget tree references were unstable
+### 3.2 Subscription strategy
 
-`updateComponentInTree` created new object references while walking the tree even for subtrees it had not modified, so React.memo's comparison always failed.
+Canvas and CanvasComponent use fine-grained zustand selectors, so an unrelated state change does not trigger a re-render:
 
-## 3. What was changed
+- **Canvas** subscribes to `canvas`, `pages`, `currentPageId`, `alignmentGuides` and the action functions.
+- **Canvas does not subscribe to `drag`**: the drag coordinates are transient, high-frequency data, read through `getState()` inside the event handlers instead.
+- **CanvasComponent** subscribes to `selection.selectedIds` and `selection.hoveredId` itself, so only the widgets whose selected or hovered state actually changed re-render.
 
-### 3.1 Merge the state updates
+### 3.3 Reference stability of the widget tree
 
-**editorStore.ts**
+When `updateComponentInTree` walks the tree, it creates new objects only along the path that actually changed and returns the original reference for untouched subtrees. Together with `React.memo`, this lets unchanged widgets skip re-rendering.
 
-New combined methods fold the move/resize and drag updates into a single `set()` call:
+## 4. Interaction handling
 
-- `moveComponentAndUpdateDrag(id, x, y, dragStartX, dragStartY)` — one set for both the widget position and the drag state
-- `resizeComponentAndUpdateDrag(id, w, h, x, y, dragStartX, dragStartY)` — likewise
+### 4.1 Drag to move
 
-The redundant `updateDrag()` calls were removed from the drag path.
+1. `mousedown` → `startDrag('move', ...)` records the start position
+2. `mousemove` → throttled by RAF → `moveComponentAndUpdateDrag()` updates the widget position and the drag state in a single `set()`
+3. `mouseup` → `endDrag()` + `saveToHistory()`
 
-### 3.2 Reference stability of the widget tree
+### 4.2 Resize
 
-**editorStore.ts — `updateComponentInTree`**
+1. `mousedown` on a resize handle → `startDrag('resize', ...)` records the handle direction
+2. `mousemove` → throttled by RAF → `resizeComponentAndUpdateDrag()` updates the size and the drag state in a single `set()`
+3. `mouseup` → `endDrag()` + `saveToHistory()`
 
-Rewritten to create new objects only along the path that actually changed, returning the original reference for untouched subtrees:
+### 4.3 Rubber-band selection
 
-```typescript
-function updateComponentInTree(components, id, updates) {
-  let changed = false;
-  const result = components.map(comp => {
-    if (comp.id === id) {
-      changed = true;
-      return { ...comp, ...updates };
-    }
-    if (comp.children.length > 0) {
-      const newChildren = updateComponentInTree(comp.children, id, updates);
-      if (newChildren !== comp.children) {
-        changed = true;
-        return { ...comp, children: newChildren };
-      }
-    }
-    return comp; // reference unchanged
-  });
-  return changed ? result : components;
-}
-```
+1. `mousedown` on the canvas background → record the start coordinates
+2. `mousemove` → update the selection rectangle (local state plus a ref)
+3. `mouseup` → find the widgets inside the rectangle → `selectComponents(ids)`
 
-### 3.3 Fine-grained store subscriptions
+### 4.4 Pan and zoom
 
-**Canvas.tsx**
+- Middle-button drag, or Space + left-button drag → pan the canvas
+- Ctrl + wheel → zoom the canvas
 
-Whole-store destructuring gave way to zustand selectors, subscribing only to what is needed:
+### 4.5 Handler stability
 
-```typescript
-const canvasState = useEditorStore(s => s.canvas);
-const selectedIds = useEditorStore(s => s.selection.selectedIds);
-const pages = useEditorStore(s => s.pages);
-// ...
+Every event handler is wrapped in `useCallback`, reads transient state through refs and `getState()`, and keeps its dependency list minimal, so the handler identity stays stable.
 
-// The important part: do not subscribe to the drag state.
-// It is read through getState() inside the event handlers.
-```
+## 5. Rendering optimisations
 
-`drag` is the most frequently changing state — it changes every frame — so not subscribing to it means Canvas does not re-render while dragging.
-
-### 3.4 Widgets subscribe to their own selection state
-
-**CanvasComponent.tsx**
-
-`isSelected` and `isHovered` are no longer passed down from Canvas as props; each widget subscribes to them itself:
-
-```typescript
-const isSelected = useEditorStore(
-  useCallback(s => s.selection.selectedIds.includes(component.id), [component.id])
-);
-const isHovered = useEditorStore(
-  useCallback(s => s.selection.hoveredId === component.id, [component.id])
-);
-```
-
-The effect: when the selection changes, only the widgets actually affected re-render, rather than all of them.
-
-### 3.5 Stable event handlers
-
-**Canvas.tsx**
-
-Every `useCallback` handler reads transient state through a ref or `getState()`, keeping its dependency array as small as possible:
-
-```typescript
-// Frequently changing local state lives in refs
-const isPanningRef = useRef(false);
-const panStartRef = useRef({ x: 0, y: 0 });
-const boxSelectionRef = useRef<BoxSelection>(...);
-
-const handleMouseMove = useCallback((e: React.MouseEvent) => {
-  // Read through refs and getState(), not through the closure
-  const drag = useEditorStore.getState().drag;
-  const zoom = useEditorStore.getState().canvas.zoom;
-  // ...
-}, []); // empty or near-empty dependencies, so the handler identity is stable
-```
-
-### 3.6 requestAnimationFrame throttling
-
-**Canvas.tsx**
-
-The mousemove handler is throttled with RAF, so there is at most one state update per frame:
-
-```typescript
-if (rafRef.current) cancelAnimationFrame(rafRef.current);
-rafRef.current = requestAnimationFrame(() => {
-  // the actual move/resize work
-});
-```
-
-### 3.7 React.memo
-
-**CanvasComponent.tsx**
-
-The component is wrapped in `React.memo`. Together with the reference-stability work above, unchanged widgets now skip re-rendering:
-
-```typescript
-export default React.memo(CanvasComponent);
-```
-
-## 4. Results
-
-| Measure | Before | After |
-|------|--------|--------|
-| `set()` calls per mousemove | 3 | 1 |
-| Canvas re-renders while dragging | on every set | none |
-| CanvasComponent re-render scope | every widget | only the dragged widget |
-| mousemove handling rate | every event | once per frame (RAF) |
-| Event handler identity | changed constantly | stable |
-
-## 5. Key files
-
-| File | Change |
+| Technique | Description |
 |------|------|
-| `src/store/editorStore.ts` | Combined update methods, widget tree reference stability |
-| `src/components/Canvas/Canvas.tsx` | Fine-grained subscriptions, stable handlers, RAF throttling |
-| `src/components/Canvas/CanvasComponent.tsx` | Self-subscribed selection, React.memo |
+| `React.memo` | CanvasComponent and CanvasImageContent are memoised, skipping re-renders of unchanged widgets |
+| Fine-grained subscriptions | zustand selectors, so a component subscribes only to the state slice it needs |
+| Reference stability | Tree updates preserve the original reference for unmodified nodes; handler dependencies are minimal |
+| Batched updates | A move or resize is merged into a single `set()` call |
+| RAF throttling | `mousemove` is throttled with `requestAnimationFrame`, at most once per frame |
+| No subscription to high-frequency state | `drag` is not subscribed through a selector; it is read on demand inside the handlers |
 
-## 6. Design principles
+## 6. Widget rendering
 
-1. **Subscribe to as little as possible**: a component subscribes only to the state slice it needs, so unrelated updates cannot re-render it
-2. **Do not subscribe to high-frequency state**: values that change every frame, such as the drag coordinates, are read with `getState()` inside the event handlers
-3. **Reference stability**: handlers read state through refs and getState() to keep their identity stable, and tree updates preserve the references of unmodified nodes
-4. **Batch updates**: several state updates belonging to one gesture are merged into a single `set()` call
-5. **Throttle per frame**: high-frequency events such as mousemove are throttled with RAF and handled at most once per frame
+### 6.1 CanvasComponent
+
+Every LVGL widget on the canvas is rendered by one `CanvasComponent`, which:
+
+- Renders the preview content for its widget type (button, label, slider, ...)
+- Applies the style properties (background colour, border, corner radius, shadow, gradient, opacity, ...)
+- Shows the selection state (selection box plus resize handles)
+- Renders its children recursively
+- Reads `appStore.defaultFontSize` as the default font size for text widgets
+
+### 6.2 Container special cases
+
+- **Tabview**: filters children by `activeTab` and `tabChildMap`, showing only the current tab's children
+- **Tileview**: filters children by `currentRow`/`currentCol` and `tileChildMap`, showing only the current tile's children
+- **Win**: title bar plus content area layout
+
+## 7. Key files
+
+| File | Responsibility |
+|------|------|
+| `src/components/Canvas/Canvas.tsx` | Canvas container, event handling, recursive widget rendering |
+| `src/components/Canvas/CanvasComponent.tsx` | Rendering and interaction for a single widget |
+| `src/components/Canvas/Canvas.css` | Canvas styles |
+| `src/components/Canvas/CanvasComponent.css` | Widget styles |
+| `src/components/Canvas/AlignmentGuides.tsx` | Alignment guides |
+| `src/store/editorStore.ts` | Editor state (widget tree, selection, drag, history) |
+| `src/store/appStore.ts` | App-level state (default font size, ...) |
