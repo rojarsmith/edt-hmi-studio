@@ -1230,6 +1230,103 @@ function FontSelector({
   );
 }
 
+// Built-in font sizes (matching montserrat available sizes)
+const BUILTIN_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48];
+
+// Font selector for component props (fontResource + fontSize)
+function ComponentFontSelector({
+  fontResource,
+  fontSize,
+  onChange,
+}: {
+  fontResource?: string;
+  fontSize?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+}): React.ReactNode {
+  const fonts = useResourceStore((s) => s.fonts);
+
+  // Determine current selection value
+  const currentValue = fontResource || '';
+
+  // Get available sizes based on selected font
+  const selectedCustomFont = fontResource ? fonts.find((f) => f.cFontName === fontResource) : undefined;
+  const availableSizes = selectedCustomFont ? selectedCustomFont.sizes : BUILTIN_FONT_SIZES;
+
+  // When font changes, adjust fontSize if needed
+  const handleFontChange = (value: string) => {
+    if (!value) {
+      // "Default" selected — clear fontResource
+      onChange('fontResource', undefined);
+    } else {
+      const customFont = fonts.find((f) => f.cFontName === value);
+      if (customFont) {
+        onChange('fontResource', value);
+        // If current fontSize is not in custom font's sizes, pick closest
+        const curSize = fontSize || 14;
+        if (!customFont.sizes.includes(curSize)) {
+          const closest = customFont.sizes.reduce((a, b) =>
+            Math.abs(b - curSize) < Math.abs(a - curSize) ? b : a
+          );
+          onChange('fontSize', closest);
+        }
+      } else {
+        // Built-in font selected — clear fontResource, extract size
+        const match = value.match(/^montserrat_(\d+)$/);
+        if (match) {
+          onChange('fontResource', undefined);
+          onChange('fontSize', parseInt(match[1]));
+        }
+      }
+    }
+  };
+
+  return (
+    <>
+      <div className="property-row">
+        <label>Font</label>
+        <select
+          value={currentValue}
+          onChange={(e) => handleFontChange(e.target.value)}
+          style={{ flex: 1, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+        >
+          <option value="">Default</option>
+          <optgroup label="Built-in Fonts">
+            {BUILTIN_FONTS.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </optgroup>
+          {fonts.length > 0 && (
+            <optgroup label="Uploaded Fonts">
+              {fonts.map((f) => (
+                <option key={f.id} value={f.cFontName}>{f.name} ({f.family})</option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+      </div>
+      <div className="property-row">
+        <label>Font Size</label>
+        <select
+          value={availableSizes.includes(fontSize || 14) ? (fontSize || 14) : 'custom'}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v !== 'custom') onChange('fontSize', parseInt(v));
+          }}
+          style={{ flex: 1, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+        >
+          {availableSizes.map((s) => (
+            <option key={s} value={s}>{s}px</option>
+          ))}
+          {!availableSizes.includes(fontSize || 14) && (
+            <option value="custom">{fontSize || 14}px (Custom)</option>
+          )}
+        </select>
+      </div>
+    </>
+  );
+}
+
 // Render component-specific properties
 function renderComponentProps(
   component: LvglComponent,
@@ -1251,10 +1348,11 @@ function renderComponentProps(
               onChange={(e) => onChange('text', e.target.value)}
             />
           </div>
-          <div className="property-row">
-            <label>Font Size</label>
-            <FontSizeInput value={props.fontSize || 14} onChange={(v) => onChange('fontSize', v)} />
-          </div>
+          <ComponentFontSelector
+            fontResource={props.fontResource}
+            fontSize={props.fontSize}
+            onChange={onChange}
+          />
           <div className="property-row">
             <label>Text Alignment</label>
             <select
@@ -1281,10 +1379,11 @@ function renderComponentProps(
               onChange={(e) => onChange('text', e.target.value)}
             />
           </div>
-          <div className="property-row">
-            <label>Font Size</label>
-            <FontSizeInput value={props.fontSize || 14} onChange={(v) => onChange('fontSize', v)} />
-          </div>
+          <ComponentFontSelector
+            fontResource={props.fontResource}
+            fontSize={props.fontSize}
+            onChange={onChange}
+          />
           <div className="property-row">
             <label>Text Alignment</label>
             <select
@@ -1332,6 +1431,11 @@ function renderComponentProps(
               onChange={(e) => onChange('placeholder', e.target.value)}
             />
           </div>
+          <ComponentFontSelector
+            fontResource={props.fontResource}
+            fontSize={props.fontSize}
+            onChange={onChange}
+          />
           <div className="property-row">
             <label>Maximum Length</label>
             <input
@@ -1374,6 +1478,11 @@ function renderComponentProps(
               onChange={(e) => onChange('text', e.target.value)}
             />
           </div>
+          <ComponentFontSelector
+            fontResource={props.fontResource}
+            fontSize={props.fontSize}
+            onChange={onChange}
+          />
           <div className="property-row">
             <label>Checked</label>
             <input
@@ -1581,6 +1690,11 @@ function renderComponentProps(
               ))}
             </select>
           </div>
+          <ComponentFontSelector
+            fontResource={props.fontResource}
+            fontSize={props.fontSize}
+            onChange={onChange}
+          />
           <div className="property-row">
             <label>Opening Direction</label>
             <select

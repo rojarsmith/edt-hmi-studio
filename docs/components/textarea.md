@@ -54,9 +54,22 @@ Nothing. Textarea is a leaf widget and does not support children.
 |--------|------|--------|------|
 | `text` | `string` | `''` | The text in the field. When empty, the placeholder is shown |
 | `placeholder` | `string` | `'Enter text...'` | Placeholder text, shown in grey while `text` is empty |
+| `fontSize` | `number` | `14` | Text size (optional; maps to a built-in Montserrat size) |
+| `fontResource` | `string` | `undefined` | Custom font resource name (optional; takes precedence over fontSize). The font must first be uploaded in the resource manager with its sizes configured |
 | `maxLength` | `number` | `undefined` | Maximum number of characters; unlimited when unset |
 | `password` | `boolean` | `false` | Password mode; typed characters render as dots |
 | `oneLine` | `boolean` | `false` | Single-line mode; line breaks are disallowed |
+
+### Font selection
+
+The property panel offers a font dropdown supporting:
+- **Default**: the LVGL default font
+- **Built-in fonts**: the built-in Montserrat family, montserrat_14 through montserrat_32 and others
+- **Uploaded fonts**: custom fonts (TTF/OTF) uploaded in the resource manager
+
+When a custom font is selected, the size dropdown lists only the sizes configured for that font, because custom fonts are compiled per size. When a built-in font is selected, all available built-in sizes are listed.
+
+When `fontResource` is set, the generator emits `lv_obj_set_style_text_font(obj, &{fontResource}_{fontSize}, 0)`; otherwise it uses the built-in `lv_font_montserrat_{fontSize}`.
 
 ### Definition (componentDefinitions.ts)
 

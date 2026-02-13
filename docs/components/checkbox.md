@@ -53,6 +53,19 @@ Nothing. Checkbox is a leaf widget and does not support children.
 |--------|------|--------|------|
 | `text` | `string` | `'Checkbox'` | The label beside the checkbox |
 | `checked` | `boolean` | `false` | Whether it is checked. When checked, the marker fills with the theme colour and shows a tick |
+| `fontSize` | `number` | `14` | Text size (optional; maps to a built-in Montserrat size) |
+| `fontResource` | `string` | `undefined` | Custom font resource name (optional; takes precedence over fontSize). The font must first be uploaded in the resource manager with its sizes configured |
+
+### Font selection
+
+The property panel offers a font dropdown supporting:
+- **Default**: the LVGL default font
+- **Built-in fonts**: the built-in Montserrat family, montserrat_14 through montserrat_32 and others
+- **Uploaded fonts**: custom fonts (TTF/OTF) uploaded in the resource manager
+
+When a custom font is selected, the size dropdown lists only the sizes configured for that font, because custom fonts are compiled per size. When a built-in font is selected, all available built-in sizes are listed.
+
+When `fontResource` is set, the generator emits `lv_obj_set_style_text_font(obj, &{fontResource}_{fontSize}, 0)`; otherwise it uses the built-in `lv_font_montserrat_{fontSize}`.
 
 ### Definition (componentDefinitions.ts)
 
