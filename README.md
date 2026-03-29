@@ -105,6 +105,19 @@ npm run build
 npm run preview  # preview the build output
 ```
 
+To build a version **without** the "🔨 Build & Run" in-browser WASM compile preview, turn the switch off at build time:
+
+```bash
+VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
+```
+
+When deploying to GitHub Pages, a repository sub-path can also be given:
+
+```bash
+VITE_BASE_PATH=/lvgl-editor/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
+```
+`.github/workflows/deploy-pages.yml` is provided and, by default, builds and publishes to GitHub Pages on a push to `main`, with the in-browser compile preview switched off.
+
 # Build the front-end assets first
 npm ci
 npm run build:desktop-web
