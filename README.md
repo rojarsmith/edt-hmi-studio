@@ -116,8 +116,12 @@ When deploying to GitHub Pages, a repository sub-path can also be given:
 ```bash
 VITE_BASE_PATH=/lvgl-editor/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
 ```
-`.github/workflows/deploy-pages.yml` is provided and, by default, builds and publishes to GitHub Pages on a push to `main`, with the in-browser compile preview switched off.
 
+### Desktop build (OmniHost)
+
+`desktop/` wraps the existing Vite front end as a desktop application using [OmniHost](https://github.com/maikebing/OmniHost).
+
+```bash
 # Build the front-end assets first
 npm ci
 npm run build:desktop-web
@@ -228,8 +232,6 @@ src/
 ## 🔧 Known limitations
 
 1. **Font conversion**: the actual bitmap data is produced by the external `lv_font_conv` tool; the editor generates the template and the command.
-2. **LVGL v9**: code generation currently targets the LVGL v8 API.
-3. **Tests**: there are no unit or integration tests yet.
 
 ## 📝 Changelog
 

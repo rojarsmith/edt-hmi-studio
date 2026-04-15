@@ -20,6 +20,7 @@ import HelpPanel from './components/HelpPanel';
 import Toast, { useToast } from './components/Toast';
 import Modal, { modal } from './components/Modal';
 import CodePreview from './components/CodePreview';
+import DesktopMenuBar from './components/DesktopMenuBar/DesktopMenuBar';
 import { LogicEditor } from './components/LogicEditor';
 import PreviewPanel from './components/Preview';
 import WasmPreview from './components/WasmPreview';
@@ -526,76 +527,95 @@ const EditorView: React.FC<EditorViewProps> = ({
   return (
     <div className="app">
       <div className="app-header">
-        <div className="app-logo">
-          <button className="back-to-list-btn" onClick={handleBackToList} title="Back to project list">
-            ◀
-          </button>
-          <span className="logo-icon">📐</span>
-          <span className="logo-text project-name-display">{projectName || 'LVGL UI Editor'}</span>
-        </div>
+        <DesktopMenuBar
+          projectName={projectName}
+          activeTab={activeTab}
+          showResourcePanel={showResourcePanel}
+          onNewProject={handleNewProjectClick}
+          onOpenProject={handleImportProject}
+          onSaveProject={handleSaveProject}
+          onExportProject={handleExportProject}
+          onImportProject={handleImportProject}
+          onUndo={() => useEditorStore.getState().undo()}
+          onRedo={() => useEditorStore.getState().redo()}
+          onSelectTab={setActiveTab}
+          onToggleResources={() => setShowResourcePanel(prev => !prev)}
+          onOpenSettings={() => setShowProjectSettings(true)}
+          onOpenHelp={() => setShowHelpPanel(true)}
+        />
 
-        {/* Main tabs */}
-        <div className="app-tabs">
-          <button
-            className={`tab-btn ${activeTab === 'design' ? 'active' : ''}`}
-            onClick={() => setActiveTab('design')}
-          >
-            🎨 Design
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'logic' ? 'active' : ''}`}
-            onClick={() => setActiveTab('logic')}
-          >
-            🔗 Logic
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'communication' ? 'active' : ''}`}
-            onClick={() => setActiveTab('communication')}
-          >
-            🔌 Communication
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
-            onClick={() => setActiveTab('code')}
-          >
-            💻 Code
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'preview' ? 'active' : ''}`}
-            onClick={() => setActiveTab('preview')}
-          >
-            📱 Preview
-          </button>
-        </div>
+        <div className="app-command-bar">
+          <div className="app-logo">
+            <button className="back-to-list-btn" onClick={handleBackToList} title="Back to project list">
+              ◀
+            </button>
+            <span className="logo-icon">📐</span>
+            <span className="logo-text project-name-display">{projectName || 'LVGL UI Editor'}</span>
+          </div>
 
-        <div className="app-toolbar">
-          <ToolbarButton icon="💾" label="Save" onClick={handleSaveProject} shortcut="Ctrl+S" />
-          <ToolbarButton icon="📤" label="Export" onClick={handleExportProject} />
-          <ToolbarButton icon="📥" label="Import" onClick={handleImportProject} />
-          <div className="toolbar-divider" />
-          <ToolbarButton icon="↩️" label="Undo" onClick={() => useEditorStore.getState().undo()} shortcut="Ctrl+Z" />
-          <ToolbarButton icon="↪️" label="Redo" onClick={() => useEditorStore.getState().redo()} shortcut="Ctrl+Y" />
-          <div className="toolbar-divider" />
-          <ToolbarButton
-            icon="📦"
-            label="Resources"
-            onClick={() => setShowResourcePanel(!showResourcePanel)}
-            active={showResourcePanel}
-          />
-          <ToolbarButton
-            icon="⚙️"
-            label="Settings"
-            onClick={() => setShowProjectSettings(true)}
-          />
-          <div className="toolbar-divider" />
-          <ThemeSelector />
-          <div className="toolbar-divider" />
-          <ToolbarButton
-            icon="❓"
-            label="Help"
-            onClick={() => setShowHelpPanel(true)}
-            shortcut="F1"
-          />
+          {/* Main tabs */}
+          <div className="app-tabs">
+            <button
+              className={`tab-btn ${activeTab === 'design' ? 'active' : ''}`}
+              onClick={() => setActiveTab('design')}
+            >
+              🎨 Design
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'logic' ? 'active' : ''}`}
+              onClick={() => setActiveTab('logic')}
+            >
+              🔗 Logic
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'communication' ? 'active' : ''}`}
+              onClick={() => setActiveTab('communication')}
+            >
+              🔌 Communication
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
+              onClick={() => setActiveTab('code')}
+            >
+              💻 Code
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'preview' ? 'active' : ''}`}
+              onClick={() => setActiveTab('preview')}
+            >
+              📱 Preview
+            </button>
+          </div>
+
+          <div className="app-toolbar">
+            <ToolbarButton icon="💾" label="Save" onClick={handleSaveProject} shortcut="Ctrl+S" />
+            <ToolbarButton icon="📤" label="Export" onClick={handleExportProject} />
+            <ToolbarButton icon="📥" label="Import" onClick={handleImportProject} />
+            <div className="toolbar-divider" />
+            <ToolbarButton icon="↩️" label="Undo" onClick={() => useEditorStore.getState().undo()} shortcut="Ctrl+Z" />
+            <ToolbarButton icon="↪️" label="Redo" onClick={() => useEditorStore.getState().redo()} shortcut="Ctrl+Y" />
+            <div className="toolbar-divider" />
+            <ToolbarButton
+              icon="📦"
+              label="Resources"
+              onClick={() => setShowResourcePanel(!showResourcePanel)}
+              active={showResourcePanel}
+            />
+            <ToolbarButton
+              icon="⚙️"
+              label="Settings"
+              onClick={() => setShowProjectSettings(true)}
+            />
+            <div className="toolbar-divider" />
+            <ThemeSelector />
+            <div className="toolbar-divider" />
+            <ToolbarButton
+              icon="❓"
+              label="Help"
+              onClick={() => setShowHelpPanel(true)}
+              shortcut="F1"
+            />
+          </div>
         </div>
         <input
           ref={fileInputRef}
