@@ -27,3 +27,5 @@ wasm/build/
 .hmi-cache/
 bin/
 obj/
+/.vs
+/desktop/.vs/LvglEditor.Desktop
