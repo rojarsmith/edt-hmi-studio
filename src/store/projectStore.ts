@@ -6,6 +6,12 @@ import { v4 as uuidv4 } from 'uuid';
 import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '../resources/types';
 import type { Page } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
+import type { BoardId, CommunicationConfig } from '../types/hmi';
+import {
+  DEFAULT_BOARD_ID,
+  createDefaultCommunicationConfig,
+  getBoardDefinition,
+} from '../types/hmi';
 
 // ---------------------------------------------------------------------------
 // Project config type
@@ -34,8 +40,10 @@ export interface ProjectConfig {
   name: string;
   createdAt: number;
   updatedAt: number;
+  boardId: BoardId;
   display: DisplayConfig;
   lvglConfig: LvglConfig;
+  communication: CommunicationConfig;
   codeGenOptions: CodeGenOptions;
 }
 
@@ -62,22 +70,27 @@ export interface ProjectListItem {
 // Default values
 // ---------------------------------------------------------------------------
 
+const DEFAULT_BOARD = getBoardDefinition(DEFAULT_BOARD_ID);
+
 export const DEFAULT_DISPLAY: DisplayConfig = {
-  width: 480,
-  height: 320,
-  colorDepth: 32,
+  width: DEFAULT_BOARD.display.width,
+  height: DEFAULT_BOARD.display.height,
+  colorDepth: DEFAULT_BOARD.display.colorDepth,
   rotation: 0,
 };
 
 export const DEFAULT_LVGL_CONFIG: LvglConfig = {
   version: '9',
-  colorFormat: 'ARGB8888',
+  colorFormat: DEFAULT_BOARD.display.colorFormat,
   fontLarge: true,
   defaultFont: 'montserrat_14',
   useBuiltinSymbols: true,
   symbolFont: 'montserrat_14',
   memSize: 64,
 };
+
+export const DEFAULT_COMMUNICATION_CONFIG: CommunicationConfig =
+  createDefaultCommunicationConfig();
 
 export const DEFAULT_CODEGEN_OPTIONS: CodeGenOptions = {
   outputFormat: 'single-file',
@@ -96,6 +109,36 @@ const DB_NAME = 'lvgl-editor-projects';
 const DB_VERSION = 1;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
+
+function normalizeCommunicationConfig(
+  communication?: Partial<CommunicationConfig>,
+): CommunicationConfig {
+  const defaults = createDefaultCommunicationConfig();
+  return {
+    ...defaults,
+    ...communication,
+    tags: (communication?.tags || []).map((tag) => ({
+      ...tag,
+      scale: Number.isFinite(tag.scale) ? tag.scale : 1,
+      pollIntervalMs: Number.isFinite(tag.pollIntervalMs)
+        ? tag.pollIntervalMs
+        : defaults.pollIntervalMs,
+    })),
+  };
+}
+
+function normalizeProjectConfig(
+  config: ProjectConfig | (Omit<ProjectConfig, 'boardId' | 'communication'> & {
+    boardId?: BoardId;
+    communication?: Partial<CommunicationConfig>;
+  }),
+): ProjectConfig {
+  return {
+    ...config,
+    boardId: config.boardId ?? DEFAULT_BOARD_ID,
+    communication: normalizeCommunicationConfig(config.communication),
+  };
+}
 
 function getDB(): Promise<IDBPDatabase> {
   if (!dbPromise) {
@@ -123,7 +166,7 @@ function getDB(): Promise<IDBPDatabase> {
 
 async function dbCreateProject(config: ProjectConfig): Promise<void> {
   const db = await getDB();
-  await db.put('projects', config);
+  await db.put('projects', normalizeProjectConfig(config));
   await db.put('projectData', {
     projectId: config.id,
     pages: [{ id: uuidv4(), name: 'Page 1', components: [], backgroundColor: '#F5F5F5' }],
@@ -134,7 +177,8 @@ async function dbCreateProject(config: ProjectConfig): Promise<void> {
 
 async function dbGetProjectConfig(id: string): Promise<ProjectConfig | undefined> {
   const db = await getDB();
-  return db.get('projects', id);
+  const config = await db.get('projects', id) as ProjectConfig | undefined;
+  return config ? normalizeProjectConfig(config) : undefined;
 }
 
 async function dbGetProjectData(id: string): Promise<ProjectData | undefined> {
@@ -149,7 +193,7 @@ async function dbGetProjectResources(projectId: string): Promise<ProjectResource
 
 async function dbUpdateProjectConfig(config: ProjectConfig): Promise<void> {
   const db = await getDB();
-  await db.put('projects', config);
+  await db.put('projects', normalizeProjectConfig(config));
 }
 
 async function dbUpdateProjectData(data: ProjectData): Promise<void> {
@@ -182,7 +226,8 @@ async function dbDeleteProject(id: string): Promise<void> {
 
 async function dbListProjects(): Promise<ProjectConfig[]> {
   const db = await getDB();
-  return db.getAll('projects');
+  const configs = await db.getAll('projects') as ProjectConfig[];
+  return configs.map(normalizeProjectConfig);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +242,7 @@ interface ProjectStoreState {
   // Actions
   init: () => Promise<void>;
   refreshList: () => Promise<void>;
-  createProject: (name: string, display: DisplayConfig, lvglConfig: LvglConfig) => Promise<string>;
+  createProject: (name: string, boardId: BoardId, display: DisplayConfig, lvglConfig: LvglConfig) => Promise<string>;
   deleteProject: (id: string) => Promise<void>;
   getProjectConfig: (id: string) => Promise<ProjectConfig | undefined>;
   updateProjectConfig: (config: ProjectConfig) => Promise<void>;
@@ -244,7 +289,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     set({ projects: items });
   },
 
-  createProject: async (name, display, lvglConfig) => {
+  createProject: async (name, boardId, display, lvglConfig) => {
     const id = uuidv4();
     const now = Date.now();
     const config: ProjectConfig = {
@@ -252,8 +297,10 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       name,
       createdAt: now,
       updatedAt: now,
+      boardId,
       display,
       lvglConfig,
+      communication: createDefaultCommunicationConfig(),
       codeGenOptions: { ...DEFAULT_CODEGEN_OPTIONS },
     };
     await dbCreateProject(config);
@@ -336,7 +383,12 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
       canvasSize: { width: config.display.width, height: config.display.height },
-      pages: data.pages.map(p => ({ id: p.id, name: p.name, components: p.components })),
+      pages: data.pages.map(p => ({
+        id: p.id,
+        name: p.name,
+        components: p.components,
+        backgroundColor: p.backgroundColor,
+      })),
       resources: { images, fonts },
       variables: data.variables.map(v => ({
         id: v.id,
@@ -347,8 +399,10 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       logicGraphs: data.logicGraphs,
       codeGenOptions: config.codeGenOptions,
       // Extended fields for round-trip
+      boardId: config.boardId,
       display: config.display,
       lvglConfig: config.lvglConfig,
+      communication: config.communication,
     };
     return projectFile;
   },
@@ -364,14 +418,18 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       rotation: 0,
     };
     const lvglConfig: LvglConfig = (file as ProjectFile & { lvglConfig?: LvglConfig }).lvglConfig ?? { ...DEFAULT_LVGL_CONFIG };
+    const boardId = file.boardId ?? DEFAULT_BOARD_ID;
+    const communication = normalizeCommunicationConfig(file.communication);
 
     const config: ProjectConfig = {
       id,
       name: name || file.name || 'Imported Project',
       createdAt: now,
       updatedAt: now,
+      boardId,
       display,
       lvglConfig,
+      communication,
       codeGenOptions: file.codeGenOptions || { ...DEFAULT_CODEGEN_OPTIONS },
     };
     await dbUpdateProjectConfig(config);
@@ -380,7 +438,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       id: p.id,
       name: p.name,
       components: p.components,
-      backgroundColor: '#F5F5F5',
+      backgroundColor: p.backgroundColor ?? '#F5F5F5',
     }));
     await dbUpdateProjectData({
       projectId: id,

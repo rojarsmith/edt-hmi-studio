@@ -22,9 +22,9 @@ const COMPARE_OPERATORS: { value: CompareOperator; label: string }[] = [
 ];
 
 const LOGIC_OPERATORS: { value: LogicOperator; label: string }[] = [
-  { value: 'AND', label: 'AND (AND)' },
-  { value: 'OR', label: 'OR (OR)' },
-  { value: 'NOT', label: 'NOT (NOT)' },
+  { value: 'AND', label: 'AND' },
+  { value: 'OR', label: 'OR' },
+  { value: 'NOT', label: 'NOT' },
 ];
 
 const MATH_OPERATORS: { value: MathOperator; label: string }[] = [
@@ -249,7 +249,7 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
                 onChange={e => handleParamChange('action', e.target.value)}
               >
                 <option value="show">Show</option>
-                <option value="hide">Hidden</option>
+                <option value="hide">Hide</option>
                 <option value="toggle">Toggle</option>
               </select>
             </div>
@@ -275,7 +275,7 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
               </select>
             </div>
             <div className="param-group">
-              <label>Properties</label>
+              <label>Property</label>
               <select
                 value={params.property || ''}
                 onChange={e => handleParamChange('property', e.target.value)}
@@ -317,7 +317,7 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
       case 'var_write':
         return (
           <div className="param-group">
-            <label>Variables</label>
+            <label>Variable</label>
             <select
               value={params.variableId || ''}
               onChange={e => handleParamChange('variableId', e.target.value)}
@@ -329,6 +329,28 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
                 </option>
               ))}
             </select>
+          </div>
+        );
+
+      case 'modbus_holding_register':
+        return (
+          <div className="param-group">
+            <label>Holding Register Address (zero-based)</label>
+            <input
+              type="number"
+              min="0"
+              max="65535"
+              step="1"
+              value={params.address ?? 0}
+              title="PDU address 0 maps to Holding Register 400001"
+              onChange={e => {
+                const parsed = Number.parseInt(e.target.value, 10);
+                const address = Number.isFinite(parsed)
+                  ? Math.max(0, Math.min(65535, parsed))
+                  : 0;
+                handleParamChange('address', address);
+              }}
+            />
           </div>
         );
 
@@ -413,7 +435,7 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
               type="text"
               value={label}
               onChange={e => setLabel(e.target.value)}
-              placeholder="Node Name"
+              placeholder="Node name"
             />
           </div>
 

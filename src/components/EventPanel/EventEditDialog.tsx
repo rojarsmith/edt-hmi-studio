@@ -25,7 +25,7 @@ const BUILTIN_ACTIONS: { type: BuiltinActionType; label: string; description: st
 ];
 
 const CODE_TEMPLATE = `// Event handler code
-// Available: e (lv_event_t*), obj (the object that raised the event)
+// Available variables: e (lv_event_t*), obj (the object that triggered the event)
 
 // Example: log a message
 // LV_LOG_USER("Button clicked!");
@@ -373,7 +373,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                 className={`tab-btn ${handlerType === 'custom' ? 'active' : ''}`}
                 onClick={() => setHandlerType('custom')}
               >
-                Custom code
+                Custom Code
               </button>
             </div>
           </div>

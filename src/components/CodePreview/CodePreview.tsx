@@ -121,7 +121,7 @@ const CodePreview: React.FC = () => {
             className="code-version-select"
             value={lvglVersion}
             onChange={(e) => setLvglVersion(e.target.value as CodeGenOptions['lvglVersion'])}
-            title="LVGL Version"
+            title="LVGL version"
           >
             <option value="8">LVGL v8</option>
             <option value="9">LVGL v9</option>
@@ -133,7 +133,7 @@ const CodePreview: React.FC = () => {
             💾 Download
           </button>
           <button className="code-action-btn primary" onClick={handleDownloadAll} title="Download all files">
-            📦 Download all
+            📦 Download All
           </button>
         </div>
       </div>

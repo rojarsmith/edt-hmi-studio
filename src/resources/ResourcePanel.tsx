@@ -20,8 +20,8 @@ const ResourcePanel: React.FC = () => {
   } = useResourceStore();
   
   const tabs = [
-    { id: 'images' as const, label: 'Image', icon: '🖼️', count: images.length },
-    { id: 'fonts' as const, label: 'Font', icon: '🔤', count: fonts.length },
+    { id: 'images' as const, label: 'Images', icon: '🖼️', count: images.length },
+    { id: 'fonts' as const, label: 'Fonts', icon: '🔤', count: fonts.length },
     { id: 'icons' as const, label: 'Icons', icon: '⭐', count: 0 },
   ];
   

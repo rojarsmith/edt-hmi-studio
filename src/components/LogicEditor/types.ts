@@ -25,7 +25,8 @@ export type DataNodeType =
   | 'var_write' 
   | 'math_op' 
   | 'string_op' 
-  | 'get_property';
+  | 'get_property'
+  | 'modbus_holding_register';
 
 // Custom Node Types
 export type CustomNodeType = 'c_code_block';

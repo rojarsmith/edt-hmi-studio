@@ -25,9 +25,9 @@ const shortcutGroups: ShortcutGroup[] = [
   {
     title: 'Selection',
     shortcuts: [
-      { keys: 'Ctrl + A', description: 'Select All' },
-      { keys: 'Ctrl + Click', description: 'Multi-select or toggle selection' },
-      { keys: 'Mouse drag', description: 'Rubber-band select widgets' },
+      { keys: 'Ctrl + A', description: 'Select all' },
+      { keys: 'Ctrl + Click', description: 'Add to or toggle selection' },
+      { keys: 'Mouse drag', description: 'Select multiple components with a marquee' },
     ],
   },
   {
@@ -44,16 +44,16 @@ const shortcutGroups: ShortcutGroup[] = [
     shortcuts: [
       { keys: 'Space + Drag', description: 'Pan canvas' },
       { keys: 'Middle-button drag', description: 'Pan canvas' },
-      { keys: 'Ctrl + Wheel', description: 'Zoom canvas' },
+      { keys: 'Ctrl + Mouse wheel', description: 'Zoom canvas' },
     ],
   },
   {
     title: 'Other',
     shortcuts: [
       { keys: 'F1 / ?', description: 'Show keyboard shortcut help' },
-      { keys: 'Ctrl + S', description: 'Save Project' },
-      { keys: 'Ctrl + O', description: 'Open Project' },
-      { keys: 'Ctrl + N', description: 'New Project' },
+      { keys: 'Ctrl + S', description: 'Save project' },
+      { keys: 'Ctrl + O', description: 'Open project' },
+      { keys: 'Ctrl + N', description: 'Create new project' },
     ],
   },
 ];

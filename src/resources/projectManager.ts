@@ -3,6 +3,11 @@
 import type { ProjectFile, ImageResource, FontResource } from './types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type { CanvasState, Page } from '../types';
+import type { BoardId, CommunicationConfig } from '../types/hmi';
+import {
+  DEFAULT_BOARD_ID,
+  createDefaultCommunicationConfig,
+} from '../types/hmi';
 
 const PROJECT_VERSION = '1.0.0';
 
@@ -15,7 +20,9 @@ export function createProjectFile(
   canvas: CanvasState,
   images: ImageResource[],
   fonts: FontResource[],
-  logicGraphs: LogicGraph[] = []
+  logicGraphs: LogicGraph[] = [],
+  boardId: BoardId = DEFAULT_BOARD_ID,
+  communication: CommunicationConfig = createDefaultCommunicationConfig(),
 ): ProjectFile {
   return {
     version: PROJECT_VERSION,
@@ -30,6 +37,7 @@ export function createProjectFile(
       id: page.id,
       name: page.name,
       components: page.components,
+      backgroundColor: page.backgroundColor,
     })),
     resources: {
       images,
@@ -37,6 +45,8 @@ export function createProjectFile(
     },
     variables: [],
     logicGraphs,
+    boardId,
+    communication,
     codeGenOptions: {
       outputFormat: 'single-file',
       includeComments: true,
@@ -89,6 +99,12 @@ function migrateProject(project: ProjectFile): ProjectFile {
     resources: project.resources || { images: [], fonts: [] },
     variables: project.variables || [],
     logicGraphs: project.logicGraphs || [],
+    boardId: project.boardId || DEFAULT_BOARD_ID,
+    communication: {
+      ...createDefaultCommunicationConfig(),
+      ...(project.communication || {}),
+      tags: project.communication?.tags || [],
+    },
     codeGenOptions: project.codeGenOptions || {
       outputFormat: 'single-file',
       includeComments: true,

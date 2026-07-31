@@ -8,7 +8,7 @@ import { generateCode } from '../../codegen';
 import { compileCode, type CompileStatus, type WasmRuntime, type FontCompileRequest } from './compilerService';
 import { getCharsetRanges } from '../../resources/converters/fontConverter';
 import type { LvglComponent } from '../../types';
-import type { FontResource, ImageResource } from '../../resources/types';
+import type { FontResource } from '../../resources/types';
 import { loadImageFromBase64, generateImageCCode, DEFAULT_IMAGE_OPTIONS } from '../../resources/converters/imageConverter';
 import './CompilePreview.css';
 
@@ -281,7 +281,7 @@ const CompilePreview: React.FC = () => {
       runtimeRef.current = result.runtime;
       setRunning(true);
       setStatus('done');
-      setStatusMessage('Running — Click the canvas to interact');
+      setStatusMessage('Running — click the canvas to interact');
 
       // Render initial frame
       const fb = result.runtime.getFramebuffer();
@@ -433,7 +433,7 @@ const CompilePreview: React.FC = () => {
           onClick={handleCompile}
           disabled={isWorking}
         >
-          {isWorking ? '⏳ Working...' : '🔨 Build & Run'}
+          {isWorking ? '⏳ Processing...' : '🔨 Build & Run'}
         </button>
 
         {running && (
@@ -496,7 +496,7 @@ const CompilePreview: React.FC = () => {
       </div>
 
       <div className="compile-preview-footer">
-        Compiled with emcc on the server and rendered by real LVGL · Mouse and keyboard input supported
+        Server-side emcc build with real LVGL rendering · Mouse and keyboard input supported
       </div>
     </div>
   );

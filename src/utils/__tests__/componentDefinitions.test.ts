@@ -91,7 +91,7 @@ describe('componentDefinitions', () => {
   // --- all component types ---
   describe('all component types coverage', () => {
     const expectedTypes = [
-      'btn', 'label', 'img', 'line',
+      'btn', 'label', 'img', 'image-button', 'line',
       'textarea', 'dropdown', 'checkbox', 'switch', 'slider',
       'obj', 'tabview', 'tileview', 'win',
       'bar', 'arc', 'spinner', 'chart', 'table', 'calendar',
@@ -134,6 +134,26 @@ describe('componentDefinitions', () => {
         const components = getComponentsByCategory(cat.id);
         expect(components.length, `Category "${cat.name}" has no components`).toBeGreaterThan(0);
       }
+    });
+  });
+
+  describe('image-button definition', () => {
+    it('provides an ordered two-state Resource Manager schema', () => {
+      const def = getComponentDefinition('image-button');
+
+      expect(def).toBeDefined();
+      expect(def!.category).toBe('basic');
+      expect(def!.isContainer).toBe(false);
+      expect(def!.defaultProps).toEqual({
+        states: [
+          { id: 'state-1', name: 'State 1', imageId: '', value: 0 },
+          { id: 'state-2', name: 'State 2', imageId: '', value: 1 },
+        ],
+        initialState: 0,
+        currentState: 0,
+        value: 0,
+        cycleOnClick: true,
+      });
     });
   });
 

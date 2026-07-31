@@ -2,6 +2,11 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
 import type { LvglComponent, Animation } from '../../types';
+import {
+  getImageButtonState,
+  getNextImageButtonStateIndex,
+  normalizeImageButtonProps,
+} from '../PropertyEditor/imageButtonModel';
 import './PreviewPanel.css';
 
 // Image cache to avoid reloading images
@@ -70,6 +75,20 @@ function computeAnimState(anim: Animation, progress: number): Partial<AnimState>
   }
 }
 
+function collectInitialImageButtonStates(
+  components: LvglComponent[],
+  result = new Map<string, number>(),
+): Map<string, number> {
+  for (const component of components) {
+    if (component.type === 'image-button') {
+      const props = normalizeImageButtonProps(component.props);
+      result.set(component.id, props.initialState);
+    }
+    collectInitialImageButtonStates(component.children, result);
+  }
+  return result;
+}
+
 const PreviewPanel: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -83,6 +102,8 @@ const PreviewPanel: React.FC = () => {
   const animStartRef = useRef<number>(0);
   const animPausedAtRef = useRef<number>(0);
   const [animStates, setAnimStates] = useState<Map<string, Partial<AnimState>>>(new Map());
+  const [imageButtonStateIndices, setImageButtonStateIndices] =
+    useState<Map<string, number>>(new Map());
 
   // Sync preview page with editor when not playing
   useEffect(() => {
@@ -92,6 +113,10 @@ const PreviewPanel: React.FC = () => {
   const previewPage = pages.find(p => p.id === previewPageId) || pages.find(p => p.id === currentPageId);
   const components = useMemo(() => previewPage?.components || [], [previewPage?.components]);
   const bgColor = previewPage?.backgroundColor || '#ffffff';
+
+  useEffect(() => {
+    setImageButtonStateIndices(collectInitialImageButtonStates(components));
+  }, [components, previewPageId]);
 
   // Load image from resource store or URL
   const loadImage = useCallback((src: string): HTMLImageElement | null => {
@@ -271,7 +296,8 @@ const PreviewPanel: React.FC = () => {
     setAnimPlaying(false);
     setAnimPaused(false);
     setAnimStates(new Map());
-  }, []);
+    setImageButtonStateIndices(collectInitialImageButtonStates(components));
+  }, [components]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -299,6 +325,20 @@ const PreviewPanel: React.FC = () => {
     };
 
     const hit = findAtPoint(components);
+    if (hit?.type === 'image-button') {
+      const imageButton = normalizeImageButtonProps(hit.props);
+      if (imageButton.cycleOnClick && imageButton.states.length > 0) {
+        setImageButtonStateIndices((previous) => {
+          const current = previous.get(hit.id) ?? imageButton.initialState;
+          const next = new Map(previous);
+          next.set(
+            hit.id,
+            getNextImageButtonStateIndex(imageButton.states, current),
+          );
+          return next;
+        });
+      }
+    }
     if (hit && hit.events) {
       for (const ev of hit.events) {
         if (ev.action?.type === 'navigate' && ev.action.targetPage) {
@@ -513,6 +553,28 @@ const PreviewPanel: React.FC = () => {
           });
           break;
 
+        case 'image-button': {
+          const imageButton = normalizeImageButtonProps(comp.props);
+          const activeIndex = imageButtonStateIndices.get(comp.id)
+            ?? imageButton.initialState;
+          const activeState = getImageButtonState(
+            imageButton.states,
+            activeIndex,
+          );
+          drawImage(ctx, x, y, w, h, {
+            src: activeState?.imageId,
+            loadImage,
+          });
+          if (isHovered) {
+            ctx.save();
+            ctx.strokeStyle = '#2196F3';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 1, y + 1, Math.max(0, w - 2), Math.max(0, h - 2));
+            ctx.restore();
+          }
+          break;
+        }
+
         case 'obj':
         case 'panel':
         case 'container':
@@ -672,7 +734,15 @@ const PreviewPanel: React.FC = () => {
     };
 
     components.forEach(comp => renderComponent(comp));
-  }, [components, canvas, bgColor, hoveredComponent, loadImage, animStates]);
+  }, [
+    components,
+    canvas,
+    bgColor,
+    hoveredComponent,
+    loadImage,
+    animStates,
+    imageButtonStateIndices,
+  ]);
 
   // Handle mouse move for hover effects
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {

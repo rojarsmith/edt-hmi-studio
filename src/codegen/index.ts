@@ -2,5 +2,6 @@
 
 export * from './types';
 export * from './generator';
+export * from './hmiBindingGenerator';
 export * from './utils/nameUtils';
 export * from './formatters/cFormatter';

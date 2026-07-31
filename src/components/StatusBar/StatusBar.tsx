@@ -42,7 +42,7 @@ const StatusBar: React.FC = () => {
             </span>
           )}
           {selectedCount > 1 && (
-            <span className="status-text">Selected {selectedCount} widgets</span>
+            <span className="status-text">{selectedCount} components selected</span>
           )}
         </div>
         

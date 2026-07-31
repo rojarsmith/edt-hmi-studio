@@ -155,7 +155,7 @@ function renderParamsPreview(node: LogicNode): React.ReactNode {
   
   switch (subType) {
     case 'event_trigger':
-      return <span className="param-preview">Events: {params.eventType?.replace('LV_EVENT_', '')}</span>;
+      return <span className="param-preview">Event: {params.eventType?.replace('LV_EVENT_', '')}</span>;
     case 'timer_trigger':
       return <span className="param-preview">{params.mode === 'delay' ? 'Delay' : 'Interval'}: {params.duration}ms</span>;
     case 'compare':
@@ -174,6 +174,8 @@ function renderParamsPreview(node: LogicNode): React.ReactNode {
       return params.targetPage ? <span className="param-preview">Page: {params.targetPage}</span> : null;
     case 'call_function':
       return params.functionName ? <span className="param-preview">Function: {params.functionName}</span> : null;
+    case 'modbus_holding_register':
+      return <span className="param-preview">Holding Register: {params.address ?? 0}</span>;
     default:
       return null;
   }

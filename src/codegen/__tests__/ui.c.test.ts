@@ -8,8 +8,6 @@ import {
   createImageResource,
   createEvent,
   createAnimation,
-  createStyleProps,
-  resetIdCounter,
 } from './helpers';
 
 describe('generateUiSource', () => {
@@ -206,6 +204,53 @@ describe('generateUiSource', () => {
       const result = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
       expect(result).toContain('ui_logo = lv_img_create(ui_screen_main);');
       expect(result).toContain('lv_img_set_src(ui_logo, &logo_img);');
+    });
+
+    it('creates a multi-state image button from image resources', () => {
+      const offImage = createImageResource({
+        id: 'off-image',
+        cArrayName: 'img_off',
+      });
+      const onImage = createImageResource({
+        id: 'on-image',
+        cArrayName: 'img_on',
+      });
+      const imageButton = createComponent('image-button', {
+        name: 'modeSelect',
+        props: {
+          states: [
+            { id: 'off', name: 'Off', imageId: offImage.id, value: 10 },
+            { id: 'on', name: 'On', imageId: onImage.id, value: 20 },
+          ],
+          initialState: 1,
+          currentState: 1,
+          cycleOnClick: true,
+        },
+      });
+      const pages = [
+        createPage({ name: 'main', components: [imageButton] }),
+      ];
+      const result = generateUiSource(
+        pages,
+        defaultOptions({ lvglVersion: '9' }),
+        undefined,
+        [offImage, onImage],
+      );
+
+      expect(result).toContain('LV_IMAGE_DECLARE(img_off);');
+      expect(result).toContain('LV_IMAGE_DECLARE(img_on);');
+      expect(result).toContain(
+        'ui_mode_select = lv_image_create(ui_screen_main);',
+      );
+      expect(result).toContain(
+        'static const void *const ui_mode_select_state_images[]',
+      );
+      expect(result).toContain('&img_off, &img_on');
+      expect(result).toContain('10, 20');
+      expect(result).toContain('.current_index = 1U');
+      expect(result).toContain('ui_mode_select_get_value');
+      expect(result).toContain('ui_mode_select_set_value');
+      expect(result).toContain('LV_EVENT_VALUE_CHANGED');
     });
 
     it('creates obj', () => {

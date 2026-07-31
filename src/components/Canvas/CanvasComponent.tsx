@@ -3,6 +3,10 @@ import type { LvglComponent, ResizeHandle } from '../../types';
 import { useEditorStore } from '../../store/editorStore';
 import { useAppStore } from '../../store/appStore';
 import { useResourceStore } from '../../resources/resourceStore';
+import {
+  getImageButtonState,
+  normalizeImageButtonProps,
+} from '../PropertyEditor/imageButtonModel';
 import './CanvasComponent.css';
 
 interface CanvasComponentProps {
@@ -31,7 +35,6 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   parentWidth,
   parentHeight,
   parentLayout,
-  parentFlexDirection,
   onClick,
   onDragStart,
   onResizeStart,
@@ -232,6 +235,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
         case 'textarea': return '#ffffff';
         case 'dropdown': return '#ffffff';
         case 'img': return '#f0f0f0';
+        case 'image-button': return '#f0f0f0';
         case 'table': return '#ffffff';
         case 'chart': return '#ffffff';
         case 'calendar': return '#ffffff';
@@ -368,6 +372,25 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
       
       case 'img':
         return <CanvasImageContent src={props.src} />;
+
+      case 'image-button': {
+        const imageButton = normalizeImageButtonProps(props);
+        const state = getImageButtonState(
+          imageButton.states,
+          imageButton.currentState,
+        );
+        return (
+          <CanvasImageContent
+            src={state?.imageId}
+            placeholder={
+              state
+                ? `${state.name} · value ${state.value}`
+                : 'Add an image-button state'
+            }
+            title={state ? `${state.name} (${state.value})` : 'Image Button'}
+          />
+        );
+      }
       
       case 'line':
         return (
@@ -751,8 +774,8 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
               {props.year || 2024} / {props.month || 1}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '1px', flex: 1, padding: '2px' }}>
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                <div key={d} style={{ textAlign: 'center', fontWeight: 'bold', color: '#666', padding: '2px 0' }}>{d}</div>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, index) => (
+                <div key={`${d}-${index}`} style={{ textAlign: 'center', fontWeight: 'bold', color: '#666', padding: '2px 0' }}>{d}</div>
               ))}
               {Array.from({ length: 28 }).map((_, i) => (
                 <div key={i} style={{ textAlign: 'center', padding: '1px 0' }}>{i + 1}</div>
@@ -829,8 +852,12 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   );
 };
 
-// Separate component to subscribe to resource store only for img type
-const CanvasImageContent: React.FC<{ src?: string }> = React.memo(({ src }) => {
+// Separate component to subscribe to resource store only for image types.
+export const CanvasImageContent: React.FC<{
+  src?: string;
+  placeholder?: string;
+  title?: string;
+}> = React.memo(({ src, placeholder, title }) => {
   const images = useResourceStore((s) => s.images);
   const matched = src
     ? images.find((img) => img.id === src || img.name === src)
@@ -840,6 +867,7 @@ const CanvasImageContent: React.FC<{ src?: string }> = React.memo(({ src }) => {
     return (
       <div
         className="lvgl-img"
+        title={title}
         style={{
           width: '100%',
           height: '100%',
@@ -853,16 +881,21 @@ const CanvasImageContent: React.FC<{ src?: string }> = React.memo(({ src }) => {
   return (
     <div
       className="lvgl-img"
+      title={title}
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
         height: '100%',
-        fontSize: '24px',
+        padding: '6px',
+        boxSizing: 'border-box',
+        textAlign: 'center',
+        fontSize: placeholder ? '11px' : '24px',
+        color: '#777',
       }}
     >
-      🖼️
+      {placeholder || '🖼️'}
     </div>
   );
 });

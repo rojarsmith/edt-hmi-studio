@@ -18,7 +18,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     type: 'trigger',
     subType: 'event_trigger',
     label: 'Event Trigger',
-    description: 'Receives an event from a component',
+    description: 'Receives events from a component',
     icon: '⚡',
     color: NODE_COLORS.trigger,
     defaultParams: {
@@ -34,7 +34,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     type: 'trigger',
     subType: 'timer_trigger',
     label: 'Timer Trigger',
-    description: 'Runs after a delay or on an interval',
+    description: 'Runs after a delay or at an interval',
     icon: '⏱️',
     color: NODE_COLORS.trigger,
     defaultParams: {
@@ -130,7 +130,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'set_property',
-    label: 'Set property',
+    label: 'Set Property',
     description: 'Changes a component property',
     icon: '🎨',
     color: NODE_COLORS.action,
@@ -150,7 +150,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     type: 'action',
     subType: 'navigate_page',
     label: 'Navigate to Page',
-    description: 'Switch to the specified page',
+    description: 'Switches to the specified page',
     icon: '📄',
     color: NODE_COLORS.action,
     defaultParams: {
@@ -167,7 +167,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'show_hide',
-    label: 'Show or hide',
+    label: 'Show/Hide',
     description: 'Controls component visibility',
     icon: '👁️',
     color: NODE_COLORS.action,
@@ -185,8 +185,8 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'set_text',
-    label: 'Set text',
-    description: 'Changes the text',
+    label: 'Set Text',
+    description: 'Changes text content',
     icon: '📝',
     color: NODE_COLORS.action,
     defaultParams: {
@@ -203,8 +203,8 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'set_value',
-    label: 'Set value',
-    description: 'Changes a numeric property',
+    label: 'Set Value',
+    description: 'Changes a numeric value',
     icon: '🔢',
     color: NODE_COLORS.action,
     defaultParams: {
@@ -212,7 +212,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     },
     inputs: [
       { name: 'Execute', type: 'execution' },
-      { name: 'Value', type: 'int' },
+      { name: 'Number', type: 'int' },
     ],
     outputs: [
       { name: 'Done', type: 'execution' },
@@ -231,7 +231,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     },
     inputs: [
       { name: 'Execute', type: 'execution' },
-      { name: 'Parameters1', type: 'any' },
+      { name: 'Argument 1', type: 'any' },
     ],
     outputs: [
       { name: 'Done', type: 'execution' },
@@ -242,7 +242,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     type: 'action',
     subType: 'delay',
     label: 'Delay',
-    description: 'Waits for a set time',
+    description: 'Waits for the specified time',
     icon: '⏳',
     color: NODE_COLORS.action,
     defaultParams: {
@@ -260,7 +260,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'var_read',
-    label: 'Reads a variable',
+    label: 'Read Variable',
     description: 'Reads a global or local variable',
     icon: '📖',
     color: NODE_COLORS.data,
@@ -275,7 +275,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'var_write',
-    label: 'Writes a variable',
+    label: 'Write Variable',
     description: 'Sets a variable value',
     icon: '✏️',
     color: NODE_COLORS.data,
@@ -294,7 +294,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     type: 'data',
     subType: 'math_op',
     label: 'Math Operation',
-    description: 'Add, subtract, multiply, divide, modulo',
+    description: 'Add, subtract, multiply, divide, or modulo',
     icon: '🧮',
     color: NODE_COLORS.data,
     defaultParams: {
@@ -312,7 +312,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     type: 'data',
     subType: 'string_op',
     label: 'String Operation',
-    description: 'Concatenate and format',
+    description: 'Concatenates or formats strings',
     icon: '🔤',
     color: NODE_COLORS.data,
     defaultParams: {
@@ -330,7 +330,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     type: 'data',
     subType: 'get_property',
     label: 'Get Property',
-    description: 'Reads a component's current property value',
+    description: 'Reads the current component property value',
     icon: '🔍',
     color: NODE_COLORS.data,
     defaultParams: {
@@ -340,6 +340,21 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     inputs: [],
     outputs: [
       { name: 'Value', type: 'any' },
+    ],
+  },
+  {
+    type: 'data',
+    subType: 'modbus_holding_register',
+    label: 'Read Holding Register',
+    description: 'Reads a cached Modbus Holding Register value',
+    icon: '📥',
+    color: NODE_COLORS.data,
+    defaultParams: {
+      address: 0,
+    },
+    inputs: [],
+    outputs: [
+      { name: 'Value', type: 'int' },
     ],
   },
 
@@ -356,11 +371,11 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     },
     inputs: [
       { name: 'Execute', type: 'execution' },
-      { name: 'Input1', type: 'any' },
+      { name: 'Input 1', type: 'any' },
     ],
     outputs: [
       { name: 'Done', type: 'execution' },
-      { name: 'Output1', type: 'any' },
+      { name: 'Output 1', type: 'any' },
     ],
   },
 ];
@@ -378,8 +393,8 @@ export function getNodesByCategory(category: string): LogicNodeDefinition[] {
 // Node categories for palette
 export const NODE_CATEGORIES = [
   { id: 'trigger', name: 'Triggers', icon: '⚡', color: NODE_COLORS.trigger },
-  { id: 'condition', name: 'Condition', icon: '🔀', color: NODE_COLORS.condition },
-  { id: 'action', name: 'Action', icon: '🎬', color: NODE_COLORS.action },
+  { id: 'condition', name: 'Conditions', icon: '🔀', color: NODE_COLORS.condition },
+  { id: 'action', name: 'Actions', icon: '🎬', color: NODE_COLORS.action },
   { id: 'data', name: 'Data', icon: '📊', color: NODE_COLORS.data },
   { id: 'custom', name: 'Custom', icon: '💻', color: NODE_COLORS.custom },
 ];

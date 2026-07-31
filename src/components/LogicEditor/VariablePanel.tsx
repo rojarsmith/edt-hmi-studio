@@ -95,7 +95,7 @@ const VariablePanel: React.FC = () => {
         <div className="add-var-form">
           <input
             type="text"
-            placeholder="Variable Name"
+            placeholder="Variable name"
             value={newVarName}
             onChange={e => setNewVarName(e.target.value)}
             autoFocus
@@ -126,7 +126,7 @@ const VariablePanel: React.FC = () => {
         {variables.length === 0 ? (
           <div className="no-variables">
             <p>No variables</p>
-            <button onClick={() => setIsAdding(true)}>+ Add variable</button>
+            <button onClick={() => setIsAdding(true)}>+ Add Variable</button>
           </div>
         ) : (
           variables.map(variable => (

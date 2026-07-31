@@ -448,4 +448,4 @@ export const COMMON_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48,
  * Preview text for font display
  */
 export const FONT_PREVIEW_TEXT = 'The quick brown fox jumps over the lazy dog. 0123456789';
-export const FONT_PREVIEW_TEXT_CJK = '中文字体预览 日本語フォント 한국어 글꼴';
+export const FONT_PREVIEW_TEXT_CJK = 'CJK glyph preview: 漢字 日本語 한국어 Aa123';

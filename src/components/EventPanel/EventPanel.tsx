@@ -88,17 +88,17 @@ const EventPanel: React.FC = () => {
         case 'show':
           return `Show: ${event.action.targetComponent || 'Not set'}`;
         case 'hide':
-          return `Hidden: ${event.action.targetComponent || 'Not set'}`;
+          return `Hide: ${event.action.targetComponent || 'Not set'}`;
         case 'enable':
           return `Enable: ${event.action.targetComponent || 'Not set'}`;
         case 'disable':
-          return `Disabled: ${event.action.targetComponent || 'Not set'}`;
+          return `Disable: ${event.action.targetComponent || 'Not set'}`;
         case 'setText':
           return `Set text: "${event.action.value || ''}"`;
         case 'setValue':
           return `Set value: ${event.action.value ?? 'Not set'}`;
         default:
-          return 'Built-in Action';
+          return 'Built-in action';
       }
     }
     return 'Not configured';
@@ -111,7 +111,7 @@ const EventPanel: React.FC = () => {
           <h3>Events</h3>
         </div>
         <div className="no-selection">
-          <p>No widget selected</p>
+          <p>No component selected</p>
           <p className="hint">Select a component to add events</p>
         </div>
       </div>
@@ -122,7 +122,7 @@ const EventPanel: React.FC = () => {
     <div className="event-panel">
       <div className="panel-header">
         <h3>Events</h3>
-        <button className="add-event-btn" onClick={handleAddEvent} title="Add Event">
+        <button className="add-event-btn" onClick={handleAddEvent} title="Add event">
           <span>+</span>
         </button>
       </div>

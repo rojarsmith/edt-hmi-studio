@@ -7,7 +7,10 @@ import {
   createLogicVariable,
   createLogicConnection,
   createLogicPort,
+  createComponent,
+  createPage,
 } from './helpers';
+import { getNodeDefinition } from '../../components/LogicEditor/nodeDefinitions';
 
 describe('generateLogicSource', () => {
   // ── Includes ──────────────────────────────────────────────
@@ -1026,6 +1029,330 @@ describe('generateLogicSource', () => {
       const graph = createLogicGraph({ name: 'empty_flow', nodes: [] });
       const result = generateLogicSource(defaultOptions(), [graph]);
       expect(result).toContain('// Empty logic graph');
+    });
+  });
+
+  describe('Modbus Holding Register node', () => {
+    it('defines an English Data node with a zero-based address and numeric output', () => {
+      const definition = getNodeDefinition('modbus_holding_register');
+
+      expect(definition).toMatchObject({
+        type: 'data',
+        label: 'Read Holding Register',
+        defaultParams: { address: 0 },
+        inputs: [],
+        outputs: [{ name: 'Value', type: 'int' }],
+      });
+    });
+
+    it('reads the cached register through hmi_runtime with a zero fallback', () => {
+      const trigger = createLogicNode('event_trigger', {
+        id: 'trigger',
+        params: { eventType: 'LV_EVENT_CLICKED', targetComponent: 'button' },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'execute', name: 'Execute', type: 'execution' })],
+      });
+      const readNode = createLogicNode('modbus_holding_register', {
+        id: 'read',
+        type: 'data',
+        params: { address: 17 },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'register_value', name: 'Value', type: 'int' })],
+      });
+      const writeNode = createLogicNode('var_write', {
+        id: 'write',
+        params: { variableName: 'registerValue' },
+        inputs: [createLogicPort({ id: 'write_value', name: 'Value', type: 'int' })],
+        outputs: [],
+      });
+      const executionConnection = createLogicConnection({
+        sourceNode: 'trigger',
+        sourceOutput: 'execute',
+        targetNode: 'write',
+        targetInput: '',
+        type: 'execution',
+      });
+      const dataConnection = createLogicConnection({
+        sourceNode: 'read',
+        sourceOutput: 'register_value',
+        targetNode: 'write',
+        targetInput: 'write_value',
+        type: 'data',
+      });
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({
+          name: 'modbus_read',
+          nodes: [trigger, readNode, writeNode],
+          connections: [executionConnection, dataConnection],
+        })],
+      );
+
+      expect(result).toContain('#include "hmi_runtime.h"');
+      expect(result).toContain('static uint16_t logic_read_holding_register_cached(uint16_t address)');
+      expect(result).toContain('if (!hmi_runtime_read_holding_register(address, &value))');
+      expect(result).toContain('return 0U;');
+      expect(result).toContain('var_register_value = logic_read_holding_register_cached(17U);');
+    });
+
+    it('clamps imported out-of-range addresses to a valid uint16_t address', () => {
+      const readNode = createLogicNode('modbus_holding_register', {
+        id: 'read',
+        type: 'data',
+        params: { address: 70000 },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'register_value', name: 'Value', type: 'int' })],
+      });
+      const textNode = createLogicNode('set_value', {
+        id: 'consumer',
+        params: { targetComponent: 'slider', componentType: 'slider' },
+        inputs: [createLogicPort({ id: 'consumer_value', name: 'Number', type: 'int' })],
+        outputs: [],
+      });
+      const dataConnection = createLogicConnection({
+        sourceNode: 'read',
+        sourceOutput: 'register_value',
+        targetNode: 'consumer',
+        targetInput: 'consumer_value',
+        type: 'data',
+      });
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({
+          name: 'clamped_address',
+          nodes: [readNode, textNode],
+          connections: [dataConnection],
+        })],
+      );
+
+      expect(result).toContain('logic_read_holding_register_cached(65535U)');
+    });
+
+    it('does not include the HMI runtime when no Modbus node is present', () => {
+      const result = generateLogicSource(defaultOptions(), [createLogicGraph({ name: 'plain' })]);
+
+      expect(result).not.toContain('#include "hmi_runtime.h"');
+      expect(result).not.toContain('logic_read_holding_register_cached');
+    });
+  });
+
+  describe('English port labels', () => {
+    it('uses the current English Condition input label', () => {
+      const trigger = createLogicNode('event_trigger', {
+        id: 'trigger',
+        params: { eventType: 'LV_EVENT_CLICKED', targetComponent: 'button' },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'execute', name: 'Execute', type: 'execution' })],
+      });
+      const node = createLogicNode('if_else', {
+        id: 'if1',
+        type: 'condition',
+        inputs: [createLogicPort({ id: 'condition', name: 'Condition', type: 'bool', defaultValue: 'true' })],
+        outputs: [],
+      });
+      const connection = createLogicConnection({
+        sourceNode: 'trigger',
+        sourceOutput: 'execute',
+        targetNode: 'if1',
+        targetInput: '',
+        type: 'execution',
+      });
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({ name: 'condition', nodes: [trigger, node], connections: [connection] })],
+      );
+      expect(result).toContain('if (true)');
+    });
+
+    it('uses the current English Text and Number input labels', () => {
+      const textNode = createLogicNode('set_text', {
+        id: 'text',
+        params: { targetComponent: 'statusLabel' },
+        inputs: [createLogicPort({ id: 'text_in', name: 'Text', type: 'string', defaultValue: '"Ready"' })],
+        outputs: [],
+      });
+      const numberNode = createLogicNode('set_value', {
+        id: 'number',
+        params: { targetComponent: 'speedSlider', componentType: 'slider' },
+        inputs: [createLogicPort({ id: 'number_in', name: 'Number', type: 'int', defaultValue: 42 })],
+        outputs: [],
+      });
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({ name: 'values', nodes: [textNode, numberNode] })],
+      );
+      expect(result).toContain('lv_label_set_text(ui_status_label, "Ready")');
+      expect(result).toContain('lv_slider_set_value(ui_speed_slider, 42, LV_ANIM_ON)');
+    });
+
+    it('uses the current English Value input label', () => {
+      const trigger = createLogicNode('event_trigger', {
+        id: 'trigger',
+        params: { eventType: 'LV_EVENT_CLICKED', targetComponent: 'button' },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'execute', name: 'Execute', type: 'execution' })],
+      });
+      const node = createLogicNode('var_write', {
+        id: 'write',
+        params: { variableName: 'counter' },
+        inputs: [createLogicPort({ id: 'value', name: 'Value', type: 'int', defaultValue: 7 })],
+        outputs: [],
+      });
+      const connection = createLogicConnection({
+        sourceNode: 'trigger',
+        sourceOutput: 'execute',
+        targetNode: 'write',
+        targetInput: '',
+        type: 'execution',
+      });
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({ name: 'write', nodes: [trigger, node], connections: [connection] })],
+      );
+      expect(result).toContain('var_counter = 7;');
+    });
+  });
+
+  describe('persisted editor ID references', () => {
+    it('resolves graph variable and textarea component IDs to generated C names', () => {
+      const variable = createLogicVariable({
+        id: '1703e14d-9a3c-45d6-8cc4-67736eb6e552',
+        name: 'aaa1',
+        type: 'string',
+        defaultValue: 'abc',
+      });
+      const variableRead = createLogicNode('var_read', {
+        id: 'read-variable',
+        params: { variableId: variable.id },
+        outputs: [createLogicPort({ id: 'read-value', name: 'Value', type: 'string' })],
+      });
+      const setText = createLogicNode('set_text', {
+        id: 'set-text',
+        params: { targetComponent: 'c5f1da51-7871-4da3-9e0b-75f1e493a8e1' },
+        inputs: [createLogicPort({ id: 'text-value', name: 'Text', type: 'string' })],
+        outputs: [],
+      });
+      const graph = createLogicGraph({
+        name: 'textarea_from_variable',
+        variables: [variable],
+        nodes: [variableRead, setText],
+        connections: [createLogicConnection({
+          sourceNode: variableRead.id,
+          sourceOutput: 'read-value',
+          targetNode: setText.id,
+          targetInput: 'text-value',
+          type: 'data',
+        })],
+      });
+      const page = createPage({
+        id: 'page-id',
+        name: 'Page 1',
+        components: [createComponent('textarea', {
+          id: 'c5f1da51-7871-4da3-9e0b-75f1e493a8e1',
+          name: 'Textarea_c5f1',
+        })],
+      });
+
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [graph],
+        [page],
+      );
+
+      expect(result).toContain('static char* var_aaa1 = "abc";');
+      expect(result).toContain('lv_textarea_set_text(ui_textarea_c5f1, var_aaa1);');
+      expect(result).not.toContain('var_1703e14d_9a3c_45d6_8cc4_67736eb6e552');
+      expect(result).not.toContain('ui_c5f1da51_7871_4da3_9e0b_75f1e493a8e1');
+    });
+
+    it('resolves event and navigation UUIDs and declares the callback before use', () => {
+      const button = createComponent('btn', {
+        id: 'button-uuid',
+        name: 'Run Button',
+      });
+      const destination = createPage({
+        id: 'destination-page-uuid',
+        name: 'Machine Status',
+      });
+      const eventTrigger = createLogicNode('event_trigger', {
+        id: 'trigger',
+        params: {
+          eventType: 'LV_EVENT_CLICKED',
+          targetComponent: button.id,
+        },
+        outputs: [createLogicPort({ id: 'execute', name: 'Execute', type: 'execution' })],
+      });
+      const navigate = createLogicNode('navigate_page', {
+        id: 'navigate',
+        params: {
+          targetPage: destination.id,
+          animation: 'none',
+        },
+        outputs: [],
+      });
+      const graph = createLogicGraph({
+        name: 'open_status',
+        nodes: [eventTrigger, navigate],
+        connections: [createLogicConnection({
+          sourceNode: eventTrigger.id,
+          sourceOutput: 'execute',
+          targetNode: navigate.id,
+          targetInput: '',
+          type: 'execution',
+        })],
+      });
+
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [graph],
+        [
+          createPage({ id: 'main-page', name: 'Main', components: [button] }),
+          destination,
+        ],
+      );
+
+      const declarationIndex = result.indexOf(
+        'static void logic_open_status_event_cb(lv_event_t *e);',
+      );
+      const registrationIndex = result.indexOf(
+        'lv_obj_add_event_cb(ui_run_button, logic_open_status_event_cb',
+      );
+      expect(declarationIndex).toBeGreaterThan(-1);
+      expect(registrationIndex).toBeGreaterThan(declarationIndex);
+      expect(result).toContain('ui_load_screen_machine_status();');
+      expect(result).not.toContain('button_uuid');
+      expect(result).not.toContain('destination_page_uuid');
+    });
+
+    it.each([
+      ['label', 'lv_label_set_text(ui_text_target, "Ready");'],
+      ['textarea', 'lv_textarea_set_text(ui_text_target, "Ready");'],
+      ['checkbox', 'lv_checkbox_set_text(ui_text_target, "Ready");'],
+      ['dropdown', 'lv_dropdown_set_options(ui_text_target, "Ready");'],
+      ['btn', 'logic_set_button_text(ui_text_target, "Ready");'],
+    ])('uses the %s text API for ID-based targets', (componentType, expectedCode) => {
+      const component = createComponent(componentType, {
+        id: `${componentType}-id`,
+        name: 'Text Target',
+      });
+      const node = createLogicNode('set_text', {
+        params: { targetComponent: component.id },
+        inputs: [createLogicPort({
+          id: 'text',
+          name: 'Text',
+          type: 'string',
+          defaultValue: '"Ready"',
+        })],
+        outputs: [],
+      });
+
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({ name: 'set_text', nodes: [node] })],
+        [createPage({ components: [component] })],
+      );
+
+      expect(result).toContain(expectedCode);
     });
   });
 });

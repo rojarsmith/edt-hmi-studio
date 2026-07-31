@@ -66,7 +66,7 @@ const WasmPreview: React.FC = () => {
     status === 'ready'
       ? '✅ Ready'
       : status === 'loading'
-        ? '⏳ LVGL Loading runtime...'
+        ? '⏳ Loading LVGL runtime...'
         : '❌ Load failed';
 
   return (
@@ -86,11 +86,11 @@ const WasmPreview: React.FC = () => {
           style={{ width: canvas.width, height: canvas.height }}
         >
           {status === 'loading' && (
-            <div className="wasm-preview-overlay">LVGL Loading runtime...</div>
+            <div className="wasm-preview-overlay">Loading LVGL runtime...</div>
           )}
           {status === 'error' && (
             <div className="wasm-preview-overlay wasm-preview-overlay--error">
-              WASM Load failed. Click refresh to try again.
+              Failed to load WASM. Click Refresh to try again.
             </div>
           )}
           <iframe

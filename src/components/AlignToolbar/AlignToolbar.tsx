@@ -1,5 +1,6 @@
 import React from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import type { LvglComponent } from '../../types';
 import './AlignToolbar.css';
 
 type AlignType = 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom' | 'distribute-h' | 'distribute-v';
@@ -471,7 +472,7 @@ const AlignToolbar: React.FC = () => {
           className="align-btn"
           onClick={() => handleLayout('same-y')}
           disabled={!hasMultipleSelection}
-          title="Ythe same value (one row)"
+          title="Match Y (arrange in one row)"
         >
           <svg viewBox="0 0 24 24" width="16" height="16">
             <rect x="2" y="9" width="5" height="6" rx="1" fill="currentColor"/>
@@ -484,7 +485,7 @@ const AlignToolbar: React.FC = () => {
           className="align-btn"
           onClick={() => handleLayout('same-x')}
           disabled={!hasMultipleSelection}
-          title="Xthe same value (one column)"
+          title="Match X (arrange in one column)"
         >
           <svg viewBox="0 0 24 24" width="16" height="16">
             <rect x="9" y="2" width="6" height="5" rx="1" fill="currentColor"/>

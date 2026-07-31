@@ -3,12 +3,13 @@
  * Generates C code via generateCode(), writes to a temp dir, and compiles with emcc + LVGL.
  * This validates that the generated code is syntactically and semantically correct C.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { execSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { generateCode } from '../generator';
+import type { GeneratedCode } from '../types';
 import {
   defaultOptions,
   createComponent,
@@ -16,14 +17,12 @@ import {
   createEvent,
   createBuiltinAction,
   createAnimation,
-  createTheme,
   createImageResource,
   createLogicGraph,
   createLogicNode,
   createLogicVariable,
   createLogicConnection,
   createLogicPort,
-  resetIdCounter,
 } from './helpers';
 
 // Paths
@@ -49,7 +48,7 @@ int main(void) {
  * Returns { success, stderr } for assertion.
  */
 function compileGenerated(
-  files: Record<string, string>,
+  files: GeneratedCode,
   extraCFiles: string[] = [],
   extraFlags: string[] = [],
 ): { success: boolean; stderr: string } {
@@ -265,7 +264,7 @@ describe('Compile verification', { timeout: 300_000 }, () => {
       styles: {
         default: {
           textColor: '#FF5500',
-          fontSize: 24,
+          textFontSize: 24,
           shadowColor: '#000000',
           shadowWidth: 5,
           shadowOffsetX: 2,
@@ -388,7 +387,7 @@ describe('Compile verification', { timeout: 300_000 }, () => {
 
     // Add a stub C file providing the image symbol
     const imgStub = `#include "lvgl/lvgl.h"\nconst lv_image_dsc_t img_test_image = {0};\n`;
-    code['img_stub.c'] = imgStub;
+    Object.assign(code, { 'img_stub.c': imgStub });
 
     const result = compileGenerated(code, ['img_stub.c']);
     expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
@@ -556,7 +555,7 @@ describe('Compile verification', { timeout: 300_000 }, () => {
   describe('Existing component untested properties', () => {
     it('compiles label longMode variants', { timeout: 30_000 }, () => {
       const modes = ['wrap', 'scroll', 'dot', 'clip'] as const;
-      const comps = modes.map((m, i) =>
+      const comps = modes.map((m) =>
         createComponent('label', { name: `lbl_${m}`, props: { text: `Mode ${m}`, longMode: m } }),
       );
       const page = createPage({ name: 'main', components: comps });
@@ -637,7 +636,7 @@ describe('Compile verification', { timeout: 300_000 }, () => {
       const page = createPage({ name: 'main', components: [img] });
       const code = generateCode([page], defaultOptions(), [], undefined, [imgRes]);
       const imgStub = `#include "lvgl/lvgl.h"\nconst lv_image_dsc_t img_rot_img = {0};\n`;
-      code['img_stub.c'] = imgStub;
+      Object.assign(code, { 'img_stub.c': imgStub });
       const result = compileGenerated(code, ['img_stub.c']);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });

@@ -11,7 +11,6 @@ import {
   copySelectedComponents,
   cutSelectedComponents,
   pasteClipboardComponents,
-  pasteIntoContainer,
   duplicateSelectedComponents,
   selectAllComponents,
 } from '../../hooks/useKeyboardShortcuts';
@@ -100,8 +99,8 @@ const Canvas: React.FC = () => {
   // === Fine-grained store subscriptions ===
   // State that affects rendering
   const canvas = useEditorStore(s => s.canvas);
-  const selectedIds = useEditorStore(s => s.selection.selectedIds);
-  const hoveredId = useEditorStore(s => s.selection.hoveredId);
+  useEditorStore(s => s.selection.selectedIds);
+  useEditorStore(s => s.selection.hoveredId);
   const alignmentGuides = useEditorStore(s => s.alignmentGuides);
   const pages = useEditorStore(s => s.pages);
   const currentPageId = useEditorStore(s => s.currentPageId);

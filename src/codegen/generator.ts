@@ -40,7 +40,7 @@ export function generateCode(
     'ui_events.h': generateEventsHeader(pages, opts),
     'ui_events.c': generateEventsSource(pages, opts),
     'ui_logic.h': generateLogicHeader(opts, logicGraphs),
-    'ui_logic.c': generateLogicSource(opts, logicGraphs),
+    'ui_logic.c': generateLogicSource(opts, logicGraphs, pages),
   };
 }
 
@@ -74,7 +74,7 @@ export function generateSingleFile(
     case 'ui_logic.h':
       return generateLogicHeader(opts, logicGraphs);
     case 'ui_logic.c':
-      return generateLogicSource(opts, logicGraphs);
+      return generateLogicSource(opts, logicGraphs, pages);
     default:
       throw new Error(`Unknown file: ${fileName}`);
   }
@@ -117,9 +117,28 @@ export async function generateZipBlob(
       for (const comp of components) {
         if (comp.type === 'img' && comp.props.src) {
           const matched = imageResources.find(
-            (img) => img.id === comp.props.src || img.name === comp.props.src
+            (img) =>
+              img.id === comp.props.src ||
+              img.name === comp.props.src ||
+              img.cArrayName === comp.props.src
           );
           if (matched) usedIds.add(matched.id);
+        }
+        if (comp.type === 'image-button' && Array.isArray(comp.props.states)) {
+          for (const state of comp.props.states) {
+            const imageId =
+              state && typeof state === 'object'
+                ? (state as { imageId?: string }).imageId
+                : undefined;
+            if (!imageId) continue;
+            const matched = imageResources.find(
+              (img) =>
+                img.id === imageId ||
+                img.name === imageId ||
+                img.cArrayName === imageId
+            );
+            if (matched) usedIds.add(matched.id);
+          }
         }
         walk(comp.children);
       }

@@ -40,6 +40,23 @@ describe('generateUiHeader', () => {
     expect(result).toContain('extern lv_obj_t *ui_my_btn;');
   });
 
+  it('declares image-button value adapter functions', () => {
+    const imageButton = createComponent('image-button', {
+      name: 'modeSelect',
+    });
+    const pages = [
+      createPage({ name: 'main', components: [imageButton] }),
+    ];
+    const result = generateUiHeader(pages, defaultOptions());
+
+    expect(result).toContain(
+      'float ui_mode_select_get_value(lv_obj_t *object);',
+    );
+    expect(result).toContain(
+      'void ui_mode_select_set_value(lv_obj_t *object, float value);',
+    );
+  });
+
   it('declares nested component variables', () => {
     const label = createComponent('label', { name: 'innerLabel' });
     const container = createComponent('obj', { name: 'container', children: [label] });

@@ -22,5 +22,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "vite-plugin-compile.ts"]
+  "include": [
+    "vite.config.ts",
+    "vite-plugin-compile.ts",
+    "vite-plugin-hmi.ts",
+    "server/**/*.ts"
+  ]
 }

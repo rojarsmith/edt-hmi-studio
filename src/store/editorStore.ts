@@ -9,7 +9,9 @@ import type {
   AlignmentGuide,
   Page,
 } from '../types';
+import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
+import { synchronizeModbusBindings } from '../utils/modbusBindings';
 
 // Maximum history entries for undo/redo
 const MAX_HISTORY = 50;
@@ -65,6 +67,7 @@ interface EditorState {
   clearComponents: () => void;
   setComponents: (components: LvglComponent[]) => void;
   setPages: (pages: Page[]) => void;
+  syncModbusBindings: (tags: ModbusRegisterTag[]) => void;
   
   // Actions - Z-order
   bringToFront: (id: string) => void;
@@ -289,6 +292,7 @@ function cloneComponents(components: LvglComponent[]): LvglComponent[] {
     },
     events: comp.events.map(e => ({ ...e, action: e.action ? { ...e.action } : undefined })),
     animations: (comp.animations || []).map(a => ({ ...a })),
+    modbusBinding: comp.modbusBinding ? { ...comp.modbusBinding } : undefined,
     children: cloneComponents(comp.children),
   }));
 }
@@ -671,6 +675,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       currentPageId: pages.length > 0 ? pages[0].id : get().currentPageId,
       selection: { selectedIds: [], hoveredId: null },
     });
+  },
+
+  syncModbusBindings: (tags) => {
+    const nextPages = synchronizeModbusBindings(get().pages, tags);
+    if (nextPages === get().pages) return;
+    get().saveToHistory();
+    set({ pages: nextPages });
   },
   
   clearComponents: () => {

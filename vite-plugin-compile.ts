@@ -439,7 +439,7 @@ export default function compilePlugin(): Plugin {
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({
               success: false,
-              error: `LVGL Library build failed: ${String(libErr)}`,
+              error: `Failed to compile the LVGL library: ${String(libErr)}`,
               buildId: '',
             }));
             return;

@@ -116,8 +116,8 @@ export async function compileCode(
       result.output = 'Build succeeded';
       onStatus?.('done', 'Running');
     } else {
-      result.output = 'Emscripten Failed to load module';
-      onStatus?.('error', 'Failed to load module');
+      result.output = 'Failed to load Emscripten module';
+      onStatus?.('error', 'Module load failed');
     }
 
     return result;

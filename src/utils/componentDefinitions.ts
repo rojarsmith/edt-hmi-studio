@@ -4,8 +4,8 @@ import type { ComponentDefinition, ComponentCategory } from '../types';
 export const componentCategories: ComponentCategory[] = [
   { id: 'basic', name: 'Basic', icon: '📦', collapsed: false },
   { id: 'input', name: 'Input', icon: '✏️', collapsed: false },
-  { id: 'container', name: 'Container', icon: '📁', collapsed: false },
-  { id: 'display', name: 'Show', icon: '📊', collapsed: false },
+  { id: 'container', name: 'Containers', icon: '📁', collapsed: false },
+  { id: 'display', name: 'Display', icon: '📊', collapsed: false },
 ];
 
 // LVGL default theme colors (Light mode)
@@ -78,6 +78,36 @@ export const componentDefinitions: ComponentDefinition[] = [
     defaultStyles: {
       default: {
         // img: no special theme style, transparent bg
+        bgColor: 'transparent',
+        borderColor: 'transparent',
+        borderWidth: 0,
+        borderRadius: 0,
+        textColor: '#212121',
+        opacity: 1,
+        padding: 0,
+      },
+    },
+    isContainer: false,
+  },
+  {
+    type: 'image-button',
+    name: 'Image Button',
+    icon: '🖲️',
+    category: 'basic',
+    defaultWidth: 100,
+    defaultHeight: 64,
+    defaultProps: {
+      states: [
+        { id: 'state-1', name: 'State 1', imageId: '', value: 0 },
+        { id: 'state-2', name: 'State 2', imageId: '', value: 1 },
+      ],
+      initialState: 0,
+      currentState: 0,
+      value: 0,
+      cycleOnClick: true,
+    },
+    defaultStyles: {
+      default: {
         bgColor: 'transparent',
         borderColor: 'transparent',
         borderWidth: 0,

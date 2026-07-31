@@ -2,6 +2,7 @@
 
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type { LvglComponent } from '../types';
+import type { BoardId, CommunicationConfig } from '../types/hmi';
 
 export type ImageFormat = 'RGB565' | 'RGB888' | 'ARGB8888';
 
@@ -103,6 +104,8 @@ export interface ProjectFile {
   logicGraphs?: LogicGraph[];
   codeGenOptions: CodeGenOptions;
   // Extended fields (optional, for project round-trip)
+  boardId?: BoardId;
+  communication?: CommunicationConfig;
   display?: {
     width: number;
     height: number;
@@ -125,6 +128,7 @@ export interface ProjectPage {
   id: string;
   name: string;
   components: LvglComponent[];
+  backgroundColor?: string;
 }
 
 export interface ProjectVariable {

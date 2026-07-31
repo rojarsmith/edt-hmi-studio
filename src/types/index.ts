@@ -1,3 +1,18 @@
+import type { ModbusBinding } from './hmi';
+
+export type {
+  BoardDefinition,
+  BoardId,
+  CommunicationConfig,
+  ModbusAccess,
+  ModbusBinding,
+  ModbusDataType,
+  ModbusRegisterArea,
+  ModbusRegisterTag,
+  ModbusWidgetProperty,
+  ModbusWriteBehavior,
+} from './hmi';
+
 // Theme Types
 
 export interface ThemeColors {
@@ -177,6 +192,36 @@ export interface LvglFlags {
   disabled?: boolean;
 }
 
+/**
+ * One ordered visual/value state of an image button.
+ *
+ * `imageId` references an ImageResource from the project's Resource Manager.
+ * `value` is a uint16 exposed through the widget's `value` property and can
+ * be mapped to a Modbus Holding Register.
+ */
+export interface ImageButtonState {
+  id: string;
+  name: string;
+  imageId: string;
+  value: number;
+}
+
+/**
+ * Canonical props used by the editor, preview, and downstream code generation
+ * for the `image-button` component.
+ */
+export interface ImageButtonProps {
+  states: ImageButtonState[];
+  /** Zero-based state selected when a preview/runtime session starts. */
+  initialState: number;
+  /** Zero-based state displayed on the design canvas. */
+  currentState: number;
+  /** Numeric value of the authoring `currentState`. */
+  value: number;
+  /** Advance to the next ordered state when clicked in the preview/runtime. */
+  cycleOnClick: boolean;
+}
+
 export interface LvglComponent {
   id: string;
   type: string; // 'btn', 'label', etc.
@@ -209,6 +254,8 @@ export interface LvglComponent {
   alignOffsetY?: number;
   // Flags
   flags?: LvglFlags;
+  // Optional no-code Modbus data synchronization/write behavior
+  modbusBinding?: ModbusBinding;
 }
 
 // Component Category Definition

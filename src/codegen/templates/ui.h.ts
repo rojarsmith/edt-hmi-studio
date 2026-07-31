@@ -184,6 +184,29 @@ export function generateUiHeader(pages: Page[], options: CodeGenOptions, fonts: 
   // Main init function
   lines.push(formatFuncDecl('void', 'ui_init', []));
   lines.push('');
+
+  const imageButtons = allComponents.filter(
+    ({ component }) => component.type === 'image-button',
+  );
+  if (imageButtons.length > 0) {
+    for (const { component, pageName } of imageButtons) {
+      const varName = needsPagePrefix.has(component.id)
+        ? getComponentVarName(`${pageName}_${component.name}`, options)
+        : getComponentVarName(component.name, options);
+      lines.push(
+        formatFuncDecl('float', `${varName}_get_value`, [
+          'lv_obj_t *object',
+        ]),
+      );
+      lines.push(
+        formatFuncDecl('void', `${varName}_set_value`, [
+          'lv_obj_t *object',
+          'float value',
+        ]),
+      );
+    }
+    lines.push('');
+  }
   
   // Screen load functions
   for (const page of pages) {

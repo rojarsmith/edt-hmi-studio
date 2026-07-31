@@ -61,10 +61,10 @@ const BUILT_IN_ICONS = [
 const CATEGORIES = [
   { id: 'all', name: 'All' },
   { id: 'navigation', name: 'Navigation' },
-  { id: 'action', name: 'Operation' },
+  { id: 'action', name: 'Actions' },
   { id: 'device', name: 'Devices' },
   { id: 'content', name: 'Content' },
-  { id: 'toggle', name: 'Toggle' },
+  { id: 'toggle', name: 'Toggles' },
   { id: 'alert', name: 'Alerts' },
 ];
 
@@ -101,7 +101,7 @@ const IconLibrary: React.FC<IconLibraryProps> = ({ viewMode }) => {
 </svg>`;
     
     navigator.clipboard.writeText(svg);
-    toast.success('SVG Copied to clipboard');
+    toast.success('SVG copied to clipboard');
   };
   
   const handleCopyPath = () => {

@@ -4,6 +4,7 @@ import { defineConfig, loadEnv } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import compilePlugin from './vite-plugin-compile'
+import hmiPlugin from './vite-plugin-hmi'
 
 const compilePreviewModuleId = 'virtual:compile-preview'
 const compilePreviewModulePath = fileURLToPath(new URL('./src/components/CompilePreview/index.ts', import.meta.url))
@@ -42,6 +43,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       compilePreviewModulePlugin(enableCompilePreview),
+      hmiPlugin(),
       ...(enableCompilePreview ? [compilePlugin()] : []),
     ],
     test: {
@@ -50,8 +52,11 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/setupTests.ts'],
     },
     server: {
-      host: '0.0.0.0',
+      host: '127.0.0.1',
       port: 5173,
+    },
+    preview: {
+      host: '127.0.0.1',
     },
     build: {
       rollupOptions: {

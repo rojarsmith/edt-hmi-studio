@@ -187,7 +187,7 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
           onClick={handleUploadClick}
           disabled={isUploading}
         >
-          {isUploading ? 'Uploading...' : '📤 Upload font'}
+          {isUploading ? 'Uploading...' : '📤 Upload Font'}
         </button>
         <input
           ref={fileInputRef}
@@ -299,8 +299,8 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
               onChange={(e) => updateFont(selectedFont.id, { charset: e.target.value as CharsetType })}
             >
               <option value="ascii">ASCII (Basic)</option>
-              <option value="latin">Latin Extended (Latin Extended)</option>
-              <option value="cjk-basic">CJK Basic (CJK basic)</option>
+              <option value="latin">Latin Extended</option>
+              <option value="cjk-basic">CJK Basic</option>
               <option value="custom">Custom</option>
             </select>
           </div>

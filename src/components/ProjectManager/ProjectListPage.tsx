@@ -11,6 +11,7 @@ import { toast } from '../Toast';
 import ProjectCard from './ProjectCard';
 import NewProjectDialog from './NewProjectDialog';
 import type { Page } from '../../types';
+import type { BoardId } from '../../types/hmi';
 import './ProjectListPage.css';
 
 const ProjectListPage: React.FC = () => {
@@ -72,9 +73,9 @@ const ProjectListPage: React.FC = () => {
     }
   };
 
-  const handleCreate = async (name: string, display: DisplayConfig, lvglConfig: LvglConfig) => {
+  const handleCreate = async (name: string, boardId: BoardId, display: DisplayConfig, lvglConfig: LvglConfig) => {
     try {
-      const id = await createProject(name, display, lvglConfig);
+      const id = await createProject(name, boardId, display, lvglConfig);
       setShowNewDialog(false);
       await handleOpenProject(id);
     } catch (err) {
@@ -85,7 +86,7 @@ const ProjectListPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     const config = await getProjectConfig(id);
-    const confirmed = await modal.confirm(`Delete project "${config?.name || id}"? This cannot be undone.`);
+    const confirmed = await modal.confirm(`Delete project "${config?.name || id}"? This action cannot be undone.`);
     if (confirmed) {
       await deleteProject(id);
       toast.success('Project deleted');
@@ -130,7 +131,7 @@ const ProjectListPage: React.FC = () => {
           />
           <div className="plp-actions">
             <button className="plp-btn plp-btn-primary" onClick={() => setShowNewDialog(true)}>
-              + New Project
+          + New Project
             </button>
             <button className="plp-btn" onClick={() => fileInputRef.current?.click()}>
               📂 Import Project

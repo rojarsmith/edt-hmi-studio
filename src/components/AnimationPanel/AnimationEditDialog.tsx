@@ -38,8 +38,8 @@ const PROPERTY_OPTIONS = [
   { value: 'y', label: 'Y Coordinate' },
   { value: 'width', label: 'Width' },
   { value: 'height', label: 'Height' },
-  { value: 'transform_zoom', label: 'Scale (transform_zoom)' },
-  { value: 'transform_angle', label: 'Rotation (transform_angle)' },
+  { value: 'transform_zoom', label: 'Zoom (transform_zoom)' },
+  { value: 'transform_angle', label: 'Rotation Angle (transform_angle)' },
 ];
 
 function getDefaultsForType(type: AnimationType): { property: string; startValue: number; endValue: number } {

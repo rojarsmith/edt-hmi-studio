@@ -1,0 +1,41 @@
+.modbus-binding-section {
+  border-top: 2px solid #4f79b7;
+}
+
+.modbus-binding-section.enabled {
+  background: #f7faff;
+}
+
+.modbus-binding-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modbus-binding-header label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  color: #405573;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.modbus-binding-header input {
+  width: auto;
+}
+
+.modbus-binding-body {
+  padding-top: 4px;
+}
+
+.modbus-binding-hint {
+  margin-top: 8px;
+  padding: 7px 8px;
+  border-radius: 4px;
+  background: #e9f1fc;
+  color: #526a8d;
+  font-size: 10px;
+  line-height: 1.45;
+}

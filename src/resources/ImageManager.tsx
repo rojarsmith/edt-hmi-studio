@@ -111,7 +111,7 @@ const ImageManager: React.FC<ImageManagerProps> = ({ viewMode }) => {
           onClick={handleUploadClick}
           disabled={isUploading}
         >
-          {isUploading ? 'Uploading...' : '📤 Upload image'}
+          {isUploading ? 'Uploading...' : '📤 Upload Image'}
         </button>
         <input
           ref={fileInputRef}
@@ -178,7 +178,7 @@ const ImageManager: React.FC<ImageManagerProps> = ({ viewMode }) => {
             />
           </div>
           <div className="detail-row">
-            <label>Size:</label>
+            <label>Dimensions:</label>
             <span>{selectedImage.width} × {selectedImage.height}</span>
           </div>
           <div className="detail-row">
@@ -231,7 +231,7 @@ const ImageManager: React.FC<ImageManagerProps> = ({ viewMode }) => {
               <pre className="code-preview">{generatedCode}</pre>
             </div>
             <div className="modal-footer">
-              <button onClick={handleCopyCode}>📋 Copy code</button>
+              <button onClick={handleCopyCode}>📋 Copy Code</button>
               <button onClick={handleDownloadCode}>💾 Download File</button>
             </div>
           </div>

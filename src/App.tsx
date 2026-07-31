@@ -30,6 +30,7 @@ import { ResourcePanel, useResourceStore } from './resources';
 import { useLogicEditorStore } from './components/LogicEditor';
 import { ProjectListPage } from './components/ProjectManager';
 import { ProjectSettings } from './components/ProjectSettings';
+import CommunicationPanel from './components/CommunicationPanel';
 import {
   downloadProject,
   loadProjectFromFile,
@@ -42,7 +43,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { getComponentDefinition } from './utils/componentDefinitions';
 import './App.css';
 
-type TabType = 'design' | 'logic' | 'code' | 'preview';
+type TabType = 'design' | 'logic' | 'communication' | 'code' | 'preview';
 const isCompilePreviewEnabled = import.meta.env.VITE_ENABLE_COMPILE_PREVIEW !== 'false';
 
 const App: React.FC = () => {
@@ -226,7 +227,7 @@ const EditorView: React.FC<EditorViewProps> = ({
       await saveProjectData(currentProjectId, pages, logicGraphs, images, fonts);
       const project = await exportProject(currentProjectId);
       downloadProject(project);
-      success(`Project exported`);
+      success('Project exported');
     } catch (err) {
       error('Export failed: ' + String(err));
     }
@@ -468,6 +469,13 @@ const EditorView: React.FC<EditorViewProps> = ({
           </div>
         );
 
+      case 'communication':
+        return (
+          <div className="app-body full-panel">
+            <CommunicationPanel />
+          </div>
+        );
+
       case 'code':
         return (
           <div className="app-body full-panel">
@@ -539,6 +547,12 @@ const EditorView: React.FC<EditorViewProps> = ({
             onClick={() => setActiveTab('logic')}
           >
             🔗 Logic
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'communication' ? 'active' : ''}`}
+            onClick={() => setActiveTab('communication')}
+          >
+            🔌 Communication
           </button>
           <button
             className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}

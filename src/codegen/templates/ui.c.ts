@@ -21,6 +21,52 @@ import {
   generateUserCodeSection,
 } from '../formatters/cFormatter';
 
+interface ImageButtonState {
+  id?: string;
+  name?: string;
+  imageId?: string;
+  value?: number;
+}
+
+function getImageButtonStates(component: LvglComponent): ImageButtonState[] {
+  const states = Array.isArray(component.props?.states)
+    ? component.props.states.filter(
+        (state: unknown): state is ImageButtonState =>
+          typeof state === 'object' && state !== null,
+      )
+    : [];
+
+  return states.length > 0 ? states : [{ value: 0 }];
+}
+
+function getImageButtonInitialState(
+  component: LvglComponent,
+  stateCount: number,
+): number {
+  const requested = Number.isFinite(component.props?.initialState)
+    ? Math.trunc(component.props.initialState)
+    : 0;
+  return Math.max(0, Math.min(Math.max(0, stateCount - 1), requested));
+}
+
+function getImageResource(
+  imageId: string | undefined,
+  imageResources: ImageResource[],
+): ImageResource | undefined {
+  if (!imageId) return undefined;
+  return imageResources.find(
+    (image) =>
+      image.id === imageId ||
+      image.name === imageId ||
+      image.cArrayName === imageId,
+  );
+}
+
+function finiteInt32(value: unknown, fallback = 0): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.max(-2147483648, Math.min(2147483647, Math.trunc(value)));
+}
+
 /**
  * Get LVGL create function for component type
  */
@@ -32,6 +78,7 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
     btn: 'lv_btn_create',
     label: 'lv_label_create',
     img: isV9 ? 'lv_image_create' : 'lv_img_create',
+    'image-button': isV9 ? 'lv_image_create' : 'lv_img_create',
     line: 'lv_line_create',
     textarea: 'lv_textarea_create',
     dropdown: 'lv_dropdown_create',
@@ -510,6 +557,20 @@ function generatePropsCode(
       if (props.scaleMode === 'cover' || props.scaleMode === 'contain') {
         lines.push(`${indent}// Note: Scale mode "${props.scaleMode}" needs custom implementation`);
       }
+      break;
+
+    case 'image-button':
+      lines.push(`${indent}lv_obj_add_flag(${varName}, LV_OBJ_FLAG_CLICKABLE);`);
+      if (isV9) {
+        lines.push(`${indent}lv_image_set_inner_align(${varName}, LV_IMAGE_ALIGN_STRETCH);`);
+      } else {
+        lines.push(`${indent}// LVGL v8 image buttons use the source image's native sizing.`);
+      }
+      lines.push(`${indent}${varName}_image_button_context.object = ${varName};`);
+      lines.push(`${indent}ui_image_button_apply_state(&${varName}_image_button_context);`);
+      lines.push(
+        `${indent}lv_obj_add_event_cb(${varName}, ui_image_button_event_cb, LV_EVENT_CLICKED, &${varName}_image_button_context);`,
+      );
       break;
       
     case 'line':
@@ -1126,7 +1187,6 @@ function generateScreenInitFunc(
   imageResources: ImageResource[] = [],
   defaultFont?: string,
   defaultFontSize?: number,
-  fontResources: FontResource[] = [],
   useBuiltinSymbols?: boolean,
   symbolFont?: string
 ): string {
@@ -1210,6 +1270,12 @@ function collectUsedImages(pages: Page[], imageResources: ImageResource[]): Imag
         );
         if (matched) usedIds.add(matched.id);
       }
+      if (comp.type === 'image-button') {
+        for (const state of getImageButtonStates(comp)) {
+          const matched = getImageResource(state.imageId, imageResources);
+          if (matched) usedIds.add(matched.id);
+        }
+      }
       walk(comp.children);
     }
   };
@@ -1219,6 +1285,117 @@ function collectUsedImages(pages: Page[], imageResources: ImageResource[]): Imag
   }
 
   return imageResources.filter((img) => usedIds.has(img.id));
+}
+
+function generateImageButtonSupport(
+  components: { comp: LvglComponent; pageName: string }[],
+  needsPagePrefix: Set<string>,
+  options: CodeGenOptions,
+  imageResources: ImageResource[],
+): string[] {
+  const imageButtons = components.filter(
+    ({ comp }) => comp.type === 'image-button',
+  );
+  if (imageButtons.length === 0) return [];
+
+  const imageSetSource =
+    options.lvglVersion === '9' ? 'lv_image_set_src' : 'lv_img_set_src';
+  const lines: string[] = [
+    'typedef struct {',
+    '    lv_obj_t *object;',
+    '    const void *const *images;',
+    '    const int32_t *values;',
+    '    uint16_t state_count;',
+    '    uint16_t current_index;',
+    '    bool cycle_on_click;',
+    '} ui_image_button_context_t;',
+    '',
+    'static void ui_image_button_apply_state(ui_image_button_context_t *context) {',
+    '    const void *image;',
+    '',
+    '    if ((context == NULL) || (context->object == NULL) ||',
+    '        (context->state_count == 0U) ||',
+    '        (context->current_index >= context->state_count)) {',
+    '        return;',
+    '    }',
+    '',
+    '    image = context->images[context->current_index];',
+    '    if (image != NULL) {',
+    `        ${imageSetSource}(context->object, image);`,
+    '    }',
+    '}',
+    '',
+    'static void ui_image_button_event_cb(lv_event_t *event) {',
+    '    ui_image_button_context_t *context =',
+    '        (ui_image_button_context_t *)lv_event_get_user_data(event);',
+    '',
+    '    if ((context == NULL) || !context->cycle_on_click ||',
+    '        (context->state_count == 0U)) {',
+    '        return;',
+    '    }',
+    '',
+    '    context->current_index =',
+    '        (uint16_t)((context->current_index + 1U) % context->state_count);',
+    '    ui_image_button_apply_state(context);',
+    '    (void)lv_obj_send_event(context->object, LV_EVENT_VALUE_CHANGED, NULL);',
+    '}',
+    '',
+  ];
+
+  for (const { comp, pageName } of imageButtons) {
+    const varName = needsPagePrefix.has(comp.id)
+      ? getComponentVarName(`${pageName}_${comp.name}`, options)
+      : getComponentVarName(comp.name, options);
+    const states = getImageButtonStates(comp);
+    const images = states.map((state) => {
+      const image = getImageResource(state.imageId, imageResources);
+      return image ? `&${image.cArrayName}` : 'NULL';
+    });
+    const values = states.map((state) => finiteInt32(state.value));
+    const initialState = getImageButtonInitialState(comp, states.length);
+
+    lines.push(
+      `static const void *const ${varName}_state_images[] = {`,
+      `    ${images.join(', ')},`,
+      '};',
+      `static const int32_t ${varName}_state_values[] = {`,
+      `    ${values.join(', ')},`,
+      '};',
+      `static ui_image_button_context_t ${varName}_image_button_context = {`,
+      '    .object = NULL,',
+      `    .images = ${varName}_state_images,`,
+      `    .values = ${varName}_state_values,`,
+      `    .state_count = ${states.length}U,`,
+      `    .current_index = ${initialState}U,`,
+      `    .cycle_on_click = ${comp.props?.cycleOnClick === false ? 'false' : 'true'},`,
+      '};',
+      '',
+      `float ${varName}_get_value(lv_obj_t *object) {`,
+      '    (void)object;',
+      `    if (${varName}_image_button_context.state_count == 0U) {`,
+      '        return 0.0f;',
+      '    }',
+      `    return (float)${varName}_image_button_context.values[`,
+      `        ${varName}_image_button_context.current_index];`,
+      '}',
+      '',
+      `void ${varName}_set_value(lv_obj_t *object, float value) {`,
+      '    uint16_t index;',
+      '    (void)object;',
+      '',
+      `    for (index = 0U; index < ${varName}_image_button_context.state_count; ++index) {`,
+      `        if (${varName}_image_button_context.values[index] == (int32_t)value) {`,
+      `            ${varName}_image_button_context.current_index = index;`,
+      `            ui_image_button_apply_state(&${varName}_image_button_context);`,
+      '            return;',
+      '        }',
+      '    }',
+      '}',
+      '',
+    );
+  }
+
+  return lines;
 }
 
 /**
@@ -1328,7 +1505,6 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
     // Generate mutable font wrapper for fallback support
     // (const fonts in WASM are placed in read-only memory, so fallback pointer cannot be set at runtime)
     if (defaultFont && !/^montserrat_\d+$/.test(defaultFont)) {
-      const defaultFontCName = `${defaultFont}_${defaultFontSize || 16}`;
       lines.push('');
       if (options.generateComments) {
         lines.push(`${generateComment('Mutable copy of default font with symbol fallback (const fonts are read-only in WASM)', options)}`);
@@ -1424,6 +1600,20 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
     }
     lines.push('');
   }
+
+  const imageButtonSupport = generateImageButtonSupport(
+    allComponents,
+    needsPagePrefix,
+    options,
+    imageResources,
+  );
+  if (imageButtonSupport.length > 0) {
+    if (options.generateComments) {
+      lines.push(generateSectionHeader('Image Button State Support', options));
+      lines.push('');
+    }
+    lines.push(...imageButtonSupport);
+  }
   
   // Screen init functions (static)
   if (options.generateComments) {
@@ -1432,7 +1622,7 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
   }
   
   for (const page of pages) {
-    lines.push(generateScreenInitFunc(page, options, needsPagePrefix, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont));
+    lines.push(generateScreenInitFunc(page, options, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
     lines.push('');
   }
   

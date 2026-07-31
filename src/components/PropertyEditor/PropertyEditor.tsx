@@ -3,8 +3,22 @@ import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
 import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
-import type { LvglComponent, StyleProps, LvglAlign, LvglFlags } from '../../types';
+import type {
+  ImageButtonState,
+  LvglComponent,
+  StyleProps,
+  LvglAlign,
+  LvglFlags,
+} from '../../types';
+import type { ModbusRegisterTag } from '../../types/hmi';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
+import ModbusBindingEditor from './ModbusBindingEditor';
+import {
+  clampImageButtonStateIndex,
+  createImageButtonState,
+  normalizeImageButtonProps,
+  normalizeImageButtonStateValue,
+} from './imageButtonModel';
 import './PropertyEditor.css';
 
 // Inline CollapsibleSection component
@@ -74,13 +88,13 @@ function GridTemplatePreview({ value }: { value: string }) {
 
 // Style section visibility per component type (Task 2)
 const STYLE_SECTION_VISIBILITY: Record<string, Set<string>> = {
-  shadow: new Set(['btn', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'table', 'chart', 'calendar', 'bar', 'arc']),
-  transform: new Set(['btn', 'label', 'img', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'checkbox', 'switch', 'slider', 'bar', 'arc', 'spinner', 'chart', 'table', 'calendar']),
+  shadow: new Set(['btn', 'image-button', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'table', 'chart', 'calendar', 'bar', 'arc']),
+  transform: new Set(['btn', 'label', 'img', 'image-button', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'checkbox', 'switch', 'slider', 'bar', 'arc', 'spinner', 'chart', 'table', 'calendar']),
   gradient: new Set(['btn', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'bar', 'slider']),
-  outline: new Set(['btn', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'checkbox', 'switch', 'slider', 'bar', 'arc', 'table', 'chart', 'calendar']),
+  outline: new Set(['btn', 'image-button', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'checkbox', 'switch', 'slider', 'bar', 'arc', 'table', 'chart', 'calendar']),
   scrollbar: new Set(['obj', 'tabview', 'tileview', 'win', 'textarea']),
   textStyle: new Set(['btn', 'label', 'textarea', 'dropdown', 'checkbox', 'table', 'calendar']),
-  blendMode: new Set(['btn', 'label', 'img', 'obj', 'chart']),
+  blendMode: new Set(['btn', 'label', 'img', 'image-button', 'obj', 'chart']),
 };
 
 // Flags that only apply to container-like components
@@ -188,14 +202,54 @@ const STYLE_STATES: { key: StyleState; label: string }[] = [
 
 const PropertyEditor: React.FC = () => {
   const { selection, getComponentById, updateComponent } = useEditorStore();
+  const currentProjectId = useAppStore((state) => state.currentProjectId);
+  const projectList = useProjectStore((state) => state.projects);
+  const getProjectConfig = useProjectStore((state) => state.getProjectConfig);
   const [activeStyleState, setActiveStyleState] = useState<StyleState>('default');
   const [paddingLinked, setPaddingLinked] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [loadedCommunication, setLoadedCommunication] = useState<{
+    projectId: string;
+    enabled: boolean;
+    tags: ModbusRegisterTag[];
+  } | null>(null);
   const [radiusLinked, setRadiusLinked] = useState(true);
   
   const selectedId = selection.selectedIds[0];
   const component = selectedId ? getComponentById(selectedId) : undefined;
   const definition = component ? getComponentDefinition(component.type) : undefined;
+  const listedProjectConfig = useMemo(
+    () => projectList.find((item) => item.config.id === currentProjectId)?.config,
+    [currentProjectId, projectList],
+  );
+  const modbusTags = listedProjectConfig?.communication.tags
+    ?? (
+      loadedCommunication?.projectId === currentProjectId
+        ? loadedCommunication.tags
+        : []
+    );
+  const communicationEnabled = listedProjectConfig?.communication.enabled
+    ?? (
+      loadedCommunication?.projectId === currentProjectId
+        ? loadedCommunication.enabled
+        : false
+    );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentProjectId || listedProjectConfig) return;
+    getProjectConfig(currentProjectId).then((config) => {
+      if (!cancelled && config) {
+        setLoadedCommunication({
+          projectId: currentProjectId,
+          enabled: config.communication.enabled,
+          tags: config.communication.tags.map((tag) => ({ ...tag })),
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProjectId, getProjectConfig, listedProjectConfig]);
 
   // Look up parent component for flex/grid child properties
   const parentComponent = useMemo(() => {
@@ -457,7 +511,7 @@ const PropertyEditor: React.FC = () => {
           </div>
           <div className="property-row two-col">
             <div className="property-field">
-              <label>Offset X</label>
+              <label>X Offset</label>
               <input
                 type="number"
                 value={component.alignOffsetX || 0}
@@ -465,7 +519,7 @@ const PropertyEditor: React.FC = () => {
               />
             </div>
             <div className="property-field">
-              <label>Offset Y</label>
+              <label>Y Offset</label>
               <input
                 type="number"
                 value={component.alignOffsetY || 0}
@@ -502,7 +556,7 @@ const PropertyEditor: React.FC = () => {
             <div className="style-state-info">
               {hasStateOverride ? (
                 <button className="clear-override-btn" onClick={handleClearStateOverride}>
-                  Clear{STYLE_STATES.find(s => s.key === activeStyleState)?.label}State Styles
+                  Clear {STYLE_STATES.find(s => s.key === activeStyleState)?.label} State Style
                 </button>
               ) : (
                 <span className="inherit-hint">Inherits the default style. Editing creates an independent state style.</span>
@@ -615,7 +669,7 @@ const PropertyEditor: React.FC = () => {
             <div className="border-side-group">
               {([
                 ['full', 'All'], ['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'],
-                ['right', 'Right'], ['top_bottom', 'Top and Bottom'], ['left_right', 'Left and Right'], ['none', 'None'],
+                ['right', 'Right'], ['top_bottom', 'Top & Bottom'], ['left_right', 'Left & Right'], ['none', 'None'],
               ] as const).map(([val, lbl]) => (
                 <button
                   key={val}
@@ -738,7 +792,7 @@ const PropertyEditor: React.FC = () => {
             </div>
             <div className="property-row two-col">
               <div className="property-field">
-                <label>Offset X</label>
+                <label>X Offset</label>
                 <input
                   type="number"
                   value={currentStyles.shadowOffsetX || 0}
@@ -746,7 +800,7 @@ const PropertyEditor: React.FC = () => {
                 />
               </div>
               <div className="property-field">
-                <label>Offset Y</label>
+                <label>Y Offset</label>
                 <input
                   type="number"
                   value={currentStyles.shadowOffsetY || 0}
@@ -846,7 +900,7 @@ const PropertyEditor: React.FC = () => {
                 onChange={(e) => handleStyleChange('scrollbarMode', e.target.value)}
                 style={{ flex: 1, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
               >
-                <option value="off">Close</option>
+                <option value="off">Off</option>
                 <option value="on">Always Visible</option>
                 <option value="active">Visible While Active</option>
                 <option value="auto">Auto</option>
@@ -1026,6 +1080,14 @@ const PropertyEditor: React.FC = () => {
 
         {/* Component-specific props */}
         {renderComponentProps(component, handlePropsChange, handleBatchPropsChange)}
+
+        <ModbusBindingEditor
+          componentType={component.type}
+          binding={component.modbusBinding}
+          tags={modbusTags}
+          communicationEnabled={communicationEnabled}
+          onChange={(modbusBinding) => handlePropertyChange('modbusBinding', modbusBinding)}
+        />
 
         {/* Flex/Grid child properties */}
         {parentLayout === 'flex' && (
@@ -1302,7 +1364,7 @@ function ComponentFontSelector({
   // When font changes, adjust fontSize if needed
   const handleFontChange = (value: string) => {
     if (!value) {
-      // "Default" selected - clear fontResource; keep fontSize only if default is custom and size differs
+      // "Default" selected - clear fontResource; keep fontSize only if default is custom and size differs.
       const defaultIsCustom = projectDefaultFont && !isBuiltinFont(projectDefaultFont);
       if (defaultIsCustom && fontSize !== undefined && fontSize !== (projectDefaultFontSize || 16)) {
         // Keep fontSize to indicate this component uses default font but at a different size
@@ -1422,7 +1484,7 @@ function ContainerLayoutEditor({
           value={props.scrollDir || 'none'}
           onChange={(e) => onChange('scrollDir', e.target.value)}
         >
-          <option value="none">None</option>
+          <option value="none">No Scrolling</option>
           <option value="hor">Horizontal</option>
           <option value="ver">Vertical</option>
           <option value="all">Both Directions</option>
@@ -1452,7 +1514,7 @@ function ContainerLayoutEditor({
             </select>
           </div>
           <div className="property-row">
-            <label>Spacing</label>
+            <label>Gap</label>
             <input
               type="number"
               value={props.gap || 0}
@@ -1548,7 +1610,7 @@ function ContainerLayoutEditor({
               />
             </div>
             <div className="property-field">
-              <label>Line Spacing</label>
+              <label>Row Gap</label>
               <input
                 type="number"
                 value={props.gridRowGap || 0}
@@ -1599,9 +1661,9 @@ function renderComponentProps(
                 value={props.textAlign || 'center'}
                 onChange={(e) => onChange('textAlign', e.target.value)}
               >
-                <option value="left">Align Left</option>
+                <option value="left">Left</option>
                 <option value="center">Center</option>
-                <option value="right">Align Right</option>
+                <option value="right">Right</option>
               </select>
             </div>
           </div>
@@ -1633,9 +1695,9 @@ function renderComponentProps(
               value={props.textAlign || 'left'}
               onChange={(e) => onChange('textAlign', e.target.value)}
             >
-              <option value="left">Align Left</option>
+              <option value="left">Left</option>
               <option value="center">Center</option>
-              <option value="right">Align Right</option>
+              <option value="right">Right</option>
             </select>
           </div>
           <div className="property-row">
@@ -1645,7 +1707,7 @@ function renderComponentProps(
               onChange={(e) => onChange('longMode', e.target.value)}
             >
               <option value="wrap">Wrap</option>
-              <option value="scroll">Scrolling</option>
+              <option value="scroll">Scroll</option>
               <option value="dot">Ellipsis</option>
               <option value="clip">Clip</option>
             </select>
@@ -1910,6 +1972,15 @@ function renderComponentProps(
     case 'img':
       return <ImagePropsEditor props={props} onChange={onChange} />;
 
+    case 'image-button':
+      return (
+        <ImageButtonEditor
+          props={props}
+          onChange={onChange}
+          onBatchChange={onBatchChange}
+        />
+      );
+
     case 'line':
       return <LineEditor props={props} onChange={onChange} />;
 
@@ -2035,7 +2106,7 @@ function renderComponentProps(
         <div className="property-section">
           <div className="section-header">Spinner</div>
           <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
-            <label>Spin Speed: {props.speed || 1000}ms</label>
+            <label>Rotation Speed: {props.speed || 1000} ms</label>
             <input
               type="range"
               min={100}
@@ -2165,7 +2236,7 @@ function ImagePropsEditor({
           type="text"
           value={props.src || ''}
           onChange={(e) => onChange('src', e.target.value)}
-          placeholder="or type an image ID / URL"
+          placeholder="Or enter an image ID or URL manually"
           style={{ fontSize: 11, color: '#888' }}
         />
       </div>
@@ -2175,7 +2246,7 @@ function ImagePropsEditor({
           value={props.scaleMode || 'none'}
           onChange={(e) => onChange('scaleMode', e.target.value)}
         >
-          <option value="none">Original</option>
+          <option value="none">Original Size</option>
           <option value="cover">Cover</option>
           <option value="contain">Contain</option>
         </select>
@@ -2190,6 +2261,273 @@ function ImagePropsEditor({
           onChange={(e) => onChange('rotation', parseInt(e.target.value) || 0)}
         />
       </div>
+    </div>
+  );
+}
+
+export function ImageButtonEditor({
+  props,
+  onChange,
+  onBatchChange,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  props: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onBatchChange?: (updates: Record<string, any>) => void;
+}): React.ReactNode {
+  const images = useResourceStore((state) => state.images);
+  const imageButton = normalizeImageButtonProps(props);
+  const { states, initialState, currentState } = imageButton;
+
+  const applyUpdates = (updates: Record<string, unknown>) => {
+    if (onBatchChange) {
+      onBatchChange(updates);
+      return;
+    }
+    Object.entries(updates).forEach(([key, value]) => onChange(key, value));
+  };
+
+  const commitStates = (
+    nextStates: ImageButtonState[],
+    preferredInitialId = states[initialState]?.id,
+    preferredCurrentId = states[currentState]?.id,
+  ) => {
+    const matchedInitial = preferredInitialId
+      ? nextStates.findIndex((state) => state.id === preferredInitialId)
+      : -1;
+    const matchedCurrent = preferredCurrentId
+      ? nextStates.findIndex((state) => state.id === preferredCurrentId)
+      : -1;
+    const nextInitial = matchedInitial >= 0
+      ? matchedInitial
+      : clampImageButtonStateIndex(initialState, nextStates.length);
+    const nextCurrent = matchedCurrent >= 0
+      ? matchedCurrent
+      : clampImageButtonStateIndex(currentState, nextStates.length);
+
+    applyUpdates({
+      states: nextStates,
+      initialState: nextInitial,
+      currentState: nextCurrent,
+      value: nextStates[nextCurrent]?.value ?? 0,
+    });
+  };
+
+  const updateState = (
+    index: number,
+    updates: Partial<ImageButtonState>,
+  ) => {
+    const nextStates = states.map((state, stateIndex) => (
+      stateIndex === index ? { ...state, ...updates } : state
+    ));
+    commitStates(nextStates);
+  };
+
+  const moveState = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= states.length) return;
+    const nextStates = [...states];
+    [nextStates[index], nextStates[target]] = [
+      nextStates[target],
+      nextStates[index],
+    ];
+    commitStates(nextStates);
+  };
+
+  const removeState = (index: number) => {
+    if (states.length <= 1) return;
+    commitStates(states.filter((_, stateIndex) => stateIndex !== index));
+  };
+
+  const addState = () => {
+    commitStates([...states, createImageButtonState(states)]);
+  };
+
+  return (
+    <div className="property-section">
+      <div className="section-header">Image Button</div>
+
+      <div className="property-row">
+        <label>Initial State</label>
+        <select
+          aria-label="Initial image-button state"
+          value={initialState}
+          disabled={states.length === 0}
+          onChange={(event) => {
+            applyUpdates({
+              initialState: clampImageButtonStateIndex(
+                Number(event.target.value),
+                states.length,
+              ),
+            });
+          }}
+        >
+          {states.map((state, index) => (
+            <option key={state.id} value={index}>
+              {index + 1}: {state.name} ({state.value})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="property-row">
+        <label>Current State</label>
+        <select
+          aria-label="Current image-button state"
+          value={currentState}
+          disabled={states.length === 0}
+          onChange={(event) => {
+            const nextCurrent = clampImageButtonStateIndex(
+              Number(event.target.value),
+              states.length,
+            );
+            applyUpdates({
+              currentState: nextCurrent,
+              value: states[nextCurrent]?.value ?? 0,
+            });
+          }}
+        >
+          {states.map((state, index) => (
+            <option key={state.id} value={index}>
+              {index + 1}: {state.name} ({state.value})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="property-row">
+        <label>Cycle on Click</label>
+        <input
+          aria-label="Cycle image-button states on click"
+          type="checkbox"
+          checked={imageButton.cycleOnClick}
+          onChange={(event) => onChange('cycleOnClick', event.target.checked)}
+        />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {states.map((state, index) => {
+          const selectedImage = images.find((image) => image.id === state.imageId);
+          return (
+            <div
+              key={state.id}
+              data-testid={`image-button-state-${index}`}
+              style={{
+                border: '1px solid #ddd',
+                borderRadius: 6,
+                padding: 8,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <strong style={{ flex: 1 }}>State {index + 1}</strong>
+                <button
+                  type="button"
+                  title="Move State Up"
+                  disabled={index === 0}
+                  onClick={() => moveState(index, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  title="Move State Down"
+                  disabled={index === states.length - 1}
+                  onClick={() => moveState(index, 1)}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  title="Delete State"
+                  disabled={states.length <= 1}
+                  onClick={() => removeState(index)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="property-row">
+                <label>Name</label>
+                <input
+                  aria-label={`Image-button state ${index + 1} name`}
+                  type="text"
+                  value={state.name}
+                  onChange={(event) => updateState(index, {
+                    name: event.target.value,
+                  })}
+                />
+              </div>
+
+              <div className="property-row">
+                <label>Image</label>
+                <select
+                  aria-label={`Image-button state ${index + 1} image`}
+                  value={state.imageId}
+                  onChange={(event) => updateState(index, {
+                    imageId: event.target.value,
+                  })}
+                >
+                  <option value="">Select a Resource Manager image...</option>
+                  {images.map((image) => (
+                    <option key={image.id} value={image.id}>
+                      {image.name} ({image.width}×{image.height})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedImage && (
+                <img
+                  src={selectedImage.data}
+                  alt={`${state.name} preview`}
+                  style={{
+                    maxWidth: '100%',
+                    height: 54,
+                    objectFit: 'contain',
+                    background: '#f3f3f3',
+                    borderRadius: 4,
+                  }}
+                />
+              )}
+
+              <div className="property-row">
+                <label>Numeric Value</label>
+                <input
+                  aria-label={`Image-button state ${index + 1} value`}
+                  type="number"
+                  min={0}
+                  max={65535}
+                  step={1}
+                  value={state.value}
+                  onChange={(event) => updateState(index, {
+                    value: normalizeImageButtonStateValue(
+                      event.target.valueAsNumber,
+                    ),
+                  })}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={addState}
+        style={{ marginTop: 8, width: '100%' }}
+      >
+        + Add State
+      </button>
+
+      <p className="modbus-binding-hint">
+        States are ordered. The design canvas shows the current state; the
+        preview starts at the initial state and advances on each click.
+      </p>
     </div>
   );
 }
@@ -2288,10 +2626,10 @@ function TableEditor({
         />
       </div>
       <div className="table-editor-actions">
-        <button onClick={addRow} title="Add row">+ lines</button>
-        <button onClick={addCol} title="Add column">+ Column</button>
-        <button onClick={deleteRow} title="Delete last row" disabled={rows <= 1}>- lines</button>
-        <button onClick={deleteCol} title="Delete last column" disabled={cols <= 1}>- Column</button>
+        <button onClick={addRow} title="Add Row">+ Row</button>
+        <button onClick={addCol} title="Add Column">+ Column</button>
+        <button onClick={deleteRow} title="Delete Last Row" disabled={rows <= 1}>- Row</button>
+        <button onClick={deleteCol} title="Delete Last Column" disabled={cols <= 1}>- Column</button>
       </div>
       {selectedCell && (
         <div className="table-cell-align-bar">
@@ -2429,7 +2767,7 @@ function WindowEditor({
                 type="text"
                 value={btn.id}
                 onChange={(e) => updateHeaderButton(i, 'id', e.target.value)}
-                placeholder="ButtonID"
+                placeholder="Button ID"
                 className="win-btn-id-input"
               />
               <button className="win-btn-delete" onClick={() => removeHeaderButton(i)} title="Delete">✕</button>
@@ -2652,7 +2990,7 @@ function CalendarEditor({
     const trimmed = dateInput.trim();
     if (!trimmed) return;
     if (!isValidDate(trimmed)) {
-      setDateError('Invalid format, use YYYY-MM-DD');
+      setDateError('Invalid format. Use YYYY-MM-DD.');
       return;
     }
     if (highlightedDates.includes(trimmed)) {
@@ -2895,7 +3233,7 @@ function TabManager({
           <option value="right">Right</option>
         </select>
       </div>
-      <div className="tab-manager-hint">Dropped widgets are assigned to the active Tab</div>
+      <div className="tab-manager-hint">Dropped widgets are automatically assigned to the active tab.</div>
     </div>
   );
 }
@@ -2991,7 +3329,7 @@ function TileGridEditor({
           />
         </div>
       </div>
-      <div className="tile-grid-hint">Dropped widgets are assigned to the selected Tile</div>
+      <div className="tile-grid-hint">Dropped widgets are automatically assigned to the selected tile.</div>
     </div>
   );
 }
@@ -2999,7 +3337,7 @@ function TileGridEditor({
 // Font size input with preset dropdown + custom number
 const FONT_SIZE_PRESETS = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72];
 
-function FontSizeInput({ value, onChange }: { value: number; onChange: (v: number) => void }): React.ReactNode {
+export function FontSizeInput({ value, onChange }: { value: number; onChange: (v: number) => void }): React.ReactNode {
   const isPreset = FONT_SIZE_PRESETS.includes(value);
   return (
     <div className="font-size-input">

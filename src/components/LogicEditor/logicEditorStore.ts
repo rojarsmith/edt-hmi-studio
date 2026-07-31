@@ -591,7 +591,7 @@ export const useLogicEditorStore = create<LogicEditorStore>((set, get) => ({
       const importedGraph: LogicGraph = {
         ...graph,
         id: newId,
-        name: `${graph.name} (Import)`,
+        name: `${graph.name} (Imported)`,
       };
 
       set(state => ({

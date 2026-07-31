@@ -2,6 +2,7 @@
 // Generates C code from logic orchestration graphs
 
 import type { CodeGenOptions } from '../types';
+import type { LvglComponent, Page } from '../../types';
 import type {
   LogicGraph,
   LogicNode,
@@ -14,22 +15,71 @@ import {
   generateUserCodeSection,
   getIndent,
 } from '../formatters/cFormatter';
+import {
+  getComponentVarName,
+  getScreenLoadFuncName,
+  getScreenVarName,
+} from '../utils/nameUtils';
+
+interface ComponentReference {
+  component?: LvglComponent;
+  pageName: string;
+  variableName: string;
+}
+
+interface PageReference {
+  page: Page;
+  variableName: string;
+  loadFunctionName: string;
+  resolved: boolean;
+}
+
+interface LogicCodegenContext {
+  options: CodeGenOptions;
+  componentsById: Map<string, ComponentReference>;
+  componentsByName: Map<string, ComponentReference>;
+  pagesById: Map<string, PageReference>;
+  pagesByName: Map<string, PageReference>;
+}
 
 /**
  * Generate ui_logic.c source file from logic graphs
  */
 export function generateLogicSource(
   options: CodeGenOptions,
-  graphs: LogicGraph[] = []
+  graphs: LogicGraph[] = [],
+  pages: Page[] = [],
 ): string {
+  const context = createLogicCodegenContext(pages, options);
   const lines: string[] = [];
+  const hasHoldingRegisterNodes = graphs.some(graph =>
+    graph.nodes.some(node => node.subType === 'modbus_holding_register')
+  );
+  const hasButtonTextNodes = graphs.some(graph =>
+    graph.nodes.some(node =>
+      node.subType === 'set_text'
+      && resolveComponent(node.params.targetComponent, context, options).component?.type === 'btn'
+    )
+  );
   
   // Includes
   lines.push(generateInclude('ui.h'));
   lines.push(generateInclude('ui_logic.h'));
+  if (hasHoldingRegisterNodes) {
+    lines.push(generateInclude('hmi_runtime.h'));
+  }
   lines.push(generateInclude('string.h', true));
   lines.push(generateInclude('stdio.h', true));
   lines.push('');
+
+  if (hasHoldingRegisterNodes) {
+    lines.push(generateHoldingRegisterReadHelper(options));
+    lines.push('');
+  }
+  if (hasButtonTextNodes) {
+    lines.push(generateButtonSetTextHelper(options));
+    lines.push('');
+  }
   
   // Collect all variables from all graphs
   const allVariables = collectAllVariables(graphs);
@@ -52,14 +102,21 @@ export function generateLogicSource(
     }
   }
 
-  // Forward declarations for timer callbacks
+  // Forward declarations for callbacks
   const timerGraphs = graphs.filter(g =>
     g.nodes.some(n => n.subType === 'timer_trigger')
   );
-  if (timerGraphs.length > 0) {
+  const eventGraphs = graphs.filter(g =>
+    g.nodes.some(n => n.subType === 'event_trigger')
+  );
+  if (timerGraphs.length > 0 || eventGraphs.length > 0) {
     if (options.generateComments) {
-      lines.push(generateSectionHeader('Timer Callback Forward Declarations', options));
+      lines.push(generateSectionHeader('Callback Forward Declarations', options));
       lines.push('');
+    }
+    for (const graph of eventGraphs) {
+      const funcName = toSnakeCase(`logic_${graph.name}`);
+      lines.push(`static void ${funcName}_event_cb(lv_event_t *e);`);
     }
     for (const graph of timerGraphs) {
       const funcName = toSnakeCase(`logic_${graph.name}`);
@@ -76,7 +133,7 @@ export function generateLogicSource(
   
   if (graphs.length > 0) {
     for (const graph of graphs) {
-      const functionCode = generateLogicFunction(graph, options);
+      const functionCode = generateLogicFunction(graph, options, context);
       lines.push(functionCode);
       lines.push('');
     }
@@ -88,7 +145,7 @@ export function generateLogicSource(
     }
     
     // Generate init function
-    lines.push(generateInitFunction(graphs, options));
+    lines.push(generateInitFunction(graphs, options, context));
     lines.push('');
   } else {
     if (options.generateComments) {
@@ -107,6 +164,185 @@ export function generateLogicSource(
   }
   
   return lines.join('\n');
+}
+
+function generateHoldingRegisterReadHelper(options: CodeGenOptions): string {
+  const indent = getIndent(options);
+  return [
+    'static uint16_t logic_read_holding_register_cached(uint16_t address) {',
+    `${indent}uint16_t value = 0U;`,
+    `${indent}if (!hmi_runtime_read_holding_register(address, &value)) {`,
+    `${indent}${indent}return 0U;`,
+    `${indent}}`,
+    `${indent}return value;`,
+    '}',
+  ].join('\n');
+}
+
+function generateButtonSetTextHelper(options: CodeGenOptions): string {
+  const indent = getIndent(options);
+  return [
+    'static void logic_set_button_text(lv_obj_t *button, const char *text) {',
+    `${indent}if (button == NULL) {`,
+    `${indent}${indent}return;`,
+    `${indent}}`,
+    `${indent}lv_obj_t *label = lv_obj_get_child(button, 0);`,
+    `${indent}if (label == NULL) {`,
+    `${indent}${indent}label = lv_label_create(button);`,
+    `${indent}${indent}lv_obj_center(label);`,
+    `${indent}}`,
+    `${indent}lv_label_set_text(label, text);`,
+    '}',
+  ].join('\n');
+}
+
+function createLogicCodegenContext(
+  pages: Page[],
+  options: CodeGenOptions,
+): LogicCodegenContext {
+  const componentEntries: Array<{ component: LvglComponent; pageName: string }> = [];
+
+  const collectComponents = (components: LvglComponent[], pageName: string) => {
+    for (const component of components) {
+      componentEntries.push({ component, pageName });
+      collectComponents(component.children, pageName);
+    }
+  };
+
+  for (const page of pages) {
+    collectComponents(page.components, page.name);
+  }
+
+  // Keep the cross-page collision policy in lockstep with ui.c/ui.h generation.
+  const componentsByOriginalName = new Map<
+    string,
+    Array<{ component: LvglComponent; pageName: string }>
+  >();
+  for (const entry of componentEntries) {
+    const matchingEntries = componentsByOriginalName.get(entry.component.name) ?? [];
+    matchingEntries.push(entry);
+    componentsByOriginalName.set(entry.component.name, matchingEntries);
+  }
+
+  const needsPagePrefix = new Set<string>();
+  for (const matchingEntries of componentsByOriginalName.values()) {
+    if (
+      matchingEntries.length > 1
+      && new Set(matchingEntries.map(entry => entry.pageName)).size > 1
+    ) {
+      for (const entry of matchingEntries) {
+        needsPagePrefix.add(entry.component.id);
+      }
+    }
+  }
+
+  const componentsById = new Map<string, ComponentReference>();
+  const componentsByName = new Map<string, ComponentReference>();
+  const ambiguousComponentNames = new Set<string>();
+
+  for (const { component, pageName } of componentEntries) {
+    const reference: ComponentReference = {
+      component,
+      pageName,
+      variableName: getComponentVarName(
+        needsPagePrefix.has(component.id)
+          ? `${pageName}_${component.name}`
+          : component.name,
+        options,
+      ),
+    };
+    componentsById.set(component.id, reference);
+    if (componentsByName.has(component.name)) {
+      componentsByName.delete(component.name);
+      ambiguousComponentNames.add(component.name);
+    } else if (!ambiguousComponentNames.has(component.name)) {
+      componentsByName.set(component.name, reference);
+    }
+  }
+
+  const pagesById = new Map<string, PageReference>();
+  const pagesByName = new Map<string, PageReference>();
+  for (const page of pages) {
+    const reference: PageReference = {
+      page,
+      variableName: getScreenVarName(page.name, options),
+      loadFunctionName: getScreenLoadFuncName(page.name, options),
+      resolved: true,
+    };
+    pagesById.set(page.id, reference);
+    pagesByName.set(page.name, reference);
+  }
+
+  return {
+    options,
+    componentsById,
+    componentsByName,
+    pagesById,
+    pagesByName,
+  };
+}
+
+function resolveComponent(
+  target: unknown,
+  context: LogicCodegenContext,
+  options: CodeGenOptions,
+): ComponentReference {
+  const targetValue = typeof target === 'string' && target.trim()
+    ? target
+    : 'obj';
+  const resolved =
+    context.componentsById.get(targetValue)
+    ?? context.componentsByName.get(targetValue);
+
+  if (resolved) {
+    return resolved;
+  }
+
+  return {
+    pageName: '',
+    variableName: getComponentVarName(targetValue, options),
+  };
+}
+
+function resolvePage(
+  target: unknown,
+  context: LogicCodegenContext,
+  options: CodeGenOptions,
+): PageReference {
+  const targetValue = typeof target === 'string' && target.trim()
+    ? target
+    : 'page1';
+  const resolved =
+    context.pagesById.get(targetValue)
+    ?? context.pagesByName.get(targetValue);
+
+  if (resolved) {
+    return resolved;
+  }
+
+  return {
+    page: {
+      id: targetValue,
+      name: targetValue,
+      components: [],
+    },
+    variableName: getScreenVarName(targetValue, options),
+    loadFunctionName: getScreenLoadFuncName(targetValue, options),
+    resolved: false,
+  };
+}
+
+function resolveVariableName(graph: LogicGraph, node: LogicNode): string {
+  const requestedVariable =
+    node.params.variableId
+    || node.params.variableName
+    || 'unknown';
+  const variable = graph.variables.find(
+    candidate =>
+      candidate.id === requestedVariable
+      || candidate.name === requestedVariable,
+  );
+  return toSnakeCase(`var_${variable?.name ?? requestedVariable}`);
 }
 
 /**
@@ -140,7 +376,11 @@ function generateTimerCallback(graph: LogicGraph, options: CodeGenOptions): stri
 /**
  * Generate init function that registers event callbacks and timers
  */
-function generateInitFunction(graphs: LogicGraph[], options: CodeGenOptions): string {
+function generateInitFunction(
+  graphs: LogicGraph[],
+  options: CodeGenOptions,
+  context: LogicCodegenContext,
+): string {
   const lines: string[] = [];
   const indent = getIndent(options);
   
@@ -162,13 +402,13 @@ function generateInitFunction(graphs: LogicGraph[], options: CodeGenOptions): st
       const eventType = trigger.params.eventType || 'LV_EVENT_CLICKED';
       const targetComp = trigger.params.targetComponent;
       if (targetComp) {
-        const targetVar = `ui_${toSnakeCase(targetComp)}`;
+        const target = resolveComponent(targetComp, context, options);
         if (options.generateComments) {
-          lines.push(`${indent}// ${graph.name}: ${eventType} on ${targetComp}`);
+          lines.push(`${indent}// ${graph.name}: ${eventType} on ${target.component?.name ?? targetComp}`);
         }
         // Use a wrapper — the logic function has void(void) signature,
         // so we generate an inline event callback
-        lines.push(`${indent}lv_obj_add_event_cb(${targetVar}, ${functionName}_event_cb, ${eventType}, NULL);`);
+        lines.push(`${indent}lv_obj_add_event_cb(${target.variableName}, ${functionName}_event_cb, ${eventType}, NULL);`);
         hasContent = true;
       }
     }
@@ -283,7 +523,11 @@ function toSnakeCase(str: string): string {
 /**
  * Generate a logic function from a graph
  */
-function generateLogicFunction(graph: LogicGraph, options: CodeGenOptions): string {
+function generateLogicFunction(
+  graph: LogicGraph,
+  options: CodeGenOptions,
+  context: LogicCodegenContext,
+): string {
   const lines: string[] = [];
   const functionName = toSnakeCase(`logic_${graph.name}`);
   
@@ -298,7 +542,7 @@ function generateLogicFunction(graph: LogicGraph, options: CodeGenOptions): stri
   
   lines.push(`void ${functionName}(void) {`);
   
-  const body = generateFunctionBody(graph, options);
+  const body = generateFunctionBody(graph, options, context);
   if (body.trim()) {
     lines.push(body);
   } else {
@@ -313,7 +557,11 @@ function generateLogicFunction(graph: LogicGraph, options: CodeGenOptions): stri
 /**
  * Generate function body from graph nodes by following execution flow
  */
-function generateFunctionBody(graph: LogicGraph, options: CodeGenOptions): string {
+function generateFunctionBody(
+  graph: LogicGraph,
+  options: CodeGenOptions,
+  context: LogicCodegenContext,
+): string {
   // Find trigger nodes (entry points)
   const triggerNodes = graph.nodes.filter(n => n.type === 'trigger');
   
@@ -322,7 +570,7 @@ function generateFunctionBody(graph: LogicGraph, options: CodeGenOptions): strin
     const lines: string[] = [];
     for (const node of graph.nodes) {
       if (node.type === 'action' || node.type === 'custom') {
-        const code = generateNodeCode(node, graph, options, 1);
+        const code = generateNodeCode(node, graph, options, context, 1);
         if (code) lines.push(code);
       }
     }
@@ -334,7 +582,7 @@ function generateFunctionBody(graph: LogicGraph, options: CodeGenOptions): strin
   const lines: string[] = [];
   
   for (const trigger of triggerNodes) {
-    const code = generateExecutionChain(trigger.id, graph, options, 1, visited);
+    const code = generateExecutionChain(trigger.id, graph, options, context, 1, visited);
     if (code) lines.push(code);
   }
   
@@ -348,6 +596,7 @@ function generateExecutionChain(
   nodeId: string,
   graph: LogicGraph,
   options: CodeGenOptions,
+  context: LogicCodegenContext,
   indentLevel: number,
   visited: Set<string>
 ): string {
@@ -360,7 +609,7 @@ function generateExecutionChain(
   const lines: string[] = [];
   
   // Generate code for this node
-  const nodeCode = generateNodeCode(node, graph, options, indentLevel);
+  const nodeCode = generateNodeCode(node, graph, options, context, indentLevel);
   if (nodeCode) lines.push(nodeCode);
   
   // For branching nodes (if_else, switch), the branches are handled inside generateNodeCode
@@ -368,7 +617,7 @@ function generateExecutionChain(
   if (node.subType !== 'if_else' && node.subType !== 'switch') {
     const nextNodeId = getNextExecutionNode(node, graph);
     if (nextNodeId) {
-      const nextCode = generateExecutionChain(nextNodeId, graph, options, indentLevel, visited);
+      const nextCode = generateExecutionChain(nextNodeId, graph, options, context, indentLevel, visited);
       if (nextCode) lines.push(nextCode);
     }
   }
@@ -407,8 +656,15 @@ function getOutputTargetNode(node: LogicNode, outputName: string, graph: LogicGr
 /**
  * Get input value for a node port (traces back through connections)
  */
-function getInputValue(node: LogicNode, inputName: string, graph: LogicGraph): string {
-  const inputPort = node.inputs.find(i => i.name === inputName);
+function getInputValue(
+  node: LogicNode,
+  inputName: string,
+  graph: LogicGraph,
+  context: LogicCodegenContext,
+  ...legacyNames: string[]
+): string {
+  const acceptedNames = [inputName, ...legacyNames];
+  const inputPort = node.inputs.find(i => acceptedNames.includes(i.name));
   if (!inputPort) return '0';
   
   const connection = graph.connections.find(
@@ -422,50 +678,61 @@ function getInputValue(node: LogicNode, inputName: string, graph: LogicGraph): s
   const sourceNode = graph.nodes.find(n => n.id === connection.sourceNode);
   if (!sourceNode) return '0';
   
-  return generateNodeExpression(sourceNode, graph);
+  return generateNodeExpression(sourceNode, graph, context);
 }
 
 /**
  * Generate expression for a data node
  */
-function generateNodeExpression(node: LogicNode, graph: LogicGraph): string {
+function generateNodeExpression(
+  node: LogicNode,
+  graph: LogicGraph,
+  context: LogicCodegenContext,
+): string {
   switch (node.subType) {
     case 'var_read': {
-      const varName = node.params.variableName || node.params.variableId || 'unknown';
-      return toSnakeCase(`var_${varName}`);
+      return resolveVariableName(graph, node);
     }
     case 'math_op': {
-      const a = getInputValue(node, 'A', graph);
-      const b = getInputValue(node, 'B', graph);
+      const a = getInputValue(node, 'A', graph, context);
+      const b = getInputValue(node, 'B', graph, context);
       const op = node.params.operator || '+';
       return `(${a} ${op} ${b})`;
     }
     case 'compare': {
-      const a = getInputValue(node, 'A', graph);
-      const b = getInputValue(node, 'B', graph);
+      const a = getInputValue(node, 'A', graph, context);
+      const b = getInputValue(node, 'B', graph, context);
       const op = node.params.operator || '==';
       return `(${a} ${op} ${b})`;
     }
     case 'logic_op': {
-      const a = getInputValue(node, 'A', graph);
-      const b = getInputValue(node, 'B', graph);
+      const a = getInputValue(node, 'A', graph, context);
+      const b = getInputValue(node, 'B', graph, context);
       const op = node.params.operator || 'AND';
       if (op === 'NOT') return `(!${a})`;
       const cOp = op === 'AND' ? '&&' : '||';
       return `(${a} ${cOp} ${b})`;
     }
     case 'string_op': {
-      const a = getInputValue(node, 'A', graph);
-      const b = getInputValue(node, 'B', graph);
+      const a = getInputValue(node, 'A', graph, context);
+      const b = getInputValue(node, 'B', graph, context);
       const operation = node.params.operation || 'concat';
       if (operation === 'length') return `strlen(${a})`;
       if (operation === 'concat') return `/* strcat(${a}, ${b}) */`;
       return a;
     }
+    case 'modbus_holding_register': {
+      const address = normalizeHoldingRegisterAddress(node.params.address);
+      return `logic_read_holding_register_cached(${address}U)`;
+    }
     case 'get_property': {
-      const target = node.params.targetComponent || 'obj';
+      const target = resolveComponent(
+        node.params.targetComponent,
+        context,
+        context.options,
+      );
       const prop = node.params.property || 'x';
-      const targetVar = `ui_${toSnakeCase(target)}`;
+      const targetVar = target.variableName;
       const propGetters: Record<string, string> = {
         x: `lv_obj_get_x(${targetVar})`,
         y: `lv_obj_get_y(${targetVar})`,
@@ -480,6 +747,14 @@ function generateNodeExpression(node: LogicNode, graph: LogicGraph): string {
   }
 }
 
+function normalizeHoldingRegisterAddress(address: unknown): number {
+  const numericAddress = Number(address);
+  if (!Number.isFinite(numericAddress)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(65535, Math.trunc(numericAddress)));
+}
+
 // ============ Node Code Generators ============
 
 /**
@@ -489,37 +764,44 @@ function generateNodeCode(
   node: LogicNode,
   graph: LogicGraph,
   options: CodeGenOptions,
+  context: LogicCodegenContext,
   indentLevel: number
 ): string {
   const subType = node.subType as LogicNodeSubType;
   const indent = getIndent(options).repeat(indentLevel);
   
   switch (subType) {
-    case 'event_trigger':
+    case 'event_trigger': {
+      const target = resolveComponent(
+        node.params.targetComponent,
+        context,
+        options,
+      );
       return options.generateComments
-        ? `${indent}// Event: ${node.params.eventType || 'LV_EVENT_CLICKED'} on ${node.params.targetComponent || '?'}`
+        ? `${indent}// Event: ${node.params.eventType || 'LV_EVENT_CLICKED'} on ${target.component?.name ?? node.params.targetComponent ?? '?'}`
         : '';
+    }
     case 'timer_trigger':
       return options.generateComments
         ? `${indent}// Timer: ${node.params.mode || 'repeat'}, ${node.params.duration || 1000}ms`
         : '';
     case 'if_else':
-      return generateIfElseCode(node, graph, options, indentLevel);
+      return generateIfElseCode(node, graph, options, context, indentLevel);
     case 'switch':
-      return generateSwitchCode(node, graph, options, indentLevel);
+      return generateSwitchCode(node, graph, options, context, indentLevel);
     case 'compare':
     case 'logic_op':
       return ''; // Inline expression nodes
     case 'set_property':
-      return generateSetPropertyCode(node, indent);
+      return generateSetPropertyCode(node, options, context, indent);
     case 'navigate_page':
-      return generateNavigatePageCode(node, indent);
+      return generateNavigatePageCode(node, options, context, indent);
     case 'show_hide':
-      return generateShowHideCode(node, indent);
+      return generateShowHideCode(node, options, context, indent);
     case 'set_text':
-      return generateSetTextCode(node, graph, indent);
+      return generateSetTextCode(node, graph, options, context, indent);
     case 'set_value':
-      return generateSetValueCode(node, graph, indent);
+      return generateSetValueCode(node, graph, options, context, indent);
     case 'call_function':
       return generateCallFunctionCode(node, indent);
     case 'delay':
@@ -530,7 +812,7 @@ function generateNodeCode(
     case 'get_property':
       return ''; // Data nodes don't generate standalone code
     case 'var_write':
-      return generateVarWriteCode(node, graph, indent);
+      return generateVarWriteCode(node, graph, context, indent);
     case 'c_code_block':
       return generateCustomCodeBlock(node, indent);
     default:
@@ -542,10 +824,11 @@ function generateIfElseCode(
   node: LogicNode,
   graph: LogicGraph,
   options: CodeGenOptions,
+  context: LogicCodegenContext,
   indentLevel: number
 ): string {
   const indent = getIndent(options).repeat(indentLevel);
-  const condition = getInputValue(node, '条件', graph);
+  const condition = getInputValue(node, 'Condition', graph, context, '条件');
   const lines: string[] = [];
   
   lines.push(`${indent}if (${condition}) {`);
@@ -555,7 +838,7 @@ function generateIfElseCode(
     || getOutputTargetNode(node, '真', graph);
   if (trueNodeId) {
     const visited = new Set<string>();
-    const trueCode = generateExecutionChain(trueNodeId, graph, options, indentLevel + 1, visited);
+    const trueCode = generateExecutionChain(trueNodeId, graph, options, context, indentLevel + 1, visited);
     if (trueCode.trim()) {
       lines.push(trueCode);
     } else {
@@ -571,7 +854,7 @@ function generateIfElseCode(
   if (falseNodeId) {
     lines.push(`${indent}} else {`);
     const visited = new Set<string>();
-    const falseCode = generateExecutionChain(falseNodeId, graph, options, indentLevel + 1, visited);
+    const falseCode = generateExecutionChain(falseNodeId, graph, options, context, indentLevel + 1, visited);
     if (falseCode.trim()) {
       lines.push(falseCode);
     } else {
@@ -589,12 +872,13 @@ function generateSwitchCode(
   node: LogicNode,
   graph: LogicGraph,
   options: CodeGenOptions,
+  context: LogicCodegenContext,
   indentLevel: number
 ): string {
   const indent = getIndent(options).repeat(indentLevel);
   const innerIndent = getIndent(options).repeat(indentLevel + 1);
   const bodyIndent = getIndent(options).repeat(indentLevel + 2);
-  const value = getInputValue(node, '值', graph);
+  const value = getInputValue(node, 'Value', graph, context, '值');
   const cases = node.params.cases || [0, 1, 2];
   const lines: string[] = [];
   
@@ -608,7 +892,7 @@ function generateSwitchCode(
       || getOutputTargetNode(node, String(caseVal), graph);
     if (caseNodeId) {
       const visited = new Set<string>();
-      const caseCode = generateExecutionChain(caseNodeId, graph, options, indentLevel + 2, visited);
+      const caseCode = generateExecutionChain(caseNodeId, graph, options, context, indentLevel + 2, visited);
       if (caseCode.trim()) {
         lines.push(caseCode);
       }
@@ -624,7 +908,7 @@ function generateSwitchCode(
   lines.push(`${innerIndent}default: {`);
   if (defaultNodeId) {
     const visited = new Set<string>();
-    const defaultCode = generateExecutionChain(defaultNodeId, graph, options, indentLevel + 2, visited);
+    const defaultCode = generateExecutionChain(defaultNodeId, graph, options, context, indentLevel + 2, visited);
     if (defaultCode.trim()) {
       lines.push(defaultCode);
     }
@@ -637,11 +921,16 @@ function generateSwitchCode(
   return lines.join('\n');
 }
 
-function generateSetPropertyCode(node: LogicNode, indent: string): string {
-  const target = node.params.targetComponent || 'obj';
+function generateSetPropertyCode(
+  node: LogicNode,
+  options: CodeGenOptions,
+  context: LogicCodegenContext,
+  indent: string,
+): string {
+  const target = resolveComponent(node.params.targetComponent, context, options);
   const property = node.params.property || 'x';
   const value = node.params.value !== undefined ? node.params.value : 'value';
-  const targetName = `ui_${toSnakeCase(target)}`;
+  const targetName = target.variableName;
   
   const setters: Record<string, string> = {
     x: `lv_obj_set_x(${targetName}, ${value});`,
@@ -654,13 +943,20 @@ function generateSetPropertyCode(node: LogicNode, indent: string): string {
   return `${indent}${setters[property] || `// Set property: ${property} on ${targetName}`}`;
 }
 
-function generateNavigatePageCode(node: LogicNode, indent: string): string {
-  const targetPage = node.params.targetPage || 'page1';
+function generateNavigatePageCode(
+  node: LogicNode,
+  options: CodeGenOptions,
+  context: LogicCodegenContext,
+  indent: string,
+): string {
+  const targetPage = resolvePage(node.params.targetPage, context, options);
   const animation = node.params.animation || 'none';
-  const pageName = `ui_${toSnakeCase(targetPage)}`;
+  const legacyVariableName = `ui_${toSnakeCase(targetPage.page.name)}`;
   
   if (animation === 'none') {
-    return `${indent}lv_scr_load(${pageName});`;
+    return targetPage.resolved
+      ? `${indent}${targetPage.loadFunctionName}();`
+      : `${indent}lv_scr_load(${legacyVariableName});`;
   }
   const animMap: Record<string, string> = {
     fade: 'LV_SCR_LOAD_ANIM_FADE_IN',
@@ -670,13 +966,21 @@ function generateNavigatePageCode(node: LogicNode, indent: string): string {
     slide_down: 'LV_SCR_LOAD_ANIM_MOVE_BOTTOM',
   };
   const animType = animMap[animation] || 'LV_SCR_LOAD_ANIM_FADE_IN';
-  return `${indent}lv_scr_load_anim(${pageName}, ${animType}, 300, 0, false);`;
+  const variableName = targetPage.resolved
+    ? targetPage.variableName
+    : legacyVariableName;
+  return `${indent}lv_scr_load_anim(${variableName}, ${animType}, 300, 0, false);`;
 }
 
-function generateShowHideCode(node: LogicNode, indent: string): string {
-  const target = node.params.targetComponent || 'obj';
+function generateShowHideCode(
+  node: LogicNode,
+  options: CodeGenOptions,
+  context: LogicCodegenContext,
+  indent: string,
+): string {
+  const target = resolveComponent(node.params.targetComponent, context, options);
   const action = node.params.action || 'toggle';
-  const targetName = `ui_${toSnakeCase(target)}`;
+  const targetName = target.variableName;
   
   switch (action) {
     case 'show':
@@ -696,19 +1000,40 @@ function generateShowHideCode(node: LogicNode, indent: string): string {
   }
 }
 
-function generateSetTextCode(node: LogicNode, graph: LogicGraph, indent: string): string {
-  const target = node.params.targetComponent || 'label';
-  const text = getInputValue(node, '文本', graph);
-  const targetName = `ui_${toSnakeCase(target)}`;
-  
-  return `${indent}lv_label_set_text(${targetName}, ${text});`;
+function generateSetTextCode(
+  node: LogicNode,
+  graph: LogicGraph,
+  options: CodeGenOptions,
+  context: LogicCodegenContext,
+  indent: string,
+): string {
+  const target = resolveComponent(node.params.targetComponent || 'label', context, options);
+  const text = getInputValue(node, 'Text', graph, context, '文本');
+  const targetName = target.variableName;
+
+  const setters: Record<string, string> = {
+    label: `lv_label_set_text(${targetName}, ${text});`,
+    textarea: `lv_textarea_set_text(${targetName}, ${text});`,
+    btn: `logic_set_button_text(${targetName}, ${text});`,
+    checkbox: `lv_checkbox_set_text(${targetName}, ${text});`,
+    dropdown: `lv_dropdown_set_options(${targetName}, ${text});`,
+  };
+
+  // Preserve legacy graphs that stored a component name without page metadata.
+  return `${indent}${setters[target.component?.type ?? 'label'] ?? `// Set Text is not supported for ${target.component?.type ?? 'this component'}`}`;
 }
 
-function generateSetValueCode(node: LogicNode, graph: LogicGraph, indent: string): string {
-  const target = node.params.targetComponent || 'slider';
-  const value = getInputValue(node, '数值', graph);
-  const targetName = `ui_${toSnakeCase(target)}`;
-  const compType = node.params.componentType || 'slider';
+function generateSetValueCode(
+  node: LogicNode,
+  graph: LogicGraph,
+  options: CodeGenOptions,
+  context: LogicCodegenContext,
+  indent: string,
+): string {
+  const target = resolveComponent(node.params.targetComponent || 'slider', context, options);
+  const value = getInputValue(node, 'Number', graph, context, '数值');
+  const targetName = target.variableName;
+  const compType = target.component?.type || node.params.componentType || 'slider';
   
   // Choose the correct LVGL API based on component type
   const valueSetters: Record<string, string> = {
@@ -741,10 +1066,14 @@ function generateDelayCode(node: LogicNode, indent: string, options: CodeGenOpti
   return `${indent}// Delay ${duration}ms`;
 }
 
-function generateVarWriteCode(node: LogicNode, graph: LogicGraph, indent: string): string {
-  const varName = node.params.variableName || node.params.variableId || 'unknown';
-  const value = getInputValue(node, '值', graph);
-  const cVarName = toSnakeCase(`var_${varName}`);
+function generateVarWriteCode(
+  node: LogicNode,
+  graph: LogicGraph,
+  context: LogicCodegenContext,
+  indent: string,
+): string {
+  const value = getInputValue(node, 'Value', graph, context, '值');
+  const cVarName = resolveVariableName(graph, node);
   
   return `${indent}${cVarName} = ${value};`;
 }
