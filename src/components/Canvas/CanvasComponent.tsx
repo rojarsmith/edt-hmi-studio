@@ -7,6 +7,7 @@ import {
   getImageButtonState,
   normalizeImageButtonProps,
 } from '../PropertyEditor/imageButtonModel';
+import { resolveFallbackBackground } from './widgetBackground';
 import './CanvasComponent.css';
 
 interface CanvasComponentProps {
@@ -220,35 +221,13 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   const borderStyles = buildBorderStyles();
   const paddingStyles = buildPadding();
 
-  // Resolve effective background color: ensure components are never accidentally invisible
-  // in the design canvas. Components with transparent bg are correct for LVGL, but need
-  // a visible fallback in the designer so users can see and interact with them.
   const resolvedBgColor = (() => {
     const bg = defaultStyle.bgColor;
     const isMissing = !bg || bg === '';
     const isTransparent = bg?.toLowerCase() === 'transparent';
 
     if (isMissing || isTransparent) {
-      switch (type) {
-        case 'btn': return '#2196F3';
-        case 'obj': return '#fafafa';
-        case 'textarea': return '#ffffff';
-        case 'dropdown': return '#ffffff';
-        case 'img': return '#f0f0f0';
-        case 'image-button': return '#f0f0f0';
-        case 'table': return '#ffffff';
-        case 'chart': return '#ffffff';
-        case 'calendar': return '#ffffff';
-        case 'tabview': return '#ffffff';
-        case 'tileview': return '#ffffff';
-        case 'win': return '#ffffff';
-        // These types are legitimately transparent — keep them that way
-        case 'label': return 'transparent';
-        case 'arc': return 'transparent';
-        case 'spinner': return 'transparent';
-        case 'checkbox': return 'transparent';
-        default: return bg || 'transparent';
-      }
+      return resolveFallbackBackground(type) ?? bg ?? 'transparent';
     }
     return bg;
   })();
@@ -878,9 +857,12 @@ export const CanvasImageContent: React.FC<{
     );
   }
 
+  // No image resolves yet, so nothing would be painted. Fill the widget so it
+  // stays visible and clickable on the canvas — this is the only case where an
+  // image widget gets an opaque background.
   return (
     <div
-      className="lvgl-img"
+      className="lvgl-img placeholder"
       title={title}
       style={{
         display: 'flex',
@@ -893,6 +875,7 @@ export const CanvasImageContent: React.FC<{
         textAlign: 'center',
         fontSize: placeholder ? '11px' : '24px',
         color: '#777',
+        backgroundColor: '#f0f0f0',
       }}
     >
       {placeholder || '🖼️'}
