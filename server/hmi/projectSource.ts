@@ -16,9 +16,10 @@ import { isRecord } from './validation';
 interface ImageGenerationPlan {
   image: ImageResource;
   /**
-   * Image-button sources are stretched to the widget bounds by generated UI
-   * code, so retaining pixels beyond the largest fixed-size use only consumes
-   * target Flash. Undefined means at least one use requires native resolution.
+   * Image and image-button sources are stretched to the widget bounds by
+   * generated UI code, so retaining pixels beyond the largest fixed-size use
+   * only consumes target Flash. Undefined means at least one use requires
+   * native resolution.
    */
   targetSize?: {
     width: number;
@@ -57,7 +58,7 @@ function collectUsedImageResources(
   const retainNativeSize = (image: ImageResource) => {
     plans.set(image.id, { image });
   };
-  const addFixedImageButtonUse = (
+  const addStretchedUse = (
     image: ImageResource,
     component: LvglComponent,
   ) => {
@@ -93,7 +94,7 @@ function collectUsedImageResources(
     for (const component of components) {
       if (component.type === 'img') {
         const image = findImage(component.props?.src);
-        if (image) retainNativeSize(image);
+        if (image) addStretchedUse(image, component);
       } else if (
         component.type === 'image-button' &&
         Array.isArray(component.props?.states)
@@ -104,7 +105,7 @@ function collectUsedImageResources(
               ? (state as { imageId?: string }).imageId
               : undefined;
           const image = findImage(reference);
-          if (image) addFixedImageButtonUse(image, component);
+          if (image) addStretchedUse(image, component);
         }
       }
       walk(component.children ?? []);

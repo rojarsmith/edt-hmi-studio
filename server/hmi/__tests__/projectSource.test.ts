@@ -284,7 +284,143 @@ describe('writeGeneratedProjectSource', () => {
     );
   });
 
-  it('keeps native size when an image-button asset is also used by img', async () => {
+  it('resizes img assets to fixed widget bounds', async () => {
+    const outputDirectory = await mkdtemp(
+      join(tmpdir(), 'lvgl-editor-img-assets-'),
+    );
+    temporaryDirectories.push(outputDirectory);
+    const source = await import('sharp').then(({ default: sharp }) =>
+      sharp({
+        create: {
+          width: 1024,
+          height: 683,
+          channels: 4,
+          background: { r: 40, g: 80, b: 120, alpha: 1 },
+        },
+      }).png().toBuffer(),
+    );
+    const project = {
+      pages: [{
+        id: 'page-1',
+        name: 'Main',
+        components: [{
+          id: 'image-1',
+          type: 'img',
+          name: 'Background',
+          x: 0,
+          y: 0,
+          width: 480,
+          height: 270,
+          children: [],
+          props: { src: 'background-image' },
+          styles: { default: {} },
+          events: [],
+          animations: [],
+          parentId: null,
+          locked: false,
+          visible: true,
+        }],
+      }],
+      resources: {
+        images: [{
+          id: 'background-image',
+          name: 'Background',
+          originalName: 'background.png',
+          width: 1024,
+          height: 683,
+          format: 'ARGB8888',
+          data: `data:image/png;base64,${source.toString('base64')}`,
+          cArrayName: 'img_background',
+          size: source.length,
+          createdAt: 1,
+        }],
+        fonts: [],
+      },
+      communication: createDefaultCommunicationConfig(),
+      logicGraphs: [],
+    };
+
+    await writeGeneratedProjectSource(project, outputDirectory);
+
+    const imageSource = await readFile(
+      join(outputDirectory, 'img_background.c'),
+      'utf8',
+    );
+    expect(imageSource).toContain('Size: 480x270');
+    expect(imageSource).toContain('Data size: 518400 bytes');
+    expect(imageSource).toContain('.w = 480');
+    expect(imageSource).toContain('.h = 270');
+  });
+
+  it('keeps native size when an img widget is not fixed-size', async () => {
+    const outputDirectory = await mkdtemp(
+      join(tmpdir(), 'lvgl-editor-img-content-assets-'),
+    );
+    temporaryDirectories.push(outputDirectory);
+    const source = await import('sharp').then(({ default: sharp }) =>
+      sharp({
+        create: {
+          width: 32,
+          height: 24,
+          channels: 4,
+          background: { r: 10, g: 20, b: 30, alpha: 1 },
+        },
+      }).png().toBuffer(),
+    );
+    const project = {
+      pages: [{
+        id: 'page-1',
+        name: 'Main',
+        components: [{
+          id: 'image-1',
+          type: 'img',
+          name: 'Content Sized Image',
+          x: 0,
+          y: 0,
+          width: 8,
+          height: 8,
+          widthMode: 'content',
+          heightMode: 'content',
+          children: [],
+          props: { src: 'content-image' },
+          styles: { default: {} },
+          events: [],
+          animations: [],
+          parentId: null,
+          locked: false,
+          visible: true,
+        }],
+      }],
+      resources: {
+        images: [{
+          id: 'content-image',
+          name: 'Content Image',
+          originalName: 'content.png',
+          width: 32,
+          height: 24,
+          format: 'ARGB8888',
+          data: `data:image/png;base64,${source.toString('base64')}`,
+          cArrayName: 'img_content',
+          size: source.length,
+          createdAt: 1,
+        }],
+        fonts: [],
+      },
+      communication: createDefaultCommunicationConfig(),
+      logicGraphs: [],
+    };
+
+    await writeGeneratedProjectSource(project, outputDirectory);
+
+    const imageSource = await readFile(
+      join(outputDirectory, 'img_content.c'),
+      'utf8',
+    );
+    expect(imageSource).toContain('Size: 32x24');
+    expect(imageSource).toContain('Data size: 3072 bytes');
+  });
+
+  it('resizes shared assets to the largest fixed widget bound', async () => {
     const outputDirectory = await mkdtemp(
       join(tmpdir(), 'lvgl-editor-shared-image-assets-'),
     );
@@ -339,7 +475,9 @@ describe('writeGeneratedProjectSource', () => {
             ...commonComponentFields,
             id: 'image-1',
             type: 'img',
-            name: 'Full Resolution Image',
+            name: 'Stretched Image',
+            width: 20,
+            height: 16,
             props: { src: 'shared-image' },
           },
         ],
@@ -369,7 +507,7 @@ describe('writeGeneratedProjectSource', () => {
       join(outputDirectory, 'img_shared.c'),
       'utf8',
     );
-    expect(imageSource).toContain('Size: 32x24');
-    expect(imageSource).toContain('Data size: 3072 bytes');
+    expect(imageSource).toContain('Size: 20x16');
+    expect(imageSource).toContain('Data size: 1280 bytes');
   });
 });
