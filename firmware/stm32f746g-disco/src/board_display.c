@@ -7,14 +7,23 @@
 #include <stdint.h>
 #include <string.h>
 
-#define HMI_DRAW_BUFFER_LINES 20U
 #define HMI_FRAMEBUFFER_BYTES \
     (HMI_DISPLAY_WIDTH * HMI_DISPLAY_HEIGHT * sizeof(uint16_t))
 
-static uint16_t g_draw_buffer_a[HMI_DISPLAY_WIDTH * HMI_DRAW_BUFFER_LINES]
-    __attribute__((aligned(32)));
-static uint16_t g_draw_buffer_b[HMI_DISPLAY_WIDTH * HMI_DRAW_BUFFER_LINES]
-    __attribute__((aligned(32)));
+/*
+ * Two full frame buffers in SDRAM. LVGL renders straight into the one the LTDC
+ * is not scanning, and they are swapped during vertical blanking, so a frame is
+ * never displayed while it is being drawn. The previous single-buffer driver
+ * copied each rendered band into the live frame buffer, which tore whenever the
+ * copy crossed the raster beam — most visible on a control that redraws
+ * continuously, such as a slider being dragged.
+ */
+#define HMI_FRAMEBUFFER_0 ((uint32_t)LCD_FB_START_ADDRESS)
+#define HMI_FRAMEBUFFER_1 (HMI_FRAMEBUFFER_0 + (uint32_t)HMI_FRAMEBUFFER_BYTES)
+
+/* A frame is ~16 ms; well beyond that means the LTDC is not scanning and we
+   must not block the main loop, which also drives Modbus. */
+#define HMI_RELOAD_TIMEOUT_MS 100U
 
 static void clean_dcache_range(const void *address, size_t length)
 {
@@ -35,25 +44,32 @@ static void display_flush(
     const lv_area_t *area,
     uint8_t *pixel_map)
 {
-    uint16_t *framebuffer = (uint16_t *)LCD_FB_START_ADDRESS;
-    const uint16_t *source = (const uint16_t *)pixel_map;
-    const uint32_t width = (uint32_t)(area->x2 - area->x1 + 1);
-    int32_t row;
+    uint32_t started_ms;
 
-    for (row = area->y1; row <= area->y2; ++row) {
-        uint16_t *destination =
-            &framebuffer[((uint32_t)row * HMI_DISPLAY_WIDTH) +
-                         (uint32_t)area->x1];
-        memcpy(destination, source, width * sizeof(uint16_t));
-        source += width;
+    (void)area;
+
+    /* In direct mode LVGL reports every rendered area but the buffer only
+       becomes displayable once the last one is in. */
+    if (!lv_display_flush_is_last(display)) {
+        lv_display_flush_ready(display);
+        return;
     }
 
-    clean_dcache_range(
-        &framebuffer[((uint32_t)area->y1 * HMI_DISPLAY_WIDTH) +
-                     (uint32_t)area->x1],
-        (size_t)((((uint32_t)(area->y2 - area->y1) * HMI_DISPLAY_WIDTH) +
-                  width) *
-                 sizeof(uint16_t)));
+    /* LVGL drew through the D-Cache; the LTDC reads SDRAM directly. */
+    clean_dcache_range(pixel_map, HMI_FRAMEBUFFER_BYTES);
+
+    LTDC_Layer1->CFBAR = (uint32_t)pixel_map;
+    LTDC->SRCR = LTDC_SRCR_VBR;
+
+    /* Hold the buffer until the swap has actually happened, otherwise LVGL
+       would start drawing into the frame still being scanned out. */
+    started_ms = HAL_GetTick();
+    while ((LTDC->SRCR & LTDC_SRCR_VBR) != 0U) {
+        if ((HAL_GetTick() - started_ms) > HMI_RELOAD_TIMEOUT_MS) {
+            break;
+        }
+    }
+
     lv_display_flush_ready(display);
 }
 
@@ -82,17 +98,21 @@ bool board_display_init(void)
 {
     lv_display_t *display;
     lv_indev_t *touch;
-    void *framebuffer = (void *)LCD_FB_START_ADDRESS;
+    void *framebuffers = (void *)HMI_FRAMEBUFFER_0;
 
     if (BSP_LCD_Init() != LCD_OK) {
         return false;
     }
 
-    BSP_LCD_LayerRgb565Init(0U, LCD_FB_START_ADDRESS);
+    BSP_LCD_LayerRgb565Init(0U, HMI_FRAMEBUFFER_0);
     BSP_LCD_SelectLayer(0U);
+
+    /* Clear both buffers before the layer goes live, otherwise the LTDC scans
+       out whatever the SDRAM powered up with — a burst of noise on every reset. */
+    memset(framebuffers, 0, HMI_FRAMEBUFFER_BYTES * 2U);
+    clean_dcache_range(framebuffers, HMI_FRAMEBUFFER_BYTES * 2U);
+
     BSP_LCD_SetLayerVisible(0U, ENABLE);
-    memset(framebuffer, 0, HMI_FRAMEBUFFER_BYTES);
-    clean_dcache_range(framebuffer, HMI_FRAMEBUFFER_BYTES);
     BSP_LCD_DisplayOn();
 
     if (BSP_TS_Init(HMI_DISPLAY_WIDTH, HMI_DISPLAY_HEIGHT) != TS_OK) {
@@ -107,10 +127,10 @@ bool board_display_init(void)
     lv_display_set_flush_cb(display, display_flush);
     lv_display_set_buffers(
         display,
-        g_draw_buffer_a,
-        g_draw_buffer_b,
-        sizeof(g_draw_buffer_a),
-        LV_DISPLAY_RENDER_MODE_PARTIAL);
+        (void *)HMI_FRAMEBUFFER_0,
+        (void *)HMI_FRAMEBUFFER_1,
+        HMI_FRAMEBUFFER_BYTES,
+        LV_DISPLAY_RENDER_MODE_DIRECT);
     lv_display_set_default(display);
 
     touch = lv_indev_create();

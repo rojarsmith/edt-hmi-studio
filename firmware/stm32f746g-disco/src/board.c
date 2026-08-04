@@ -59,8 +59,43 @@ bool board_uart1_apply(
     return HAL_UART_Init(&huart1) == HAL_OK;
 }
 
+/*
+ * The Cortex-M7 default memory map types the FMC SDRAM window (0xC0000000) as
+ * Device memory: uncacheable, and writes may not be merged. Streaming a frame
+ * buffer through it costs far more FMC bandwidth than it should, starving the
+ * LTDC and letting its FIFO underrun — which shows on the panel as tearing and
+ * warped lines while anything redraws continuously. Re-type it as Normal
+ * write-back memory; board_display.c cleans the cache before the LTDC reads a
+ * frame.
+ */
+static void mpu_config(void)
+{
+    MPU_Region_InitTypeDef region = {0};
+
+    HAL_MPU_Disable();
+
+    region.Enable = MPU_REGION_ENABLE;
+    region.Number = MPU_REGION_NUMBER0;
+    region.BaseAddress = 0xC0000000U; /* FMC SDRAM bank 1, 8 MB on this board */
+    region.Size = MPU_REGION_SIZE_8MB;
+    region.AccessPermission = MPU_REGION_FULL_ACCESS;
+    region.IsBufferable = MPU_ACCESS_BUFFERABLE;
+    region.IsCacheable = MPU_ACCESS_CACHEABLE;
+    region.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+    region.TypeExtField = MPU_TEX_LEVEL0;
+    region.SubRegionDisable = 0x00U;
+    region.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
+    HAL_MPU_ConfigRegion(&region);
+
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+}
+
 bool board_init(void)
 {
+    /* Must precede the cache enables so the SDRAM attributes are already in
+       force the first time anything touches the frame buffer. */
+    mpu_config();
+
     SCB_EnableICache();
     SCB_EnableDCache();
 
