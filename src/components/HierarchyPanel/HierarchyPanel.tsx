@@ -5,6 +5,33 @@ import { useEditorStore } from '../../store/editorStore';
 import type { LvglComponent } from '../../types';
 import './HierarchyPanel.css';
 
+/**
+ * The component array is stored back-to-front: index 0 is created first and so
+ * is drawn first by LVGL, putting it at the bottom of the stack. Layer panels
+ * are read the other way round — front-most on top — so the tree renders the
+ * reverse of the array, and drop positions are translated back in `handleDrop`.
+ */
+function toDisplayOrder(components: LvglComponent[]): LvglComponent[] {
+  return [...components].reverse();
+}
+
+/**
+ * Where a drop lands relative to the row under the cursor. 'above'/'below' are
+ * same-level reorders; 'inside' nests the dragged component as a child.
+ */
+type DropZone = 'above' | 'inside' | 'below';
+
+/** Fraction of a row's height that reads as a same-level drop at each edge. */
+const EDGE_ZONE_RATIO = 0.3;
+
+function resolveDropZone(event: React.DragEvent<HTMLElement>): DropZone {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const offset = event.clientY - rect.top;
+  if (offset < rect.height * EDGE_ZONE_RATIO) return 'above';
+  if (offset > rect.height * (1 - EDGE_ZONE_RATIO)) return 'below';
+  return 'inside';
+}
+
 interface TreeNodeProps {
   component: LvglComponent;
   depth: number;
@@ -13,8 +40,7 @@ interface TreeNodeProps {
   onToggleLock: (id: string) => void;
   onRename: (id: string, newName: string) => void;
   onDragStart: (id: string) => void;
-  onDragOver: (id: string) => void;
-  onDrop: (targetId: string) => void;
+  onDrop: (targetId: string, zone: DropZone) => void;
   selectedIds: string[];
   draggedId: string | null;
   expandedIds: Set<string>;
@@ -29,7 +55,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   onToggleLock,
   onRename,
   onDragStart,
-  onDragOver,
   onDrop,
   selectedIds,
   draggedId,
@@ -38,7 +63,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(component.name);
-  
+  const [dropZone, setDropZone] = useState<DropZone | null>(null);
+
   const isSelected = selectedIds.includes(component.id);
   const isExpanded = expandedIds.has(component.id);
   const hasChildren = component.children.length > 0;
@@ -77,19 +103,25 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     e.dataTransfer.effectAllowed = 'move';
   };
   
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    if (draggedId && draggedId !== component.id) {
-      onDragOver(component.id);
-    }
+    if (!draggedId || draggedId === component.id) return;
+    e.dataTransfer.dropEffect = 'move';
+    setDropZone(resolveDropZone(e));
   };
-  
-  const handleDrop = (e: React.DragEvent) => {
+
+  const handleDragLeave = () => setDropZone(null);
+
+  const handleDragEnd = () => setDropZone(null);
+
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    const zone = resolveDropZone(e);
+    setDropZone(null);
     if (draggedId && draggedId !== component.id) {
-      onDrop(component.id);
+      onDrop(component.id, zone);
     }
   };
   
@@ -120,13 +152,20 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   return (
     <div className="tree-node-wrapper">
       <div
-        className={`tree-node ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
+        className={[
+          'tree-node',
+          isSelected ? 'selected' : '',
+          isDragging ? 'dragging' : '',
+          dropZone ? `drop-${dropZone}` : '',
+        ].filter(Boolean).join(' ')}
         style={{ paddingLeft: depth * 16 + 8 }}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         draggable={!isEditing}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDragEnd={handleDragEnd}
         onDrop={handleDrop}
       >
         {/* Expand/Collapse button */}
@@ -184,10 +223,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         </div>
       </div>
       
-      {/* Children */}
+      {/* Children — front-most first, see toDisplayOrder */}
       {hasChildren && isExpanded && (
         <div className="tree-children">
-          {component.children.map(child => (
+          {toDisplayOrder(component.children).map(child => (
             <TreeNode
               key={child.id}
               component={child}
@@ -197,7 +236,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               onToggleLock={onToggleLock}
               onRename={onRename}
               onDragStart={onDragStart}
-              onDragOver={onDragOver}
               onDrop={onDrop}
               selectedIds={selectedIds}
               draggedId={draggedId}
@@ -219,6 +257,7 @@ const HierarchyPanel: React.FC = () => {
     selectComponent,
     updateComponent,
     reparentComponent,
+    reorderComponentAdjacentTo,
     saveToHistory,
   } = useEditorStore();
   
@@ -256,12 +295,8 @@ const HierarchyPanel: React.FC = () => {
   const handleDragStart = useCallback((id: string) => {
     setDraggedId(id);
   }, []);
-  
-  const handleDragOver = useCallback((_e: string) => {
-    // Visual feedback could be added here
-  }, []);
-  
-  const handleDrop = useCallback((targetId: string) => {
+
+  const handleDrop = useCallback((targetId: string, zone: DropZone) => {
     if (draggedId && draggedId !== targetId) {
       // Check if target is not a descendant of dragged
       const isDescendant = (parentId: string, childId: string): boolean => {
@@ -273,14 +308,24 @@ const HierarchyPanel: React.FC = () => {
         }
         return false;
       };
-      
+
       if (!isDescendant(draggedId, targetId)) {
-        saveToHistory();
-        reparentComponent(draggedId, targetId);
+        if (zone === 'inside') {
+          saveToHistory();
+          reparentComponent(draggedId, targetId);
+        } else {
+          // The tree is rendered front-to-back, so a row dropped visually above
+          // the target belongs *after* it in the back-to-front array.
+          reorderComponentAdjacentTo(
+            draggedId,
+            targetId,
+            zone === 'above' ? 'after' : 'before',
+          );
+        }
       }
     }
     setDraggedId(null);
-  }, [draggedId, reparentComponent, saveToHistory]);
+  }, [draggedId, reparentComponent, reorderComponentAdjacentTo, saveToHistory]);
   
   const handleToggleExpand = useCallback((id: string) => {
     setExpandedIds(prev => {
@@ -358,7 +403,7 @@ const HierarchyPanel: React.FC = () => {
             No components
           </div>
         ) : (
-          components.map(comp => (
+          toDisplayOrder(components).map(comp => (
             <TreeNode
               key={comp.id}
               component={comp}
@@ -368,7 +413,6 @@ const HierarchyPanel: React.FC = () => {
               onToggleLock={handleToggleLock}
               onRename={handleRename}
               onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
               onDrop={handleDrop}
               selectedIds={selection.selectedIds}
               draggedId={draggedId}

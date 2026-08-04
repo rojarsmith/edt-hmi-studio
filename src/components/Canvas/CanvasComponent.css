@@ -5,16 +5,17 @@
   overflow: hidden;
 }
 
-.canvas-component:hover {
-  z-index: 10;
-}
+/*
+ * Never give hovered/selected components a z-index. Canvas stacking must match
+ * the component array order, because that order is what the generated LVGL code
+ * creates children in — and LVGL draws later children on top. Lifting the
+ * selected component made every z-order command (Send to Back, Send Backward,
+ * ...) look like a no-op: the component you just sent back stayed selected, so
+ * it kept painting above its siblings.
+ */
 
 .canvas-component.hovered:not(.selected) {
   box-shadow: 0 0 0 1px #2196F3;
-}
-
-.canvas-component.selected {
-  z-index: 20;
 }
 
 /* Selection overlay */

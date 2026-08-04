@@ -2,23 +2,29 @@
 
 import type { ImageFormat, ImageConversionOptions } from '../types';
 
+/**
+ * Format actually written to the C array. `RGB565A8` has no editor-facing
+ * equivalent: it is what a transparent image requested as RGB565 has to become
+ * on LVGL v9 so the alpha channel survives.
+ */
+export type EmittedImageFormat = ImageFormat | 'RGB565A8';
+
 export interface ConvertedImage {
   cCode: string;
   dataSize: number;
   width: number;
   height: number;
-  format: ImageFormat;
+  /** The format written to the C array, which may differ from the requested one. */
+  format: EmittedImageFormat;
+  /** True when the requested format could not carry the source's alpha channel. */
+  formatUpgraded: boolean;
 }
 
 /**
  * Get LVGL color format constant (v8)
  */
-function getLvglColorFormatV8(format: ImageFormat, hasAlpha: boolean): string {
+function getLvglColorFormatV8(format: EmittedImageFormat): string {
   switch (format) {
-    case 'RGB565':
-      return 'LV_IMG_CF_TRUE_COLOR';
-    case 'RGB888':
-      return hasAlpha ? 'LV_IMG_CF_TRUE_COLOR_ALPHA' : 'LV_IMG_CF_TRUE_COLOR';
     case 'ARGB8888':
       return 'LV_IMG_CF_TRUE_COLOR_ALPHA';
     default:
@@ -29,10 +35,12 @@ function getLvglColorFormatV8(format: ImageFormat, hasAlpha: boolean): string {
 /**
  * Get LVGL v9 color format constant
  */
-function getLvglColorFormatV9(format: ImageFormat): string {
+function getLvglColorFormatV9(format: EmittedImageFormat): string {
   switch (format) {
     case 'RGB565':
       return 'LV_COLOR_FORMAT_RGB565';
+    case 'RGB565A8':
+      return 'LV_COLOR_FORMAT_RGB565A8';
     case 'RGB888':
       return 'LV_COLOR_FORMAT_RGB888';
     case 'ARGB8888':
@@ -44,11 +52,16 @@ function getLvglColorFormatV9(format: ImageFormat): string {
 
 /**
  * Get bytes per pixel for format
+ *
+ * RGB565A8 is planar — a w*h*2 color plane followed by a w*h alpha plane — so
+ * it averages 3 bytes per pixel even though its row stride is only w*2.
  */
-function getBytesPerPixel(format: ImageFormat): number {
+function getBytesPerPixel(format: EmittedImageFormat): number {
   switch (format) {
     case 'RGB565':
       return 2;
+    case 'RGB565A8':
+      return 3;
     case 'RGB888':
       return 3;
     case 'ARGB8888':
@@ -56,6 +69,47 @@ function getBytesPerPixel(format: ImageFormat): number {
     default:
       return 4;
   }
+}
+
+/**
+ * Row stride in bytes.
+ *
+ * LVGL derives an RGB565A8 stride from the color plane alone (see
+ * `img_width_to_stride` in lv_image_decoder.c) and assumes the alpha plane uses
+ * exactly half of it, so the descriptor must report `w * 2`, not `w * 3`.
+ */
+function getStride(format: EmittedImageFormat, width: number): number {
+  return format === 'RGB565A8' ? width * 2 : width * getBytesPerPixel(format);
+}
+
+/**
+ * True when any pixel is not fully opaque.
+ */
+function hasTransparency(imageData: ImageData): boolean {
+  const { data } = imageData;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] !== 255) return true;
+  }
+  return false;
+}
+
+/**
+ * Pick the format actually written to the C array.
+ *
+ * RGB565 and RGB888 have no alpha channel, so emitting them for a transparent
+ * source silently flattens the transparency: previously-invisible pixels became
+ * opaque and painted over whatever sat behind the image. Promote instead.
+ */
+export function resolveEmittedFormat(
+  requested: ImageFormat,
+  sourceHasAlpha: boolean,
+  lvglVersion: '8' | '9',
+): EmittedImageFormat {
+  if (!sourceHasAlpha || requested === 'ARGB8888') return requested;
+  // v8's LV_IMG_CF_TRUE_COLOR_ALPHA layout depends on LV_COLOR_DEPTH, so the
+  // only alpha-carrying format we can emit portably there is ARGB8888.
+  if (requested === 'RGB565' && lvglVersion === '9') return 'RGB565A8';
+  return 'ARGB8888';
 }
 
 /**
@@ -79,16 +133,18 @@ function rgbToRgb565(r: number, g: number, b: number, swapBytes: boolean): [numb
  */
 function convertPixelData(
   imageData: ImageData,
-  format: ImageFormat,
+  format: EmittedImageFormat,
   options: ImageConversionOptions
 ): Uint8Array {
   const { width, height, data } = imageData;
   const bpp = getBytesPerPixel(format);
   const outputSize = width * height * bpp;
   const output = new Uint8Array(outputSize);
-  
+
   let outIdx = 0;
-  
+  // RGB565A8 is planar: the alpha bytes follow the whole color plane.
+  let alphaIdx = width * height * 2;
+
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 4;
@@ -96,12 +152,19 @@ function convertPixelData(
       const g = data[idx + 1];
       const b = data[idx + 2];
       const a = data[idx + 3];
-      
+
       switch (format) {
         case 'RGB565': {
           const [b1, b2] = rgbToRgb565(r, g, b, options.swapBytes);
           output[outIdx++] = b1;
           output[outIdx++] = b2;
+          break;
+        }
+        case 'RGB565A8': {
+          const [b1, b2] = rgbToRgb565(r, g, b, options.swapBytes);
+          output[outIdx++] = b1;
+          output[outIdx++] = b2;
+          output[alphaIdx++] = a;
           break;
         }
         case 'RGB888': {
@@ -120,7 +183,7 @@ function convertPixelData(
       }
     }
   }
-  
+
   return output;
 }
 
@@ -149,21 +212,27 @@ export function generateImageCCode(
   lvglVersion: '8' | '9' = '9'
 ): ConvertedImage {
   const { width, height } = imageData;
-  const pixelData = convertPixelData(imageData, options.format, options);
+  const sourceHasAlpha = hasTransparency(imageData);
+  const format = resolveEmittedFormat(options.format, sourceHasAlpha, lvglVersion);
+  const formatUpgraded = format !== options.format;
+  const pixelData = convertPixelData(imageData, format, options);
   const dataSize = pixelData.length;
-  
+
   const dataArrayName = `${name}_data`;
   const dataArray = formatAsCArray(pixelData);
+  const formatComment = formatUpgraded
+    ? `${format} (requested ${options.format}, promoted to keep the alpha channel)`
+    : format;
 
   let cCode: string;
 
   if (lvglVersion === '9') {
-    const cfFormat = getLvglColorFormatV9(options.format);
-    const stride = width * getBytesPerPixel(options.format);
+    const cfFormat = getLvglColorFormatV9(format);
+    const stride = getStride(format, width);
     cCode = `/**
  * Image: ${name}
  * Size: ${width}x${height}
- * Format: ${options.format}
+ * Format: ${formatComment}
  * Data size: ${dataSize} bytes
  * Generated by LVGL UI Editor
  */
@@ -196,12 +265,11 @@ const lv_image_dsc_t ${name} = {
 };
 `;
   } else {
-    const hasAlpha = options.format === 'ARGB8888';
-    const cfFormat = getLvglColorFormatV8(options.format, hasAlpha);
+    const cfFormat = getLvglColorFormatV8(format);
     cCode = `/**
  * Image: ${name}
  * Size: ${width}x${height}
- * Format: ${options.format}
+ * Format: ${formatComment}
  * Data size: ${dataSize} bytes
  * Generated by LVGL UI Editor
  */
@@ -237,7 +305,8 @@ const lv_img_dsc_t ${name} = {
     dataSize,
     width,
     height,
-    format: options.format,
+    format,
+    formatUpgraded,
   };
 }
 

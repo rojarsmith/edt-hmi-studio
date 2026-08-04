@@ -64,6 +64,12 @@ interface EditorState {
   moveComponent: (id: string, x: number, y: number) => void;
   resizeComponent: (id: string, width: number, height: number, x?: number, y?: number) => void;
   reparentComponent: (id: string, newParentId: string | null) => void;
+  /** Same-level reorder: place `id` immediately before/after `targetId` in the target's parent. */
+  reorderComponentAdjacentTo: (
+    id: string,
+    targetId: string,
+    placement: 'before' | 'after'
+  ) => void;
   clearComponents: () => void;
   setComponents: (components: LvglComponent[]) => void;
   setPages: (pages: Page[]) => void;
@@ -277,6 +283,87 @@ function moveComponentToParent(
   
   // Add to new parent
   return addComponentToTree(newComponents, movedComponent, newParentId);
+}
+
+// Helper to find a component's actual parent id (null = page root, undefined = absent)
+function findParentIdInTree(
+  components: LvglComponent[],
+  id: string,
+  parentId: string | null = null
+): string | null | undefined {
+  for (const comp of components) {
+    if (comp.id === id) return parentId;
+    const found = findParentIdInTree(comp.children, id, comp.id);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+// Helper to test whether `id` sits anywhere inside `root`'s subtree
+function subtreeContains(root: LvglComponent, id: string): boolean {
+  for (const child of root.children) {
+    if (child.id === id || subtreeContains(child, id)) return true;
+  }
+  return false;
+}
+
+/**
+ * Move a component so it sits immediately before or after `targetId` inside the
+ * target's own parent — i.e. a same-level reorder rather than a reparent.
+ *
+ * Placement is expressed in array terms: 'before' lands on a lower index (drawn
+ * earlier, further back), 'after' on a higher index (drawn later, in front).
+ */
+function moveComponentAdjacentTo(
+  components: LvglComponent[],
+  componentId: string,
+  targetId: string,
+  placement: 'before' | 'after'
+): LvglComponent[] {
+  let moved: LvglComponent | undefined;
+
+  const removeFromTree = (comps: LvglComponent[]): LvglComponent[] =>
+    comps
+      .filter(comp => {
+        if (comp.id === componentId) {
+          moved = comp;
+          return false;
+        }
+        return true;
+      })
+      .map(comp => ({ ...comp, children: removeFromTree(comp.children) }));
+
+  const withoutMoved = removeFromTree(components);
+  if (!moved) return components;
+
+  // Resolve the target's index only after the removal, so a same-list move
+  // does not insert at a stale position.
+  let inserted = false;
+  const insertInto = (
+    comps: LvglComponent[],
+    parentId: string | null
+  ): LvglComponent[] => {
+    const index = comps.findIndex(comp => comp.id === targetId);
+    if (index !== -1) {
+      inserted = true;
+      const next = [...comps];
+      next.splice(
+        placement === 'before' ? index : index + 1,
+        0,
+        { ...moved!, parentId }
+      );
+      return next;
+    }
+    return comps.map(comp =>
+      comp.children.length > 0
+        ? { ...comp, children: insertInto(comp.children, comp.id) }
+        : comp
+    );
+  };
+
+  const result = insertInto(withoutMoved, null);
+  // The target vanished (it was inside the moved subtree) — leave the tree be.
+  return inserted ? result : components;
 }
 
 // Deep clone components for history
@@ -649,6 +736,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         get().updateComponent(newParentId, { props: { ...newParent.props, tileChildMap } });
       }
     }
+  },
+
+  reorderComponentAdjacentTo: (id, targetId, placement) => {
+    if (id === targetId) return;
+    const dragged = get().getComponentById(id);
+    const target = get().getComponentById(targetId);
+    // Dropping a component inside its own subtree would detach the tree.
+    if (!dragged || !target || subtreeContains(dragged, targetId)) return;
+
+    const { pages, currentPageId } = get();
+    const currentPage = pages.find(page => page.id === currentPageId);
+    if (!currentPage) return;
+    const draggedParentId = findParentIdInTree(currentPage.components, id);
+    const targetParentId = findParentIdInTree(currentPage.components, targetId);
+    if (draggedParentId === undefined || targetParentId === undefined) return;
+
+    if (draggedParentId !== targetParentId) {
+      // Reuse the reparent path first so tabview/tileview child maps and the
+      // history entry stay consistent; it appends, and we reposition below.
+      get().reparentComponent(id, targetParentId);
+    } else {
+      get().saveToHistory();
+    }
+
+    set(state => ({
+      pages: state.pages.map(page =>
+        page.id === state.currentPageId
+          ? {
+              ...page,
+              components: moveComponentAdjacentTo(
+                page.components,
+                id,
+                targetId,
+                placement,
+              ),
+            }
+          : page,
+      ),
+    }));
   },
   
   setComponents: (components) => {

@@ -349,4 +349,94 @@ describe('editorStore', () => {
       expect(state.selection.selectedIds).toHaveLength(0);
     });
   });
+
+  // --- reorderComponentAdjacentTo ---
+  describe('reorderComponentAdjacentTo', () => {
+    const rootTypes = () => {
+      const state = useEditorStore.getState();
+      const page = state.pages.find(p => p.id === state.currentPageId)!;
+      return page.components.map(c => c.type);
+    };
+
+    it('reorders siblings without nesting them', () => {
+      const store = useEditorStore.getState();
+      const img = store.addComponent('img', 0, 0);
+      store.addComponent('label', 0, 0);
+      const slider = store.addComponent('slider', 0, 0);
+      expect(rootTypes()).toEqual(['img', 'label', 'slider']);
+
+      // Move the image to sit directly after the slider.
+      useEditorStore.getState().reorderComponentAdjacentTo(img, slider, 'after');
+
+      expect(rootTypes()).toEqual(['label', 'slider', 'img']);
+      const state = useEditorStore.getState();
+      const page = state.pages.find(p => p.id === state.currentPageId)!;
+      // Nothing gained a child — this is a same-level move.
+      expect(page.components.every(c => c.children.length === 0)).toBe(true);
+    });
+
+    it('places a component before its target', () => {
+      const store = useEditorStore.getState();
+      store.addComponent('img', 0, 0);
+      const label = store.addComponent('label', 0, 0);
+      const slider = store.addComponent('slider', 0, 0);
+
+      useEditorStore.getState().reorderComponentAdjacentTo(slider, label, 'before');
+
+      expect(rootTypes()).toEqual(['img', 'slider', 'label']);
+    });
+
+    it('keeps indices correct when moving forwards within one list', () => {
+      const store = useEditorStore.getState();
+      const first = store.addComponent('img', 0, 0);
+      store.addComponent('label', 0, 0);
+      const third = store.addComponent('slider', 0, 0);
+      store.addComponent('btn', 0, 0);
+
+      // Removing `first` shifts `third` down one slot; the insert must account
+      // for that rather than using the pre-removal index.
+      useEditorStore.getState().reorderComponentAdjacentTo(first, third, 'before');
+
+      expect(rootTypes()).toEqual(['label', 'img', 'slider', 'btn']);
+    });
+
+    it('moves a component out of a container into the root list', () => {
+      const store = useEditorStore.getState();
+      const container = store.addComponent('obj', 0, 0);
+      const nested = store.addComponent('label', 0, 0, container);
+      const sibling = store.addComponent('btn', 0, 0);
+
+      useEditorStore.getState().reorderComponentAdjacentTo(nested, sibling, 'after');
+
+      const state = useEditorStore.getState();
+      const page = state.pages.find(p => p.id === state.currentPageId)!;
+      expect(page.components.map(c => c.id)).toEqual([container, sibling, nested]);
+      expect(page.components[0].children).toHaveLength(0);
+      expect(page.components[2].parentId).toBeNull();
+    });
+
+    it('refuses to move a component into its own subtree', () => {
+      const store = useEditorStore.getState();
+      const parent = store.addComponent('obj', 0, 0);
+      const child = store.addComponent('label', 0, 0, parent);
+
+      useEditorStore.getState().reorderComponentAdjacentTo(parent, child, 'after');
+
+      const state = useEditorStore.getState();
+      const page = state.pages.find(p => p.id === state.currentPageId)!;
+      expect(page.components).toHaveLength(1);
+      expect(page.components[0].id).toBe(parent);
+      expect(page.components[0].children[0].id).toBe(child);
+    });
+
+    it('is a no-op when target and source are the same', () => {
+      const store = useEditorStore.getState();
+      const a = store.addComponent('img', 0, 0);
+      store.addComponent('label', 0, 0);
+
+      useEditorStore.getState().reorderComponentAdjacentTo(a, a, 'after');
+
+      expect(rootTypes()).toEqual(['img', 'label']);
+    });
+  });
 });

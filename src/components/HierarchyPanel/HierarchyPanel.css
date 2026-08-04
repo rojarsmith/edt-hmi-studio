@@ -178,9 +178,37 @@
   /* Children are indented via padding-left on tree-node */
 }
 
-/* Drag over indicator */
-.tree-node.drag-over {
-  border: 1px dashed #2196F3;
+/* Drag over indicators.
+   A line at an edge means "reorder at the same level"; the filled outline means
+   "nest inside this component". */
+.tree-node.drop-above,
+.tree-node.drop-below {
+  position: relative;
+}
+
+.tree-node.drop-above::before,
+.tree-node.drop-below::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #2196F3;
+  pointer-events: none;
+}
+
+.tree-node.drop-above::before {
+  top: -1px;
+}
+
+.tree-node.drop-below::after {
+  bottom: -1px;
+}
+
+.tree-node.drop-inside {
+  outline: 2px solid #2196F3;
+  outline-offset: -2px;
+  background: #d4e8fc;
 }
 
 /* Scrollbar styling */
