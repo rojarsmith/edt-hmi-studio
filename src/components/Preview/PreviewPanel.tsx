@@ -53,24 +53,21 @@ function computeAnimState(anim: Animation, progress: number): Partial<AnimState>
   const end = Number(anim.endValue) || 0;
   const val = start + (end - start) * t;
 
-  switch (anim.type) {
-    case 'fade_in': return { opacity: t };
-    case 'fade_out': return { opacity: 1 - t };
-    case 'slide_left': return { offsetX: (1 - t) * (start || 100) * -1 };
-    case 'slide_right': return { offsetX: (1 - t) * (start || 100) };
-    case 'slide_up': return { offsetY: (1 - t) * (start || 100) * -1 };
-    case 'slide_down': return { offsetY: (1 - t) * (start || 100) };
-    case 'zoom_in': return { scaleX: t, scaleY: t };
-    case 'zoom_out': return { scaleX: 1 - t, scaleY: 1 - t };
-    case 'custom': {
-      // Use property + start/end for custom
-      if (anim.property === 'x') return { offsetX: val };
-      if (anim.property === 'y') return { offsetY: val };
-      if (anim.property === 'opacity') return { opacity: val / 255 };
-      if (anim.property === 'width') return { scaleX: val / 100 };
-      if (anim.property === 'height') return { scaleY: val / 100 };
-      return {};
-    }
+  // Interpret the animation exactly as the code generator does: by property and
+  // start/end value. Every animation type sets those when it is picked, so the
+  // preview and the generated firmware can no longer disagree.
+  //
+  // The type-keyed formulas this replaces negated the start value on top of the
+  // already-negative default ("Slide In from Left" stores -100), so left slides
+  // came in from the right and top slides from the bottom.
+  switch (anim.property) {
+    case 'x': return { offsetX: val };
+    case 'y': return { offsetY: val };
+    case 'opa': return { opacity: val / 255 };
+    case 'width': return { scaleX: val / 100 };
+    case 'height': return { scaleY: val / 100 };
+    // LVGL scale units: 256 is 1:1, which is what the editor stores.
+    case 'transform_zoom': return { scaleX: val / 256, scaleY: val / 256 };
     default: return {};
   }
 }

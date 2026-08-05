@@ -884,24 +884,123 @@ function getEasingPath(easing: AnimationEasing): string {
 }
 
 /**
- * Map animation property to LVGL exec callback
+ * Animated properties whose LVGL setter takes a style selector, so it cannot be
+ * used as an `lv_anim_exec_xcb_t` (`void (*)(void *, int32_t)`) directly —
+ * calling a three-parameter function through a two-parameter pointer leaves the
+ * selector as whatever happens to be in the register, and the value lands on an
+ * arbitrary part/state. Each needs a generated wrapper instead.
+ *
+ * These use style transforms rather than `lv_image_set_scale`/`_rotation`, which
+ * only exist on image widgets: applied to any other widget they reinterpret the
+ * object, and LV_USE_ASSERT_OBJ is off in the firmware so nothing catches it.
  */
-function getAnimExecCb(property: string, options: CodeGenOptions): string {
-  const isV9 = options.lvglVersion === '9';
-  const map: Record<string, string> = {
-    x: '(lv_anim_exec_xcb_t)lv_obj_set_x',
-    y: '(lv_anim_exec_xcb_t)lv_obj_set_y',
-    width: '(lv_anim_exec_xcb_t)lv_obj_set_width',
-    height: '(lv_anim_exec_xcb_t)lv_obj_set_height',
-    opa: '(lv_anim_exec_xcb_t)lv_obj_set_style_opa',
-    transform_zoom: isV9
-      ? '(lv_anim_exec_xcb_t)lv_image_set_scale'
-      : '(lv_anim_exec_xcb_t)lv_img_set_zoom',
-    transform_angle: isV9
-      ? '(lv_anim_exec_xcb_t)lv_image_set_rotation'
-      : '(lv_anim_exec_xcb_t)lv_img_set_angle',
+const ANIM_WRAPPERS: Record<string, { name: string; setter: (isV9: boolean) => string[] }> = {
+  opa: {
+    name: 'ui_anim_set_opa',
+    setter: () => ['lv_obj_set_style_opa(target, (lv_opa_t)value, LV_PART_MAIN);'],
+  },
+  transform_zoom: {
+    name: 'ui_anim_set_zoom',
+    setter: (isV9) => isV9
+      ? [
+        'lv_obj_set_style_transform_scale_x(target, value, LV_PART_MAIN);',
+        'lv_obj_set_style_transform_scale_y(target, value, LV_PART_MAIN);',
+      ]
+      : ['lv_obj_set_style_transform_zoom(target, value, LV_PART_MAIN);'],
+  },
+  transform_angle: {
+    name: 'ui_anim_set_angle',
+    setter: (isV9) => isV9
+      ? ['lv_obj_set_style_transform_rotation(target, value, LV_PART_MAIN);']
+      : ['lv_obj_set_style_transform_angle(target, value, LV_PART_MAIN);'],
+  },
+};
+
+/** Properties whose setter already matches lv_anim_exec_xcb_t exactly. */
+const ANIM_DIRECT_SETTERS: Record<string, string> = {
+  x: 'lv_obj_set_x',
+  y: 'lv_obj_set_y',
+  width: 'lv_obj_set_width',
+  height: 'lv_obj_set_height',
+};
+
+/**
+ * Map animation property to LVGL exec callback, or undefined when the property
+ * cannot be animated — emitting a wrong-but-plausible callback would silently
+ * animate something the user never asked for.
+ */
+function getAnimExecCb(property: string): string | undefined {
+  const wrapper = ANIM_WRAPPERS[property];
+  if (wrapper) return wrapper.name;
+  const direct = ANIM_DIRECT_SETTERS[property];
+  return direct ? `(lv_anim_exec_xcb_t)${direct}` : undefined;
+}
+
+/**
+ * Put an animated widget at its start value while the screen is still being
+ * built, so it is never shown at its design position first.
+ *
+ * The animation itself only starts once the screen-load transition finishes;
+ * without this the widget sits where the designer placed it for the whole
+ * transition and then jumps off-screen to begin sliding in — a visible flash of
+ * the wrong position on every page change.
+ */
+function generateAnimationInitialState(
+  varName: string,
+  animations: Animation[],
+  options: CodeGenOptions
+): string[] {
+  const indent = getIndent(options);
+  const lines: string[] = [];
+
+  for (const anim of animations) {
+    const wrapper = ANIM_WRAPPERS[anim.property];
+    const setter = wrapper ? wrapper.name : ANIM_DIRECT_SETTERS[anim.property];
+    if (!setter) continue;
+    lines.push(`${indent}${setter}(${varName}, ${anim.startValue});`);
+  }
+
+  return lines;
+}
+
+/**
+ * Emit the wrapper functions needed by the animations in use.
+ */
+export function generateAnimationHelpers(
+  pages: Page[],
+  options: CodeGenOptions
+): string[] {
+  const used = new Set<string>();
+  const walk = (components: LvglComponent[]) => {
+    for (const component of components) {
+      for (const anim of component.animations || []) {
+        if (ANIM_WRAPPERS[anim.property]) used.add(anim.property);
+      }
+      walk(component.children);
+    }
   };
-  return map[property] || `(lv_anim_exec_xcb_t)lv_obj_set_x`;
+  for (const page of pages) walk(page.components);
+  if (used.size === 0) return [];
+
+  const isV9 = options.lvglVersion === '9';
+  const lines: string[] = [
+    '/* ------------------------------------------------------------ */',
+    '/* Animation Helpers                                          */',
+    '/* ------------------------------------------------------------ */',
+    '',
+  ];
+  for (const property of Object.keys(ANIM_WRAPPERS)) {
+    if (!used.has(property)) continue;
+    const wrapper = ANIM_WRAPPERS[property];
+    lines.push(`static void ${wrapper.name}(void *object, int32_t value) {`);
+    lines.push('    lv_obj_t *target = (lv_obj_t *)object;');
+    for (const statement of wrapper.setter(isV9)) {
+      lines.push(`    ${statement}`);
+    }
+    lines.push('}');
+    lines.push('');
+  }
+  return lines;
 }
 
 /**
@@ -920,6 +1019,14 @@ function generateAnimationCode(
   for (let i = 0; i < animations.length; i++) {
     const anim = animations[i];
     const animVar = `${varName}_anim_${i}`;
+    const execCb = getAnimExecCb(anim.property);
+
+    if (!execCb) {
+      lines.push(
+        `${indent}// Animation "${anim.name || anim.type}" skipped: property "${anim.property}" is not animatable`,
+      );
+      continue;
+    }
 
     if (options.generateComments) {
       lines.push(`${indent}${generateComment(`Animation: ${anim.name || anim.type}`, options)}`);
@@ -928,7 +1035,7 @@ function generateAnimationCode(
     lines.push(`${indent}lv_anim_t ${animVar};`);
     lines.push(`${indent}lv_anim_init(&${animVar});`);
     lines.push(`${indent}lv_anim_set_var(&${animVar}, ${varName});`);
-    lines.push(`${indent}lv_anim_set_exec_cb(&${animVar}, ${getAnimExecCb(anim.property, options)});`);
+    lines.push(`${indent}lv_anim_set_exec_cb(&${animVar}, ${execCb});`);
     lines.push(`${indent}lv_anim_set_values(&${animVar}, ${anim.startValue}, ${anim.endValue});`);
     lines.push(`${indent}lv_anim_set_time(&${animVar}, ${anim.duration});`);
 
@@ -1115,9 +1222,10 @@ function generateComponentCode(
     lines.push(`${indent}lv_obj_add_event_cb(${varName}, ${handlerName}, ${event.eventType}, NULL);`);
   }
 
-  // Animations
-  const animLines = generateAnimationCode(varName, component.animations || [], options);
-  lines.push(...animLines);
+  // Animations are started from the screen-loaded callback, not here — see
+  // generateScreenAnimationFunc. Their start value is applied now so the widget
+  // is already in place before the screen is ever shown.
+  lines.push(...generateAnimationInitialState(varName, component.animations || [], options));
 
   // Visibility
   if (!component.visible) {
@@ -1180,6 +1288,54 @@ function generateComponentCode(
 /**
  * Generate screen init function
  */
+/** Name of the callback that starts a screen's animations once it is shown. */
+function getScreenAnimFuncName(pageName: string, options: CodeGenOptions): string {
+  return `${getScreenVarName(pageName, options)}_start_anims`;
+}
+
+/**
+ * Emit the callback that starts every animation on a page.
+ *
+ * Screens are shown through lv_scr_load_anim, so for the first few hundred
+ * milliseconds after init the screen is still transitioning — and during
+ * ui_init it has not been loaded at all. Starting widget animations from the
+ * init function therefore burns part (or all) of their duration off-screen and
+ * the user only ever sees them part-way through. LV_EVENT_SCREEN_LOADED fires
+ * after the transition completes, which also means the animations replay every
+ * time the page is switched back to.
+ *
+ * Returns an empty string when the page has no animations.
+ */
+function generateScreenAnimationFunc(
+  page: Page,
+  options: CodeGenOptions,
+  needsPagePrefix: Set<string>
+): string {
+  const indent = getIndent(options);
+  const body: string[] = [];
+
+  const walk = (components: LvglComponent[]) => {
+    for (const component of components) {
+      const varName = needsPagePrefix.has(component.id)
+        ? getComponentVarName(`${page.name}_${component.name}`, options)
+        : getComponentVarName(component.name, options);
+      body.push(...generateAnimationCode(varName, component.animations || [], options));
+      walk(component.children);
+    }
+  };
+  walk(page.components);
+
+  if (body.length === 0) return '';
+
+  const funcName = getScreenAnimFuncName(page.name, options);
+  return [
+    `static void ${funcName}(lv_event_t *event) {`,
+    `${indent}LV_UNUSED(event);`,
+    ...body,
+    '}',
+  ].join('\n');
+}
+
 function generateScreenInitFunc(
   page: Page,
   options: CodeGenOptions,
@@ -1202,7 +1358,17 @@ function generateScreenInitFunc(
     lines.push(`${indent}${generateComment(`Create screen: ${page.name}`, options)}`);
   }
   lines.push(`${indent}${screenVar} = lv_obj_create(NULL);`);
-  
+
+  /*
+   * LVGL screens are scrollable by default, so anything reaching past the panel
+   * — a slide-in animation starting off-screen, a widget dragged beyond the
+   * edge — turns the screen into a scrollable area and raises a scrollbar. The
+   * design canvas is a fixed panel-sized viewport that simply clips, so match
+   * it: content outside the screen is not shown, and the screen does not grow.
+   */
+  lines.push(`${indent}lv_obj_clear_flag(${screenVar}, LV_OBJ_FLAG_SCROLLABLE);`);
+  lines.push(`${indent}lv_obj_set_scrollbar_mode(${screenVar}, LV_SCROLLBAR_MODE_OFF);`);
+
   // Screen background color
   if (page.backgroundColor) {
     lines.push(`${indent}lv_obj_set_style_bg_color(${screenVar}, ${colorToLvgl(page.backgroundColor)}, 0);`);
@@ -1228,7 +1394,15 @@ function generateScreenInitFunc(
   for (const component of page.components) {
     lines.push(...generateComponentCode(component, screenVar, options, page.name, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
   }
-  
+
+  // Start animations only once the screen-load transition has finished
+  if (generateScreenAnimationFunc(page, options, needsPagePrefix) !== '') {
+    lines.push(
+      `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimFuncName(page.name, options)}, LV_EVENT_SCREEN_LOADED, NULL);`,
+    );
+    lines.push('');
+  }
+
   // User code section
   if (options.userCodeMarkers) {
     lines.push(`${indent}${generateUserCodeSection(`${page.name}_init`, options)}`);
@@ -1540,7 +1714,13 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
     }
   }
   lines.push('');
-  
+
+  // Animation exec-callback wrappers, emitted before any screen init uses them
+  const animationHelpers = generateAnimationHelpers(pages, options);
+  if (animationHelpers.length > 0) {
+    lines.push(...animationHelpers);
+  }
+
   // Screen definitions
   if (options.generateComments) {
     lines.push(generateSectionHeader('Screen Definitions', options));
@@ -1615,12 +1795,27 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
     lines.push(...imageButtonSupport);
   }
   
+  // Animation start callbacks, defined before the init functions that bind them
+  const screenAnimFuncs = pages
+    .map((page) => generateScreenAnimationFunc(page, options, needsPagePrefix))
+    .filter((source) => source !== '');
+  if (screenAnimFuncs.length > 0) {
+    if (options.generateComments) {
+      lines.push(generateSectionHeader('Screen Animations', options));
+      lines.push('');
+    }
+    for (const source of screenAnimFuncs) {
+      lines.push(source);
+      lines.push('');
+    }
+  }
+
   // Screen init functions (static)
   if (options.generateComments) {
     lines.push(generateSectionHeader('Screen Init Functions', options));
     lines.push('');
   }
-  
+
   for (const page of pages) {
     lines.push(generateScreenInitFunc(page, options, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
     lines.push('');

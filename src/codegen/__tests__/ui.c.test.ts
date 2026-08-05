@@ -893,7 +893,8 @@ describe('generateUiSource', () => {
       });
       const pages = [createPage({ name: 'main', components: [obj] })];
       const result = generateUiSource(pages, defaultOptions());
-      expect(result).not.toContain('lv_obj_set_scrollbar_mode');
+      // Screens always turn their scrollbar off, so scope this to the widget.
+      expect(result).not.toContain('lv_obj_set_scrollbar_mode(ui_box');
     });
   });
 
@@ -956,6 +957,159 @@ describe('generateUiSource', () => {
       expect(result).toContain('lv_anim_set_path_cb(&ui_my_btn_anim_0, lv_anim_path_ease_in_out);');
       expect(result).toContain('lv_anim_set_repeat_count(&ui_my_btn_anim_0, 3);');
       expect(result).toContain('lv_anim_start(&ui_my_btn_anim_0);');
+    });
+
+    it('routes selector-taking setters through a wrapper of the right signature', () => {
+      // lv_obj_set_style_opa takes (obj, value, selector); lv_anim_exec_xcb_t is
+      // (void *, int32_t). Passing it directly leaves the selector undefined, so
+      // the opacity lands on an arbitrary part and the animation does nothing.
+      const btn = createComponent('btn', {
+        name: 'fader',
+        animations: [createAnimation({ property: 'opa', startValue: 0, endValue: 255 })],
+      });
+      const result = generateUiSource(
+        [createPage({ name: 'main', components: [btn] })],
+        defaultOptions(),
+      );
+
+      expect(result).toContain('static void ui_anim_set_opa(void *object, int32_t value) {');
+      expect(result).toContain('lv_obj_set_style_opa(target, (lv_opa_t)value, LV_PART_MAIN);');
+      expect(result).toContain('lv_anim_set_exec_cb(&ui_fader_anim_0, ui_anim_set_opa);');
+      expect(result).not.toContain('(lv_anim_exec_xcb_t)lv_obj_set_style_opa');
+    });
+
+    it('animates transforms through styles so non-image widgets work', () => {
+      // lv_image_set_scale/_rotation only exist on image widgets; used on any
+      // other widget they reinterpret the object, and LV_USE_ASSERT_OBJ is off.
+      const btn = createComponent('btn', {
+        name: 'spinner',
+        animations: [
+          createAnimation({ property: 'transform_zoom', startValue: 128, endValue: 256 }),
+          createAnimation({ property: 'transform_angle', startValue: 0, endValue: 3600 }),
+        ],
+      });
+      const result = generateUiSource(
+        [createPage({ name: 'main', components: [btn] })],
+        defaultOptions(),
+      );
+
+      expect(result).toContain('lv_obj_set_style_transform_scale_x(target, value, LV_PART_MAIN);');
+      expect(result).toContain('lv_obj_set_style_transform_scale_y(target, value, LV_PART_MAIN);');
+      expect(result).toContain('lv_obj_set_style_transform_rotation(target, value, LV_PART_MAIN);');
+      expect(result).not.toContain('lv_image_set_scale');
+      expect(result).not.toContain('lv_image_set_rotation');
+    });
+
+    it('emits a helper only for the properties actually animated', () => {
+      const btn = createComponent('btn', {
+        name: 'mover',
+        animations: [createAnimation({ property: 'x', startValue: 0, endValue: 100 })],
+      });
+      const result = generateUiSource(
+        [createPage({ name: 'main', components: [btn] })],
+        defaultOptions(),
+      );
+
+      expect(result).toContain('lv_anim_set_exec_cb(&ui_mover_anim_0, (lv_anim_exec_xcb_t)lv_obj_set_x);');
+      expect(result).not.toContain('ui_anim_set_opa');
+      expect(result).not.toContain('Animation Helpers');
+    });
+
+    it('starts animations from LV_EVENT_SCREEN_LOADED, not from screen init', () => {
+      // Screens appear through lv_scr_load_anim, so anything started during
+      // init burns part of its duration before the screen is even visible and
+      // is only ever seen part-way through.
+      const btn = createComponent('btn', {
+        name: 'slider_in',
+        animations: [createAnimation({ property: 'x', startValue: -110, endValue: 0 })],
+      });
+      const result = generateUiSource(
+        [createPage({ name: 'main', components: [btn] })],
+        defaultOptions(),
+      );
+
+      expect(result).toContain('static void ui_screen_main_start_anims(lv_event_t *event) {');
+      expect(result).toContain(
+        'lv_obj_add_event_cb(ui_screen_main, ui_screen_main_start_anims, LV_EVENT_SCREEN_LOADED, NULL);',
+      );
+      // The callback must be defined before the init function that binds it.
+      expect(result.indexOf('static void ui_screen_main_start_anims'))
+        .toBeLessThan(result.indexOf('lv_obj_add_event_cb(ui_screen_main,'));
+      // and lv_anim_start belongs to the callback, not to the init function
+      expect(result.indexOf('lv_anim_start(&ui_slider_in_anim_0);'))
+        .toBeLessThan(result.indexOf('static void ui_screen_main_init'));
+    });
+
+    it('parks an animated widget at its start value during screen init', () => {
+      // The animation only starts once the screen-load transition finishes, so
+      // without this the widget sits where it was designed for the whole
+      // transition and then jumps off-screen to begin sliding — a flash of the
+      // wrong position on every page change.
+      const btn = createComponent('btn', {
+        name: 'slider_in',
+        x: 40,
+        animations: [
+          createAnimation({ property: 'x', startValue: -110, endValue: 0 }),
+          createAnimation({ property: 'opa', startValue: 0, endValue: 255 }),
+        ],
+      });
+      const result = generateUiSource(
+        [createPage({ name: 'main', components: [btn] })],
+        defaultOptions(),
+      );
+
+      expect(result).toContain('lv_obj_set_x(ui_slider_in, -110);');
+      expect(result).toContain('ui_anim_set_opa(ui_slider_in, 0);');
+      // Applied during init, i.e. before the screen-loaded callback is bound.
+      expect(result.indexOf('lv_obj_set_x(ui_slider_in, -110);'))
+        .toBeLessThan(result.indexOf('LV_EVENT_SCREEN_LOADED'));
+      // ...and after the designed position, so it wins.
+      expect(result.indexOf('lv_obj_set_pos(ui_slider_in,'))
+        .toBeLessThan(result.indexOf('lv_obj_set_x(ui_slider_in, -110);'));
+    });
+
+    it('clips every screen instead of letting it scroll', () => {
+      // LVGL screens are scrollable by default, so a widget reaching past the
+      // panel — a slide-in starting off-screen, for instance — would turn the
+      // screen into a scrollable area with a scrollbar. The design canvas is a
+      // fixed viewport that clips, and the firmware has to match it.
+      const offEdge = createComponent('btn', { name: 'off_edge', x: 380, width: 200 });
+      const result = generateUiSource(
+        [
+          createPage({ name: 'main', components: [] }),
+          createPage({ name: 'page 2', components: [offEdge] }),
+        ],
+        defaultOptions(),
+      );
+
+      for (const screen of ['ui_screen_main', 'ui_screen_page_2']) {
+        expect(result).toContain(`lv_obj_clear_flag(${screen}, LV_OBJ_FLAG_SCROLLABLE);`);
+        expect(result).toContain(`lv_obj_set_scrollbar_mode(${screen}, LV_SCROLLBAR_MODE_OFF);`);
+      }
+    });
+
+    it('omits the animation callback for pages without animations', () => {
+      const result = generateUiSource(
+        [createPage({ name: 'main', components: [createComponent('btn', { name: 'plain' })] })],
+        defaultOptions(),
+      );
+
+      expect(result).not.toContain('start_anims');
+      expect(result).not.toContain('LV_EVENT_SCREEN_LOADED');
+    });
+
+    it('skips an unanimatable property instead of animating something else', () => {
+      const btn = createComponent('btn', {
+        name: 'odd',
+        animations: [createAnimation({ name: 'weird', property: 'bg_color' })],
+      });
+      const result = generateUiSource(
+        [createPage({ name: 'main', components: [btn] })],
+        defaultOptions(),
+      );
+
+      expect(result).toContain('Animation "weird" skipped: property "bg_color" is not animatable');
+      expect(result).not.toContain('ui_odd_anim_0');
     });
 
     it('omits delay when 0', () => {
