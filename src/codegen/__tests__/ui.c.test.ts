@@ -1040,11 +1040,10 @@ describe('generateUiSource', () => {
         .toBeLessThan(result.indexOf('static void ui_screen_main_init'));
     });
 
-    it('parks an animated widget at its start value during screen init', () => {
-      // The animation only starts once the screen-load transition finishes, so
-      // without this the widget sits where it was designed for the whole
-      // transition and then jumps off-screen to begin sliding — a flash of the
-      // wrong position on every page change.
+    it('parks animated widgets on every screen load, not only the first', () => {
+      // Widgets keep whatever the previous run left them at, so parking only at
+      // init means a second visit to the page shows them at their end position
+      // for the whole transition before the animation resets them.
       const btn = createComponent('btn', {
         name: 'slider_in',
         x: 40,
@@ -1058,14 +1057,19 @@ describe('generateUiSource', () => {
         defaultOptions(),
       );
 
+      expect(result).toContain('static void ui_screen_main_reset_anims(lv_event_t *event) {');
       expect(result).toContain('lv_obj_set_x(ui_slider_in, -110);');
       expect(result).toContain('ui_anim_set_opa(ui_slider_in, 0);');
-      // Applied during init, i.e. before the screen-loaded callback is bound.
-      expect(result.indexOf('lv_obj_set_x(ui_slider_in, -110);'))
-        .toBeLessThan(result.indexOf('LV_EVENT_SCREEN_LOADED'));
-      // ...and after the designed position, so it wins.
-      expect(result.indexOf('lv_obj_set_pos(ui_slider_in,'))
-        .toBeLessThan(result.indexOf('lv_obj_set_x(ui_slider_in, -110);'));
+      expect(result).toContain(
+        'lv_obj_add_event_cb(ui_screen_main, ui_screen_main_reset_anims, LV_EVENT_SCREEN_LOAD_START, NULL);',
+      );
+      // Parking must be bound to LOAD_START (before the transition draws) and
+      // starting to LOADED (after it ends).
+      expect(result.indexOf('ui_screen_main_reset_anims, LV_EVENT_SCREEN_LOAD_START'))
+        .toBeLessThan(result.indexOf('ui_screen_main_start_anims, LV_EVENT_SCREEN_LOADED'));
+      // The start value is no longer applied inline in the init function.
+      const initAt = result.indexOf('static void ui_screen_main_init');
+      expect(result.indexOf('lv_obj_set_x(ui_slider_in, -110);')).toBeLessThan(initAt);
     });
 
     it('clips every screen instead of letting it scroll', () => {

@@ -937,13 +937,10 @@ function getAnimExecCb(property: string): string | undefined {
 }
 
 /**
- * Put an animated widget at its start value while the screen is still being
- * built, so it is never shown at its design position first.
+ * Statements that put an animated widget at its start value.
  *
- * The animation itself only starts once the screen-load transition finishes;
- * without this the widget sits where the designer placed it for the whole
- * transition and then jumps off-screen to begin sliding in — a visible flash of
- * the wrong position on every page change.
+ * Uses the same setter the animation drives, so the parked state is identical
+ * to the animation's first frame.
  */
 function generateAnimationInitialState(
   varName: string,
@@ -1222,10 +1219,9 @@ function generateComponentCode(
     lines.push(`${indent}lv_obj_add_event_cb(${varName}, ${handlerName}, ${event.eventType}, NULL);`);
   }
 
-  // Animations are started from the screen-loaded callback, not here — see
-  // generateScreenAnimationFunc. Their start value is applied now so the widget
-  // is already in place before the screen is ever shown.
-  lines.push(...generateAnimationInitialState(varName, component.animations || [], options));
+  // Animations are parked and started from the screen's load callbacks, not
+  // here — see generateScreenAnimationFunc. Doing it per screen load is what
+  // makes them behave the same on every visit to the page, not just the first.
 
   // Visibility
   if (!component.visible) {
@@ -1285,24 +1281,31 @@ function generateComponentCode(
   return lines;
 }
 
-/**
- * Generate screen init function
- */
-/** Name of the callback that starts a screen's animations once it is shown. */
+/** Callback that parks a screen's animated widgets on their start values. */
+function getScreenAnimResetFuncName(pageName: string, options: CodeGenOptions): string {
+  return `${getScreenVarName(pageName, options)}_reset_anims`;
+}
+
+/** Callback that starts a screen's animations once it is fully shown. */
 function getScreenAnimFuncName(pageName: string, options: CodeGenOptions): string {
   return `${getScreenVarName(pageName, options)}_start_anims`;
 }
 
 /**
- * Emit the callback that starts every animation on a page.
+ * Emit the two callbacks that drive a page's animations.
  *
- * Screens are shown through lv_scr_load_anim, so for the first few hundred
- * milliseconds after init the screen is still transitioning — and during
- * ui_init it has not been loaded at all. Starting widget animations from the
- * init function therefore burns part (or all) of their duration off-screen and
- * the user only ever sees them part-way through. LV_EVENT_SCREEN_LOADED fires
- * after the transition completes, which also means the animations replay every
- * time the page is switched back to.
+ * Screens appear through lv_scr_load_anim, and LVGL brackets that transition
+ * with two events: LV_EVENT_SCREEN_LOAD_START fires before the first frame of
+ * the transition is drawn, LV_EVENT_SCREEN_LOADED once it has finished. Both
+ * are needed:
+ *
+ * - Park on LOAD_START. Widgets keep whatever the last run left them at, so on
+ *   a second visit to the page they would be sitting at their end position for
+ *   the whole transition — the page's contents flashing into view before the
+ *   animation resets them.
+ * - Start on LOADED. Starting from the init function instead burns the
+ *   animation's duration while the screen is not yet visible, so it is only
+ *   ever caught part-way through.
  *
  * Returns an empty string when the page has no animations.
  */
@@ -1312,28 +1315,63 @@ function generateScreenAnimationFunc(
   needsPagePrefix: Set<string>
 ): string {
   const indent = getIndent(options);
-  const body: string[] = [];
+  const startBody: string[] = [];
+  const resetBody: string[] = [];
 
   const walk = (components: LvglComponent[]) => {
     for (const component of components) {
       const varName = needsPagePrefix.has(component.id)
         ? getComponentVarName(`${page.name}_${component.name}`, options)
         : getComponentVarName(component.name, options);
-      body.push(...generateAnimationCode(varName, component.animations || [], options));
+      const animations = component.animations || [];
+      startBody.push(...generateAnimationCode(varName, animations, options));
+      resetBody.push(...generateAnimationInitialState(varName, animations, options));
       walk(component.children);
     }
   };
   walk(page.components);
 
-  if (body.length === 0) return '';
+  if (startBody.length === 0) return '';
 
-  const funcName = getScreenAnimFuncName(page.name, options);
-  return [
-    `static void ${funcName}(lv_event_t *event) {`,
+  const sections: string[] = [];
+  if (resetBody.length > 0) {
+    sections.push([
+      `static void ${getScreenAnimResetFuncName(page.name, options)}(lv_event_t *event) {`,
+      `${indent}LV_UNUSED(event);`,
+      ...resetBody,
+      '}',
+    ].join('\n'));
+  }
+  sections.push([
+    `static void ${getScreenAnimFuncName(page.name, options)}(lv_event_t *event) {`,
     `${indent}LV_UNUSED(event);`,
-    ...body,
+    ...startBody,
     '}',
-  ].join('\n');
+  ].join('\n'));
+
+  return sections.join('\n\n');
+}
+
+/** Whether the page has any animation start value worth parking. */
+function pageHasAnimationResets(
+  page: Page,
+  options: CodeGenOptions,
+  needsPagePrefix: Set<string>
+): boolean {
+  let found = false;
+  const walk = (components: LvglComponent[]) => {
+    for (const component of components) {
+      const varName = needsPagePrefix.has(component.id)
+        ? getComponentVarName(`${page.name}_${component.name}`, options)
+        : getComponentVarName(component.name, options);
+      if (generateAnimationInitialState(varName, component.animations || [], options).length > 0) {
+        found = true;
+      }
+      walk(component.children);
+    }
+  };
+  walk(page.components);
+  return found;
 }
 
 function generateScreenInitFunc(
@@ -1395,8 +1433,13 @@ function generateScreenInitFunc(
     lines.push(...generateComponentCode(component, screenVar, options, page.name, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
   }
 
-  // Start animations only once the screen-load transition has finished
+  // Park animated widgets before the transition draws, start them after it ends
   if (generateScreenAnimationFunc(page, options, needsPagePrefix) !== '') {
+    if (pageHasAnimationResets(page, options, needsPagePrefix)) {
+      lines.push(
+        `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimResetFuncName(page.name, options)}, LV_EVENT_SCREEN_LOAD_START, NULL);`,
+      );
+    }
     lines.push(
       `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimFuncName(page.name, options)}, LV_EVENT_SCREEN_LOADED, NULL);`,
     );
