@@ -205,13 +205,48 @@ what the firmware actually applied rather than what the project intended.
 
 ### Touch orientation
 
-The FT6X06 on this panel already reports landscape coordinates — X across the
-800-pixel axis, Y across the 480-pixel one — so `BSP_TS_Init` is called with
-`TS_SWAP_NONE`. Setting `TS_SWAP_XY` instead feeds the 0..800 raw X into the
-480-tall Y axis, and anything pressed right of x=480 lands off-screen: presses
-near the top-left still work, everything else silently does nothing.
+`BSP_TS_Init` is called with `TS_SWAP_XY | TS_SWAP_Y` for this panel. The
+FT6X06 reports the display's native **portrait** frame — X spanning 0..480,
+Y spanning 0..800 — so both transforms are needed: `TS_SWAP_XY` puts the
+800-wide axis on screen X, and `TS_SWAP_Y` corrects the remaining axis, which
+otherwise runs bottom-to-top.
 
-The BSP keeps the evidence in RAM. Read `Ts_Ctx` (find its address with
+`Width`/`Height` stay 800x480 and are matched by `FT6X06_MAX_X_LENGTH` /
+`FT6X06_MAX_Y_LENGTH` in `ft6x06_conf.h`. Those look transposed against the raw
+ranges, and must be: the BSP scales with `Width / MaxX` *after* swapping, so
+`MaxX` has to describe whichever axis ends up on X. "Correcting" them to match
+the sensor breaks the scaling instead of fixing it.
+
+**Do not deduce this from behaviour.** Symptoms overlap badly: a missing
+`TS_SWAP_XY` and a missing `TS_SWAP_Y` both present as "the wrong part of the
+screen responds", and fixing one alone can look like a regression. Measure it —
+see below.
+
+One symptom is worth recognising because it is unambiguous: a missing
+`TS_SWAP_XY` makes `MaxY - rawY - 1` underflow for every `rawY > 479`, and the
+unsigned result surfaces as coordinates around **8947848 - k**. Huge numbers in
+that range mean the axes are crossed, not that the sensor is faulty.
+
+### Measuring the mapping
+
+`board_touch_log` in `board_display.c` records touches for exactly this. Flash,
+touch the four corners in a known order, then read it:
+
+```bash
+x/5dw &board_touch_log    # presses, min_x, max_x, min_y, max_y
+x/8dw &board_touch_log.recent
+```
+
+`min`/`max` show the reachable range — if `max_x` stops near 480 on an 800-wide
+panel, the sensor's X is the short axis and the frames are crossed. `recent`
+holds the last four presses at index `presses & 3`, so with 11 presses the
+chronological order is `recent[3], recent[0], recent[1], recent[2]`.
+
+Invert the transform currently in force to recover the raw values, then check
+each axis separately: left-hand corners should give small X, top corners small
+Y. An axis where the corners come out reversed needs its mirror flag.
+
+The BSP also keeps state in RAM. Read `Ts_Ctx` (find its address with
 `arm-none-eabi-nm`) and decode it as:
 
 | Offset | Field |
@@ -225,10 +260,12 @@ The BSP keeps the evidence in RAM. Read `Ts_Ctx` (find its address with
 | 24 | `PreviousX[0]` |
 | 28 | `PreviousY[0]` |
 
-A `PreviousY` larger than `MaxY` (or `PreviousX` larger than `MaxX`) means the
-axes are being crossed, which pins the problem on the orientation mask rather
-than on the touch controller. If presses register on the correct axis but
-mirrored, add `TS_SWAP_X` or `TS_SWAP_Y` — the mask is additive.
+`PreviousX` and `PreviousY` are **arrays** of `TS_TOUCH_NBR` entries, which is 2
+here — so `PreviousY[0]` is at offset 32, not 24. Reading offset 28 as a Y
+coordinate gives you `PreviousX[1]`, an unused second-touch slot that
+`BSP_TS_Init` fills with `Width + Accuracy + 1` (806) and `Height + Accuracy + 1`
+(486). Those sentinels look exactly like out-of-range coordinates and will send
+you after the wrong axis.
 
 ## Clock and supply settings that must not be improvised
 

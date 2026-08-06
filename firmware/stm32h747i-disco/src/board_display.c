@@ -81,10 +81,53 @@ static void display_flush(
     lv_display_flush_ready(display);
 }
 
+/*
+ * Bring-up aid for a new panel. Touch orientation and scaling cannot be worked
+ * out by reasoning about the datasheet — the controller's native axes, the
+ * panel's rotation and the BSP's own transform all compound. Recording what
+ * actually arrives lets a debugger read the mapping off the running board:
+ * touch the four corners, then dump board_touch_log with
+ *
+ *   x/12dw &board_touch_log
+ *
+ * `min`/`max` bound the reachable range (they should approach 0 and the panel
+ * size), and `recent` holds the last four points in the order they were seen.
+ */
+typedef struct {
+    int32_t presses;
+    int32_t min_x;
+    int32_t max_x;
+    int32_t min_y;
+    int32_t max_y;
+    int32_t recent[4][2];
+} board_touch_log_t;
+
+board_touch_log_t board_touch_log = {
+    .min_x = INT32_MAX,
+    .max_x = INT32_MIN,
+    .min_y = INT32_MAX,
+    .max_y = INT32_MIN,
+};
+
+static void record_touch(int32_t x, int32_t y)
+{
+    board_touch_log_t *log = &board_touch_log;
+
+    if (x < log->min_x) log->min_x = x;
+    if (x > log->max_x) log->max_x = x;
+    if (y < log->min_y) log->min_y = y;
+    if (y > log->max_y) log->max_y = y;
+
+    log->recent[(uint32_t)log->presses & 3U][0] = x;
+    log->recent[(uint32_t)log->presses & 3U][1] = y;
+    log->presses++;
+}
+
 static void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
     static int32_t last_x;
     static int32_t last_y;
+    static bool was_pressed;
     TS_State_t touch = {0};
 
     (void)indev;
@@ -93,8 +136,14 @@ static void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
         (touch.TouchDetected > 0U)) {
         last_x = (int32_t)touch.TouchX;
         last_y = (int32_t)touch.TouchY;
+        /* One entry per press, not per poll, so the log stays readable. */
+        if (!was_pressed) {
+            record_touch(last_x, last_y);
+            was_pressed = true;
+        }
         data->state = LV_INDEV_STATE_PRESSED;
     } else {
+        was_pressed = false;
         data->state = LV_INDEV_STATE_RELEASED;
     }
 
@@ -137,15 +186,26 @@ bool board_display_init(void)
     (void)BSP_LCD_Reload(HMI_LCD_INSTANCE, BSP_LCD_RELOAD_NONE);
 
     /*
-     * The FT6X06 on this panel already reports landscape coordinates: its X
-     * spans the 800-pixel axis and its Y the 480-pixel one, matching the
-     * display. Asking the BSP to swap them feeds the 0..800 raw X into the
-     * 480-tall Y axis, so anything pressed right of x=480 maps off-screen and
-     * appears to do nothing at all.
+     * Measured on the board by touching all four corners and reading
+     * board_touch_log: the FT6X06 reports the panel's native *portrait* frame,
+     * X spanning 0..480 and Y spanning 0..800. Both transforms are needed —
+     * TS_SWAP_XY to put the 800-wide axis on screen X, and TS_SWAP_Y because
+     * the remaining axis then runs bottom-to-top.
+     *
+     * Width/Height stay 800x480 and are matched by FT6X06_MAX_X/Y_LENGTH in
+     * ft6x06_conf.h. Those look transposed against the raw ranges above, and
+     * must: the BSP scales with Width/MaxX *after* swapping, so MaxX has to
+     * describe the axis that ends up on X. Changing them to "match" the sensor
+     * breaks the scaling.
+     *
+     * Getting only one of the two flags right fails in a way that hides the
+     * other: with TS_SWAP_Y alone, `MaxY - rawY - 1` underflows for every
+     * rawY > 479, and the unsigned result comes back as roughly 8947848 - k.
+     * Those huge values in the log are the fingerprint of a missing TS_SWAP_XY.
      */
     touch_init.Width = HMI_DISPLAY_WIDTH;
     touch_init.Height = HMI_DISPLAY_HEIGHT;
-    touch_init.Orientation = TS_SWAP_NONE;
+    touch_init.Orientation = TS_SWAP_XY | TS_SWAP_Y;
     touch_init.Accuracy = 5U;
     if (BSP_TS_Init(HMI_LCD_INSTANCE, &touch_init) != BSP_ERROR_NONE) {
         return false;
