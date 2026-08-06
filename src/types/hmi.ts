@@ -1,4 +1,4 @@
-export type BoardId = 'stm32f746g-disco';
+export type BoardId = 'stm32f746g-disco' | 'stm32h747i-disco';
 
 export interface BoardDefinition {
   id: BoardId;
@@ -10,13 +10,26 @@ export interface BoardDefinition {
     colorDepth: 16 | 24 | 32;
     colorFormat: 'RGB565' | 'RGB888' | 'ARGB8888';
   };
+  /**
+   * On-chip Flash available to the firmware image, in bytes. The generated
+   * assets (images, fonts) are linked into it, so the editor can tell before a
+   * build that a project will not fit rather than surfacing a linker overflow.
+   */
+  flashBytes: number;
+  /**
+   * Regular expression source matching how the board identifies itself in the
+   * ST-LINK probe list — the "Board Name" field of
+   * `STM32_Programmer_CLI -l st-link-only`. Matched case-insensitively so a
+   * build cannot be flashed onto a different board by mistake.
+   */
+  probeBoardPattern: string;
 }
 
 export const DEFAULT_BOARD_ID: BoardId = 'stm32f746g-disco';
 
 export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
   {
-    id: DEFAULT_BOARD_ID,
+    id: 'stm32f746g-disco',
     name: 'STM32F746G-DISCO',
     vendor: 'STMicroelectronics',
     display: {
@@ -25,8 +38,29 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
       colorDepth: 16,
       colorFormat: 'RGB565',
     },
+    flashBytes: 1024 * 1024,
+    probeBoardPattern: '(?:32)?F746GDISCOVERY',
+  },
+  {
+    id: 'stm32h747i-disco',
+    name: 'STM32H747I-DISCO',
+    vendor: 'STMicroelectronics',
+    display: {
+      width: 800,
+      height: 480,
+      colorDepth: 16,
+      colorFormat: 'RGB565',
+    },
+    // Flash bank 1, which is the Cortex-M7's. Bank 2 belongs to the Cortex-M4
+    // and is not part of this image — see docs/stm32h747i-disco-dual-core.md.
+    flashBytes: 1024 * 1024,
+    probeBoardPattern: 'DISCO-H747XI',
   },
 ] as const;
+
+export function isSupportedBoardId(value: unknown): value is BoardId {
+  return SUPPORTED_BOARDS.some((board) => board.id === value);
+}
 
 export type ModbusRegisterArea =
   | 'coil'

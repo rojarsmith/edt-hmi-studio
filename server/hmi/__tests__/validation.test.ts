@@ -10,7 +10,10 @@ import {
   normalizeComPort,
   normalizeProbeSerial,
   resolveBuildDirectory,
+  resolveProjectBoardId,
+  SUPPORTED_BOARD_IDS,
 } from '../validation';
+import { SUPPORTED_BOARDS } from '../../../src/types/hmi';
 
 const VALID_BUILD_ID = '123e4567-e89b-42d3-a456-426614174000';
 
@@ -26,11 +29,53 @@ describe('project validation', () => {
     expect(() => assertSupportedProject(project)).not.toThrow();
   });
 
+  it('accepts every board the editor offers', () => {
+    for (const board of SUPPORTED_BOARDS) {
+      expect(() => assertSupportedProject({ boardId: board.id })).not.toThrow();
+      expect(resolveProjectBoardId({ boardId: board.id })).toBe(board.id);
+    }
+    // Guards against the list silently collapsing back to a single board.
+    expect(SUPPORTED_BOARD_IDS).toContain('stm32f746g-disco');
+    expect(SUPPORTED_BOARD_IDS).toContain('stm32h747i-disco');
+  });
+
   it('rejects missing and unsupported board ids', () => {
     expect(() => assertSupportedProject({})).toThrow(/Unsupported boardId/);
     expect(() =>
       assertSupportedProject({ boardId: 'another-board' }),
     ).toThrow(/Unsupported boardId/);
+    // The message names what is accepted, so a stale project says why.
+    expect(() => resolveProjectBoardId({ boardId: 'another-board' }))
+      .toThrow(/stm32f746g-disco/);
+  });
+});
+
+describe('board catalogue', () => {
+  it('gives every board a distinct ST-LINK probe pattern', () => {
+    // The flash step matches the attached probe's reported board name against
+    // this, so an image built for one board cannot land on another.
+    const probes = [
+      { boardName: '32F746GDISCOVERY', expected: 'stm32f746g-disco' },
+      { boardName: 'DISCO-H747XI', expected: 'stm32h747i-disco' },
+    ];
+
+    for (const { boardName, expected } of probes) {
+      const matching = SUPPORTED_BOARDS.filter((board) =>
+        new RegExp(board.probeBoardPattern, 'i').test(boardName),
+      );
+      expect(matching.map((board) => board.id)).toEqual([expected]);
+    }
+  });
+
+  it('ships a firmware template for every offered board', async () => {
+    const { existsSync } = await import('node:fs');
+    const repoRoot = resolve(__dirname, '..', '..', '..');
+    for (const board of SUPPORTED_BOARDS) {
+      const buildScript = join(
+        repoRoot, 'firmware', board.id, 'scripts', 'build.ps1',
+      );
+      expect(existsSync(buildScript), `missing ${buildScript}`).toBe(true);
+    }
   });
 });
 

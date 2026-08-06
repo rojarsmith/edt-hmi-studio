@@ -20,13 +20,16 @@ import { writeGeneratedProjectSource } from './projectSource';
 import {
   assertBuildId,
   assertSupportedProject,
-  getProjectBoardId,
   isPathInside,
+  isSupportedBoardId,
   normalizeComPort,
   normalizeProbeSerial,
   resolveBuildDirectory,
-  SUPPORTED_BOARD_ID,
+  resolveProjectBoardId,
+  SUPPORTED_BOARD_IDS,
 } from './validation';
+import { getBoardDefinition } from '../../src/types/hmi';
+import type { BoardId } from '../../src/types/hmi';
 
 const DEFAULT_TOOLCHAIN_ROOT = 'C:\\ST\\STM32CubeCLT_1.22.0';
 const BUILD_METADATA_FILE = 'build-metadata.json';
@@ -57,8 +60,8 @@ interface BuildMetadata {
 export interface HmiPaths {
   repoRoot: string;
   buildRoot: string;
-  boardRoot: string;
-  buildScript: string;
+  /** Root of every board's firmware template; a board's own root is a child. */
+  firmwareRoot: string;
   toolchainRoot: string;
   programmerCli: string;
   gcc: string;
@@ -110,18 +113,7 @@ export function resolveHmiPaths(
   return {
     repoRoot: resolvedRepoRoot,
     buildRoot: join(resolvedRepoRoot, '.hmi-builds'),
-    boardRoot: join(
-      resolvedRepoRoot,
-      'firmware',
-      SUPPORTED_BOARD_ID,
-    ),
-    buildScript: join(
-      resolvedRepoRoot,
-      'firmware',
-      SUPPORTED_BOARD_ID,
-      'scripts',
-      'build.ps1',
-    ),
+    firmwareRoot: join(resolvedRepoRoot, 'firmware'),
     toolchainRoot,
     programmerCli: envAbsolutePath(
       environment.STM32_PROGRAMMER_CLI,
@@ -185,7 +177,7 @@ async function readBuildMetadata(
   const metadata = JSON.parse(content) as BuildMetadata;
   if (
     metadata.buildId !== buildDirectory.split(/[\\/]/).at(-1) ||
-    metadata.boardId !== SUPPORTED_BOARD_ID
+    !isSupportedBoardId(metadata.boardId)
   ) {
     throw new Error('Build metadata does not match the requested build');
   }
@@ -222,11 +214,16 @@ async function collectArtifacts(
   return artifacts;
 }
 
-function isExpectedDiscoveryBoard(probe: StLinkProbe): boolean {
+/**
+ * Whether an attached probe is the board a build was produced for. Guards
+ * against flashing an image built for one board onto another.
+ */
+function probeMatchesBoard(probe: StLinkProbe, boardId: BoardId): boolean {
   if (!probe.boardName) {
     return false;
   }
-  return /(?:32)?F746GDISCOVERY/i.test(probe.boardName);
+  const pattern = getBoardDefinition(boardId).probeBoardPattern;
+  return new RegExp(pattern, 'i').test(probe.boardName);
 }
 
 export class HmiService {
@@ -237,6 +234,21 @@ export class HmiService {
     environment: NodeJS.ProcessEnv = process.env,
   ) {
     this.paths = resolveHmiPaths(repoRoot, environment);
+  }
+
+  /** Root of a board's firmware template. */
+  private boardRoot(boardId: BoardId): string {
+    return join(this.paths.firmwareRoot, boardId);
+  }
+
+  /** Build entry point for a board. Every template exposes the same interface. */
+  private buildScript(boardId: BoardId): string {
+    return join(this.boardRoot(boardId), 'scripts', 'build.ps1');
+  }
+
+  private hasFirmwareTemplate(boardId: BoardId): boolean {
+    return existsSync(this.boardRoot(boardId))
+      && existsSync(this.buildScript(boardId));
   }
 
   getCapabilities(): Record<string, unknown> {
@@ -262,30 +274,32 @@ export class HmiService {
         available: existsSync(this.paths.powerShell),
       },
     };
-    const firmwareTemplateAvailable =
-      existsSync(this.paths.boardRoot) &&
-      existsSync(this.paths.buildScript);
+    const firmwareTemplates = SUPPORTED_BOARD_IDS.map((boardId) => ({
+      boardId,
+      buildScript: this.buildScript(boardId),
+      available: this.hasFirmwareTemplate(boardId),
+    }));
+    const toolchainReady =
+      tools.gcc.available &&
+      tools.cmake.available &&
+      tools.ninja.available &&
+      tools.powerShell.available;
 
     return {
       success: true,
       localBridge: true,
-      supportedBoards: [SUPPORTED_BOARD_ID],
+      supportedBoards: firmwareTemplates
+        .filter((template) => template.available)
+        .map((template) => template.boardId),
       buildRoot: this.paths.buildRoot,
-      firmwareTemplate: {
-        boardId: SUPPORTED_BOARD_ID,
-        buildScript: this.paths.buildScript,
-        available: firmwareTemplateAvailable,
-      },
+      firmwareTemplates,
       toolchain: {
         root: this.paths.toolchainRoot,
         tools,
       },
       canBuild:
-        firmwareTemplateAvailable &&
-        tools.gcc.available &&
-        tools.cmake.available &&
-        tools.ninja.available &&
-        tools.powerShell.available,
+        toolchainReady &&
+        firmwareTemplates.some((template) => template.available),
       canFlash: tools.programmer.available,
     };
   }
@@ -366,11 +380,14 @@ export class HmiService {
       buildDirectory,
       'project-source',
     );
+    const boardId = resolveProjectBoardId(project);
+    const boardRoot = this.boardRoot(boardId);
+    const buildScript = this.buildScript(boardId);
     const createdAt = new Date().toISOString();
     const log: string[] = [];
     const metadata: BuildMetadata = {
       buildId,
-      boardId: getProjectBoardId(project) ?? '',
+      boardId,
       createdAt,
       updatedAt: createdAt,
       status: 'building',
@@ -385,9 +402,9 @@ export class HmiService {
     );
 
     try {
-      if (!existsSync(this.paths.buildScript)) {
+      if (!existsSync(buildScript)) {
         throw new Error(
-          `Firmware template is not installed: ${this.paths.buildScript}`,
+          `Firmware template for ${boardId} is not installed: ${buildScript}`,
         );
       }
       if (!existsSync(this.paths.powerShell)) {
@@ -413,7 +430,7 @@ export class HmiService {
           '-ExecutionPolicy',
           'Bypass',
           '-File',
-          this.paths.buildScript,
+          buildScript,
           '-ProjectSource',
           projectSourceDirectory,
           '-OutputDir',
@@ -422,7 +439,7 @@ export class HmiService {
           this.paths.toolchainRoot,
         ],
         {
-          cwd: this.paths.boardRoot,
+          cwd: boardRoot,
           env: {
             ...process.env,
             STM32_CUBE_CLT_ROOT: this.paths.toolchainRoot,
@@ -537,9 +554,13 @@ export class HmiService {
             : `Expected exactly one ST-LINK probe, found ${probes.length}`,
         );
       }
-      if (!isExpectedDiscoveryBoard(selectedProbe)) {
+      const targetBoardId = metadata.boardId as BoardId;
+      if (!probeMatchesBoard(selectedProbe, targetBoardId)) {
+        const target = getBoardDefinition(targetBoardId);
         throw new Error(
-          `Selected ST-LINK is not attached to a 32F746GDISCOVERY board`,
+          `This build targets ${target.name}, but the attached ST-LINK reports `
+          + `"${selectedProbe.boardName ?? 'an unknown board'}". `
+          + `Connect a ${target.name}, or rebuild the project for the board you have.`,
         );
       }
 

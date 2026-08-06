@@ -21,6 +21,7 @@ import type {
 } from '../../types/hmi';
 import {
   createDefaultCommunicationConfig,
+  DEFAULT_BOARD_ID,
   getBoardDefinition,
 } from '../../types/hmi';
 import {
@@ -99,7 +100,8 @@ const CommunicationPanel: React.FC = () => {
   const images = useResourceStore((state) => state.images);
   const fonts = useResourceStore((state) => state.fonts);
 
-  const [boardId, setBoardId] = useState<BoardId>('stm32f746g-disco');
+  /* Replaced by the project's own board as soon as its config loads. */
+  const [boardId, setBoardId] = useState<BoardId>(DEFAULT_BOARD_ID);
   const [communication, setCommunication] = useState<CommunicationConfig>(
     createDefaultCommunicationConfig,
   );
@@ -744,7 +746,7 @@ const CommunicationPanel: React.FC = () => {
           <div className="communication-card-title">
             <div>
               <h3>Build & Flash</h3>
-              <p>Build complete STM32F746G-DISCO firmware, then flash it through ST-LINK SWD.</p>
+              <p>Build complete {board.name} firmware, then flash it through ST-LINK SWD.</p>
             </div>
             {dirty && <span className="communication-dirty">Unsaved changes</span>}
           </div>
