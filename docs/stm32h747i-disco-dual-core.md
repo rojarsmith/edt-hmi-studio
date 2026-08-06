@@ -356,11 +356,30 @@ STM32_Programmer_CLI -c port=SWD mode=UR
 tool prints the supply voltage.
 
 **6. Boot the system bootloader with BOOT0.** If user code still wins the race,
-this stops it running at all. On the STM32H747I-DISCO **BOOT0 is exposed at
-resistor R192, which sits underneath the LCD panel** — the panel is removable,
-and the board's user manual has the layout. Bridging the R192 pads pulls BOOT0
-high, so the part starts the built-in bootloader instead of your image, and the
-programmer can always connect. Erase or re-flash, then remove the bridge.
+this stops it running at all: the part starts its built-in bootloader instead of
+your image, so the programmer can always connect.
+
+On the STM32H747I-DISCO **BOOT0 is exposed at resistor R192, underneath the LCD
+panel**. The panel lifts off, and the board's user manual has the layout.
+
+Pulling it high needs a 3.3 V source and a common ground, which the board itself
+does not conveniently expose next to R192:
+
+- **Ground** — Arduino header **CN8, pin 7**.
+- **3.3 V** — a USB-to-RS232 adapter works well as the source. Put its ground
+  into CN8 pin 7 so both sides share a reference, and touch its 3.3 V line to
+  the **inner right-hand pad of R192**.
+
+Hold 3.3 V on that pad while resetting or power-cycling the board, then connect,
+erase or re-flash, and remove the wire.
+
+> Use **3.3 V, not 5 V**. Many USB-to-RS232 adapters expose both, and BOOT0 is
+> not 5 V tolerant. Check which pin you are on before touching the pad, and
+> connect ground first.
+
+Re-seat the LCD panel afterwards. A panel that is off or not fully seated shows
+nothing at all while the firmware runs perfectly — which is easy to mistake for
+a new firmware fault, especially right after a recovery.
 
 Once connected, disable the Cortex-M4 boot before flashing anything else, so a
 second core is not running whatever happens to be in the erased Flash bank 2:
