@@ -1,5 +1,9 @@
 # Dropdown — Selection List
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/dropdown.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 **Dropdown** is a selection widget, mapping to LVGL's `lv_dropdown`. Clicking it expands a list of options from which one can be chosen. In embedded UIs it is commonly used on settings pages, in forms and for mode switching.

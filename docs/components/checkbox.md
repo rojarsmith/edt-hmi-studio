@@ -1,5 +1,9 @@
 # Checkbox
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/checkbox.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 **Checkbox** maps to LVGL's `lv_checkbox`. It consists of a square marker and a text label; clicking it toggles between checked and unchecked. In embedded UIs it is commonly used for settings toggles, multi-select lists and terms-acceptance prompts.
