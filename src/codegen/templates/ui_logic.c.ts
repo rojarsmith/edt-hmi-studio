@@ -828,12 +828,17 @@ function generateIfElseCode(
   indentLevel: number
 ): string {
   const indent = getIndent(options).repeat(indentLevel);
+  // The Simplified Chinese port names below are legacy data, not UI text: logic
+  // graphs authored before the editor switched to English port names are stored
+  // in project files with those names, and are looked up by name. Removing them
+  // would make an existing graph generate an empty branch instead of its code,
+  // silently. Every such fallback in this file exists for that reason.
   const condition = getInputValue(node, 'Condition', graph, context, '条件');
   const lines: string[] = [];
-  
+
   lines.push(`${indent}if (${condition}) {`);
-  
-  // Follow "True" / "真" execution output
+
+  // Follow the "True" execution output, or its legacy name
   const trueNodeId = getOutputTargetNode(node, 'True', graph)
     || getOutputTargetNode(node, '真', graph);
   if (trueNodeId) {
@@ -848,7 +853,7 @@ function generateIfElseCode(
     lines.push(`${indent}${getIndent(options)}// True branch`);
   }
   
-  // Follow "False" / "假" execution output
+  // Follow the "False" execution output, or its legacy name
   const falseNodeId = getOutputTargetNode(node, 'False', graph)
     || getOutputTargetNode(node, '假', graph);
   if (falseNodeId) {
