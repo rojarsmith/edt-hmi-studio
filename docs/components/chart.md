@@ -1,5 +1,9 @@
 # Chart (chart) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/chart.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Chart is a data-visualisation widget supporting three types: line, bar and scatter. It can display one or several data series, with configurable grid lines, legend and axis ranges. In embedded UIs it is commonly used for sensor readouts, statistics and trend analysis.
