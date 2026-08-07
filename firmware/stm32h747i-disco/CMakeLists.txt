@@ -44,11 +44,19 @@ add_compile_options(
 )
 # CORE_CM7 selects the Cortex-M7 half of the dual-core headers; the Cortex-M4
 # has no image of its own here, see docs/stm32h747i-disco-dual-core.md.
+#
+# USE_PWR_DIRECT_SMPS_SUPPLY is board wiring, not a preference: this board is
+# hardwired for the SMPS, and the macro is what makes the CMSIS ExitRun0Mode()
+# commit that supply from the reset handler — before the C runtime initialises
+# RAM, which is not permitted while the part is still in Run* mode. Changing it
+# to a supply the board is not wired for leaves the core unpowered and the
+# device permanently unreachable over SWD; see the same document.
 add_compile_definitions(
     STM32H747xx
     CORE_CM7
     USE_HAL_DRIVER
     USE_STM32H747I_DISCO
+    USE_PWR_DIRECT_SMPS_SUPPLY
     LV_CONF_INCLUDE_SIMPLE
 )
 

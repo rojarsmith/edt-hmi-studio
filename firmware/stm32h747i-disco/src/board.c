@@ -105,9 +105,18 @@ static void mpu_config(void)
  * VOSRDY stays clear until something writes PWR->CR3 — so skipping this step
  * hangs the wait below forever, and the board simply never draws anything.
  *
- * ST's examples get that write from the CMSIS ExitRun0Mode(), which compiles to
- * nothing unless the build defines one of the USE_PWR_* macros. Calling the HAL
- * directly does the same job without depending on a build-level define.
+ * It must be the supply the board is actually wired for. This one is hardwired
+ * for the SMPS (UM2411: SB2/SB11/SB19/SB46/SB48 mounted, SB1/SB12/SB49
+ * removed), so the SMPS is what feeds VCAP. Selecting PWR_LDO_SUPPLY disables
+ * it and the core loses its supply as the write lands — and since PWR->CR3 is
+ * write-once per power-on reset, no reset undoes it. The board then answers
+ * "Unable to get core ID" to every connection attempt, forever, and only the
+ * BOOT0 recovery in docs/stm32h747i-disco-dual-core.md brings it back.
+ *
+ * USE_PWR_DIRECT_SMPS_SUPPLY in CMakeLists.txt makes the CMSIS ExitRun0Mode()
+ * commit the same choice from the reset handler, before the C runtime writes
+ * to RAM. This call re-states it where it can be read, and finds it already
+ * applied.
  *
  * FLASH_LATENCY_4 is what ST uses here, not the 2 wait states the VOS1 table
  * suggests for a 200 MHz AXI clock. Too few wait states means instruction
@@ -125,7 +134,7 @@ static bool system_clock_config(void)
      * first the supply is already committed and this call reports an error it
      * would be wrong to act on. Apply it for the power-on case and move on.
      */
-    (void)HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
+    (void)HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
 
     __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
     board_wait_flag(&is_voltage_scaling_ready);

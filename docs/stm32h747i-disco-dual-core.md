@@ -288,14 +288,56 @@ ST's examples do not call `HAL_PWREx_ConfigSupply()`, which makes it look
 optional. It is not: they get the same register write from the CMSIS
 `ExitRun0Mode()`, and every branch of that function is wrapped in
 `#if defined(USE_PWR_...)`. Without one of those macros defined at build level
-it compiles to an empty function. This template calls
-`HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY)` explicitly instead, so the behaviour
-does not depend on a preprocessor define being carried along with the project.
+it compiles to an empty function.
 
 **Use `FLASH_LATENCY_4`.** The VOS1 wait-state table suggests 2 wait states for
 a 200 MHz AXI clock, and ST's examples still use 4. With too few, instruction
 fetches return corrupted data, and the failures look like anything but a clock
 problem.
+
+### The supply source is board wiring, not a preference
+
+**This is the one mistake on this board that cannot be undone by re-flashing.**
+
+The STM32H747 can take its core supply from the internal SMPS, from the LDO, or
+from an external source, and which one is available is decided by solder bridges.
+On the STM32H747I-DISCO the SMPS is hardwired — UM2411 gives the fitted
+configuration as **SB2, SB11, SB19, SB46, SB48 mounted; SB1, SB12, SB49
+removed** — so the only valid firmware setting is:
+
+```c
+HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
+```
+
+Selecting `PWR_LDO_SUPPLY` writes `LDOEN` and clears `SMPSEN`, which switches off
+the regulator that is physically feeding `VCAP`. The core loses its supply as the
+write retires. UM2411 states the consequence plainly: on a mismatch *"a deadlock
+occurs"* and *"after the reset, the ST-LINK cannot connect the target anymore."*
+
+Two properties make it stick:
+
+- `PWR->CR3` is **write-once per power-on reset**, so neither NRST nor a software
+  reset clears the bad value.
+- The next power-on clears it — and the firmware immediately writes it again,
+  before anything can connect.
+
+The only way out is to stop the firmware from running at all, which is what the
+BOOT0 recovery below does.
+
+The template pins the choice in two places, and both must agree:
+
+| Where | What |
+| --- | --- |
+| `CMakeLists.txt` | `USE_PWR_DIRECT_SMPS_SUPPLY` — makes the CMSIS `ExitRun0Mode()` commit the supply from the reset handler |
+| `board.c` | `HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY)` — re-states it in readable C; finds it already applied |
+
+The macro is not redundant. `ExitRun0Mode()` runs before the C runtime copies
+`.data` and zeroes `.bss`, and while the part is still in Run* mode **writes to
+RAM are not permitted**. Committing the supply in `board_init()` alone leaves the
+whole C startup running in a mode that does not allow it.
+
+Porting this template to another H7 board means checking that board's manual for
+its own solder-bridge configuration first. Do not copy the value across.
 
 ### A software reset is not a power-on reset
 
@@ -317,6 +359,20 @@ recently, and is not.
 Call it, ignore the result, and let the voltage-scaling wait decide whether the
 supply is usable.
 
+The same asymmetry is a diagnostic in its own right. **A board that works
+perfectly after flashing and fails only after being unplugged and plugged back
+in is telling you the fault is in something applied once per power-on reset**,
+and on this part that is almost always `PWR->CR3`. The run you were watching
+never executed the offending write — the bootloader or the previous image had
+already committed the register at the last power-on, so the new image's write
+was silently ignored. It takes effect for the first time at the next power-on,
+where nothing is left to observe it.
+
+That also makes such a fault easy to misattribute to whatever was changed in the
+same session, including option bytes. Option-byte settings are latched at every
+reset, so they behave identically after a re-flash and after a power cycle; if
+the two differ, they are not the cause.
+
 ### Nothing on the start-up path may wait forever
 
 Every wait in `board_init()` is bounded, and failures are reported rather than
@@ -331,7 +387,15 @@ unexpectedly.
 
 `Error: Unable to get core ID` / `No STM32 target found`, while the tool still
 reports the ST-LINK's serial number, firmware version and 3.28 V, means the
-probe is healthy and only the core is unreachable.
+probe is healthy and only the core is unreachable. The reported voltage is the
+board's 3.3 V rail, not the core's — a correct reading here says nothing about
+whether `VCAP` is powered.
+
+If the board became unreachable **after a power cycle rather than after a
+flash**, go straight to step 6 and read
+[The supply source is board wiring](#the-supply-source-is-board-wiring-not-a-preference)
+first. Steps 1–5 cannot fix a supply mismatch, and no amount of retrying will:
+the firmware re-applies it within microseconds of every power-on.
 
 Work through these in order; stop as soon as a connection succeeds.
 
@@ -390,20 +454,24 @@ STM32_Programmer_CLI -c port=SWD mode=UR -ob BCM4=0
 
 ## Things to check first if the board looks dead
 
-1. **Option bytes.** `-ob displ` should show `BCM7=1`, `BCM4=0`.
-2. **A white screen usually means a hang, not a display fault.** Check for a
+1. **Did it die on a power cycle rather than a flash?** That points at a
+   setting applied once per power-on reset — on this board, the `PWR->CR3`
+   supply configuration. It must be `PWR_DIRECT_SMPS_SUPPLY`; anything else
+   leaves the core unpowered and needs the BOOT0 recovery.
+2. **Option bytes.** `-ob displ` should show `BCM7=1`, `BCM4=0`.
+3. **A white screen usually means a hang, not a display fault.** Check for a
    missing interrupt handler as described above.
-3. **`Unable to get core ID` is not a probe fault.** If the ST-LINK still
+4. **`Unable to get core ID` is not a probe fault.** If the ST-LINK still
    reports its serial number and 3.28 V, the probe is healthy and the core is
    unreachable — work through the recovery steps above, starting with a full
    power cycle.
-3. **Modbus baud rate.** The generated `hmi_bindings_generated.c` carries what
+5. **Modbus baud rate.** The generated `hmi_bindings_generated.c` carries what
    the project's Communication panel is set to. If the peer disagrees you get
    framing errors and all-zero bytes on the wire, not a silent link.
-4. **LVGL asserts halt everything.** `lv_timer_handler()` shares the main loop
+6. **LVGL asserts halt everything.** `lv_timer_handler()` shares the main loop
    with `hmi_runtime_task()`, so an LVGL assertion stops Modbus too. If the UART
    goes completely silent rather than merely wrong, suspect an assert.
-5. **Check which build you flashed.** Build directories accumulate under
+7. **Check which build you flashed.** Build directories accumulate under
    `.hmi-builds/`; each carries a `build-metadata.json` with its board and
    timestamp, and a `project-source/project.json` with the pages and events it
    was generated from. A control that does nothing is often an older image.
