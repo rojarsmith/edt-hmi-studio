@@ -1,5 +1,9 @@
 # Button (btn) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/btn.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Button is one of the most fundamental interactive widgets in the LVGL editor. It triggers a user action and automatically contains a centred text label. In LVGL a button is a special container object (`lv_button`) that is clickable by default and comes with built-in visual feedback for the pressed state.

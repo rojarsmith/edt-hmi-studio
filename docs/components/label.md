@@ -1,5 +1,9 @@
 # Label (label) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/label.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Label is the most basic text-display widget in the LVGL editor. It shows static or dynamic text and is one of the core building blocks of a UI. In LVGL a label object (`lv_label`) has a transparent background by default, draws only its text, and supports long-text modes (wrap, scroll, ellipsis, clip).
