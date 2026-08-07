@@ -1,5 +1,9 @@
 # Table (table) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/table.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Table presents structured data as a grid of rows and columns of text. It supports a configurable row and column count, cell contents, column widths, a header row and per-cell alignment. In embedded UIs it is commonly used for parameter lists, device information, configuration entries and log output.
