@@ -6,6 +6,10 @@
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
 </p>
 
+<p align="center">
+  <strong>English</strong> · <a href="./README.zh-TW.md">繁體中文</a>
+</p>
+
 A full-featured **visual editor for LVGL user interfaces**, with drag-and-drop design, event binding, node-based logic and C code generation. Built for embedded GUI development.
 
 ## ✨ Features
