@@ -1,5 +1,9 @@
 # Textarea — Text Input Area
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/textarea.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 **Textarea** is a multi-line text input widget, mapping to LVGL's `lv_textarea`. The user types and edits text in it, and it supports placeholder text. In embedded UIs it is commonly used for form fields, text editing and search boxes.

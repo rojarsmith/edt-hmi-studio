@@ -1,5 +1,9 @@
 # Spinner (spinner) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/spinner.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Spinner shows a loading or waiting state. In LVGL it is a specialisation of Arc: a continuously rotating arc animation indicating that a background operation is in progress. Its rotation speed and arc length are configurable.
