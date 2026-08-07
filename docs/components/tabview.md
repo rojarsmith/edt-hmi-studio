@@ -1,5 +1,9 @@
 # Tab View (tabview) — Tabbed Container Widget
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/tabview.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Tab View is the editor's tabbed container, mapping to LVGL's `lv_tabview`. It provides a set of switchable tabs, each with its own content area; the user clicks the tab bar to switch between them. It suits settings pages, multi-function panels and step-by-step wizards.
