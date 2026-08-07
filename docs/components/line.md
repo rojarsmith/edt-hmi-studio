@@ -1,5 +1,9 @@
 # Line (line) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/line.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Line draws straight segments. In LVGL a line object (`lv_line`) is defined by an array of point coordinates and supports properties such as line width and colour. Lines are commonly used for separators and decoration.

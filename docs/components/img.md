@@ -1,5 +1,9 @@
 # Image (img) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/img.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Image displays an image resource. In LVGL an image object (`lv_image` / `lv_img`) shows either a pre-compiled C array image or a file from an external file system, and supports transforms such as rotation and scaling.
