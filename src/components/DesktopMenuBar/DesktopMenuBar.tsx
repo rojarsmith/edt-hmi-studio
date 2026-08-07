@@ -12,6 +12,12 @@ interface MenuAction {
   onClick: () => void;
 }
 
+interface MenuGroup {
+  id: string;
+  label: string;
+  items: MenuAction[];
+}
+
 interface DesktopMenuBarProps {
   projectName: string;
   activeTab: EditorTab;
@@ -60,7 +66,7 @@ const DesktopMenuBar = ({
     return () => window.removeEventListener('mousedown', handlePointerDown);
   }, []);
 
-  const menus = useMemo(
+  const menus = useMemo<MenuGroup[]>(
     () => [
       {
         id: 'file',
