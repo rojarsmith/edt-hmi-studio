@@ -1,5 +1,9 @@
 # Container (obj) — Generic Container Widget
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/obj.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Container is the most basic container in the editor, mapping to LVGL's `lv_obj` (the base object). It is the base class of every LVGL widget, and as a container it provides a rectangular area that can hold any children. It uses the card style by default — white background, grey border and rounded corners — which suits layout grouping, panels and cards.
