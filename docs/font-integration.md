@@ -1,5 +1,9 @@
 # Font Integration Design
 
+<p align="center">
+  <strong>English</strong> · <a href="./zh-TW/font-integration.md">繁體中文</a>
+</p>
+
 ## 1. Overall architecture
 
 The editor's font system supports both LVGL's built-in fonts and custom fonts uploaded by the user (TTF/OTF). Font size is chosen per widget, on demand; at build time every font+size combination actually in use is collected and converted into LVGL C source with `lv_font_conv`.

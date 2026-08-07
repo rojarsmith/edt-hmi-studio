@@ -1,5 +1,9 @@
 # Canvas Rendering Architecture
 
+<p align="center">
+  <strong>English</strong> · <a href="./zh-TW/canvas-performance.md">繁體中文</a>
+</p>
+
 ## 1. Overview
 
 The design canvas is the editor's main interaction surface. It renders the widgets, and handles dragging, resizing, rubber-band selection and alignment. The architecture is built around performance, so that interaction stays smooth on a page with many widgets.
