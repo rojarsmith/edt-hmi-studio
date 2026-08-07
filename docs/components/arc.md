@@ -1,5 +1,9 @@
 # Arc (arc) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/arc.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Arc is a ring-shaped display widget that shows a value as an angular span. It consists of a background arc and a foreground indicator arc, and is commonly used for gauges, dial indicators and circular progress. Unlike Bar's linear progress, Arc presents the data as a curve, which is more compact and often better looking.
