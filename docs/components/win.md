@@ -1,5 +1,9 @@
 # Window (win) — Window Container Widget
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/win.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Window is the editor's window container, mapping to LVGL's `lv_win`. It provides a structure with a header and a content area, where the header can hold a title and action buttons such as a close button. It suits dialogs, settings panels, popups and information cards.
