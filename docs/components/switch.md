@@ -1,5 +1,9 @@
 # Switch
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/switch.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 **Switch** is a toggle control, mapping to LVGL's `lv_switch` widget. It presents a sliding on/off control that the user toggles by clicking or dragging. In embedded UIs it is commonly used for feature toggles, mode switching, and Wi-Fi or Bluetooth on/off.
