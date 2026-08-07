@@ -1,5 +1,9 @@
 # Tile View (tileview) — Tiled Container Widget
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/tileview.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Tile View is the editor's tiled container, mapping to LVGL's `lv_tileview`. It lays out a two-dimensional grid where each cell (a tile) is its own full-size content area, and the user swipes between them. It suits smartwatch interfaces, multi-screen dashboards and swipe-navigated pages.
