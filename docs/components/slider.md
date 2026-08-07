@@ -1,5 +1,9 @@
 # Slider
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/slider.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 **Slider** maps to LVGL's `lv_slider`. The user drags a knob to pick a value within a range. In embedded UIs it is commonly used for volume, brightness and parameter adjustment.

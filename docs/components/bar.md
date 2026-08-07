@@ -1,5 +1,9 @@
 # Progress Bar (bar) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/bar.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Progress Bar is a read-only display widget showing how far a value sits within a range. It consists of a background track and a fill indicator, with the fill proportion determined by `value`, `min` and `max`. In embedded UIs it is commonly used for download progress, battery level and loading state.
