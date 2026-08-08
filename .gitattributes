@@ -1,0 +1,29 @@
+# Every committed blob in this repository is already LF, so declare it here
+# rather than leaving it to each contributor's core.autocrlf. Without this,
+# a checkout on Windows rewrites the working tree to CRLF and `git add` warns
+# on every file it touches.
+* text=auto eol=lf
+
+# Windows batch files are the one exception: cmd.exe requires CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaries must never be line-ending converted or diffed as text.
+*.wasm binary
+*.a    binary
+*.o    binary
+*.bin  binary
+*.elf  binary
+*.hex  binary
+
+# Resource formats this project ingests; committing one mangled would be
+# silent and hard to spot.
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
