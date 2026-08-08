@@ -1,7 +1,7 @@
 # Checkbox
 
 <p align="center">
-  <strong>English</strong> · <a href="../../zh-TW/components/checkbox.md">繁體中文</a>
+  <strong>English</strong> · <a href="../zh-TW/components/checkbox.md">繁體中文</a>
 </p>
 
 ## 1. Name and summary

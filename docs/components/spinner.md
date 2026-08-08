@@ -1,7 +1,7 @@
 # Spinner (spinner) — Widget Design Document
 
 <p align="center">
-  <strong>English</strong> · <a href="../../zh-TW/components/spinner.md">繁體中文</a>
+  <strong>English</strong> · <a href="../zh-TW/components/spinner.md">繁體中文</a>
 </p>
 
 ## 1. Name and summary

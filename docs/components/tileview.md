@@ -1,7 +1,7 @@
 # Tile View (tileview) — Tiled Container Widget
 
 <p align="center">
-  <strong>English</strong> · <a href="../../zh-TW/components/tileview.md">繁體中文</a>
+  <strong>English</strong> · <a href="../zh-TW/components/tileview.md">繁體中文</a>
 </p>
 
 ## 1. Name and summary
