@@ -6,7 +6,7 @@
 
 ## 1. Name and summary
 
-Button is one of the most fundamental interactive widgets in the LVGL editor. It triggers a user action and automatically contains a centred text label. In LVGL a button is a special container object (`lv_button`) that is clickable by default and comes with built-in visual feedback for the pressed state.
+Button is one of the most fundamental interactive widgets in EDT GUI Studio. It triggers a user action and automatically contains a centred text label. In LVGL a button is a special container object (`lv_button`) that is clickable by default and comes with built-in visual feedback for the pressed state.
 
 Button is a container widget (`isContainer = true`): besides its built-in text label it can hold other children (an icon, an extra label, ...) for more elaborate button layouts.
 

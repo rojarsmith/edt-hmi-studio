@@ -35,7 +35,7 @@ interface LvglConfigRequest {
 // Paths
 const EMSDK_ENV = '/home/xcssa/.openclaw/workspace/tools/emsdk/emsdk_env.sh';
 const LVGL_PARENT_DIR = '/home/xcssa/.openclaw/workspace/tools';
-const PROJECT_DIR = '/home/xcssa/.openclaw/workspace/projects/lvgl-editor';
+const PROJECT_DIR = '/home/xcssa/.openclaw/workspace/projects/edt-gui-studio';
 const LV_CONF_DIR = join(PROJECT_DIR, 'wasm');
 const LIBLVGL_PATH = join(PROJECT_DIR, 'wasm/build/liblvgl_emcc.a');
 const LV_CONF_TEMPLATE_PATH = join(PROJECT_DIR, 'wasm/lv_conf.h');

@@ -28,4 +28,4 @@ wasm/build/
 bin/
 obj/
 /.vs
-/desktop/.vs/LvglEditor.Desktop
+/desktop/.vs/EdtGuiStudio.Desktop

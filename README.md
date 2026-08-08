@@ -1,4 +1,4 @@
-# LVGL UI Editor
+# EDT GUI Studio
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
@@ -91,7 +91,7 @@ Node-based visual programming built on React Flow:
 ```bash
 # Clone the project
 git clone <repository-url>
-cd lvgl-editor
+cd edt-gui-studio
 
 # Install dependencies
 npm install
@@ -118,7 +118,7 @@ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
 When deploying to GitHub Pages, a repository sub-path can also be given:
 
 ```bash
-VITE_BASE_PATH=/lvgl-editor/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
+VITE_BASE_PATH=/edt-gui-studio/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
 ```
 
 ### Desktop build (OmniHost)
@@ -131,10 +131,10 @@ npm ci
 npm run build:desktop-web
 
 # Linux
-dotnet publish ./desktop/LvglEditor.Desktop.csproj -c Release -f net8.0
+dotnet publish ./desktop/EdtGuiStudio.Desktop.csproj -c Release -f net8.0
 
 # Windows
-dotnet publish ./desktop/LvglEditor.Desktop.csproj -c Release -f net8.0-windows
+dotnet publish ./desktop/EdtGuiStudio.Desktop.csproj -c Release -f net8.0-windows
 ```
 
 The desktop shell enables OmniHost's VSCode-style built-in title bar by default, providing maximise, minimise and close buttons; the editor itself adds a VSCode-style menu bar (File / Edit / View / Help).

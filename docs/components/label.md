@@ -6,7 +6,7 @@
 
 ## 1. Name and summary
 
-Label is the most basic text-display widget in the LVGL editor. It shows static or dynamic text and is one of the core building blocks of a UI. In LVGL a label object (`lv_label`) has a transparent background by default, draws only its text, and supports long-text modes (wrap, scroll, ellipsis, clip).
+Label is the most basic text-display widget in EDT GUI Studio. It shows static or dynamic text and is one of the core building blocks of a UI. In LVGL a label object (`lv_label`) has a transparent background by default, draws only its text, and supports long-text modes (wrap, scroll, ellipsis, clip).
 
 Label is not a container (`isContainer = false`) and cannot hold children.
 

@@ -1,7 +1,7 @@
 // Project management store — zustand + IndexedDB via idb
 
 import { create } from 'zustand';
-import { openDB, type IDBPDatabase } from 'idb';
+import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 import { v4 as uuidv4 } from 'uuid';
 import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '../resources/types';
 import type { Page } from '../types';
@@ -105,8 +105,12 @@ export const DEFAULT_CODEGEN_OPTIONS: CodeGenOptions = {
 // IndexedDB helpers
 // ---------------------------------------------------------------------------
 
-const DB_NAME = 'lvgl-editor-projects';
+const DB_NAME = 'edt-gui-studio-projects';
 const DB_VERSION = 1;
+
+// Database used before the project was renamed to EDT GUI Studio
+const LEGACY_DB_NAME = 'lvgl-editor-projects';
+const STORE_NAMES = ['projects', 'projectData', 'projectResources'] as const;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
@@ -140,6 +144,60 @@ function normalizeProjectConfig(
   };
 }
 
+/**
+ * Open the pre-rename database without creating it.
+ * Returns null when it never existed (the accidental empty database that
+ * `openDB` creates in that case is deleted again).
+ */
+async function openLegacyDB(): Promise<IDBPDatabase | null> {
+  let created = false;
+  const db = await openDB(LEGACY_DB_NAME, undefined, {
+    upgrade() {
+      created = true;
+    },
+  });
+
+  if (created) {
+    db.close();
+    await deleteDB(LEGACY_DB_NAME);
+    return null;
+  }
+
+  return db;
+}
+
+/**
+ * Copy projects saved under the old database name into the current one.
+ * Only runs while the current database is still empty, so it can never
+ * overwrite newer data; the legacy database is dropped once copied.
+ */
+async function migrateLegacyDB(db: IDBPDatabase): Promise<void> {
+  try {
+    if (await db.count('projects')) return;
+
+    const legacy = await openLegacyDB();
+    if (!legacy) return;
+
+    try {
+      for (const storeName of STORE_NAMES) {
+        if (!legacy.objectStoreNames.contains(storeName)) continue;
+        const records = await legacy.getAll(storeName);
+        if (records.length === 0) continue;
+
+        const tx = db.transaction(storeName, 'readwrite');
+        await Promise.all(records.map((record) => tx.store.put(record)));
+        await tx.done;
+      }
+    } finally {
+      legacy.close();
+    }
+
+    await deleteDB(LEGACY_DB_NAME);
+  } catch (error) {
+    console.error('Failed to migrate the legacy project database:', error);
+  }
+}
+
 function getDB(): Promise<IDBPDatabase> {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
@@ -155,6 +213,9 @@ function getDB(): Promise<IDBPDatabase> {
           store.createIndex('byProject', 'projectId');
         }
       },
+    }).then(async (db) => {
+      await migrateLegacyDB(db);
+      return db;
     });
   }
   return dbPromise;

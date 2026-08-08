@@ -159,14 +159,45 @@ export function loadProjectFromFile(file: File): Promise<ProjectFile> {
   });
 }
 
+const AUTOSAVE_KEY = 'edt-gui-studio-autosave';
+const AUTOSAVE_TIME_KEY = 'edt-gui-studio-autosave-time';
+
+// Keys used before the project was renamed to EDT GUI Studio
+const LEGACY_AUTOSAVE_KEY = 'lvgl-editor-autosave';
+const LEGACY_AUTOSAVE_TIME_KEY = 'lvgl-editor-autosave-time';
+
+/**
+ * Move an auto-save written under the old key names to the current ones.
+ * Runs at most once: the legacy keys are dropped afterwards.
+ */
+function migrateLegacyAutoSave(): void {
+  try {
+    const legacyJson = localStorage.getItem(LEGACY_AUTOSAVE_KEY);
+    if (legacyJson === null) return;
+
+    if (localStorage.getItem(AUTOSAVE_KEY) === null) {
+      localStorage.setItem(AUTOSAVE_KEY, legacyJson);
+      const legacyTime = localStorage.getItem(LEGACY_AUTOSAVE_TIME_KEY);
+      if (legacyTime !== null) {
+        localStorage.setItem(AUTOSAVE_TIME_KEY, legacyTime);
+      }
+    }
+
+    localStorage.removeItem(LEGACY_AUTOSAVE_KEY);
+    localStorage.removeItem(LEGACY_AUTOSAVE_TIME_KEY);
+  } catch (error) {
+    console.error('Auto-save migration failed:', error);
+  }
+}
+
 /**
  * Save project to localStorage (auto-save)
  */
 export function autoSaveProject(project: ProjectFile): void {
   try {
     const json = serializeProject(project);
-    localStorage.setItem('lvgl-editor-autosave', json);
-    localStorage.setItem('lvgl-editor-autosave-time', Date.now().toString());
+    localStorage.setItem(AUTOSAVE_KEY, json);
+    localStorage.setItem(AUTOSAVE_TIME_KEY, Date.now().toString());
   } catch (error) {
     console.error('Auto-save failed:', error);
   }
@@ -177,9 +208,10 @@ export function autoSaveProject(project: ProjectFile): void {
  */
 export function loadAutoSavedProject(): ProjectFile | null {
   try {
-    const json = localStorage.getItem('lvgl-editor-autosave');
+    migrateLegacyAutoSave();
+    const json = localStorage.getItem(AUTOSAVE_KEY);
     if (!json) return null;
-    
+
     return parseProject(json);
   } catch (error) {
     console.error('Failed to load auto-saved project:', error);
@@ -191,7 +223,8 @@ export function loadAutoSavedProject(): ProjectFile | null {
  * Get auto-save timestamp
  */
 export function getAutoSaveTime(): Date | null {
-  const timestamp = localStorage.getItem('lvgl-editor-autosave-time');
+  migrateLegacyAutoSave();
+  const timestamp = localStorage.getItem(AUTOSAVE_TIME_KEY);
   if (!timestamp) return null;
   return new Date(parseInt(timestamp, 10));
 }
@@ -200,8 +233,10 @@ export function getAutoSaveTime(): Date | null {
  * Clear auto-saved project
  */
 export function clearAutoSave(): void {
-  localStorage.removeItem('lvgl-editor-autosave');
-  localStorage.removeItem('lvgl-editor-autosave-time');
+  localStorage.removeItem(AUTOSAVE_KEY);
+  localStorage.removeItem(AUTOSAVE_TIME_KEY);
+  localStorage.removeItem(LEGACY_AUTOSAVE_KEY);
+  localStorage.removeItem(LEGACY_AUTOSAVE_TIME_KEY);
 }
 
 /**

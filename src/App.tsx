@@ -550,7 +550,7 @@ const EditorView: React.FC<EditorViewProps> = ({
               ◀
             </button>
             <span className="logo-icon">📐</span>
-            <span className="logo-text project-name-display">{projectName || 'LVGL UI Editor'}</span>
+            <span className="logo-text project-name-display">{projectName || 'EDT GUI Studio'}</span>
           </div>
 
           {/* Main tabs */}

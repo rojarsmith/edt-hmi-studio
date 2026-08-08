@@ -10,7 +10,7 @@ using OmniHost.Windows;
 var builder = OmniApp.CreateBuilder(args)
     .Configure(options =>
     {
-        options.Title = "LVGL Editor";
+        options.Title = "EDT GUI Studio";
         options.CustomScheme = "app";
         options.ContentRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot");
         options.StartUrl = "app://localhost/index.html";
@@ -23,7 +23,7 @@ var builder = OmniApp.CreateBuilder(args)
             ? OmniWindowStyle.VsCode
             : OmniWindowStyle.Frameless;
     })
-    .UseDesktopApp(new LvglEditorDesktopApp());
+    .UseDesktopApp(new EdtGuiStudioDesktopApp());
 
 ConfigureCurrentPlatform(builder);
 
@@ -58,7 +58,7 @@ static void ConfigureCurrentPlatform(OmniHostBuilder builder)
     throw new PlatformNotSupportedException("This platform is not supported yet.");
 }
 
-sealed class LvglEditorDesktopApp : IDesktopApp
+sealed class EdtGuiStudioDesktopApp : IDesktopApp
 {
     public Task OnStartAsync(IWebViewAdapter adapter, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
