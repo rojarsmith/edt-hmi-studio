@@ -1,5 +1,9 @@
 # Calendar (calendar) — Widget Design Document
 
+<p align="center">
+  <strong>English</strong> · <a href="../../zh-TW/components/calendar.md">繁體中文</a>
+</p>
+
 ## 1. Name and summary
 
 Calendar displays and selects dates, presenting a month view as a grid. It supports setting the displayed year and month, highlighting today, marking specific dates and selecting a date range. In embedded UIs it is commonly used for date pickers, scheduling, countdown screens and smart-home timer settings.
