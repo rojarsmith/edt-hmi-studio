@@ -121,11 +121,12 @@ body {
   margin-left: auto;
 }
 
+/* Icon-only buttons: the label lives in the tooltip / aria-label. */
 .toolbar-button {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  justify-content: center;
+  padding: 6px 8px;
   border: none;
   background: transparent;
   border-radius: 4px;
@@ -152,10 +153,7 @@ body {
 
 .toolbar-icon {
   font-size: 16px;
-}
-
-.toolbar-label {
-  font-size: 13px;
+  line-height: 1;
 }
 
 .toolbar-divider {

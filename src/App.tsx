@@ -27,7 +27,7 @@ import PreviewPanel from './components/Preview';
 import WasmPreview from './components/WasmPreview';
 import CompilePreview from 'virtual:compile-preview';
 import { HierarchyPanel } from './components/HierarchyPanel';
-import { ThemeSelector } from './components/ThemeSelector';
+// ThemeSelector is intentionally unmounted for now — see the toolbar below.
 import { ResourcePanel, useResourceStore } from './resources';
 import { useLogicEditorStore } from './components/LogicEditor';
 import { ProjectListPage } from './components/ProjectManager';
@@ -608,8 +608,7 @@ const EditorView: React.FC<EditorViewProps> = ({
               label="Settings"
               onClick={() => setShowProjectSettings(true)}
             />
-            <div className="toolbar-divider" />
-            <ThemeSelector />
+            {/* Theme switching is parked for now; <ThemeSelector /> goes back here. */}
             <div className="toolbar-divider" />
             <ToolbarButton
               icon="❓"
@@ -657,15 +656,16 @@ interface ToolbarButtonProps {
   shortcut?: string;
 }
 
+// Icon-only: the label survives as the tooltip and the accessible name.
 const ToolbarButton: React.FC<ToolbarButtonProps> = ({ icon, label, onClick, disabled, active, shortcut }) => (
   <button
     className={`toolbar-button ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`}
     onClick={onClick}
     disabled={disabled}
     title={shortcut ? `${label} (${shortcut})` : label}
+    aria-label={label}
   >
     <span className="toolbar-icon">{icon}</span>
-    <span className="toolbar-label">{label}</span>
   </button>
 );
 
