@@ -5,6 +5,7 @@ import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import compilePlugin from './vite-plugin-compile'
 import hmiPlugin from './vite-plugin-hmi'
+import pkg from './package.json' with { type: 'json' }
 
 const compilePreviewModuleId = 'virtual:compile-preview'
 const compilePreviewModulePath = fileURLToPath(new URL('./src/components/CompilePreview/index.ts', import.meta.url))
@@ -40,6 +41,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: env.VITE_BASE_PATH || '/',
+    define: {
+      // Single source of truth for the version shown in the About dialog.
+      __APP_VERSION__: JSON.stringify(pkg.version),
+    },
     plugins: [
       react(),
       compilePreviewModulePlugin(enableCompilePreview),

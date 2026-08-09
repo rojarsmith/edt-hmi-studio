@@ -1,0 +1,149 @@
+.about-dialog {
+  width: 380px;
+  max-width: calc(100vw - 32px);
+}
+
+.about-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 24px 8px;
+  text-align: center;
+}
+
+.about-logo-link {
+  display: block;
+  line-height: 0;
+}
+
+.about-logo {
+  width: 160px;
+  max-width: 100%;
+  height: auto;
+}
+
+.about-product {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.about-version {
+  font-size: 12px;
+  color: #9a9ab0;
+}
+
+.about-mode-badge {
+  margin-top: 2px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: #4a3a12;
+  border: 1px solid #b8860b;
+  color: #f0c674;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.about-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  text-align: left;
+}
+
+.about-meta dt {
+  color: #8a8a9e;
+}
+
+.about-meta dd {
+  margin: 0;
+  color: #d8d8e4;
+}
+
+/* The five-click target. Kept visually inert so it reads as plain text. */
+.about-developer-name {
+  cursor: default;
+  user-select: none;
+}
+
+.about-email {
+  color: #7986cb;
+  text-decoration: none;
+}
+
+.about-email:hover {
+  text-decoration: underline;
+}
+
+.about-unlock {
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #3a3a5c;
+  text-align: left;
+}
+
+.about-unlock-label {
+  display: block;
+  font-size: 11px;
+  color: #8a8a9e;
+  margin-bottom: 4px;
+}
+
+.about-unlock-row {
+  display: flex;
+  gap: 8px;
+}
+
+.about-unlock-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #3a3a5c;
+  border-radius: 4px;
+  background: #2a2a3e;
+  color: #e0e0e0;
+  font-size: 13px;
+  outline: none;
+}
+
+.about-unlock-input:focus {
+  border-color: #5c6bc0;
+}
+
+.about-unlock-input.rejected {
+  border-color: #d32f2f;
+}
+
+.about-unlock-btn {
+  padding: 6px 12px;
+  border: 1px solid #5c6bc0;
+  border-radius: 4px;
+  background: #5c6bc0;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.about-unlock-btn:hover {
+  background: #7986cb;
+  border-color: #7986cb;
+}
+
+.about-unlock-error {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #ef9a9a;
+}
+
+.about-copyright {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #7a7a8e;
+  line-height: 1.5;
+}

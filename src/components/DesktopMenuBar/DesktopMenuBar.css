@@ -111,3 +111,12 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* Factory engineer development mode — see docs/factory-dev-mode.md. */
+.desktop-menu-badge.factory-dev {
+  background: rgba(184, 134, 11, 0.22);
+  color: #f0c674;
+  /* The label is Chinese; uppercasing and letter-spacing only hurt it. */
+  text-transform: none;
+  letter-spacing: normal;
+}

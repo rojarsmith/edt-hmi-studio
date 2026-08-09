@@ -18,6 +18,7 @@ import ScreenManager from './components/ScreenManager';
 import StatusBar from './components/StatusBar';
 import AlignToolbar from './components/AlignToolbar';
 import HelpPanel from './components/HelpPanel';
+import AboutDialog from './components/AboutDialog';
 import Toast, { useToast } from './components/Toast';
 import Modal, { modal } from './components/Modal';
 import CodePreview from './components/CodePreview';
@@ -149,6 +150,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   // UI State
   const [showResourcePanel, setShowResourcePanel] = useState(false);
   const [showHelpPanel, setShowHelpPanel] = useState(false);
+  const [showAboutDialog, setShowAboutDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('design');
   const [previewMode, setPreviewMode] = useState<'simple' | 'wasm' | 'compile'>('simple');
   const resolvedPreviewMode = !isCompilePreviewEnabled && previewMode === 'compile'
@@ -544,6 +546,7 @@ const EditorView: React.FC<EditorViewProps> = ({
           onToggleResources={() => setShowResourcePanel(prev => !prev)}
           onOpenSettings={() => setShowProjectSettings(true)}
           onOpenHelp={() => setShowHelpPanel(true)}
+          onOpenAbout={() => setShowAboutDialog(true)}
         />
 
         <div className="app-command-bar">
@@ -633,6 +636,9 @@ const EditorView: React.FC<EditorViewProps> = ({
 
       {/* Help Panel */}
       <HelpPanel isOpen={showHelpPanel} onClose={() => setShowHelpPanel(false)} />
+
+      {/* About */}
+      {showAboutDialog && <AboutDialog onClose={() => setShowAboutDialog(false)} />}
 
       {/* Project Settings */}
       {showProjectSettings && <ProjectSettings />}

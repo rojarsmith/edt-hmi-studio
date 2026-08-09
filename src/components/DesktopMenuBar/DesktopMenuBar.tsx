@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isDesktopHostAvailable } from '../../utils/desktopHost';
+import { useAppStore } from '../../store/appStore';
 import './DesktopMenuBar.css';
 
 type EditorTab = 'design' | 'logic' | 'communication' | 'code' | 'preview';
@@ -33,6 +34,7 @@ interface DesktopMenuBarProps {
   onToggleResources: () => void;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
+  onOpenAbout: () => void;
 }
 
 const DesktopMenuBar = ({
@@ -50,8 +52,10 @@ const DesktopMenuBar = ({
   onToggleResources,
   onOpenSettings,
   onOpenHelp,
+  onOpenAbout,
 }: DesktopMenuBarProps) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const factoryDevMode = useAppStore(s => s.factoryDevMode);
   const hostMode = isDesktopHostAvailable() ? 'Desktop' : 'Web';
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -105,6 +109,8 @@ const DesktopMenuBar = ({
         label: 'Help',
         items: [
           { id: 'shortcuts', label: 'Keyboard Shortcuts', shortcut: 'F1', onClick: onOpenHelp },
+          // Deliberately menu-only: there is no toolbar button for About.
+          { id: 'about', label: 'About', onClick: onOpenAbout },
         ] satisfies MenuAction[],
       },
     ],
@@ -113,6 +119,7 @@ const DesktopMenuBar = ({
       onExportProject,
       onImportProject,
       onNewProject,
+      onOpenAbout,
       onOpenHelp,
       onOpenProject,
       onOpenSettings,
@@ -163,6 +170,14 @@ const DesktopMenuBar = ({
 
       <div className="desktop-menu-meta">
         <span className="desktop-menu-project">{projectName || 'EDT GUI Studio'}</span>
+        {factoryDevMode && (
+          <span
+            className="desktop-menu-badge factory-dev"
+            title="原廠人員研發模式 — 重新啟動後失效"
+          >
+            原廠人員研發模式
+          </span>
+        )}
         <span className="desktop-menu-badge">{hostMode}</span>
       </div>
     </div>
