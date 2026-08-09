@@ -112,11 +112,40 @@
   text-transform: uppercase;
 }
 
-/* Factory engineer development mode — see docs/factory-dev-mode.md. */
+/*
+ * Factory engineer development mode — see docs/factory-dev-mode.md.
+ * This one is a <button> (click to leave the mode), so the browser's default
+ * button chrome has to be cleared for it to match the badges beside it.
+ */
 .desktop-menu-badge.factory-dev {
   background: rgba(184, 134, 11, 0.22);
   color: #f0c674;
-  /* The label is Chinese; uppercasing and letter-spacing only hurt it. */
-  text-transform: none;
-  letter-spacing: normal;
+  border: none;
+  font-family: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.desktop-menu-badge.factory-dev:hover {
+  background: rgba(184, 134, 11, 0.38);
+}
+
+.exit-dev-mode-dialog {
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 20px 22px 0;
+}
+
+.exit-dev-mode-dialog h4 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: #fff;
+}
+
+.exit-dev-mode-dialog p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #b8b8c8;
 }

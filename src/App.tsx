@@ -152,6 +152,11 @@ const EditorView: React.FC<EditorViewProps> = ({
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [showAboutDialog, setShowAboutDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('design');
+  // The Code tab is factory-dev-mode only — see docs/factory-dev-mode.md.
+  const factoryDevMode = useAppStore(s => s.factoryDevMode);
+  // Derived rather than synced: leaving the mode makes the Code tab disappear,
+  // and everything downstream should immediately read as 'design' instead.
+  const effectiveTab: TabType = activeTab === 'code' && !factoryDevMode ? 'design' : activeTab;
   const [previewMode, setPreviewMode] = useState<'simple' | 'wasm' | 'compile'>('simple');
   const resolvedPreviewMode = !isCompilePreviewEnabled && previewMode === 'compile'
     ? 'simple'
@@ -430,7 +435,7 @@ const EditorView: React.FC<EditorViewProps> = ({
 
   // Render main content based on active tab
   const renderMainContent = () => {
-    switch (activeTab) {
+    switch (effectiveTab) {
       case 'design':
         return (
           <DndContext
@@ -533,7 +538,7 @@ const EditorView: React.FC<EditorViewProps> = ({
       <div className="app-header">
         <DesktopMenuBar
           projectName={projectName}
-          activeTab={activeTab}
+          activeTab={effectiveTab}
           showResourcePanel={showResourcePanel}
           onNewProject={handleNewProjectClick}
           onOpenProject={handleImportProject}
@@ -561,35 +566,39 @@ const EditorView: React.FC<EditorViewProps> = ({
           {/* Main tabs */}
           <div className="app-tabs">
             <button
-              className={`tab-btn ${activeTab === 'design' ? 'active' : ''}`}
+              className={`tab-btn ${effectiveTab === 'design' ? 'active' : ''}`}
               onClick={() => setActiveTab('design')}
             >
               🎨 Design
             </button>
             <button
-              className={`tab-btn ${activeTab === 'logic' ? 'active' : ''}`}
+              className={`tab-btn ${effectiveTab === 'logic' ? 'active' : ''}`}
               onClick={() => setActiveTab('logic')}
             >
               🔗 Logic
             </button>
             <button
-              className={`tab-btn ${activeTab === 'communication' ? 'active' : ''}`}
+              className={`tab-btn ${effectiveTab === 'communication' ? 'active' : ''}`}
               onClick={() => setActiveTab('communication')}
             >
               🔌 Communication
             </button>
             <button
-              className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
-              onClick={() => setActiveTab('code')}
-            >
-              💻 Code
-            </button>
-            <button
-              className={`tab-btn ${activeTab === 'preview' ? 'active' : ''}`}
+              className={`tab-btn ${effectiveTab === 'preview' ? 'active' : ''}`}
               onClick={() => setActiveTab('preview')}
             >
               📱 Preview
             </button>
+            {/* Last in the row: it only exists in factory dev mode, so keeping
+                it on the end leaves the normal tab order undisturbed. */}
+            {factoryDevMode && (
+              <button
+                className={`tab-btn ${effectiveTab === 'code' ? 'active' : ''}`}
+                onClick={() => setActiveTab('code')}
+              >
+                💻 Code
+              </button>
+            )}
           </div>
 
           <div className="app-toolbar">

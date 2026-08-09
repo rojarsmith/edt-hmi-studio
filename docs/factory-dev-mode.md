@@ -25,7 +25,7 @@ or restarted.
    edt321
    ```
 
-4. On success the field closes and a **原廠人員研發模式** badge appears both in
+4. On success the field closes and a **Factory Dev Mode** badge appears both in
    the About dialog and in the menu bar, next to the Web/Desktop badge. The UI
    updates immediately — no reload is needed.
 
@@ -40,7 +40,9 @@ It is never written to `localStorage`, IndexedDB or the project file, so:
 - it cannot be left on by accident for the next person,
 - it never travels with an exported project.
 
-There is deliberately no UI to turn it off again — reload instead.
+It can also be left on demand: click the **Factory Dev Mode** badge in the menu
+bar and confirm. The editor returns to its normal state immediately, and getting
+back in needs the access code again.
 
 ## Using the flag
 
@@ -57,14 +59,24 @@ The passphrase itself is exported as `FACTORY_DEV_MODE_PASSPHRASE` from
 
 ## What the mode changes
 
-**Nothing yet.** The flag and its unlock flow are in place, and the badge shows
-when it is on, but no feature is currently gated on it. What the mode exposes,
-and what gets hidden outside it, is still to be decided — list the decisions
-here as they are made:
-
-| Surface | Visible in factory dev mode | Visible normally |
+| Surface | In factory dev mode | Normally |
 | --- | --- | --- |
-| _(to be decided)_ | | |
+| **Code** editor tab (generated C source), last in the tab row | shown | hidden |
+| **View → Code** menu item, after Preview | shown | hidden |
+
+More surfaces will be added here as they are decided.
+
+### Notes on the Code tab
+
+Leaving the mode while the Code tab is open would otherwise strand an empty
+content area, so the tab is *derived* rather than stored: `effectiveTab` reads
+as `design` whenever `activeTab` is `code` and the flag is off. Everything —
+the rendered panel, the active tab highlight, the menu — follows that one value,
+so no state has to be synced back and no effect is involved.
+
+Hiding the tab does not disable code generation itself: `generateCode()` still
+runs for the WASM preview, the Build & Run flow and project export. Only the
+tab that displays the generated source is gated.
 
 ## Where it is implemented
 

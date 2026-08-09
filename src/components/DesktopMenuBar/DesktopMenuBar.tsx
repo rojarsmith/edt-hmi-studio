@@ -55,7 +55,9 @@ const DesktopMenuBar = ({
   onOpenAbout,
 }: DesktopMenuBarProps) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [confirmExitDevMode, setConfirmExitDevMode] = useState(false);
   const factoryDevMode = useAppStore(s => s.factoryDevMode);
+  const lockFactoryDevMode = useAppStore(s => s.lockFactoryDevMode);
   const hostMode = isDesktopHostAvailable() ? 'Desktop' : 'Web';
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -98,8 +100,12 @@ const DesktopMenuBar = ({
           { id: 'design', label: 'Design', active: activeTab === 'design', onClick: () => onSelectTab('design') },
           { id: 'logic', label: 'Logic', active: activeTab === 'logic', onClick: () => onSelectTab('logic') },
           { id: 'communication', label: 'Communication', active: activeTab === 'communication', onClick: () => onSelectTab('communication') },
-          { id: 'code', label: 'Code', active: activeTab === 'code', onClick: () => onSelectTab('code') },
           { id: 'preview', label: 'Preview', active: activeTab === 'preview', onClick: () => onSelectTab('preview') },
+          // Code is factory-dev-mode only, and sits after Preview to match the
+          // tab row — see docs/factory-dev-mode.md.
+          ...(factoryDevMode
+            ? [{ id: 'code', label: 'Code', active: activeTab === 'code', onClick: () => onSelectTab('code') }]
+            : []),
           { id: 'resources', label: showResourcePanel ? 'Hide Resources' : 'Show Resources', active: showResourcePanel, onClick: onToggleResources },
           { id: 'settings', label: 'Project Settings', onClick: onOpenSettings },
         ] satisfies MenuAction[],
@@ -116,6 +122,7 @@ const DesktopMenuBar = ({
     ],
     [
       activeTab,
+      factoryDevMode,
       onExportProject,
       onImportProject,
       onNewProject,
@@ -171,15 +178,46 @@ const DesktopMenuBar = ({
       <div className="desktop-menu-meta">
         <span className="desktop-menu-project">{projectName || 'EDT GUI Studio'}</span>
         {factoryDevMode && (
-          <span
+          <button
+            type="button"
             className="desktop-menu-badge factory-dev"
-            title="原廠人員研發模式 — 重新啟動後失效"
+            onClick={() => setConfirmExitDevMode(true)}
+            title="Factory engineer development mode — click to leave"
           >
-            原廠人員研發模式
-          </span>
+            Factory Dev Mode
+          </button>
         )}
         <span className="desktop-menu-badge">{hostMode}</span>
       </div>
+
+      {confirmExitDevMode && (
+        <div className="modal-global-overlay" onClick={() => setConfirmExitDevMode(false)}>
+          <div className="modal-dialog exit-dev-mode-dialog" onClick={e => e.stopPropagation()}>
+            <h4>Leave Factory Dev Mode?</h4>
+            <p>
+              The editor returns to its normal state and anything this mode
+              exposes is hidden again. Re-entering needs the access code.
+            </p>
+            <div className="modal-dialog-footer">
+              <button
+                className="modal-dialog-btn modal-btn-cancel"
+                onClick={() => setConfirmExitDevMode(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-dialog-btn modal-btn-confirm"
+                onClick={() => {
+                  lockFactoryDevMode();
+                  setConfirmExitDevMode(false);
+                }}
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

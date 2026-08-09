@@ -43,7 +43,10 @@ export default defineConfig(({ mode }) => {
     base: env.VITE_BASE_PATH || '/',
     define: {
       // Single source of truth for the version shown in the About dialog.
-      __APP_VERSION__: JSON.stringify(pkg.version),
+      // Injected onto import.meta.env rather than as a bare global: a missing
+      // define then reads as undefined instead of throwing a ReferenceError
+      // that would take the whole app down.
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
     },
     plugins: [
       react(),

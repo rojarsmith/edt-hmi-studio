@@ -12,6 +12,9 @@ const COMPANY_URL = 'https://www.edtc.com';
 const DEVELOPER_NAME = 'Rojar Smith';
 const DEVELOPER_NAME_ZH = '吳斌';
 const DEVELOPER_EMAIL = 'rojar@edt.com.tw';
+// Falls back rather than throwing if the Vite define is ever missing — this
+// string is not worth taking the app down for.
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
 
 /** Clicks on the developer's name that reveal the unlock field. */
 const UNLOCK_CLICK_COUNT = 5;
@@ -81,10 +84,10 @@ const AboutDialog: React.FC<AboutDialogProps> = ({ onClose }) => {
           </a>
 
           <h2 className="about-product">{PRODUCT_NAME}</h2>
-          <div className="about-version">Version {__APP_VERSION__}</div>
+          <div className="about-version">Version {APP_VERSION}</div>
 
           {factoryDevMode && (
-            <div className="about-mode-badge">原廠人員研發模式</div>
+            <div className="about-mode-badge">Factory Dev Mode</div>
           )}
 
           <dl className="about-meta">
@@ -104,7 +107,7 @@ const AboutDialog: React.FC<AboutDialogProps> = ({ onClose }) => {
               <a
                 className="about-email"
                 href={`mailto:${DEVELOPER_EMAIL}?subject=${encodeURIComponent(
-                  `${PRODUCT_NAME} ${__APP_VERSION__} feedback`,
+                  `${PRODUCT_NAME} ${APP_VERSION} feedback`,
                 )}`}
               >
                 {DEVELOPER_EMAIL}

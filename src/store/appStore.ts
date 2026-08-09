@@ -41,6 +41,8 @@ interface AppState {
   setDefaultFontSize: (size: number) => void;
   /** Returns false when the passphrase does not match; state is left untouched. */
   unlockFactoryDevMode: (passphrase: string) => boolean;
+  /** Leave factory dev mode. Re-entering needs the passphrase again. */
+  lockFactoryDevMode: () => void;
   goToProjectList: () => void;
   openProject: (id: string) => void;
 }
@@ -72,6 +74,8 @@ export const useAppStore = create<AppState>((set) => ({
     set({ factoryDevMode: true });
     return true;
   },
+
+  lockFactoryDevMode: () => set({ factoryDevMode: false }),
 
   goToProjectList: () => {
     set({ currentView: 'projectList', currentProjectId: null, lastSaveTime: null });

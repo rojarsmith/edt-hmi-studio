@@ -1,7 +1,13 @@
 /// <reference types="vite/client" />
 
-/** Injected by Vite from package.json — see `define` in vite.config.ts. */
-declare const __APP_VERSION__: string;
+interface ImportMetaEnv {
+  /** Injected by Vite from package.json — see `define` in vite.config.ts. */
+  readonly VITE_APP_VERSION?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
 
 declare module 'virtual:compile-preview' {
   import type { FC } from 'react';
