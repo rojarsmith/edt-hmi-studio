@@ -17,7 +17,7 @@ import './CompilePreview.css';
  * Returns a Map of cFontName -> Set of sizes.
  */
 function collectUsedCustomFontSizes(
-  pages: { components: LvglComponent[] }[],
+  screens: { components: LvglComponent[] }[],
   fontResources: FontResource[],
   defaultFont?: string,
   defaultFontSize?: number
@@ -66,8 +66,8 @@ function collectUsedCustomFontSizes(
     }
   };
 
-  for (const page of pages) {
-    walkComponents(page.components);
+  for (const screen of screens) {
+    walkComponents(screen.components);
   }
 
   // Include the project default font if it's a custom font (with its default size)
@@ -106,7 +106,7 @@ const CompilePreview: React.FC = () => {
   const [showOutput, setShowOutput] = useState(false);
   const [running, setRunning] = useState(false);
 
-  const pages = useEditorStore((s) => s.pages);
+  const screens = useEditorStore((s) => s.screens);
   const canvas = useEditorStore((s) => s.canvas);
   const logicGraphs = useLogicEditorStore((s) => s.graphs);
   const { images: imageResources, fonts: fontResources } = useResourceStore();
@@ -133,8 +133,8 @@ const CompilePreview: React.FC = () => {
 
   // Generate C code from current editor state
   const generateCCode = useCallback(() => {
-    return generateCode(pages, {}, logicGraphs, undefined, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont);
-  }, [pages, logicGraphs, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont]);
+    return generateCode(screens, {}, logicGraphs, undefined, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont);
+  }, [screens, logicGraphs, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont]);
 
   // Render framebuffer to canvas
   const renderFramebuffer = useCallback((fbData: Uint8Array, width: number, height: number) => {
@@ -230,7 +230,7 @@ const CompilePreview: React.FC = () => {
           walkImages(comp.children);
         }
       };
-      for (const page of pages) walkImages(page.components);
+      for (const screen of screens) walkImages(screen.components);
 
       const usedImages = imageResources.filter((img) => usedImageIds.has(img.id));
       for (const img of usedImages) {
@@ -246,7 +246,7 @@ const CompilePreview: React.FC = () => {
     }
 
     // Build font compile requests by dynamically collecting used font+size combos
-    const usedFontSizes = collectUsedCustomFontSizes(pages, fontResources, projectDefaultFont, projectDefaultFontSize);
+    const usedFontSizes = collectUsedCustomFontSizes(screens, fontResources, projectDefaultFont, projectDefaultFontSize);
     const fontRequests: FontCompileRequest[] = fontResources
       .filter((font) => usedFontSizes.has(font.cFontName))
       .map((font) => {
@@ -301,7 +301,7 @@ const CompilePreview: React.FC = () => {
       setStatus('done');
       setStatusMessage('Build succeeded (no runtime)');
     }
-  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, pages, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
+  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, screens, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
 
   // Handle stop button
   const handleStop = useCallback(() => {

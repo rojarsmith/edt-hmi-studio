@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateCode, generateSingleFile, getGeneratedFileNames } from '../generator';
-import { createPage, createComponent, createEvent, createBuiltinAction, createFontResource } from './helpers';
+import { createScreen, createComponent, createEvent, createBuiltinAction, createFontResource } from './helpers';
 import type { GeneratedCode } from '../types';
 
 describe('getGeneratedFileNames', () => {
@@ -22,7 +22,7 @@ describe('generateCode', () => {
   });
 
   it('all values are non-empty strings', () => {
-    const code = generateCode([createPage({ name: 'main' })]);
+    const code = generateCode([createScreen({ name: 'main' })]);
     for (const content of Object.values(code)) {
       expect(typeof content).toBe('string');
       expect(content.length).toBeGreaterThan(0);
@@ -30,8 +30,8 @@ describe('generateCode', () => {
   });
 
   it('generates correct ui.h content', () => {
-    const pages = [createPage({ name: 'home' })];
-    const code = generateCode(pages);
+    const screens = [createScreen({ name: 'home' })];
+    const code = generateCode(screens);
     expect(code['ui.h']).toContain('#ifndef UI_H');
     expect(code['ui.h']).toContain('extern lv_obj_t *ui_screen_home;');
     expect(code['ui.h']).toContain('void ui_init(void);');
@@ -42,8 +42,8 @@ describe('generateCode', () => {
       name: 'myBtn',
       events: [createEvent({ eventType: 'LV_EVENT_CLICKED' })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const code = generateCode(pages);
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const code = generateCode(screens);
     expect(code['ui_events.h']).toContain('#ifndef UI_EVENTS_H');
     expect(code['ui_events.h']).toContain('ui_event_my_btn_clicked');
   });
@@ -57,13 +57,13 @@ describe('generateCode', () => {
         action: createBuiltinAction({ type: 'show', targetComponent: 'panel' }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const code = generateCode(pages);
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const code = generateCode(screens);
     expect(code['ui_events.c']).toContain('#include "ui.h"');
     expect(code['ui_events.c']).toContain('lv_obj_clear_flag(ui_panel, LV_OBJ_FLAG_HIDDEN)');
   });
 
-  it('handles empty pages', () => {
+  it('handles empty screens', () => {
     const code = generateCode([]);
     expect(code['ui.h']).toContain('#ifndef UI_H');
     expect(code['ui_events.h']).toContain('#ifndef UI_EVENTS_H');
@@ -71,8 +71,8 @@ describe('generateCode', () => {
 
   it('applies custom options', () => {
     const btn = createComponent('btn', { name: 'my_button' });
-    const pages = [createPage({ name: 'main_page', components: [btn] })];
-    const code = generateCode(pages, { namingStyle: 'camelCase', generateComments: false });
+    const screens = [createScreen({ name: 'main_page', components: [btn] })];
+    const code = generateCode(screens, { namingStyle: 'camelCase', generateComments: false });
     expect(code['ui.h']).toContain('ui_screen_mainPage');
     expect(code['ui.h']).toContain('ui_myButton');
     expect(code['ui.h']).not.toContain('Screen Declarations');
@@ -85,7 +85,7 @@ describe('generateCode', () => {
   });
 
   it('uses default options when none provided', () => {
-    const code = generateCode([createPage({ name: 'test' })]);
+    const code = generateCode([createScreen({ name: 'test' })]);
     // Default has generateComments: true
     expect(code['ui.h']).toContain('Screen Declarations');
   });
@@ -93,15 +93,15 @@ describe('generateCode', () => {
 
 describe('generateSingleFile', () => {
   it('returns ui.h content', () => {
-    const pages = [createPage({ name: 'main' })];
-    const content = generateSingleFile(pages, 'ui.h');
+    const screens = [createScreen({ name: 'main' })];
+    const content = generateSingleFile(screens, 'ui.h');
     expect(content).toContain('#ifndef UI_H');
     expect(content).toContain('extern lv_obj_t *ui_screen_main;');
   });
 
   it('returns ui.c content', () => {
-    const pages = [createPage({ name: 'main' })];
-    const content = generateSingleFile(pages, 'ui.c');
+    const screens = [createScreen({ name: 'main' })];
+    const content = generateSingleFile(screens, 'ui.c');
     expect(content).toContain('#include "ui.h"');
   });
 
@@ -127,16 +127,16 @@ describe('generateSingleFile', () => {
 
   it('applies custom options', () => {
     const btn = createComponent('btn', { name: 'my_button' });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const content = generateSingleFile(pages, 'ui.h', { namingStyle: 'camelCase' });
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const content = generateSingleFile(screens, 'ui.h', { namingStyle: 'camelCase' });
     expect(content).toContain('ui_myButton');
   });
 
   it('matches corresponding generateCode output', () => {
-    const pages = [createPage({ name: 'main' })];
+    const screens = [createScreen({ name: 'main' })];
     const opts = { generateComments: true };
-    const allCode = generateCode(pages, opts);
-    const single = generateSingleFile(pages, 'ui.h', opts);
+    const allCode = generateCode(screens, opts);
+    const single = generateSingleFile(screens, 'ui.h', opts);
     expect(single).toBe(allCode['ui.h']);
   });
 });

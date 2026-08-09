@@ -13,7 +13,7 @@ import type { GeneratedCode } from '../types';
 import {
   defaultOptions,
   createComponent,
-  createPage,
+  createScreen,
   createEvent,
   createBuiltinAction,
   createAnimation,
@@ -99,15 +99,15 @@ function compileGenerated(
 }
 
 describe('Compile verification', { timeout: 300_000 }, () => {
-  // ── 1. Empty project (no pages) ──
+  // ── 1. Empty project (no screens) ──
   it('compiles empty project', { timeout: 30_000 }, () => {
     const code = generateCode([], defaultOptions());
     const result = compileGenerated(code);
     expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
   });
 
-  // ── 2. Single page + basic components (label, btn) ──
-  it('compiles single page with label and button', { timeout: 30_000 }, () => {
+  // ── 2. Single screen + basic components (label, btn) ──
+  it('compiles single screen with label and button', { timeout: 30_000 }, () => {
     const label = createComponent('label', {
       name: 'title_label',
       props: { text: 'Hello World' },
@@ -116,15 +116,15 @@ describe('Compile verification', { timeout: 300_000 }, () => {
       name: 'ok_btn',
       props: { text: 'OK' },
     });
-    const page = createPage({ name: 'main', components: [label, btn] });
-    const code = generateCode([page], defaultOptions());
+    const screen = createScreen({ name: 'main', components: [label, btn] });
+    const code = generateCode([screen], defaultOptions());
     const result = compileGenerated(code);
     expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
   });
 
-  // ── 3. Multiple pages + various components ──
-  it('compiles multi-page with slider, arc, checkbox, switch, textarea, dropdown, bar', { timeout: 30_000 }, () => {
-    const page1 = createPage({
+  // ── 3. Multiple screens + various components ──
+  it('compiles multi-screen with slider, arc, checkbox, switch, textarea, dropdown, bar', { timeout: 30_000 }, () => {
+    const page1 = createScreen({
       name: 'home',
       components: [
         createComponent('slider', { name: 'vol_slider', props: { min: 0, max: 100, value: 50 } }),
@@ -132,7 +132,7 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         createComponent('checkbox', { name: 'agree_cb', props: { text: 'I agree' } }),
       ],
     });
-    const page2 = createPage({
+    const page2 = createScreen({
       name: 'settings',
       components: [
         createComponent('switch', { name: 'dark_sw' }),
@@ -156,7 +156,7 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         createEvent({
           eventType: 'LV_EVENT_CLICKED',
           handlerType: 'builtin',
-          action: createBuiltinAction({ type: 'navigate', targetPage: page2Name }),
+          action: createBuiltinAction({ type: 'navigate', targetScreen: page2Name }),
         }),
       ],
     });
@@ -229,11 +229,11 @@ describe('Compile verification', { timeout: 300_000 }, () => {
       ],
     });
 
-    const page1 = createPage({
+    const page1 = createScreen({
       name: 'main',
       components: [btnNav, btnShow, btnHide, panel, labelTarget, btnSetText, slider, btnSetVal, btnSetProp, btnCustom],
     });
-    const page2 = createPage({ name: page2Name, components: [] });
+    const page2 = createScreen({ name: page2Name, components: [] });
     const code = generateCode([page1, page2], defaultOptions());
     const result = compileGenerated(code);
     expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
@@ -273,8 +273,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         },
       },
     });
-    const page = createPage({ name: 'main', components: [styledObj, styledLabel] });
-    const code = generateCode([page], defaultOptions());
+    const screen = createScreen({ name: 'main', components: [styledObj, styledLabel] });
+    const code = generateCode([screen], defaultOptions());
     const result = compileGenerated(code);
     expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
   });
@@ -306,7 +306,7 @@ describe('Compile verification', { timeout: 300_000 }, () => {
     const navNode = createLogicNode('navigate_page', {
       id: 'nav1',
       label: 'Go to settings',
-      params: { pageName: 'settings' },
+      params: { screenName: 'settings' },
       inputs: [createLogicPort({ id: 'nav1_in', name: 'exec', type: 'execution' })],
     });
     const timerNode = createLogicNode('timer_trigger', {
@@ -339,8 +339,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
 
     const btn = createComponent('btn', { name: 'my_btn', props: { text: 'Click' } });
     const panel = createComponent('obj', { name: 'my_panel' });
-    const page1 = createPage({ name: 'main', components: [btn, panel] });
-    const page2 = createPage({ name: 'settings', components: [] });
+    const page1 = createScreen({ name: 'main', components: [btn, panel] });
+    const page2 = createScreen({ name: 'settings', components: [] });
     const code = generateCode([page1, page2], defaultOptions(), [graph]);
     const result = compileGenerated(code);
     expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
@@ -366,8 +366,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
       props: { title: 'My Window', headerHeight: 40, showCloseBtn: true },
     });
 
-    const page = createPage({ name: 'main', components: [flexContainer, tabview, win] });
-    const code = generateCode([page], defaultOptions());
+    const screen = createScreen({ name: 'main', components: [flexContainer, tabview, win] });
+    const code = generateCode([screen], defaultOptions());
     const result = compileGenerated(code);
     expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
   });
@@ -382,8 +382,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
       name: 'my_image',
       props: { src: imgRes.name, rotation: 45 },
     });
-    const page = createPage({ name: 'main', components: [imgComp] });
-    const code = generateCode([page], defaultOptions(), [], undefined, [imgRes]);
+    const screen = createScreen({ name: 'main', components: [imgComp] });
+    const code = generateCode([screen], defaultOptions(), [], undefined, [imgRes]);
 
     // Add a stub C file providing the image symbol
     const imgStub = `#include "lvgl/lvgl.h"\nconst lv_image_dsc_t img_test_image = {0};\n`;
@@ -431,8 +431,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         }),
       ],
     });
-    const page = createPage({ name: 'main', components: [label, btn] });
-    const code = generateCode([page], defaultOptions());
+    const screen = createScreen({ name: 'main', components: [label, btn] });
+    const code = generateCode([screen], defaultOptions());
     const result = compileGenerated(code);
     expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
   });
@@ -442,8 +442,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
   it.skip('compiles in v8 mode (skipped: LVGL source is v9, v8 API names differ)', { timeout: 30_000 }, () => {
     const label = createComponent('label', { name: 'v8_label', props: { text: 'V8' } });
     const btn = createComponent('btn', { name: 'v8_btn', props: { text: 'OK' } });
-    const page = createPage({ name: 'main', components: [label, btn] });
-    const code = generateCode([page], defaultOptions({ lvglVersion: '8' }));
+    const screen = createScreen({ name: 'main', components: [label, btn] });
+    const code = generateCode([screen], defaultOptions({ lvglVersion: '8' }));
     const result = compileGenerated(code);
     expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
   });
@@ -457,8 +457,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'my_line',
         props: { lineWidth: 5, lineColor: '#FF0000' },
       });
-      const page = createPage({ name: 'main', components: [line] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [line] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -477,8 +477,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           ],
         },
       });
-      const page = createPage({ name: 'main', components: [table] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [table] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -496,8 +496,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           ],
         },
       });
-      const page = createPage({ name: 'main', components: [cal] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [cal] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -516,8 +516,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           showGrid: false,
         },
       });
-      const page = createPage({ name: 'main', components: [chart] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [chart] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -531,8 +531,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'scatter_chart',
         props: { type: 'scatter', yAxisMin: 0, yAxisMax: 50, series: [{ color: '#FF9800', data: [5, 15, 25, 35] }] },
       });
-      const page = createPage({ name: 'main', components: [barChart, scatterChart] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [barChart, scatterChart] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -542,8 +542,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'my_tv',
         props: { rows: 2, cols: 3, currentRow: 1, currentCol: 2 },
       });
-      const page = createPage({ name: 'main', components: [tv] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [tv] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -558,8 +558,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
       const comps = modes.map((m) =>
         createComponent('label', { name: `lbl_${m}`, props: { text: `Mode ${m}`, longMode: m } }),
       );
-      const page = createPage({ name: 'main', components: comps });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: comps });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -569,8 +569,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'vert_slider',
         props: { min: 0, max: 200, value: 100, step: 10, orientation: 'vertical' },
       });
-      const page = createPage({ name: 'main', components: [slider] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [slider] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -580,8 +580,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'vert_bar',
         props: { min: 0, max: 100, value: 60, orientation: 'vertical' },
       });
-      const page = createPage({ name: 'main', components: [bar] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [bar] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -599,8 +599,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'arc_rev',
         props: { startAngle: 180, endAngle: 360, min: 0, max: 100, value: 75, mode: 'reverse' },
       });
-      const page = createPage({ name: 'main', components: [arcNormal, arcSym, arcRev] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [arcNormal, arcSym, arcRev] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -610,8 +610,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'pw_ta',
         props: { text: 'secret', maxLength: 32, password: true, oneLine: true },
       });
-      const page = createPage({ name: 'main', components: [ta] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [ta] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -621,8 +621,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'up_dd',
         props: { options: 'A\nB\nC', selected: 2, direction: 'up' },
       });
-      const page = createPage({ name: 'main', components: [dd] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [dd] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -633,8 +633,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'rotated_img',
         props: { src: 'rot_img', rotation: 90 },
       });
-      const page = createPage({ name: 'main', components: [img] });
-      const code = generateCode([page], defaultOptions(), [], undefined, [imgRes]);
+      const screen = createScreen({ name: 'main', components: [img] });
+      const code = generateCode([screen], defaultOptions(), [], undefined, [imgRes]);
       const imgStub = `#include "lvgl/lvgl.h"\nconst lv_image_dsc_t img_rot_img = {0};\n`;
       Object.assign(code, { 'img_stub.c': imgStub });
       const result = compileGenerated(code, ['img_stub.c']);
@@ -646,8 +646,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'sized_tabs',
         props: { tabs: ['Home', 'Profile', 'Settings'], tabBarPosition: 'top', tabBarSize: 60, activeTab: 2 },
       });
-      const page = createPage({ name: 'main', components: [tv] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [tv] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -665,8 +665,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           ],
         },
       });
-      const page = createPage({ name: 'main', components: [win] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [win] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -691,8 +691,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         },
         children: [child1, child2],
       });
-      const page = createPage({ name: 'main', components: [gridObj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [gridObj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -705,8 +705,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         props: { layout: 'flex', flexDirection: 'row', gap: 8, scrollDir: 'ver' },
         children: [c1, c2],
       });
-      const page = createPage({ name: 'main', components: [flexObj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [flexObj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -729,8 +729,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           },
         },
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -746,8 +746,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           },
         },
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -765,8 +765,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'bs_lr',
         styles: { default: { borderWidth: 2, borderColor: '#000', borderSide: 'left_right' } },
       });
-      const page = createPage({ name: 'main', components: [top, bottom, lr] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [top, bottom, lr] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -782,8 +782,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         props: { text: 'Strike' },
         styles: { default: { textDecor: 'strikethrough' } },
       });
-      const page = createPage({ name: 'main', components: [ul, st] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [ul, st] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -797,8 +797,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'blend_sub',
         styles: { default: { blendMode: 'subtractive' } },
       });
-      const page = createPage({ name: 'main', components: [add, sub] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [add, sub] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -809,8 +809,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         props: { text: 'Big Font' },
         styles: { default: { textFont: 'montserrat_20' } },
       });
-      const page = createPage({ name: 'main', components: [lbl] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [lbl] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -821,8 +821,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         props: { text: 'Spaced text' },
         styles: { default: { textLetterSpace: 3, textLineSpace: 8 } },
       });
-      const page = createPage({ name: 'main', components: [lbl] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [lbl] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -832,8 +832,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'pad_obj',
         styles: { default: { paddingTop: 10, paddingBottom: 20, paddingLeft: 15, paddingRight: 25 } },
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -849,8 +849,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           disabled: { bgColor: '#9E9E9E', opacity: 0.5 },
         },
       });
-      const page = createPage({ name: 'main', components: [btn] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [btn] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -868,8 +868,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'sb_active',
         styles: { default: { scrollbarMode: 'active' } },
       });
-      const page = createPage({ name: 'main', components: [off, on, active] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [off, on, active] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -883,8 +883,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         name: 'grad_ver',
         styles: { default: { bgColor: '#00FF00', bgGradDir: 'ver', bgGradColor: '#FFFF00', bgGradStop: 128 } },
       });
-      const page = createPage({ name: 'main', components: [hor, ver] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [hor, ver] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -903,8 +903,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           },
         },
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -932,8 +932,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           gesturesBubble: true,
         },
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -951,8 +951,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         widthMode: 'percent',
         heightMode: 'content',
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -965,8 +965,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         widthMode: 'content',
         heightMode: 'percent',
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -993,8 +993,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
         alignOffsetX: -10,
         alignOffsetY: -10,
       });
-      const page = createPage({ name: 'main', components: [c, tm, br] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [c, tm, br] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -1028,8 +1028,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           }),
         ],
       });
-      const page = createPage({ name: 'main', components: [target, enableBtn, disableBtn] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [target, enableBtn, disableBtn] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -1059,8 +1059,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           }),
         ],
       });
-      const page = createPage({ name: 'main', components: [bar, arc, setBarBtn, setArcBtn] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [bar, arc, setBarBtn, setArcBtn] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -1079,8 +1079,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           createAnimation({ name: 'grow_h', property: 'height', startValue: 30, endValue: 150, duration: 600, easing: 'ease_out' }),
         ],
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -1094,8 +1094,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           createAnimation({ name: 'rotate', property: 'transform_angle', startValue: 0, endValue: 3600, duration: 1000, easing: 'bounce' }),
         ],
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
@@ -1115,8 +1115,8 @@ describe('Compile verification', { timeout: 300_000 }, () => {
           }),
         ),
       });
-      const page = createPage({ name: 'main', components: [obj] });
-      const code = generateCode([page], defaultOptions());
+      const screen = createScreen({ name: 'main', components: [obj] });
+      const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });

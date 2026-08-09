@@ -14,7 +14,7 @@ import './CodePanel.css';
 type FileName = keyof GeneratedCode;
 
 const CodePanel: React.FC = () => {
-  const { pages } = useEditorStore();
+  const { screens } = useEditorStore();
   const { graphs: logicGraphs } = useLogicEditorStore();
   const imageResources = useResourceStore((s) => s.images);
   const fontResources = useResourceStore((s) => s.fonts);
@@ -33,8 +33,8 @@ const CodePanel: React.FC = () => {
   
   // Generate code
   const generatedCode = useMemo(() => {
-    return generateCode(pages, options, logicGraphs, undefined, imageResources, fontResources);
-  }, [pages, options, logicGraphs, imageResources, fontResources]);
+    return generateCode(screens, options, logicGraphs, undefined, imageResources, fontResources);
+  }, [screens, options, logicGraphs, imageResources, fontResources]);
   
   // Current file content
   const currentContent = generatedCode[selectedFile];
@@ -54,14 +54,14 @@ const CodePanel: React.FC = () => {
   const handleExport = useCallback(async () => {
     setIsExporting(true);
     try {
-      await downloadAsZip(pages, options, logicGraphs, 'lvgl_ui.zip', undefined, imageResources);
+      await downloadAsZip(screens, options, logicGraphs, 'lvgl_ui.zip', undefined, imageResources);
     } catch (error) {
       console.error('Export failed:', error);
       toast.error('Export failed. Please try again.');
     } finally {
       setIsExporting(false);
     }
-  }, [pages, options, logicGraphs, imageResources]);
+  }, [screens, options, logicGraphs, imageResources]);
   
   // Handle copy
   const handleCopy = useCallback(() => {

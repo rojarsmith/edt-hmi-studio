@@ -7,8 +7,10 @@ import type {
   DragState,
   HistoryEntry,
   AlignmentGuide,
-  Page,
+  Screen,
+  ScreenGroup,
 } from '../types';
+import { MAX_SCREEN_GROUP_DEPTH } from '../types';
 import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
@@ -16,21 +18,49 @@ import { synchronizeModbusBindings } from '../utils/modbusBindings';
 // Maximum history entries for undo/redo
 const MAX_HISTORY = 50;
 
-// Create default page
-function createDefaultPage(): Page {
+// Create default screen
+function createDefaultScreen(): Screen {
   return {
     id: uuidv4(),
-    name: 'Page 1',
+    name: 'Screen 1',
     components: [],
     backgroundColor: '#F5F5F5',
   };
 }
 
+/**
+ * First unused `${prefix} N` name. Counting from the list length would hand out
+ * a duplicate as soon as anything in the middle has been deleted.
+ */
+function nextDefaultName(existing: { name: string }[], prefix: string): string {
+  const taken = new Set(existing.map(item => item.name));
+  let n = 1;
+  while (taken.has(`${prefix} ${n}`)) n += 1;
+  return `${prefix} ${n}`;
+}
+
+function nextScreenName(screens: Screen[]): string {
+  return nextDefaultName(screens, 'Screen');
+}
+
+function nextGroupName(groups: ScreenGroup[]): string {
+  return nextDefaultName(groups, 'Group');
+}
+
 interface EditorState {
-  // Multi-page support
-  pages: Page[];
-  currentPageId: string;
-  
+  // Multi-screen support
+  screens: Screen[];
+  currentScreenId: string;
+
+  /** Organisational folders shown in the screen manager. */
+  screenGroups: ScreenGroup[];
+
+  /**
+   * Screens with a tab open along the bottom of the canvas, in tab order.
+   * A screen can exist in the manager without being open.
+   */
+  openScreenIds: string[];
+
   // Canvas state
   canvas: CanvasState;
   
@@ -47,16 +77,35 @@ interface EditorState {
   // Alignment guides
   alignmentGuides: AlignmentGuide[];
   
-  // Computed - current page components (for backward compatibility)
+  // Computed - current screen components (for backward compatibility)
   components: LvglComponent[];
   
-  // Actions - Pages
-  addPage: () => string;
-  deletePage: (pageId: string) => void;
-  renamePage: (pageId: string, name: string) => void;
-  setCurrentPage: (pageId: string) => void;
-  updatePageBackground: (pageId: string, color: string) => void;
-  
+  // Actions - Screens
+  addScreen: (groupId?: string | null) => string;
+  deleteScreen: (screenId: string) => void;
+  renameScreen: (screenId: string, name: string) => void;
+  setCurrentScreen: (screenId: string) => void;
+  updateScreenBackground: (screenId: string, color: string) => void;
+  /** Open a tab for the screen (or focus its existing tab) and make it current. */
+  openScreen: (screenId: string) => void;
+  /** Close the screen's tab. The screen itself stays in the manager. */
+  closeScreen: (screenId: string) => void;
+  moveScreenToGroup: (screenId: string, groupId: string | null) => void;
+
+  // Actions - Screen groups
+  /**
+   * Create a group under `parentId`. Returns null when the parent is already at
+   * the deepest allowed level, in which case nothing is created.
+   */
+  addScreenGroup: (parentId?: string | null) => string | null;
+  renameScreenGroup: (groupId: string, name: string) => void;
+  /** Delete a group, lifting its screens and subgroups up to its own parent. */
+  deleteScreenGroup: (groupId: string) => void;
+  /** 1-based depth of a group, or 0 when the id is unknown. */
+  getScreenGroupDepth: (groupId: string | null | undefined) => number;
+  /** Whether a new subgroup may be created under `parentId`. */
+  canNestScreenGroup: (parentId: string | null | undefined) => boolean;
+
   // Actions - Components
   addComponent: (type: string, x: number, y: number, parentId?: string | null) => string;
   updateComponent: (id: string, updates: Partial<LvglComponent>) => void;
@@ -72,7 +121,7 @@ interface EditorState {
   ) => void;
   clearComponents: () => void;
   setComponents: (components: LvglComponent[]) => void;
-  setPages: (pages: Page[]) => void;
+  setScreens: (screens: Screen[], screenGroups?: ScreenGroup[]) => void;
   syncModbusBindings: (tags: ModbusRegisterTag[]) => void;
   
   // Actions - Z-order
@@ -117,7 +166,7 @@ interface EditorState {
   getComponentsByParent: (parentId: string | null) => LvglComponent[];
   findComponentAtPoint: (x: number, y: number) => LvglComponent | undefined;
   getAllComponents: () => LvglComponent[];
-  getCurrentPage: () => Page | undefined;
+  getCurrentScreen: () => Screen | undefined;
 }
 
 // Helper to find component in tree
@@ -285,7 +334,7 @@ function moveComponentToParent(
   return addComponentToTree(newComponents, movedComponent, newParentId);
 }
 
-// Helper to find a component's actual parent id (null = page root, undefined = absent)
+// Helper to find a component's actual parent id (null = screen root, undefined = absent)
 function findParentIdInTree(
   components: LvglComponent[],
   id: string,
@@ -384,27 +433,81 @@ function cloneComponents(components: LvglComponent[]): LvglComponent[] {
   }));
 }
 
-// Deep clone pages for history
-function clonePages(pages: Page[]): Page[] {
-  return pages.map(page => ({
-    ...page,
-    components: cloneComponents(page.components),
+// Deep clone screens for history
+function cloneScreens(screens: Screen[]): Screen[] {
+  return screens.map(screen => ({
+    ...screen,
+    components: cloneComponents(screen.components),
   }));
 }
 
-// Initial page
-const initialPage = createDefaultPage();
+/** State captured by one undo step. */
+interface SnapshotSource {
+  screens: Screen[];
+  screenGroups: ScreenGroup[];
+  openScreenIds: string[];
+  currentScreenId: string;
+}
+
+function snapshotState(state: SnapshotSource): HistoryEntry {
+  return {
+    screens: cloneScreens(state.screens),
+    screenGroups: state.screenGroups.map(g => ({ ...g })),
+    openScreenIds: [...state.openScreenIds],
+    currentScreenId: state.currentScreenId,
+    timestamp: Date.now(),
+  };
+}
+
+/**
+ * Rebuild editor state from a snapshot. Tab state is re-derived against the
+ * restored screen list rather than trusted outright, so an entry saved before
+ * `openScreenIds` existed — or one referring to a screen that later vanished —
+ * still lands on something valid.
+ */
+function restoreSnapshot(
+  entry: HistoryEntry,
+  fallback: SnapshotSource,
+): SnapshotSource & { selection: SelectionState } {
+  const screens = cloneScreens(entry.screens || []);
+  const validIds = new Set(screens.map(s => s.id));
+
+  const openScreenIds = (entry.openScreenIds ?? fallback.openScreenIds).filter(id =>
+    validIds.has(id),
+  );
+  if (openScreenIds.length === 0 && screens.length > 0) {
+    openScreenIds.push(screens[0].id);
+  }
+
+  const requestedCurrent = entry.currentScreenId ?? fallback.currentScreenId;
+  const currentScreenId = openScreenIds.includes(requestedCurrent)
+    ? requestedCurrent
+    : openScreenIds[0] ?? '';
+
+  return {
+    screens,
+    screenGroups: (entry.screenGroups ?? []).map(g => ({ ...g })),
+    openScreenIds,
+    currentScreenId,
+    selection: { selectedIds: [], hoveredId: null },
+  };
+}
+
+// Initial screen
+const initialScreen = createDefaultScreen();
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  // Initial state - Multi-page
-  pages: [initialPage],
-  currentPageId: initialPage.id,
-  
-  // Computed components (current page)
+  // Initial state - Multi-screen
+  screens: [initialScreen],
+  currentScreenId: initialScreen.id,
+  screenGroups: [],
+  openScreenIds: [initialScreen.id],
+
+  // Computed components (current screen)
   get components() {
     const state = get();
-    const currentPage = state.pages.find(p => p.id === state.currentPageId);
-    return currentPage?.components || [];
+    const currentScreen = state.screens.find(p => p.id === state.currentScreenId);
+    return currentScreen?.components || [];
   },
   
   canvas: {
@@ -440,72 +543,195 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   alignmentGuides: [],
   
-  // Page Actions
-  addPage: () => {
+  // Screen Actions
+  addScreen: (groupId = null) => {
     const id = uuidv4();
-    const pageCount = get().pages.length;
-    const newPage: Page = {
-      id,
-      name: `Page ${pageCount + 1}`,
-      components: [],
-      backgroundColor: '#F5F5F5',
-    };
-    
+    get().saveToHistory();
+
     set(state => ({
-      pages: [...state.pages, newPage],
-      currentPageId: id,
+      screens: [
+        ...state.screens,
+        {
+          id,
+          name: nextScreenName(state.screens),
+          components: [],
+          backgroundColor: '#F5F5F5',
+          groupId,
+        },
+      ],
+      openScreenIds: [...state.openScreenIds, id],
+      currentScreenId: id,
       selection: { ...state.selection, selectedIds: [] },
     }));
-    
+
     return id;
   },
-  
-  deletePage: (pageId) => {
-    const { pages, currentPageId } = get();
-    if (pages.length <= 1) return; // Don't delete last page
-    
-    const newPages = pages.filter(p => p.id !== pageId);
-    const newCurrentPageId = pageId === currentPageId 
-      ? newPages[0].id 
-      : currentPageId;
-    
+
+  deleteScreen: (screenId) => {
+    const { screens, currentScreenId, openScreenIds } = get();
+    if (screens.length <= 1) return; // Don't delete last screen
+    if (!screens.some(s => s.id === screenId)) return;
+
+    get().saveToHistory();
+
+    const newScreens = screens.filter(s => s.id !== screenId);
+    const newOpenIds = openScreenIds.filter(id => id !== screenId);
+    // Keep a tab open so the canvas always has something to show.
+    if (newOpenIds.length === 0) newOpenIds.push(newScreens[0].id);
+
     set({
-      pages: newPages,
-      currentPageId: newCurrentPageId,
+      screens: newScreens,
+      openScreenIds: newOpenIds,
+      currentScreenId: screenId === currentScreenId ? newOpenIds[0] : currentScreenId,
       selection: { selectedIds: [], hoveredId: null },
     });
   },
-  
-  renamePage: (pageId, name) => {
+
+  renameScreen: (screenId, name) => {
+    get().saveToHistory();
     set(state => ({
-      pages: state.pages.map(p => 
-        p.id === pageId ? { ...p, name } : p
+      screens: state.screens.map(s =>
+        s.id === screenId ? { ...s, name } : s
       ),
     }));
   },
-  
-  setCurrentPage: (pageId) => {
+
+  setCurrentScreen: (screenId) => {
     set({
-      currentPageId: pageId,
+      currentScreenId: screenId,
       selection: { selectedIds: [], hoveredId: null },
     });
   },
-  
-  updatePageBackground: (pageId, color) => {
+
+  updateScreenBackground: (screenId, color) => {
     set(state => ({
-      pages: state.pages.map(p => 
-        p.id === pageId ? { ...p, backgroundColor: color } : p
+      screens: state.screens.map(s =>
+        s.id === screenId ? { ...s, backgroundColor: color } : s
       ),
     }));
   },
-  
+
+  openScreen: (screenId) => {
+    const { screens, openScreenIds, currentScreenId } = get();
+    if (!screens.some(s => s.id === screenId)) return;
+
+    // Already open — just jump to it.
+    if (openScreenIds.includes(screenId)) {
+      if (screenId !== currentScreenId) get().setCurrentScreen(screenId);
+      return;
+    }
+
+    set(state => ({
+      openScreenIds: [...state.openScreenIds, screenId],
+      currentScreenId: screenId,
+      selection: { selectedIds: [], hoveredId: null },
+    }));
+  },
+
+  closeScreen: (screenId) => {
+    const { openScreenIds, currentScreenId } = get();
+    if (openScreenIds.length <= 1) return; // Never close the last tab
+    if (!openScreenIds.includes(screenId)) return;
+
+    const index = openScreenIds.indexOf(screenId);
+    const newOpenIds = openScreenIds.filter(id => id !== screenId);
+    // Closing the active tab hands focus to its neighbour, like an editor would.
+    const nextCurrentId =
+      screenId === currentScreenId
+        ? newOpenIds[Math.min(index, newOpenIds.length - 1)]
+        : currentScreenId;
+
+    set(state => ({
+      openScreenIds: newOpenIds,
+      currentScreenId: nextCurrentId,
+      selection:
+        nextCurrentId === currentScreenId
+          ? state.selection
+          : { selectedIds: [], hoveredId: null },
+    }));
+  },
+
+  moveScreenToGroup: (screenId, groupId) => {
+    get().saveToHistory();
+    set(state => ({
+      screens: state.screens.map(s =>
+        s.id === screenId ? { ...s, groupId } : s
+      ),
+    }));
+  },
+
+  // Screen Group Actions
+  getScreenGroupDepth: (groupId) => {
+    if (!groupId) return 0;
+    const { screenGroups } = get();
+    let depth = 0;
+    let current = screenGroups.find(g => g.id === groupId);
+    // Bounded by MAX_SCREEN_GROUP_DEPTH so a corrupted parent cycle can't hang.
+    while (current && depth <= MAX_SCREEN_GROUP_DEPTH) {
+      depth += 1;
+      if (!current.parentId) break;
+      current = screenGroups.find(g => g.id === current!.parentId);
+    }
+    return depth;
+  },
+
+  canNestScreenGroup: (parentId) => {
+    if (!parentId) return true;
+    return get().getScreenGroupDepth(parentId) < MAX_SCREEN_GROUP_DEPTH;
+  },
+
+  addScreenGroup: (parentId = null) => {
+    if (!get().canNestScreenGroup(parentId)) return null;
+
+    const id = uuidv4();
+    get().saveToHistory();
+    set(state => ({
+      screenGroups: [
+        ...state.screenGroups,
+        { id, name: nextGroupName(state.screenGroups), parentId: parentId ?? null },
+      ],
+    }));
+
+    return id;
+  },
+
+  renameScreenGroup: (groupId, name) => {
+    get().saveToHistory();
+    set(state => ({
+      screenGroups: state.screenGroups.map(g =>
+        g.id === groupId ? { ...g, name } : g
+      ),
+    }));
+  },
+
+  deleteScreenGroup: (groupId) => {
+    const { screenGroups } = get();
+    const group = screenGroups.find(g => g.id === groupId);
+    if (!group) return;
+
+    get().saveToHistory();
+    const parentId = group.parentId ?? null;
+
+    set(state => ({
+      // Contents are lifted rather than deleted — removing a folder should
+      // never take screens with it.
+      screenGroups: state.screenGroups
+        .filter(g => g.id !== groupId)
+        .map(g => (g.parentId === groupId ? { ...g, parentId } : g)),
+      screens: state.screens.map(s =>
+        s.groupId === groupId ? { ...s, groupId: parentId } : s
+      ),
+    }));
+  },
+
+
   // Component Actions
   addComponent: (type, x, y, parentId = null) => {
     const definition = getComponentDefinition(type);
     if (!definition) return '';
     
     const id = uuidv4();
-    const { canvas, currentPageId } = get();
+    const { canvas, currentScreenId } = get();
     
     // Snap to grid if enabled
     let finalX = x;
@@ -538,14 +764,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().saveToHistory();
     
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: addComponentToTree(page.components, newComponent, parentId),
+            ...screen,
+            components: addComponentToTree(screen.components, newComponent, parentId),
           };
         }
-        return page;
+        return screen;
       }),
     }));
     
@@ -571,24 +797,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   updateComponent: (id, updates) => {
-    const { currentPageId } = get();
+    const { currentScreenId } = get();
     get().saveToHistory();
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: updateComponentInTree(page.components, id, updates),
+            ...screen,
+            components: updateComponentInTree(screen.components, id, updates),
           };
         }
-        return page;
+        return screen;
       }),
     }));
   },
   
   deleteComponents: (ids) => {
     if (ids.length === 0) return;
-    const { currentPageId } = get();
+    const { currentScreenId } = get();
     
     // Remove from parent's childMap before deleting
     for (const id of ids) {
@@ -612,14 +838,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: deleteComponentFromTree(page.components, ids),
+            ...screen,
+            components: deleteComponentFromTree(screen.components, ids),
           };
         }
-        return page;
+        return screen;
       }),
       selection: {
         ...state.selection,
@@ -629,7 +855,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   moveComponent: (id, x, y) => {
-    const { canvas, currentPageId } = get();
+    const { canvas, currentScreenId } = get();
     let finalX = x;
     let finalY = y;
     
@@ -639,20 +865,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: updateComponentInTree(page.components, id, { x: finalX, y: finalY }),
+            ...screen,
+            components: updateComponentInTree(screen.components, id, { x: finalX, y: finalY }),
           };
         }
-        return page;
+        return screen;
       }),
     }));
   },
   
   resizeComponent: (id, width, height, x, y) => {
-    const { canvas, currentPageId } = get();
+    const { canvas, currentScreenId } = get();
     let finalWidth = Math.max(10, width);
     let finalHeight = Math.max(10, height);
     
@@ -672,20 +898,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: updateComponentInTree(page.components, id, updates),
+            ...screen,
+            components: updateComponentInTree(screen.components, id, updates),
           };
         }
-        return page;
+        return screen;
       }),
     }));
   },
   
   reparentComponent: (id, newParentId) => {
-    const { currentPageId } = get();
+    const { currentScreenId } = get();
     
     // Remove from old parent's childMap before reparenting
     const comp = get().getComponentById(id);
@@ -708,14 +934,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     
     get().saveToHistory();
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: moveComponentToParent(page.components, id, newParentId),
+            ...screen,
+            components: moveComponentToParent(screen.components, id, newParentId),
           };
         }
-        return page;
+        return screen;
       }),
     }));
     
@@ -745,11 +971,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Dropping a component inside its own subtree would detach the tree.
     if (!dragged || !target || subtreeContains(dragged, targetId)) return;
 
-    const { pages, currentPageId } = get();
-    const currentPage = pages.find(page => page.id === currentPageId);
-    if (!currentPage) return;
-    const draggedParentId = findParentIdInTree(currentPage.components, id);
-    const targetParentId = findParentIdInTree(currentPage.components, targetId);
+    const { screens, currentScreenId } = get();
+    const currentScreen = screens.find(screen => screen.id === currentScreenId);
+    if (!currentScreen) return;
+    const draggedParentId = findParentIdInTree(currentScreen.components, id);
+    const targetParentId = findParentIdInTree(currentScreen.components, targetId);
     if (draggedParentId === undefined || targetParentId === undefined) return;
 
     if (draggedParentId !== targetParentId) {
@@ -761,67 +987,71 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     set(state => ({
-      pages: state.pages.map(page =>
-        page.id === state.currentPageId
+      screens: state.screens.map(screen =>
+        screen.id === state.currentScreenId
           ? {
-              ...page,
+              ...screen,
               components: moveComponentAdjacentTo(
-                page.components,
+                screen.components,
                 id,
                 targetId,
                 placement,
               ),
             }
-          : page,
+          : screen,
       ),
     }));
   },
   
   setComponents: (components) => {
-    const { currentPageId } = get();
+    const { currentScreenId } = get();
     get().saveToHistory();
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
+            ...screen,
             components: cloneComponents(components),
           };
         }
-        return page;
+        return screen;
       }),
       selection: { selectedIds: [], hoveredId: null },
     }));
   },
 
-  setPages: (pages) => {
+  setScreens: (screens, screenGroups) => {
     get().saveToHistory();
+    const firstId = screens.length > 0 ? screens[0].id : get().currentScreenId;
     set({
-      pages: clonePages(pages),
-      currentPageId: pages.length > 0 ? pages[0].id : get().currentPageId,
+      screens: cloneScreens(screens),
+      screenGroups: screenGroups ? screenGroups.map(g => ({ ...g })) : [],
+      // A freshly loaded project starts with just its first screen open.
+      openScreenIds: screens.length > 0 ? [firstId] : [],
+      currentScreenId: firstId,
       selection: { selectedIds: [], hoveredId: null },
     });
   },
 
   syncModbusBindings: (tags) => {
-    const nextPages = synchronizeModbusBindings(get().pages, tags);
-    if (nextPages === get().pages) return;
+    const nextScreens = synchronizeModbusBindings(get().screens, tags);
+    if (nextScreens === get().screens) return;
     get().saveToHistory();
-    set({ pages: nextPages });
+    set({ screens: nextScreens });
   },
   
   clearComponents: () => {
-    const { currentPageId } = get();
+    const { currentScreenId } = get();
     get().saveToHistory();
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
+            ...screen,
             components: [],
           };
         }
-        return page;
+        return screen;
       }),
       selection: { selectedIds: [], hoveredId: null },
     }));
@@ -829,65 +1059,65 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   // Z-order Actions
   bringToFront: (id) => {
-    const { currentPageId } = get();
+    const { currentScreenId } = get();
     get().saveToHistory();
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: changeZOrder(page.components, id, 'front'),
+            ...screen,
+            components: changeZOrder(screen.components, id, 'front'),
           };
         }
-        return page;
+        return screen;
       }),
     }));
   },
   
   sendToBack: (id) => {
-    const { currentPageId } = get();
+    const { currentScreenId } = get();
     get().saveToHistory();
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: changeZOrder(page.components, id, 'back'),
+            ...screen,
+            components: changeZOrder(screen.components, id, 'back'),
           };
         }
-        return page;
+        return screen;
       }),
     }));
   },
   
   bringForward: (id) => {
-    const { currentPageId } = get();
+    const { currentScreenId } = get();
     get().saveToHistory();
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: changeZOrder(page.components, id, 'forward'),
+            ...screen,
+            components: changeZOrder(screen.components, id, 'forward'),
           };
         }
-        return page;
+        return screen;
       }),
     }));
   },
   
   sendBackward: (id) => {
-    const { currentPageId } = get();
+    const { currentScreenId } = get();
     get().saveToHistory();
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
           return {
-            ...page,
-            components: changeZOrder(page.components, id, 'backward'),
+            ...screen,
+            components: changeZOrder(screen.components, id, 'backward'),
           };
         }
-        return page;
+        return screen;
       }),
     }));
   },
@@ -1014,7 +1244,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   // Combined move + drag update in a single set call
   moveComponentAndUpdateDrag: (id, x, y, dragStartX, dragStartY) => {
-    const { canvas, currentPageId } = get();
+    const { canvas, currentScreenId } = get();
     let finalX = x;
     let finalY = y;
     
@@ -1024,13 +1254,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
-          const newComponents = updateComponentInTree(page.components, id, { x: finalX, y: finalY });
-          if (newComponents === page.components) return page;
-          return { ...page, components: newComponents };
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
+          const newComponents = updateComponentInTree(screen.components, id, { x: finalX, y: finalY });
+          if (newComponents === screen.components) return screen;
+          return { ...screen, components: newComponents };
         }
-        return page;
+        return screen;
       }),
       drag: {
         ...state.drag,
@@ -1042,7 +1272,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   // Combined resize + drag update in a single set call
   resizeComponentAndUpdateDrag: (id, width, height, dragStartX, dragStartY, x, y) => {
-    const { canvas, currentPageId } = get();
+    const { canvas, currentScreenId } = get();
     let finalWidth = Math.max(10, width);
     let finalHeight = Math.max(10, height);
     
@@ -1062,13 +1292,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     
     set(state => ({
-      pages: state.pages.map(page => {
-        if (page.id === currentPageId) {
-          const newComponents = updateComponentInTree(page.components, id, updates);
-          if (newComponents === page.components) return page;
-          return { ...page, components: newComponents };
+      screens: state.screens.map(screen => {
+        if (screen.id === currentScreenId) {
+          const newComponents = updateComponentInTree(screen.components, id, updates);
+          if (newComponents === screen.components) return screen;
+          return { ...screen, components: newComponents };
         }
-        return page;
+        return screen;
       }),
       drag: {
         ...state.drag,
@@ -1081,12 +1311,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // History Actions
   // Model: history is an array of snapshots. historyIndex points to the "current" snapshot.
   // saveToHistory() is called BEFORE a mutation: it saves the current state, truncates future,
-  // and then the mutation changes pages (which becomes the "unsaved current" state).
+  // and then the mutation changes screens (which becomes the "unsaved current" state).
   // undo: save current state as a redo point, restore history[historyIndex], decrement index.
   // redo: increment index, restore history[historyIndex].
 
   undo: () => {
-    const { history, historyIndex, pages } = get();
+    const { history, historyIndex } = get();
     if (historyIndex < 0) return;
 
     const entry = history[historyIndex];
@@ -1095,20 +1325,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newHistory = [...history];
     // If there's no entry after historyIndex, push current state for redo
     if (historyIndex === history.length - 1) {
-      newHistory.push({
-        pages: clonePages(pages),
-        timestamp: Date.now(),
-      });
+      newHistory.push(snapshotState(get()));
     } else {
       // Replace the entry right after historyIndex with current state
-      newHistory[historyIndex + 1] = {
-        pages: clonePages(pages),
-        timestamp: Date.now(),
-      };
+      newHistory[historyIndex + 1] = snapshotState(get());
     }
 
     set({
-      pages: clonePages(entry.pages || []),
+      ...restoreSnapshot(entry, get()),
       history: newHistory,
       historyIndex: historyIndex - 1,
     });
@@ -1124,22 +1348,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const entry = history[nextIndex];
 
     set({
-      pages: clonePages(entry.pages || []),
+      ...restoreSnapshot(entry, get()),
       historyIndex: nextIndex,
     });
   },
 
   saveToHistory: () => {
-    const { pages, history, historyIndex } = get();
+    const { history, historyIndex } = get();
 
     // Remove any future history (redo states) beyond current position
     const newHistory = history.slice(0, historyIndex + 1);
 
     // Add current state as a snapshot we can undo to
-    newHistory.push({
-      pages: clonePages(pages),
-      timestamp: Date.now(),
-    });
+    newHistory.push(snapshotState(get()));
 
     // Limit history size
     if (newHistory.length > MAX_HISTORY) {
@@ -1163,28 +1384,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   // Helpers
   getComponentById: (id) => {
-    const { pages, currentPageId } = get();
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return undefined;
-    return findComponentInTree(currentPage.components, id);
+    const { screens, currentScreenId } = get();
+    const currentScreen = screens.find(p => p.id === currentScreenId);
+    if (!currentScreen) return undefined;
+    return findComponentInTree(currentScreen.components, id);
   },
   
   getComponentsByParent: (parentId) => {
-    const { pages, currentPageId } = get();
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return [];
+    const { screens, currentScreenId } = get();
+    const currentScreen = screens.find(p => p.id === currentScreenId);
+    if (!currentScreen) return [];
     
     if (parentId === null) {
-      return currentPage.components;
+      return currentScreen.components;
     }
-    const parent = findComponentInTree(currentPage.components, parentId);
+    const parent = findComponentInTree(currentScreen.components, parentId);
     return parent?.children || [];
   },
   
   findComponentAtPoint: (x, y) => {
-    const { pages, currentPageId } = get();
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return undefined;
+    const { screens, currentScreenId } = get();
+    const currentScreen = screens.find(p => p.id === currentScreenId);
+    if (!currentScreen) return undefined;
     
     // Recursive search, preferring deeper (child) components
     const findAtPoint = (comps: LvglComponent[], offsetX = 0, offsetY = 0): LvglComponent | undefined => {
@@ -1209,18 +1430,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return undefined;
     };
     
-    return findAtPoint(currentPage.components);
+    return findAtPoint(currentScreen.components);
   },
   
   getAllComponents: () => {
-    const { pages, currentPageId } = get();
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return [];
-    return flattenComponents(currentPage.components);
+    const { screens, currentScreenId } = get();
+    const currentScreen = screens.find(p => p.id === currentScreenId);
+    if (!currentScreen) return [];
+    return flattenComponents(currentScreen.components);
   },
   
-  getCurrentPage: () => {
-    const { pages, currentPageId } = get();
-    return pages.find(p => p.id === currentPageId);
+  getCurrentScreen: () => {
+    const { screens, currentScreenId } = get();
+    return screens.find(p => p.id === currentScreenId);
   },
 }));

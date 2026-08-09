@@ -4,10 +4,12 @@ import { useEditorStore } from '../editorStore';
 // Reset store before each test
 function resetStore() {
   useEditorStore.getState();
-  // Reset to a clean state by replacing pages with a single default page
+  // Reset to a clean state by replacing screens with a single default screen
   useEditorStore.setState({
-    pages: [{ id: 'test-page-1', name: 'Page 1', components: [], backgroundColor: '#ffffff' }],
-    currentPageId: 'test-page-1',
+    screens: [{ id: 'test-screen-1', name: 'Screen 1', components: [], backgroundColor: '#ffffff' }],
+    currentScreenId: 'test-screen-1',
+    screenGroups: [],
+    openScreenIds: ['test-screen-1'],
     selection: { selectedIds: [], hoveredId: null },
     history: [],
     historyIndex: -1,
@@ -22,14 +24,14 @@ describe('editorStore', () => {
 
   // --- addComponent ---
   describe('addComponent', () => {
-    it('should add a button component to the current page', () => {
+    it('should add a button component to the current screen', () => {
       const store = useEditorStore.getState();
       const id = store.addComponent('btn', 10, 20);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
       expect(id).toBeTruthy();
-      expect(page.components).toHaveLength(1);
-      expect(page.components[0].type).toBe('btn');
+      expect(screen.components).toHaveLength(1);
+      expect(screen.components[0].type).toBe('btn');
     });
 
     it('should snap position to grid when snapToGrid is enabled', () => {
@@ -37,9 +39,9 @@ describe('editorStore', () => {
       // Default gridSize is 10, snapToGrid is true
       store.addComponent('label', 13, 27);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components[0].x).toBe(10);
-      expect(page.components[0].y).toBe(30);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components[0].x).toBe(10);
+      expect(screen.components[0].y).toBe(30);
     });
 
     it('should add a child component to a parent', () => {
@@ -47,10 +49,10 @@ describe('editorStore', () => {
       const parentId = store.addComponent('obj', 0, 0);
       store.addComponent('label', 5, 5, parentId);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(1);
-      expect(page.components[0].children).toHaveLength(1);
-      expect(page.components[0].children[0].type).toBe('label');
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(1);
+      expect(screen.components[0].children).toHaveLength(1);
+      expect(screen.components[0].children[0].type).toBe('label');
     });
 
     it('should return empty string for unknown component type', () => {
@@ -63,8 +65,8 @@ describe('editorStore', () => {
       const store = useEditorStore.getState();
       store.addComponent('slider', 0, 0);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      const slider = page.components[0];
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      const slider = screen.components[0];
       expect(slider.props.min).toBe(0);
       expect(slider.props.max).toBe(100);
       expect(slider.props.value).toBe(50);
@@ -78,8 +80,8 @@ describe('editorStore', () => {
       const id = store.addComponent('btn', 0, 0);
       store.deleteComponents([id]);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(0);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(0);
     });
 
     it('should delete multiple components', () => {
@@ -88,8 +90,8 @@ describe('editorStore', () => {
       const id2 = store.addComponent('label', 50, 50);
       store.deleteComponents([id1, id2]);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(0);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(0);
     });
 
     it('should remove deleted ids from selection', () => {
@@ -107,8 +109,8 @@ describe('editorStore', () => {
       const childId = store.addComponent('label', 5, 5, parentId);
       store.deleteComponents([childId]);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components[0].children).toHaveLength(0);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components[0].children).toHaveLength(0);
     });
 
     it('should do nothing when deleting empty array', () => {
@@ -116,8 +118,8 @@ describe('editorStore', () => {
       store.addComponent('btn', 0, 0);
       store.deleteComponents([]);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(1);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(1);
     });
   });
 
@@ -128,9 +130,9 @@ describe('editorStore', () => {
       const id = store.addComponent('btn', 0, 0);
       store.moveComponent(id, 100, 200);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components[0].x).toBe(100);
-      expect(page.components[0].y).toBe(200);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components[0].x).toBe(100);
+      expect(screen.components[0].y).toBe(200);
     });
 
     it('should snap to grid when moving', () => {
@@ -138,9 +140,9 @@ describe('editorStore', () => {
       const id = store.addComponent('btn', 0, 0);
       store.moveComponent(id, 13, 27);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components[0].x).toBe(10);
-      expect(page.components[0].y).toBe(30);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components[0].x).toBe(10);
+      expect(screen.components[0].y).toBe(30);
     });
 
     it('should not snap when snapToGrid is disabled', () => {
@@ -149,9 +151,9 @@ describe('editorStore', () => {
       const id = store.addComponent('btn', 0, 0);
       store.moveComponent(id, 13, 27);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components[0].x).toBe(13);
-      expect(page.components[0].y).toBe(27);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components[0].x).toBe(13);
+      expect(screen.components[0].y).toBe(27);
     });
 
     it('should move a nested child component', () => {
@@ -160,9 +162,9 @@ describe('editorStore', () => {
       const childId = store.addComponent('label', 0, 0, parentId);
       store.moveComponent(childId, 50, 60);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components[0].children[0].x).toBe(50);
-      expect(page.components[0].children[0].y).toBe(60);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components[0].children[0].x).toBe(50);
+      expect(screen.components[0].children[0].y).toBe(60);
     });
 
     it('should handle moving to negative coordinates', () => {
@@ -170,9 +172,9 @@ describe('editorStore', () => {
       const id = store.addComponent('btn', 0, 0);
       store.moveComponent(id, -10, -20);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components[0].x).toBe(-10);
-      expect(page.components[0].y).toBe(-20);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components[0].x).toBe(-10);
+      expect(screen.components[0].y).toBe(-20);
     });
   });
 
@@ -182,13 +184,13 @@ describe('editorStore', () => {
       const store = useEditorStore.getState();
       store.addComponent('btn', 0, 0);
       let state = useEditorStore.getState();
-      let page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(1);
+      let screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(1);
 
       store.undo();
       state = useEditorStore.getState();
-      page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(0);
+      screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(0);
     });
 
     it('should redo after undo', () => {
@@ -201,31 +203,31 @@ describe('editorStore', () => {
       // redo again: goes to history[1] (with btn), historyIndex = 1
       store.undo();
       let state = useEditorStore.getState();
-      let page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(0);
+      let screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(0);
 
       // Two redos needed: first restores the pre-mutation snapshot, second restores post-mutation
       store.redo();
       store.redo();
       state = useEditorStore.getState();
-      page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(1);
+      screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(1);
     });
 
     it('should do nothing when undo with no history', () => {
       const store = useEditorStore.getState();
       store.undo(); // should not throw
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(0);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(0);
     });
 
     it('should do nothing when redo with no future', () => {
       const store = useEditorStore.getState();
       store.redo(); // should not throw
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(0);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(0);
     });
 
     it('should handle multiple undo/redo cycles', () => {
@@ -234,69 +236,69 @@ describe('editorStore', () => {
       store.addComponent('label', 50, 50);
 
       let state = useEditorStore.getState();
-      let page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(2);
+      let screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(2);
 
       store.undo(); // undo label add → 1 component
       state = useEditorStore.getState();
-      page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(1);
+      screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(1);
 
       store.undo(); // undo btn add → 0 components
       state = useEditorStore.getState();
-      page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(0);
+      screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(0);
 
       // Redo twice to get back to 1 component (pre-mutation + post-mutation of first add)
       store.redo();
       store.redo();
       state = useEditorStore.getState();
-      page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(1);
+      screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(1);
     });
   });
 
-  // --- addPage/deletePage/renamePage ---
-  describe('page management', () => {
-    it('should add a new page', () => {
+  // --- addScreen/deleteScreen/renameScreen ---
+  describe('screen management', () => {
+    it('should add a new screen', () => {
       const store = useEditorStore.getState();
-      const newPageId = store.addPage();
+      const newPageId = store.addScreen();
       const state = useEditorStore.getState();
-      expect(state.pages).toHaveLength(2);
-      expect(state.currentPageId).toBe(newPageId);
+      expect(state.screens).toHaveLength(2);
+      expect(state.currentScreenId).toBe(newPageId);
     });
 
-    it('should delete a page', () => {
+    it('should delete a screen', () => {
       const store = useEditorStore.getState();
-      const newPageId = store.addPage();
-      store.deletePage(newPageId);
+      const newPageId = store.addScreen();
+      store.deleteScreen(newPageId);
       const state = useEditorStore.getState();
-      expect(state.pages).toHaveLength(1);
+      expect(state.screens).toHaveLength(1);
     });
 
-    it('should not delete the last page', () => {
+    it('should not delete the last screen', () => {
       const store = useEditorStore.getState();
       const state = useEditorStore.getState();
-      store.deletePage(state.currentPageId);
+      store.deleteScreen(state.currentScreenId);
       const afterState = useEditorStore.getState();
-      expect(afterState.pages).toHaveLength(1);
+      expect(afterState.screens).toHaveLength(1);
     });
 
-    it('should rename a page', () => {
+    it('should rename a screen', () => {
       const store = useEditorStore.getState();
       const state = useEditorStore.getState();
-      store.renamePage(state.currentPageId, 'My Screen');
+      store.renameScreen(state.currentScreenId, 'My Screen');
       const afterState = useEditorStore.getState();
-      expect(afterState.pages[0].name).toBe('My Screen');
+      expect(afterState.screens[0].name).toBe('My Screen');
     });
 
-    it('should switch current page when deleting the active page', () => {
+    it('should switch current screen when deleting the active screen', () => {
       const store = useEditorStore.getState();
-      const firstPageId = useEditorStore.getState().currentPageId;
-      store.addPage();
-      store.deletePage(useEditorStore.getState().currentPageId);
+      const firstPageId = useEditorStore.getState().currentScreenId;
+      store.addScreen();
+      store.deleteScreen(useEditorStore.getState().currentScreenId);
       const state = useEditorStore.getState();
-      expect(state.currentPageId).toBe(firstPageId);
+      expect(state.currentScreenId).toBe(firstPageId);
     });
   });
 
@@ -354,8 +356,8 @@ describe('editorStore', () => {
   describe('reorderComponentAdjacentTo', () => {
     const rootTypes = () => {
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      return page.components.map(c => c.type);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      return screen.components.map(c => c.type);
     };
 
     it('reorders siblings without nesting them', () => {
@@ -370,9 +372,9 @@ describe('editorStore', () => {
 
       expect(rootTypes()).toEqual(['label', 'slider', 'img']);
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
       // Nothing gained a child — this is a same-level move.
-      expect(page.components.every(c => c.children.length === 0)).toBe(true);
+      expect(screen.components.every(c => c.children.length === 0)).toBe(true);
     });
 
     it('places a component before its target', () => {
@@ -409,10 +411,10 @@ describe('editorStore', () => {
       useEditorStore.getState().reorderComponentAdjacentTo(nested, sibling, 'after');
 
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components.map(c => c.id)).toEqual([container, sibling, nested]);
-      expect(page.components[0].children).toHaveLength(0);
-      expect(page.components[2].parentId).toBeNull();
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components.map(c => c.id)).toEqual([container, sibling, nested]);
+      expect(screen.components[0].children).toHaveLength(0);
+      expect(screen.components[2].parentId).toBeNull();
     });
 
     it('refuses to move a component into its own subtree', () => {
@@ -423,10 +425,10 @@ describe('editorStore', () => {
       useEditorStore.getState().reorderComponentAdjacentTo(parent, child, 'after');
 
       const state = useEditorStore.getState();
-      const page = state.pages.find(p => p.id === state.currentPageId)!;
-      expect(page.components).toHaveLength(1);
-      expect(page.components[0].id).toBe(parent);
-      expect(page.components[0].children[0].id).toBe(child);
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components).toHaveLength(1);
+      expect(screen.components[0].id).toBe(parent);
+      expect(screen.components[0].children[0].id).toBe(child);
     });
 
     it('is a no-op when target and source are the same', () => {
@@ -437,6 +439,164 @@ describe('editorStore', () => {
       useEditorStore.getState().reorderComponentAdjacentTo(a, a, 'after');
 
       expect(rootTypes()).toEqual(['img', 'label']);
+    });
+  });
+
+  // --- screens: open / close tabs ---
+  describe('screen tabs', () => {
+    it('opens a screen and makes it current', () => {
+      const created = useEditorStore.getState().addScreen();
+      useEditorStore.getState().setCurrentScreen('test-screen-1');
+
+      useEditorStore.getState().openScreen(created);
+
+      const state = useEditorStore.getState();
+      expect(state.currentScreenId).toBe(created);
+      expect(state.openScreenIds).toEqual(['test-screen-1', created]);
+    });
+
+    it('jumps to an already open screen without opening it twice', () => {
+      const created = useEditorStore.getState().addScreen();
+      useEditorStore.getState().setCurrentScreen('test-screen-1');
+
+      useEditorStore.getState().openScreen(created);
+      useEditorStore.getState().openScreen(created);
+
+      const state = useEditorStore.getState();
+      expect(state.currentScreenId).toBe(created);
+      expect(state.openScreenIds.filter(id => id === created)).toHaveLength(1);
+    });
+
+    it('closing a tab keeps the screen in the manager', () => {
+      const created = useEditorStore.getState().addScreen();
+
+      useEditorStore.getState().closeScreen(created);
+
+      const state = useEditorStore.getState();
+      expect(state.openScreenIds).toEqual(['test-screen-1']);
+      expect(state.screens.some(s => s.id === created)).toBe(true);
+    });
+
+    it('closing the active tab activates its neighbour', () => {
+      const second = useEditorStore.getState().addScreen();
+
+      useEditorStore.getState().closeScreen(second);
+
+      expect(useEditorStore.getState().currentScreenId).toBe('test-screen-1');
+    });
+
+    it('refuses to close the last open tab', () => {
+      useEditorStore.getState().closeScreen('test-screen-1');
+
+      expect(useEditorStore.getState().openScreenIds).toEqual(['test-screen-1']);
+    });
+  });
+
+  // --- screens: creation and deletion ---
+  describe('screen lifecycle', () => {
+    it('names new screens by filling the first free slot', () => {
+      const store = useEditorStore.getState();
+      const second = store.addScreen();
+      useEditorStore.getState().addScreen();
+      useEditorStore.getState().deleteScreen(second);
+
+      const created = useEditorStore.getState().addScreen();
+
+      const screen = useEditorStore.getState().screens.find(s => s.id === created)!;
+      expect(screen.name).toBe('Screen 2');
+    });
+
+    it('refuses to delete the last screen', () => {
+      useEditorStore.getState().deleteScreen('test-screen-1');
+
+      expect(useEditorStore.getState().screens).toHaveLength(1);
+    });
+
+    it('undo restores a deleted screen along with its tab', () => {
+      const created = useEditorStore.getState().addScreen();
+      useEditorStore.getState().addComponent('btn', 10, 10);
+      const before = useEditorStore.getState().screens.find(s => s.id === created)!;
+      expect(before.components).toHaveLength(1);
+
+      useEditorStore.getState().deleteScreen(created);
+      expect(useEditorStore.getState().screens.some(s => s.id === created)).toBe(false);
+
+      useEditorStore.getState().undo();
+
+      const state = useEditorStore.getState();
+      const restored = state.screens.find(s => s.id === created);
+      expect(restored).toBeDefined();
+      expect(restored!.components).toHaveLength(1);
+      expect(state.openScreenIds).toContain(created);
+    });
+
+    it('redo re-applies the deletion', () => {
+      const created = useEditorStore.getState().addScreen();
+      useEditorStore.getState().deleteScreen(created);
+      useEditorStore.getState().undo();
+
+      // Two redos, matching the existing history semantics: the first lands on
+      // the pre-mutation snapshot, the second on the post-mutation state.
+      useEditorStore.getState().redo();
+      useEditorStore.getState().redo();
+
+      const state = useEditorStore.getState();
+      expect(state.screens.some(s => s.id === created)).toBe(false);
+      expect(state.openScreenIds).not.toContain(created);
+    });
+  });
+
+  // --- screen groups ---
+  describe('screen groups', () => {
+    it('creates a top-level group', () => {
+      const groupId = useEditorStore.getState().addScreenGroup(null);
+
+      expect(groupId).toBeTruthy();
+      const group = useEditorStore.getState().screenGroups.find(g => g.id === groupId)!;
+      expect(group.name).toBe('Group 1');
+      expect(group.parentId).toBeNull();
+    });
+
+    it('allows a second level of nesting', () => {
+      const parent = useEditorStore.getState().addScreenGroup(null)!;
+
+      const child = useEditorStore.getState().addScreenGroup(parent);
+
+      expect(child).toBeTruthy();
+      expect(useEditorStore.getState().getScreenGroupDepth(child)).toBe(2);
+    });
+
+    it('refuses a third level', () => {
+      const level1 = useEditorStore.getState().addScreenGroup(null)!;
+      const level2 = useEditorStore.getState().addScreenGroup(level1)!;
+
+      expect(useEditorStore.getState().canNestScreenGroup(level2)).toBe(false);
+      expect(useEditorStore.getState().addScreenGroup(level2)).toBeNull();
+      expect(useEditorStore.getState().screenGroups).toHaveLength(2);
+    });
+
+    it('deleting a group lifts its screens and subgroups to the parent', () => {
+      const level1 = useEditorStore.getState().addScreenGroup(null)!;
+      const level2 = useEditorStore.getState().addScreenGroup(level1)!;
+      const screenId = useEditorStore.getState().addScreen(level2);
+
+      useEditorStore.getState().deleteScreenGroup(level2);
+
+      const state = useEditorStore.getState();
+      expect(state.screenGroups.map(g => g.id)).toEqual([level1]);
+      expect(state.screens.find(s => s.id === screenId)!.groupId).toBe(level1);
+    });
+
+    it('undo restores a deleted group', () => {
+      const level1 = useEditorStore.getState().addScreenGroup(null)!;
+      const screenId = useEditorStore.getState().addScreen(level1);
+
+      useEditorStore.getState().deleteScreenGroup(level1);
+      useEditorStore.getState().undo();
+
+      const state = useEditorStore.getState();
+      expect(state.screenGroups.map(g => g.id)).toEqual([level1]);
+      expect(state.screens.find(s => s.id === screenId)!.groupId).toBe(level1);
     });
   });
 });

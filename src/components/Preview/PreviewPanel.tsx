@@ -89,11 +89,11 @@ function collectInitialImageButtonStates(
 const PreviewPanel: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
-  const { pages, currentPageId, canvas } = useEditorStore();
+  const { screens, currentScreenId, canvas } = useEditorStore();
   const { images } = useResourceStore();
   const [scale, setScale] = useState(1);
   const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
-  const [previewPageId, setPreviewPageId] = useState<string>(currentPageId);
+  const [previewPageId, setPreviewPageId] = useState<string>(currentScreenId);
   const [animPlaying, setAnimPlaying] = useState(false);
   const [animPaused, setAnimPaused] = useState(false);
   const animStartRef = useRef<number>(0);
@@ -102,12 +102,12 @@ const PreviewPanel: React.FC = () => {
   const [imageButtonStateIndices, setImageButtonStateIndices] =
     useState<Map<string, number>>(new Map());
 
-  // Sync preview page with editor when not playing
+  // Sync preview screen with editor when not playing
   useEffect(() => {
-    if (!animPlaying) setPreviewPageId(currentPageId);
-  }, [currentPageId, animPlaying]);
+    if (!animPlaying) setPreviewPageId(currentScreenId);
+  }, [currentScreenId, animPlaying]);
 
-  const previewPage = pages.find(p => p.id === previewPageId) || pages.find(p => p.id === currentPageId);
+  const previewPage = screens.find(p => p.id === previewPageId) || screens.find(p => p.id === currentScreenId);
   const components = useMemo(() => previewPage?.components || [], [previewPage?.components]);
   const bgColor = previewPage?.backgroundColor || '#ffffff';
 
@@ -339,7 +339,7 @@ const PreviewPanel: React.FC = () => {
     if (hit && hit.events) {
       for (const ev of hit.events) {
         if (ev.action?.type === 'navigate' && ev.action.targetPage) {
-          const targetPage = pages.find(p => p.name === ev.action!.targetPage || p.id === ev.action!.targetPage);
+          const targetPage = screens.find(p => p.name === ev.action!.targetPage || p.id === ev.action!.targetPage);
           if (targetPage) {
             setPreviewPageId(targetPage.id);
             return;
@@ -347,7 +347,7 @@ const PreviewPanel: React.FC = () => {
         }
       }
     }
-  }, [components, pages, scale]);
+  }, [components, screens, scale]);
 
   // Render components to canvas
   useEffect(() => {
@@ -807,11 +807,11 @@ const PreviewPanel: React.FC = () => {
         </div>
       </div>
       <div className="preview-footer">
-        <div className="preview-pages">
-          {pages.map(p => (
+        <div className="preview-screens">
+          {screens.map(p => (
             <button
               key={p.id}
-              className={`preview-page-btn ${p.id === previewPageId ? 'active' : ''}`}
+              className={`preview-screen-btn ${p.id === previewPageId ? 'active' : ''}`}
               onClick={() => setPreviewPageId(p.id)}
             >
               {p.name}

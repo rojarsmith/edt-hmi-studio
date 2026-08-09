@@ -4,7 +4,7 @@ import {
   createComponent,
   createLogicGraph,
   createLogicNode,
-  createPage,
+  createScreen,
 } from './helpers';
 import { generateHmiBindings } from '../hmiBindingGenerator';
 
@@ -34,7 +34,7 @@ describe('generateHmiBindings', () => {
     });
 
     const generated = generateHmiBindings([
-      createPage({ name: 'Main', components: [button] }),
+      createScreen({ name: 'Main', components: [button] }),
     ], communication);
 
     expect(generated['hmi_bindings_generated.c']).toContain('.baud_rate = 19200U');
@@ -62,7 +62,7 @@ describe('generateHmiBindings', () => {
     });
 
     const generated = generateHmiBindings(
-      [createPage({ components: [label] })],
+      [createScreen({ components: [label] })],
       createDefaultCommunicationConfig(),
     );
 
@@ -88,7 +88,7 @@ describe('generateHmiBindings', () => {
     });
 
     const generated = generateHmiBindings(
-      [createPage({ components: [imageButton] })],
+      [createScreen({ components: [imageButton] })],
       createDefaultCommunicationConfig(),
     );
     const source = generated['hmi_bindings_generated.c'];
@@ -101,7 +101,7 @@ describe('generateHmiBindings', () => {
 
   it('emits an empty, standard-compliant descriptor table', () => {
     const generated = generateHmiBindings(
-      [createPage()],
+      [createScreen()],
       createDefaultCommunicationConfig(),
     );
 
@@ -115,7 +115,7 @@ describe('generateHmiBindings', () => {
 
   it('emits a virtual polling descriptor for each Logic holding-register address', () => {
     const generated = generateHmiBindings(
-      [createPage()],
+      [createScreen()],
       {
         ...createDefaultCommunicationConfig(),
         pollIntervalMs: 400,

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateEventsSource } from '../templates/ui_events.c';
 import {
   defaultOptions,
-  createPage,
+  createScreen,
   createComponent,
   createEvent,
   createBuiltinAction,
@@ -45,8 +45,8 @@ describe('generateEventsSource', () => {
         action: createBuiltinAction({ type: 'show', targetComponent: 'label1' }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('void ui_event_my_btn_clicked(lv_event_t *e)');
     expect(result).toContain('lv_event_code_t code = lv_event_get_code(e);');
     expect(result).toContain('if (code == LV_EVENT_CLICKED)');
@@ -61,8 +61,8 @@ describe('generateEventsSource', () => {
         action: createBuiltinAction({ type: 'show', targetComponent: 'x' }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsSource(pages, defaultOptions({ generateComments: true }));
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsSource(screens, defaultOptions({ generateComments: true }));
     expect(result).toContain('Event Handlers');
   });
 
@@ -73,14 +73,14 @@ describe('generateEventsSource', () => {
       events: [createEvent({
         eventType: 'LV_EVENT_CLICKED',
         handlerType: 'builtin',
-        action: createBuiltinAction({ type: 'navigate', targetPage: 'settings' }),
+        action: createBuiltinAction({ type: 'navigate', targetScreen: 'settings' }),
       })],
     });
-    const pages = [
-      createPage({ name: 'main', components: [btn] }),
-      createPage({ name: 'settings' }),
+    const screens = [
+      createScreen({ name: 'main', components: [btn] }),
+      createScreen({ name: 'settings' }),
     ];
-    const result = generateEventsSource(pages, defaultOptions());
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('ui_load_screen_settings();');
   });
 
@@ -99,8 +99,8 @@ describe('generateEventsSource', () => {
         }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_obj_set_style_bg_color(ui_box1');
     expect(result).toContain('lv_color_hex(0xFF0000)');
   });
@@ -115,8 +115,8 @@ describe('generateEventsSource', () => {
         action: createBuiltinAction({ type: 'show', targetComponent: 'panel' }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_obj_clear_flag(ui_panel, LV_OBJ_FLAG_HIDDEN);');
   });
 
@@ -130,8 +130,8 @@ describe('generateEventsSource', () => {
         action: createBuiltinAction({ type: 'hide', targetComponent: 'panel' }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_obj_add_flag(ui_panel, LV_OBJ_FLAG_HIDDEN);');
   });
 
@@ -145,8 +145,8 @@ describe('generateEventsSource', () => {
         action: createBuiltinAction({ type: 'enable', targetComponent: 'input1' }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_obj_clear_state(ui_input1, LV_STATE_DISABLED);');
   });
 
@@ -160,8 +160,8 @@ describe('generateEventsSource', () => {
         action: createBuiltinAction({ type: 'disable', targetComponent: 'input1' }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_obj_add_state(ui_input1, LV_STATE_DISABLED);');
   });
 
@@ -180,8 +180,8 @@ describe('generateEventsSource', () => {
         }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [label, btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [label, btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_label_set_text(ui_my_label, "Hello");');
   });
 
@@ -199,8 +199,8 @@ describe('generateEventsSource', () => {
         }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [ta, btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [ta, btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_textarea_set_text(ui_my_ta, "typed text");');
   });
 
@@ -218,8 +218,8 @@ describe('generateEventsSource', () => {
         }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [target, trigger] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [target, trigger] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_label_set_text(lv_obj_get_child(ui_my_btn, 0), "Click me");');
   });
 
@@ -237,8 +237,8 @@ describe('generateEventsSource', () => {
         }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [cb, btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [cb, btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_checkbox_set_text(ui_my_cb, "Agree");');
   });
 
@@ -256,8 +256,8 @@ describe('generateEventsSource', () => {
         }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [dd, btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [dd, btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_dropdown_set_text(ui_my_dd, "Option A");');
   });
 
@@ -276,8 +276,8 @@ describe('generateEventsSource', () => {
         }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [slider, btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [slider, btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_slider_set_value(ui_my_slider, 50, LV_ANIM_ON);');
   });
 
@@ -295,8 +295,8 @@ describe('generateEventsSource', () => {
         }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [bar, btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [bar, btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_bar_set_value(ui_my_bar, 75, LV_ANIM_ON);');
   });
 
@@ -314,8 +314,8 @@ describe('generateEventsSource', () => {
         }),
       })],
     });
-    const pages = [createPage({ name: 'main', components: [arc, btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [arc, btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('lv_arc_set_value(ui_my_arc, 120);');
   });
 
@@ -329,8 +329,8 @@ describe('generateEventsSource', () => {
         customCode: 'printf("clicked!");',
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsSource(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('printf("clicked!");');
   });
 
@@ -344,8 +344,8 @@ describe('generateEventsSource', () => {
         // no action
       })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsSource(pages, defaultOptions({ userCodeMarkers: true }));
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsSource(screens, defaultOptions({ userCodeMarkers: true }));
     expect(result).toContain('USER_CODE_START: emptyBtn_LV_EVENT_CLICKED');
     expect(result).toContain('USER_CODE_END: emptyBtn_LV_EVENT_CLICKED');
   });
@@ -357,19 +357,19 @@ describe('generateEventsSource', () => {
       events: [createEvent({
         eventType: 'LV_EVENT_CLICKED',
         handlerType: 'builtin',
-        action: createBuiltinAction({ type: 'navigate', targetPage: 'settings' }),
+        action: createBuiltinAction({ type: 'navigate', targetScreen: 'settings' }),
       })],
     });
-    const pages = [
-      createPage({ name: 'main', components: [btn] }),
-      createPage({ name: 'settings' }),
+    const screens = [
+      createScreen({ name: 'main', components: [btn] }),
+      createScreen({ name: 'settings' }),
     ];
-    const result = generateEventsSource(pages, defaultOptions({ generateComments: true }));
+    const result = generateEventsSource(screens, defaultOptions({ generateComments: true }));
     expect(result).toContain('Navigate to: settings');
   });
 
-  // --- Multiple events from multiple pages ---
-  it('generates handlers from multiple pages', () => {
+  // --- Multiple events from multiple screens ---
+  it('generates handlers from multiple screens', () => {
     const btn1 = createComponent('btn', {
       name: 'btn1',
       events: [createEvent({
@@ -386,11 +386,11 @@ describe('generateEventsSource', () => {
         action: createBuiltinAction({ type: 'hide', targetComponent: 'y' }),
       })],
     });
-    const pages = [
-      createPage({ name: 'page1', components: [btn1] }),
-      createPage({ name: 'page2', components: [btn2] }),
+    const screens = [
+      createScreen({ name: 'page1', components: [btn1] }),
+      createScreen({ name: 'page2', components: [btn2] }),
     ];
-    const result = generateEventsSource(pages, defaultOptions());
+    const result = generateEventsSource(screens, defaultOptions());
     expect(result).toContain('void ui_event_btn1_clicked(lv_event_t *e)');
     expect(result).toContain('void ui_event_btn2_pressed(lv_event_t *e)');
   });

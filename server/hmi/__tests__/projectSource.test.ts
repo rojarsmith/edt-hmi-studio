@@ -39,9 +39,9 @@ describe('writeGeneratedProjectSource', () => {
     }
 
     const project = {
-      pages: [
+      screens: [
         {
-          id: 'page-1',
+          id: 'screen-1',
           name: 'Main',
           components: [
             {
@@ -209,8 +209,8 @@ describe('writeGeneratedProjectSource', () => {
       }).png().toBuffer(),
     );
     const project = {
-      pages: [{
-        id: 'page-1',
+      screens: [{
+        id: 'screen-1',
         name: 'Main',
         components: [{
           id: 'image-button-1',
@@ -300,8 +300,8 @@ describe('writeGeneratedProjectSource', () => {
       }).png().toBuffer(),
     );
     const project = {
-      pages: [{
-        id: 'page-1',
+      screens: [{
+        id: 'screen-1',
         name: 'Main',
         components: [{
           id: 'image-1',
@@ -368,8 +368,8 @@ describe('writeGeneratedProjectSource', () => {
       }).png().toBuffer(),
     );
     const project = {
-      pages: [{
-        id: 'page-1',
+      screens: [{
+        id: 'screen-1',
         name: 'Main',
         components: [{
           id: 'image-1',
@@ -449,8 +449,8 @@ describe('writeGeneratedProjectSource', () => {
       visible: true,
     };
     const project = {
-      pages: [{
-        id: 'page-1',
+      screens: [{
+        id: 'screen-1',
         name: 'Main',
         components: [
           {

@@ -13,7 +13,8 @@ import Canvas from './components/Canvas';
 import PropertyEditor from './components/PropertyEditor';
 import EventPanel from './components/EventPanel';
 import AnimationPanel from './components/AnimationPanel';
-import PageManager from './components/PageManager';
+import ScreenTabs from './components/ScreenTabs';
+import ScreenManager from './components/ScreenManager';
 import StatusBar from './components/StatusBar';
 import AlignToolbar from './components/AlignToolbar';
 import HelpPanel from './components/HelpPanel';
@@ -39,7 +40,7 @@ import {
 import { useEditorStore } from './store/editorStore';
 import { useAppStore, parseFontSize } from './store/appStore';
 import { useProjectStore } from './store/projectStore';
-import type { LvglComponent, Page } from './types';
+import type { LvglComponent, Screen } from './types';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { getComponentDefinition } from './utils/componentDefinitions';
 import './App.css';
@@ -60,7 +61,7 @@ const App: React.FC = () => {
         if (cfg) {
           // Load project data into stores
           loadProjectData(lastId).then(({ data, images, fonts }) => {
-            useEditorStore.getState().setPages(data.pages as Page[]);
+            useEditorStore.getState().setScreens(data.screens as Screen[], data.screenGroups);
             useEditorStore.getState().setCanvasSize(cfg.display.width, cfg.display.height);
             useResourceStore.getState().importResources({ images, fonts });
             if (data.logicGraphs) {
@@ -116,10 +117,10 @@ interface EditorViewProps {
   goToProjectList: () => void;
   setLastSaveTime: (t: number) => void;
   setDefaultFontSize: (size: number) => void;
-  saveProjectData: (id: string, pages: Page[], logicGraphs: import('./components/LogicEditor/types').LogicGraph[], images: import('./resources/types').ImageResource[], fonts: import('./resources/types').FontResource[]) => Promise<void>;
+  saveProjectData: (id: string, screens: Screen[], logicGraphs: import('./components/LogicEditor/types').LogicGraph[], images: import('./resources/types').ImageResource[], fonts: import('./resources/types').FontResource[], screenGroups?: import('./types').ScreenGroup[]) => Promise<void>;
   exportProject: (id: string) => Promise<import('./resources/types').ProjectFile>;
   importProject: (file: import('./resources/types').ProjectFile, name?: string) => Promise<string>;
-  loadProjectData: (id: string) => Promise<{ data: { pages: Page[]; logicGraphs: import('./components/LogicEditor/types').LogicGraph[] }; images: import('./resources/types').ImageResource[]; fonts: import('./resources/types').FontResource[] }>;
+  loadProjectData: (id: string) => Promise<{ data: { screens: Screen[]; screenGroups?: import('./types').ScreenGroup[]; logicGraphs: import('./components/LogicEditor/types').LogicGraph[] }; images: import('./resources/types').ImageResource[]; fonts: import('./resources/types').FontResource[] }>;
   getProjectConfig: (id: string) => Promise<import('./store/projectStore').ProjectConfig | undefined>;
   openProject: (id: string) => void;
 }
@@ -141,7 +142,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   // Enable keyboard shortcuts
   useKeyboardShortcuts();
 
-  const { addComponent, pages, setPages, setCanvasSize } = useEditorStore();
+  const { addComponent, screens, screenGroups, setScreens, setCanvasSize } = useEditorStore();
   const { images, fonts, importResources } = useResourceStore();
   const { messages, removeToast, success, error } = useToast();
 
@@ -182,7 +183,7 @@ const EditorView: React.FC<EditorViewProps> = ({
     const doSave = async () => {
       try {
         const logicGraphs = useLogicEditorStore.getState().graphs;
-        await saveProjectData(currentProjectId, pages, logicGraphs, images, fonts);
+        await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
         setLastSaveTime(Date.now());
       } catch (err) {
         console.error('Auto-save failed:', err);
@@ -205,34 +206,34 @@ const EditorView: React.FC<EditorViewProps> = ({
       clearInterval(saveInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [currentProjectId, pages, images, fonts, saveProjectData, setLastSaveTime]);
+  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, setLastSaveTime]);
 
   // Project management handlers
   const handleSaveProject = useCallback(async () => {
     if (!currentProjectId) return;
     try {
       const logicGraphs = useLogicEditorStore.getState().graphs;
-      await saveProjectData(currentProjectId, pages, logicGraphs, images, fonts);
+      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
       setLastSaveTime(Date.now());
       success('Project saved');
     } catch (err) {
       error('Save failed: ' + String(err));
     }
-  }, [currentProjectId, pages, images, fonts, saveProjectData, setLastSaveTime, success, error]);
+  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, setLastSaveTime, success, error]);
 
   const handleExportProject = useCallback(async () => {
     if (!currentProjectId) return;
     try {
       // Save first
       const logicGraphs = useLogicEditorStore.getState().graphs;
-      await saveProjectData(currentProjectId, pages, logicGraphs, images, fonts);
+      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
       const project = await exportProject(currentProjectId);
       downloadProject(project);
       success('Project exported');
     } catch (err) {
       error('Export failed: ' + String(err));
     }
-  }, [currentProjectId, pages, images, fonts, saveProjectData, exportProject, success, error]);
+  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, exportProject, success, error]);
 
   const handleImportProject = () => {
     fileInputRef.current?.click();
@@ -247,7 +248,7 @@ const EditorView: React.FC<EditorViewProps> = ({
       const cfg = await getProjectConfig(id);
       if (cfg) {
         const { data, images: imgs, fonts: fnts } = await loadProjectData(id);
-        setPages(data.pages as Page[]);
+        setScreens(data.screens as Screen[], data.screenGroups);
         setCanvasSize(cfg.display.width, cfg.display.height);
         importResources({ images: imgs, fonts: fnts });
         if (data.logicGraphs) {
@@ -270,24 +271,24 @@ const EditorView: React.FC<EditorViewProps> = ({
       // Save current project first
       if (currentProjectId) {
         const logicGraphs = useLogicEditorStore.getState().graphs;
-        await saveProjectData(currentProjectId, pages, logicGraphs, images, fonts);
+        await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
       }
       goToProjectList();
     }
-  }, [currentProjectId, pages, images, fonts, saveProjectData, goToProjectList]);
+  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, goToProjectList]);
 
   const handleBackToList = useCallback(async () => {
     // Save current project first
     if (currentProjectId) {
       try {
         const logicGraphs = useLogicEditorStore.getState().graphs;
-        await saveProjectData(currentProjectId, pages, logicGraphs, images, fonts);
+        await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
       } catch {
         // ignore
       }
     }
     goToProjectList();
-  }, [currentProjectId, pages, images, fonts, saveProjectData, goToProjectList]);
+  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, goToProjectList]);
 
   // Listen for keyboard shortcut events
   useEffect(() => {
@@ -345,8 +346,8 @@ const EditorView: React.FC<EditorViewProps> = ({
 
         // Find the deepest container component under the drop point
         const state = useEditorStore.getState();
-        const currentPage = state.pages.find(p => p.id === state.currentPageId);
-        const components = currentPage?.components || [];
+        const currentScreen = state.screens.find(p => p.id === state.currentScreenId);
+        const components = currentScreen?.components || [];
 
         type HitResult = { comp: LvglComponent; absX: number; absY: number } | null;
 
@@ -439,12 +440,13 @@ const EditorView: React.FC<EditorViewProps> = ({
             <div className="app-body">
               <div className="left-panel">
                 <ComponentPanel />
+                <ScreenManager />
                 <HierarchyPanel />
               </div>
               <div className="canvas-area">
                 <AlignToolbar />
                 <Canvas />
-                <PageManager />
+                <ScreenTabs />
               </div>
               <div className="right-panel">
                 <PropertyEditor />

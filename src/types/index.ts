@@ -150,7 +150,9 @@ export type BuiltinActionType =
 // Built-in Action Configuration
 export interface BuiltinAction {
   type: BuiltinActionType;
-  targetPage?: string;      // For navigate
+  targetScreen?: string;    // For navigate
+  /** @deprecated Pre-rename spelling of `targetScreen`; still read from older projects. */
+  targetPage?: string;
   targetComponent?: string; // For setProperty, show, hide, enable, disable, setText, setValue
   property?: string;        // For setProperty
   value?: string | number | boolean;  // For setProperty, setText, setValue
@@ -167,13 +169,32 @@ export interface EventBinding {
   customCode?: string;
 }
 
-// Page Definition (Phase 3 - Multi-page support)
-export interface Page {
+// Screen Definition (Phase 3 - Multi-screen support)
+export interface Screen {
   id: string;
   name: string;
   components: LvglComponent[];
   backgroundColor?: string;
+  /** Owning ScreenGroup, or null/undefined when the screen sits at the root. */
+  groupId?: string | null;
 }
+
+/**
+ * Organisational folder in the screen manager. Purely a UI grouping — it has no
+ * effect on generated code.
+ *
+ * Nesting is capped at two levels: a group with `parentId == null` is level 1,
+ * a group pointing at one of those is level 2, and level 2 groups cannot take
+ * children of their own.
+ */
+export interface ScreenGroup {
+  id: string;
+  name: string;
+  parentId?: string | null;
+}
+
+/** Deepest group level the manager allows (1-based). */
+export const MAX_SCREEN_GROUP_DEPTH = 2;
 
 export type LvglAlign = 'default' | 'center' | 'top_left' | 'top_mid' | 'top_right' | 'bottom_left' | 'bottom_mid' | 'bottom_right' | 'left_mid' | 'right_mid';
 
@@ -301,7 +322,11 @@ export interface SelectionState {
 // History State for Undo/Redo
 export interface HistoryEntry {
   components?: LvglComponent[]; // Legacy support
-  pages?: Page[]; // Multi-page support
+  screens?: Screen[]; // Multi-screen support
+  screenGroups?: ScreenGroup[];
+  /** Tab state is part of the snapshot so undoing an add/delete restores the tabs too. */
+  openScreenIds?: string[];
+  currentScreenId?: string;
   timestamp: number;
 }
 

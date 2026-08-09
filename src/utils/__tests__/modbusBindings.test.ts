@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { LvglComponent, Page } from '../../types';
+import type { LvglComponent, Screen } from '../../types';
 import type { ModbusRegisterTag } from '../../types/hmi';
 import { synchronizeModbusBindings } from '../modbusBindings';
 
@@ -48,7 +48,7 @@ const tag: ModbusRegisterTag = {
 };
 
 describe('synchronizeModbusBindings', () => {
-  it('updates nested tag-backed bindings and keeps unrelated pages reference-stable', () => {
+  it('updates nested tag-backed bindings and keeps unrelated screens reference-stable', () => {
     const taggedChild = component(tag.id);
     const container = {
       ...component(''),
@@ -57,16 +57,16 @@ describe('synchronizeModbusBindings', () => {
       modbusBinding: undefined,
       children: [taggedChild],
     };
-    const pages: Page[] = [
+    const screens: Screen[] = [
       { id: 'main', name: 'Main', components: [container] },
       { id: 'other', name: 'Other', components: [] },
     ];
 
-    const synchronized = synchronizeModbusBindings(pages, [tag]);
+    const synchronized = synchronizeModbusBindings(screens, [tag]);
     const binding = synchronized[0].components[0].children[0].modbusBinding;
 
-    expect(synchronized).not.toBe(pages);
-    expect(synchronized[1]).toBe(pages[1]);
+    expect(synchronized).not.toBe(screens);
+    expect(synchronized[1]).toBe(screens[1]);
     expect(binding).toMatchObject({
       tagId: tag.id,
       area: tag.area,
@@ -79,13 +79,13 @@ describe('synchronizeModbusBindings', () => {
   });
 
   it('falls back to a direct snapshot when its tag is removed', () => {
-    const pages: Page[] = [{
+    const screens: Screen[] = [{
       id: 'main',
       name: 'Main',
       components: [component(tag.id)],
     }];
 
-    const synchronized = synchronizeModbusBindings(pages, []);
+    const synchronized = synchronizeModbusBindings(screens, []);
     const binding = synchronized[0].components[0].modbusBinding;
 
     expect(binding?.tagId).toBeUndefined();

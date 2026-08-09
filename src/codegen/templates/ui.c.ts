@@ -1,6 +1,6 @@
 // ui.c template generator
 
-import type { Page, LvglComponent, StyleProps, Theme, Animation, AnimationEasing } from '../../types';
+import type { Screen, LvglComponent, StyleProps, Theme, Animation, AnimationEasing } from '../../types';
 import type { CodeGenOptions } from '../types';
 import type { ImageResource, FontResource } from '../../resources/types';
 import {
@@ -964,7 +964,7 @@ function generateAnimationInitialState(
  * Emit the wrapper functions needed by the animations in use.
  */
 export function generateAnimationHelpers(
-  pages: Page[],
+  screens: Screen[],
   options: CodeGenOptions
 ): string[] {
   const used = new Set<string>();
@@ -976,7 +976,7 @@ export function generateAnimationHelpers(
       walk(component.children);
     }
   };
-  for (const page of pages) walk(page.components);
+  for (const screen of screens) walk(screen.components);
   if (used.size === 0) return [];
 
   const isV9 = options.lvglVersion === '9';
@@ -1059,8 +1059,8 @@ function generateComponentCode(
   component: LvglComponent,
   parentVar: string,
   options: CodeGenOptions,
-  pageName: string,
-  needsPagePrefix: Set<string>,
+  screenName: string,
+  needsScreenPrefix: Set<string>,
   imageResources: ImageResource[] = [],
   defaultFont?: string,
   defaultFontSize?: number,
@@ -1069,8 +1069,8 @@ function generateComponentCode(
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
-  const varName = needsPagePrefix.has(component.id)
-    ? getComponentVarName(`${pageName}_${component.name}`, options)
+  const varName = needsScreenPrefix.has(component.id)
+    ? getComponentVarName(`${screenName}_${component.name}`, options)
     : getComponentVarName(component.name, options);
 
   // Comment
@@ -1221,7 +1221,7 @@ function generateComponentCode(
 
   // Animations are parked and started from the screen's load callbacks, not
   // here — see generateScreenAnimationFunc. Doing it per screen load is what
-  // makes them behave the same on every visit to the page, not just the first.
+  // makes them behave the same on every visit to the screen, not just the first.
 
   // Visibility
   if (!component.visible) {
@@ -1245,7 +1245,7 @@ function generateComponentCode(
     const defaultTab = `${varName}_tab_${component.props.activeTab || 0}`;
     for (const child of component.children) {
       const tabParent = childToTab[child.id] || defaultTab;
-      lines.push(...generateComponentCode(child, tabParent, options, pageName, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+      lines.push(...generateComponentCode(child, tabParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
     }
   } else if (component.type === 'tileview' && component.props?.rows !== undefined && component.props?.cols !== undefined) {
     const tileChildMap: Record<string, string[]> = component.props.tileChildMap || {};
@@ -1262,19 +1262,19 @@ function generateComponentCode(
     const defaultTile = `${varName}_tile_0_0`;
     for (const child of component.children) {
       const tileParent = childToTile[child.id] || defaultTile;
-      lines.push(...generateComponentCode(child, tileParent, options, pageName, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+      lines.push(...generateComponentCode(child, tileParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
     }
   } else if (component.type === 'win') {
     // Win children go into the content area
     if (component.children.length > 0) {
       lines.push(`${indent}lv_obj_t * ${varName}_content = lv_win_get_content(${varName});`);
       for (const child of component.children) {
-        lines.push(...generateComponentCode(child, `${varName}_content`, options, pageName, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+        lines.push(...generateComponentCode(child, `${varName}_content`, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
       }
     }
   } else {
     for (const child of component.children) {
-      lines.push(...generateComponentCode(child, varName, options, pageName, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+      lines.push(...generateComponentCode(child, varName, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
     }
   }
 
@@ -1282,17 +1282,17 @@ function generateComponentCode(
 }
 
 /** Callback that parks a screen's animated widgets on their start values. */
-function getScreenAnimResetFuncName(pageName: string, options: CodeGenOptions): string {
-  return `${getScreenVarName(pageName, options)}_reset_anims`;
+function getScreenAnimResetFuncName(screenName: string, options: CodeGenOptions): string {
+  return `${getScreenVarName(screenName, options)}_reset_anims`;
 }
 
 /** Callback that starts a screen's animations once it is fully shown. */
-function getScreenAnimFuncName(pageName: string, options: CodeGenOptions): string {
-  return `${getScreenVarName(pageName, options)}_start_anims`;
+function getScreenAnimFuncName(screenName: string, options: CodeGenOptions): string {
+  return `${getScreenVarName(screenName, options)}_start_anims`;
 }
 
 /**
- * Emit the two callbacks that drive a page's animations.
+ * Emit the two callbacks that drive a screen's animations.
  *
  * Screens appear through lv_scr_load_anim, and LVGL brackets that transition
  * with two events: LV_EVENT_SCREEN_LOAD_START fires before the first frame of
@@ -1300,19 +1300,19 @@ function getScreenAnimFuncName(pageName: string, options: CodeGenOptions): strin
  * are needed:
  *
  * - Park on LOAD_START. Widgets keep whatever the last run left them at, so on
- *   a second visit to the page they would be sitting at their end position for
- *   the whole transition — the page's contents flashing into view before the
+ *   a second visit to the screen they would be sitting at their end position for
+ *   the whole transition — the screen's contents flashing into view before the
  *   animation resets them.
  * - Start on LOADED. Starting from the init function instead burns the
  *   animation's duration while the screen is not yet visible, so it is only
  *   ever caught part-way through.
  *
- * Returns an empty string when the page has no animations.
+ * Returns an empty string when the screen has no animations.
  */
 function generateScreenAnimationFunc(
-  page: Page,
+  screen: Screen,
   options: CodeGenOptions,
-  needsPagePrefix: Set<string>
+  needsScreenPrefix: Set<string>
 ): string {
   const indent = getIndent(options);
   const startBody: string[] = [];
@@ -1320,8 +1320,8 @@ function generateScreenAnimationFunc(
 
   const walk = (components: LvglComponent[]) => {
     for (const component of components) {
-      const varName = needsPagePrefix.has(component.id)
-        ? getComponentVarName(`${page.name}_${component.name}`, options)
+      const varName = needsScreenPrefix.has(component.id)
+        ? getComponentVarName(`${screen.name}_${component.name}`, options)
         : getComponentVarName(component.name, options);
       const animations = component.animations || [];
       startBody.push(...generateAnimationCode(varName, animations, options));
@@ -1329,21 +1329,21 @@ function generateScreenAnimationFunc(
       walk(component.children);
     }
   };
-  walk(page.components);
+  walk(screen.components);
 
   if (startBody.length === 0) return '';
 
   const sections: string[] = [];
   if (resetBody.length > 0) {
     sections.push([
-      `static void ${getScreenAnimResetFuncName(page.name, options)}(lv_event_t *event) {`,
+      `static void ${getScreenAnimResetFuncName(screen.name, options)}(lv_event_t *event) {`,
       `${indent}LV_UNUSED(event);`,
       ...resetBody,
       '}',
     ].join('\n'));
   }
   sections.push([
-    `static void ${getScreenAnimFuncName(page.name, options)}(lv_event_t *event) {`,
+    `static void ${getScreenAnimFuncName(screen.name, options)}(lv_event_t *event) {`,
     `${indent}LV_UNUSED(event);`,
     ...startBody,
     '}',
@@ -1352,17 +1352,17 @@ function generateScreenAnimationFunc(
   return sections.join('\n\n');
 }
 
-/** Whether the page has any animation start value worth parking. */
-function pageHasAnimationResets(
-  page: Page,
+/** Whether the screen has any animation start value worth parking. */
+function screenHasAnimationResets(
+  screen: Screen,
   options: CodeGenOptions,
-  needsPagePrefix: Set<string>
+  needsScreenPrefix: Set<string>
 ): boolean {
   let found = false;
   const walk = (components: LvglComponent[]) => {
     for (const component of components) {
-      const varName = needsPagePrefix.has(component.id)
-        ? getComponentVarName(`${page.name}_${component.name}`, options)
+      const varName = needsScreenPrefix.has(component.id)
+        ? getComponentVarName(`${screen.name}_${component.name}`, options)
         : getComponentVarName(component.name, options);
       if (generateAnimationInitialState(varName, component.animations || [], options).length > 0) {
         found = true;
@@ -1370,14 +1370,14 @@ function pageHasAnimationResets(
       walk(component.children);
     }
   };
-  walk(page.components);
+  walk(screen.components);
   return found;
 }
 
 function generateScreenInitFunc(
-  page: Page,
+  screen: Screen,
   options: CodeGenOptions,
-  needsPagePrefix: Set<string>,
+  needsScreenPrefix: Set<string>,
   imageResources: ImageResource[] = [],
   defaultFont?: string,
   defaultFontSize?: number,
@@ -1386,14 +1386,14 @@ function generateScreenInitFunc(
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
-  const screenVar = getScreenVarName(page.name, options);
-  const funcName = getScreenInitFuncName(page.name, options);
+  const screenVar = getScreenVarName(screen.name, options);
+  const funcName = getScreenInitFuncName(screen.name, options);
   
   lines.push(`static void ${funcName}(void) {`);
   
   // Create screen
   if (options.generateComments) {
-    lines.push(`${indent}${generateComment(`Create screen: ${page.name}`, options)}`);
+    lines.push(`${indent}${generateComment(`Create screen: ${screen.name}`, options)}`);
   }
   lines.push(`${indent}${screenVar} = lv_obj_create(NULL);`);
 
@@ -1408,8 +1408,8 @@ function generateScreenInitFunc(
   lines.push(`${indent}lv_obj_set_scrollbar_mode(${screenVar}, LV_SCROLLBAR_MODE_OFF);`);
 
   // Screen background color
-  if (page.backgroundColor) {
-    lines.push(`${indent}lv_obj_set_style_bg_color(${screenVar}, ${colorToLvgl(page.backgroundColor)}, 0);`);
+  if (screen.backgroundColor) {
+    lines.push(`${indent}lv_obj_set_style_bg_color(${screenVar}, ${colorToLvgl(screen.backgroundColor)}, 0);`);
   }
 
   // Set default font on this screen
@@ -1429,26 +1429,26 @@ function generateScreenInitFunc(
   lines.push('');
   
   // Generate components
-  for (const component of page.components) {
-    lines.push(...generateComponentCode(component, screenVar, options, page.name, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+  for (const component of screen.components) {
+    lines.push(...generateComponentCode(component, screenVar, options, screen.name, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
   }
 
   // Park animated widgets before the transition draws, start them after it ends
-  if (generateScreenAnimationFunc(page, options, needsPagePrefix) !== '') {
-    if (pageHasAnimationResets(page, options, needsPagePrefix)) {
+  if (generateScreenAnimationFunc(screen, options, needsScreenPrefix) !== '') {
+    if (screenHasAnimationResets(screen, options, needsScreenPrefix)) {
       lines.push(
-        `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimResetFuncName(page.name, options)}, LV_EVENT_SCREEN_LOAD_START, NULL);`,
+        `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimResetFuncName(screen.name, options)}, LV_EVENT_SCREEN_LOAD_START, NULL);`,
       );
     }
     lines.push(
-      `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimFuncName(page.name, options)}, LV_EVENT_SCREEN_LOADED, NULL);`,
+      `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimFuncName(screen.name, options)}, LV_EVENT_SCREEN_LOADED, NULL);`,
     );
     lines.push('');
   }
 
   // User code section
   if (options.userCodeMarkers) {
-    lines.push(`${indent}${generateUserCodeSection(`${page.name}_init`, options)}`);
+    lines.push(`${indent}${generateUserCodeSection(`${screen.name}_init`, options)}`);
   }
   
   lines.push('}');
@@ -1459,10 +1459,10 @@ function generateScreenInitFunc(
 /**
  * Generate screen load function
  */
-function generateScreenLoadFunc(page: Page, options: CodeGenOptions): string {
+function generateScreenLoadFunc(screen: Screen, options: CodeGenOptions): string {
   const indent = getIndent(options);
-  const screenVar = getScreenVarName(page.name, options);
-  const funcName = getScreenLoadFuncName(page.name, options);
+  const screenVar = getScreenVarName(screen.name, options);
+  const funcName = getScreenLoadFuncName(screen.name, options);
   
   return [
     `void ${funcName}(void) {`,
@@ -1474,7 +1474,7 @@ function generateScreenLoadFunc(page: Page, options: CodeGenOptions): string {
 /**
  * Collect image resources that are actually referenced by components
  */
-function collectUsedImages(pages: Page[], imageResources: ImageResource[]): ImageResource[] {
+function collectUsedImages(screens: Screen[], imageResources: ImageResource[]): ImageResource[] {
   if (imageResources.length === 0) return [];
 
   const usedIds = new Set<string>();
@@ -1497,16 +1497,16 @@ function collectUsedImages(pages: Page[], imageResources: ImageResource[]): Imag
     }
   };
 
-  for (const page of pages) {
-    walk(page.components);
+  for (const screen of screens) {
+    walk(screen.components);
   }
 
   return imageResources.filter((img) => usedIds.has(img.id));
 }
 
 function generateImageButtonSupport(
-  components: { comp: LvglComponent; pageName: string }[],
-  needsPagePrefix: Set<string>,
+  components: { comp: LvglComponent; screenName: string }[],
+  needsScreenPrefix: Set<string>,
   options: CodeGenOptions,
   imageResources: ImageResource[],
 ): string[] {
@@ -1559,9 +1559,9 @@ function generateImageButtonSupport(
     '',
   ];
 
-  for (const { comp, pageName } of imageButtons) {
-    const varName = needsPagePrefix.has(comp.id)
-      ? getComponentVarName(`${pageName}_${comp.name}`, options)
+  for (const { comp, screenName } of imageButtons) {
+    const varName = needsScreenPrefix.has(comp.id)
+      ? getComponentVarName(`${screenName}_${comp.name}`, options)
       : getComponentVarName(comp.name, options);
     const states = getImageButtonStates(comp);
     const images = states.map((state) => {
@@ -1620,7 +1620,7 @@ function generateImageButtonSupport(
  * Returns a Map of cFontName -> Set of sizes.
  */
 function collectUsedCustomFonts(
-  pages: Page[],
+  screens: Screen[],
   fontResources: FontResource[],
   defaultFont?: string,
   defaultFontSize?: number
@@ -1675,8 +1675,8 @@ function collectUsedCustomFonts(
     }
   };
 
-  for (const page of pages) {
-    walkComponents(page.components);
+  for (const screen of screens) {
+    walkComponents(screen.components);
   }
 
   // Also include the project default font if it's a custom font
@@ -1691,7 +1691,7 @@ function collectUsedCustomFonts(
 /**
  * Generate ui.c source file
  */
-export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?: Theme, imageResources: ImageResource[] = [], defaultFont?: string, defaultFontSize?: number, fontResources: FontResource[] = [], useBuiltinSymbols?: boolean, symbolFont?: string): string {
+export function generateUiSource(screens: Screen[], options: CodeGenOptions, theme?: Theme, imageResources: ImageResource[] = [], defaultFont?: string, defaultFontSize?: number, fontResources: FontResource[] = [], useBuiltinSymbols?: boolean, symbolFont?: string): string {
   const lines: string[] = [];
   
   // Includes
@@ -1731,7 +1731,7 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
   }
 
   // Collect used image resources and add extern declarations
-  const usedImageResources = collectUsedImages(pages, imageResources);
+  const usedImageResources = collectUsedImages(screens, imageResources);
   if (usedImageResources.length > 0) {
     lines.push('');
     if (options.generateComments) {
@@ -1743,7 +1743,7 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
   }
 
   // Collect used custom font + size combinations and add LV_FONT_DECLARE
-  const usedCustomFonts = collectUsedCustomFonts(pages, fontResources, defaultFont, defaultFontSize);
+  const usedCustomFonts = collectUsedCustomFonts(screens, fontResources, defaultFont, defaultFontSize);
   if (usedCustomFonts.size > 0) {
     lines.push('');
     if (options.generateComments) {
@@ -1759,7 +1759,7 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
   lines.push('');
 
   // Animation exec-callback wrappers, emitted before any screen init uses them
-  const animationHelpers = generateAnimationHelpers(pages, options);
+  const animationHelpers = generateAnimationHelpers(screens, options);
   if (animationHelpers.length > 0) {
     lines.push(...animationHelpers);
   }
@@ -1770,41 +1770,41 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
     lines.push('');
   }
   
-  for (const page of pages) {
-    const varName = getScreenVarName(page.name, options);
+  for (const screen of screens) {
+    const varName = getScreenVarName(screen.name, options);
     lines.push(`lv_obj_t *${varName};`);
   }
   lines.push('');
   
-  // Component definitions — detect cross-page name collisions
-  const componentsByName = new Map<string, { comp: LvglComponent; pageName: string }[]>();
-  const flatten = (components: LvglComponent[], pageName: string) => {
+  // Component definitions — detect cross-screen name collisions
+  const componentsByName = new Map<string, { comp: LvglComponent; screenName: string }[]>();
+  const flatten = (components: LvglComponent[], screenName: string) => {
     for (const comp of components) {
       const existing = componentsByName.get(comp.name) || [];
-      existing.push({ comp, pageName });
+      existing.push({ comp, screenName });
       componentsByName.set(comp.name, existing);
-      flatten(comp.children, pageName);
+      flatten(comp.children, screenName);
     }
   };
-  for (const page of pages) {
-    flatten(page.components, page.name);
+  for (const screen of screens) {
+    flatten(screen.components, screen.name);
   }
 
-  // Build a set of component IDs that need page-prefixed variable names
-  const needsPagePrefix = new Set<string>();
+  // Build a set of component IDs that need screen-prefixed variable names
+  const needsScreenPrefix = new Set<string>();
   for (const [, entries] of componentsByName) {
     if (entries.length > 1) {
-      // Multiple components share the same name — check if they're on different pages
-      const uniquePages = new Set(entries.map(e => e.pageName));
+      // Multiple components share the same name — check if they're on different screens
+      const uniquePages = new Set(entries.map(e => e.screenName));
       if (uniquePages.size > 1) {
         for (const entry of entries) {
-          needsPagePrefix.add(entry.comp.id);
+          needsScreenPrefix.add(entry.comp.id);
         }
       }
     }
   }
 
-  const allComponents: { comp: LvglComponent; pageName: string }[] = [];
+  const allComponents: { comp: LvglComponent; screenName: string }[] = [];
   for (const [, entries] of componentsByName) {
     allComponents.push(...entries);
   }
@@ -1815,9 +1815,9 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
       lines.push('');
     }
 
-    for (const { comp, pageName } of allComponents) {
-      const varName = needsPagePrefix.has(comp.id)
-        ? getComponentVarName(`${pageName}_${comp.name}`, options)
+    for (const { comp, screenName } of allComponents) {
+      const varName = needsScreenPrefix.has(comp.id)
+        ? getComponentVarName(`${screenName}_${comp.name}`, options)
         : getComponentVarName(comp.name, options);
       lines.push(`lv_obj_t *${varName};`);
     }
@@ -1826,7 +1826,7 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
 
   const imageButtonSupport = generateImageButtonSupport(
     allComponents,
-    needsPagePrefix,
+    needsScreenPrefix,
     options,
     imageResources,
   );
@@ -1839,8 +1839,8 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
   }
   
   // Animation start callbacks, defined before the init functions that bind them
-  const screenAnimFuncs = pages
-    .map((page) => generateScreenAnimationFunc(page, options, needsPagePrefix))
+  const screenAnimFuncs = screens
+    .map((screen) => generateScreenAnimationFunc(screen, options, needsScreenPrefix))
     .filter((source) => source !== '');
   if (screenAnimFuncs.length > 0) {
     if (options.generateComments) {
@@ -1859,8 +1859,8 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
     lines.push('');
   }
 
-  for (const page of pages) {
-    lines.push(generateScreenInitFunc(page, options, needsPagePrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+  for (const screen of screens) {
+    lines.push(generateScreenInitFunc(screen, options, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
     lines.push('');
   }
   
@@ -1870,8 +1870,8 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
     lines.push('');
   }
   
-  for (const page of pages) {
-    lines.push(generateScreenLoadFunc(page, options));
+  for (const screen of screens) {
+    lines.push(generateScreenLoadFunc(screen, options));
     lines.push('');
   }
   
@@ -1906,15 +1906,15 @@ export function generateUiSource(pages: Page[], options: CodeGenOptions, theme?:
   }
   
   // Initialize all screens
-  for (const page of pages) {
-    const initFunc = getScreenInitFuncName(page.name, options);
+  for (const screen of screens) {
+    const initFunc = getScreenInitFuncName(screen.name, options);
     lines.push(`${indent}${initFunc}();`);
   }
   lines.push('');
   
   // Load first screen
-  if (pages.length > 0) {
-    const loadFunc = getScreenLoadFuncName(pages[0].name, options);
+  if (screens.length > 0) {
+    const loadFunc = getScreenLoadFuncName(screens[0].name, options);
     lines.push(`${indent}${loadFunc}();`);
   }
   

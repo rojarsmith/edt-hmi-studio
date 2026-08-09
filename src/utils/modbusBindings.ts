@@ -1,4 +1,4 @@
-import type { LvglComponent, Page } from '../types';
+import type { LvglComponent, Screen } from '../types';
 import type {
   ModbusBinding,
   ModbusRegisterTag,
@@ -92,21 +92,21 @@ function synchronizeComponents(
 
 /**
  * Updates every tag-backed binding while retaining reference identity for
- * pages and component subtrees that did not change.
+ * screens and component subtrees that did not change.
  */
 export function synchronizeModbusBindings(
-  pages: Page[],
+  screens: Screen[],
   tags: ModbusRegisterTag[],
-): Page[] {
+): Screen[] {
   const tagsById = new Map(tags.map((tag) => [tag.id, tag]));
   let changed = false;
-  const synchronized = pages.map((page) => {
-    const components = synchronizeComponents(page.components, tagsById);
-    if (components !== page.components) {
+  const synchronized = screens.map((screen) => {
+    const components = synchronizeComponents(screen.components, tagsById);
+    if (components !== screen.components) {
       changed = true;
-      return { ...page, components };
+      return { ...screen, components };
     }
-    return page;
+    return screen;
   });
-  return changed ? synchronized : pages;
+  return changed ? synchronized : screens;
 }

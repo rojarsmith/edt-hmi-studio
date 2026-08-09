@@ -40,15 +40,15 @@ export function useKeyboardShortcuts() {
     redo,
     clearSelection,
     selectComponents,
-    pages,
-    currentPageId,
+    screens,
+    currentScreenId,
     saveToHistory,
   } = useEditorStore();
 
-  // Get all components from current page (flattened)
+  // Get all components from current screen (flattened)
   const getAllComponentIds = useCallback(() => {
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return [];
+    const currentScreen = screens.find(p => p.id === currentScreenId);
+    if (!currentScreen) return [];
     
     const flatten = (comps: LvglComponent[]): string[] => {
       const result: string[] = [];
@@ -59,13 +59,13 @@ export function useKeyboardShortcuts() {
       return result;
     };
     
-    return flatten(currentPage.components);
-  }, [pages, currentPageId]);
+    return flatten(currentScreen.components);
+  }, [screens, currentScreenId]);
 
   // Get selected components
   const getSelectedComponents = useCallback(() => {
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return [];
+    const currentScreen = screens.find(p => p.id === currentScreenId);
+    if (!currentScreen) return [];
     
     const findComponents = (comps: LvglComponent[]): LvglComponent[] => {
       const result: LvglComponent[] = [];
@@ -78,8 +78,8 @@ export function useKeyboardShortcuts() {
       return result;
     };
     
-    return findComponents(currentPage.components);
-  }, [pages, currentPageId, selection.selectedIds]);
+    return findComponents(currentScreen.components);
+  }, [screens, currentScreenId, selection.selectedIds]);
 
   // Copy selected components
   const copyComponents = useCallback(() => {
@@ -117,8 +117,8 @@ export function useKeyboardShortcuts() {
     if (!clipboard || clipboard.components.length === 0) return;
     
     const store = useEditorStore.getState();
-    const currentPage = store.pages.find(p => p.id === store.currentPageId);
-    if (!currentPage) return;
+    const currentScreen = store.screens.find(p => p.id === store.currentScreenId);
+    if (!currentScreen) return;
     
     saveToHistory();
     
@@ -143,7 +143,7 @@ export function useKeyboardShortcuts() {
       return cloned;
     });
     
-    // Add to current page (into container or root)
+    // Add to current screen (into container or root)
     const addToTree = (comps: LvglComponent[], parentId: string | null, newComps: LvglComponent[]): LvglComponent[] => {
       if (parentId === null) {
         return [...comps, ...newComps];
@@ -159,17 +159,17 @@ export function useKeyboardShortcuts() {
       });
     };
     
-    const newPages = store.pages.map(page => {
-      if (page.id === store.currentPageId) {
+    const newPages = store.screens.map(screen => {
+      if (screen.id === store.currentScreenId) {
         return {
-          ...page,
-          components: addToTree(page.components, targetParentId, newComponents),
+          ...screen,
+          components: addToTree(screen.components, targetParentId, newComponents),
         };
       }
-      return page;
+      return screen;
     });
     
-    useEditorStore.setState({ pages: newPages });
+    useEditorStore.setState({ screens: newPages });
     
     // Select pasted components
     selectComponents(newComponents.map(c => c.id));
@@ -313,8 +313,8 @@ export function getClipboard() {
  */
 export function copySelectedComponents(): void {
   const store = useEditorStore.getState();
-  const currentPage = store.pages.find(p => p.id === store.currentPageId);
-  if (!currentPage) return;
+  const currentScreen = store.screens.find(p => p.id === store.currentScreenId);
+  if (!currentScreen) return;
 
   const findSelected = (comps: LvglComponent[]): LvglComponent[] => {
     const result: LvglComponent[] = [];
@@ -327,7 +327,7 @@ export function copySelectedComponents(): void {
     return result;
   };
 
-  const components = findSelected(currentPage.components);
+  const components = findSelected(currentScreen.components);
   if (components.length === 0) return;
 
   clipboard = {
@@ -338,8 +338,8 @@ export function copySelectedComponents(): void {
 
 export function cutSelectedComponents(): void {
   const store = useEditorStore.getState();
-  const currentPage = store.pages.find(p => p.id === store.currentPageId);
-  if (!currentPage) return;
+  const currentScreen = store.screens.find(p => p.id === store.currentScreenId);
+  if (!currentScreen) return;
 
   const findSelected = (comps: LvglComponent[]): LvglComponent[] => {
     const result: LvglComponent[] = [];
@@ -352,7 +352,7 @@ export function cutSelectedComponents(): void {
     return result;
   };
 
-  const components = findSelected(currentPage.components);
+  const components = findSelected(currentScreen.components);
   if (components.length === 0) return;
 
   clipboard = {
@@ -368,8 +368,8 @@ export function pasteClipboardComponents(): void {
   if (!clipboard || clipboard.components.length === 0) return;
 
   const store = useEditorStore.getState();
-  const currentPage = store.pages.find(p => p.id === store.currentPageId);
-  if (!currentPage) return;
+  const currentScreen = store.screens.find(p => p.id === store.currentScreenId);
+  if (!currentScreen) return;
 
   store.saveToHistory();
 
@@ -407,17 +407,17 @@ export function pasteClipboardComponents(): void {
     });
   };
 
-  const newPages = store.pages.map(page => {
-    if (page.id === store.currentPageId) {
+  const newPages = store.screens.map(screen => {
+    if (screen.id === store.currentScreenId) {
       return {
-        ...page,
-        components: addToTree(page.components, targetParentId, newComponents),
+        ...screen,
+        components: addToTree(screen.components, targetParentId, newComponents),
       };
     }
-    return page;
+    return screen;
   });
 
-  useEditorStore.setState({ pages: newPages });
+  useEditorStore.setState({ screens: newPages });
   store.selectComponents(newComponents.map(c => c.id));
 }
 
@@ -428,8 +428,8 @@ export function pasteIntoContainer(containerId: string): void {
   if (!clipboard || clipboard.components.length === 0) return;
 
   const store = useEditorStore.getState();
-  const currentPage = store.pages.find(p => p.id === store.currentPageId);
-  if (!currentPage) return;
+  const currentScreen = store.screens.find(p => p.id === store.currentScreenId);
+  if (!currentScreen) return;
 
   const container = store.getComponentById(containerId);
   if (!container) return;
@@ -457,17 +457,17 @@ export function pasteIntoContainer(containerId: string): void {
     });
   };
 
-  const newPages = store.pages.map(page => {
-    if (page.id === store.currentPageId) {
+  const newPages = store.screens.map(screen => {
+    if (screen.id === store.currentScreenId) {
       return {
-        ...page,
-        components: addToTree(page.components, containerId, newComponents),
+        ...screen,
+        components: addToTree(screen.components, containerId, newComponents),
       };
     }
-    return page;
+    return screen;
   });
 
-  useEditorStore.setState({ pages: newPages });
+  useEditorStore.setState({ screens: newPages });
   store.selectComponents(newComponents.map(c => c.id));
 }
 
@@ -478,8 +478,8 @@ export function duplicateSelectedComponents(): void {
 
 export function selectAllComponents(): void {
   const store = useEditorStore.getState();
-  const currentPage = store.pages.find(p => p.id === store.currentPageId);
-  if (!currentPage) return;
+  const currentScreen = store.screens.find(p => p.id === store.currentScreenId);
+  if (!currentScreen) return;
 
   const flatten = (comps: LvglComponent[]): string[] => {
     const result: string[] = [];
@@ -490,6 +490,6 @@ export function selectAllComponents(): void {
     return result;
   };
 
-  const allIds = flatten(currentPage.components);
+  const allIds = flatten(currentScreen.components);
   store.selectComponents(allIds);
 }

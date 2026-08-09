@@ -10,14 +10,14 @@ import { modal } from '../Modal';
 import { toast } from '../Toast';
 import ProjectCard from './ProjectCard';
 import NewProjectDialog from './NewProjectDialog';
-import type { Page } from '../../types';
+import type { Screen } from '../../types';
 import type { BoardId } from '../../types/hmi';
 import './ProjectListPage.css';
 
 const ProjectListPage: React.FC = () => {
   const { projects, loading, init, createProject, deleteProject, importProject, loadProjectData, getProjectConfig } = useProjectStore();
   const { openProject } = useAppStore();
-  const { setPages, setCanvasSize } = useEditorStore();
+  const { setScreens, setCanvasSize } = useEditorStore();
   const { importResources } = useResourceStore();
 
   const [showNewDialog, setShowNewDialog] = useState(false);
@@ -36,7 +36,7 @@ const ProjectListPage: React.FC = () => {
     setMigrationChecked(true);
 
     const autoSaved = loadAutoSavedProject();
-    if (autoSaved && autoSaved.pages && autoSaved.pages.length > 0) {
+    if (autoSaved && autoSaved.screens && autoSaved.screens.length > 0) {
       modal.confirm('Legacy auto-save data was found. Import it as a new project?').then(async (yes) => {
         if (yes) {
           try {
@@ -61,7 +61,7 @@ const ProjectListPage: React.FC = () => {
       if (!config) { toast.error('Project not found'); return; }
 
       const { data, images, fonts } = await loadProjectData(id);
-      setPages(data.pages as Page[]);
+      setScreens(data.screens as Screen[]);
       setCanvasSize(config.display.width, config.display.height);
       importResources({ images, fonts });
       if (data.logicGraphs) {
@@ -112,7 +112,7 @@ const ProjectListPage: React.FC = () => {
     : projects;
 
   return (
-    <div className="project-list-page">
+    <div className="project-list-screen">
       <div className="plp-header">
         <div className="plp-logo">
           <span className="plp-logo-icon">📐</span>

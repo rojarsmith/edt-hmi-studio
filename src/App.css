@@ -190,7 +190,7 @@ body {
   min-height: 0;
 }
 
-/* Canvas area with page manager */
+/* Canvas area with screen tabs */
 .canvas-area {
   flex: 1;
   display: flex;
@@ -209,9 +209,19 @@ body {
   overflow: hidden;
 }
 
+/*
+ * Three stacked sections: component palette, screen manager, hierarchy. The
+ * outer two share the leftover height; the screen manager sizes itself and
+ * shrinks to its header bar when collapsed (see ScreenManager.css).
+ */
 .left-panel > *:first-child {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
+}
+
+.left-panel > .screen-manager {
+  flex: 0 1 auto;
   min-height: 0;
 }
 

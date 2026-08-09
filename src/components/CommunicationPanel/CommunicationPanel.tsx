@@ -92,7 +92,7 @@ const CommunicationPanel: React.FC = () => {
     saveProjectData,
     exportProject,
   } = useProjectStore();
-  const pages = useEditorStore((state) => state.pages);
+  const screens = useEditorStore((state) => state.screens);
   const syncModbusBindings = useEditorStore(
     (state) => state.syncModbusBindings,
   );
@@ -353,7 +353,7 @@ const CommunicationPanel: React.FC = () => {
     setArtifactUrl('');
     try {
       await persistConfiguration();
-      await saveProjectData(currentProjectId, pages, logicGraphs, images, fonts);
+      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts);
       const project = await exportProject(currentProjectId);
       const result = await buildHmiProject(project);
       appendLog(result.log);
@@ -380,7 +380,7 @@ const CommunicationPanel: React.FC = () => {
     fonts,
     images,
     logicGraphs,
-    pages,
+    screens,
     persistConfiguration,
     saveProjectData,
   ]);

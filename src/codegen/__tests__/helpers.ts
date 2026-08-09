@@ -1,6 +1,6 @@
 // Test helpers and factory functions for codegen tests
 
-import type { Page, LvglComponent, EventBinding, Animation, StyleProps, Theme, BuiltinAction } from '../../types';
+import type { Screen, LvglComponent, EventBinding, Animation, StyleProps, Theme, BuiltinAction } from '../../types';
 import type { CodeGenOptions } from '../types';
 import type { ImageResource, FontResource } from '../../resources/types';
 import type { LogicGraph, LogicNode, LogicConnection, LogicVariable, LogicNodeCategory, LogicNodeSubType, LogicPort } from '../../components/LogicEditor/types';
@@ -48,7 +48,7 @@ export function createComponent(
   };
 }
 
-export function createPage(overrides: Partial<Page> = {}): Page {
+export function createScreen(overrides: Partial<Screen> = {}): Screen {
   return {
     id: overrides.id ?? uid(),
     name: overrides.name ?? 'main',

@@ -170,8 +170,10 @@ function renderParamsPreview(node: LogicNode): React.ReactNode {
       return <span className="param-preview">Delay: {params.duration}ms</span>;
     case 'show_hide':
       return <span className="param-preview">Action: {params.action}</span>;
-    case 'navigate_page':
-      return params.targetPage ? <span className="param-preview">Page: {params.targetPage}</span> : null;
+    case 'navigate_page': {
+      const target = params.targetScreen || params.targetPage;
+      return target ? <span className="param-preview">Screen: {target}</span> : null;
+    }
     case 'call_function':
       return params.functionName ? <span className="param-preview">Function: {params.functionName}</span> : null;
     case 'modbus_holding_register':

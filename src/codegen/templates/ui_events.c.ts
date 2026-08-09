@@ -1,6 +1,6 @@
 // ui_events.c template generator
 
-import type { Page, LvglComponent, EventBinding, BuiltinAction } from '../../types';
+import type { Screen, LvglComponent, EventBinding, BuiltinAction } from '../../types';
 import type { CodeGenOptions } from '../types';
 import {
   getEventHandlerName,
@@ -18,31 +18,31 @@ import {
 } from '../formatters/cFormatter';
 
 /**
- * Collect all events from all pages
+ * Collect all events from all screens
  */
-function getAllEvents(pages: Page[]): { component: LvglComponent; event: EventBinding; pageName: string }[] {
-  const result: { component: LvglComponent; event: EventBinding; pageName: string }[] = [];
+function getAllEvents(screens: Screen[]): { component: LvglComponent; event: EventBinding; screenName: string }[] {
+  const result: { component: LvglComponent; event: EventBinding; screenName: string }[] = [];
 
-  const collectFromComponents = (components: LvglComponent[], pageName: string) => {
+  const collectFromComponents = (components: LvglComponent[], screenName: string) => {
     for (const comp of components) {
       for (const event of comp.events) {
-        result.push({ component: comp, event, pageName });
+        result.push({ component: comp, event, screenName });
       }
-      collectFromComponents(comp.children, pageName);
+      collectFromComponents(comp.children, screenName);
     }
   };
 
-  for (const page of pages) {
-    collectFromComponents(page.components, page.name);
+  for (const screen of screens) {
+    collectFromComponents(screen.components, screen.name);
   }
 
   return result;
 }
 
 /**
- * Find a component by name across all pages
+ * Find a component by name across all screens
  */
-function findComponentByName(pages: Page[], name: string): LvglComponent | null {
+function findComponentByName(screens: Screen[], name: string): LvglComponent | null {
   const search = (components: LvglComponent[]): LvglComponent | null => {
     for (const comp of components) {
       if (comp.name === name) return comp;
@@ -52,8 +52,8 @@ function findComponentByName(pages: Page[], name: string): LvglComponent | null 
     return null;
   };
 
-  for (const page of pages) {
-    const found = search(page.components);
+  for (const screen of screens) {
+    const found = search(screen.components);
     if (found) return found;
   }
   return null;
@@ -65,25 +65,28 @@ function findComponentByName(pages: Page[], name: string): LvglComponent | null 
 function generateBuiltinActionCode(
   action: BuiltinAction,
   options: CodeGenOptions,
-  pages: Page[]
+  screens: Screen[]
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options, 2);
   
   switch (action.type) {
-    case 'navigate':
-      if (action.targetPage) {
-        // Find the page to get the load function name
-        const targetPage = pages.find(p => p.name === action.targetPage);
-        if (targetPage) {
-          const loadFunc = getScreenLoadFuncName(targetPage.name, options);
+    case 'navigate': {
+      // `targetPage` is the pre-rename spelling, still present in older projects.
+      const targetName = action.targetScreen ?? action.targetPage;
+      if (targetName) {
+        // Find the screen to get the load function name
+        const targetScreen = screens.find(s => s.name === targetName);
+        if (targetScreen) {
+          const loadFunc = getScreenLoadFuncName(targetScreen.name, options);
           if (options.generateComments) {
-            lines.push(`${indent}${generateComment(`Navigate to: ${action.targetPage}`, options)}`);
+            lines.push(`${indent}${generateComment(`Navigate to: ${targetName}`, options)}`);
           }
           lines.push(`${indent}${loadFunc}();`);
         }
       }
       break;
+    }
       
     case 'setProperty':
       if (action.targetComponent && action.property) {
@@ -170,7 +173,7 @@ function generateBuiltinActionCode(
     case 'setText':
       if (action.targetComponent) {
         const targetVar = getComponentVarName(action.targetComponent, options);
-        const targetComp = findComponentByName(pages, action.targetComponent);
+        const targetComp = findComponentByName(screens, action.targetComponent);
         const targetType = targetComp?.type || 'label';
         if (options.generateComments) {
           lines.push(`${indent}${generateComment(`Set text: ${action.value}`, options)}`);
@@ -199,7 +202,7 @@ function generateBuiltinActionCode(
     case 'setValue':
       if (action.targetComponent) {
         const targetVar = getComponentVarName(action.targetComponent, options);
-        const targetComp = findComponentByName(pages, action.targetComponent);
+        const targetComp = findComponentByName(screens, action.targetComponent);
         const targetType = targetComp?.type || 'slider';
         if (options.generateComments) {
           lines.push(`${indent}${generateComment(`Set value: ${action.value}`, options)}`);
@@ -229,7 +232,7 @@ function generateEventHandler(
   component: LvglComponent,
   event: EventBinding,
   options: CodeGenOptions,
-  pages: Page[]
+  screens: Screen[]
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -248,7 +251,7 @@ function generateEventHandler(
   
   if (event.handlerType === 'builtin' && event.action) {
     // Generate builtin action code
-    const actionLines = generateBuiltinActionCode(event.action, options, pages);
+    const actionLines = generateBuiltinActionCode(event.action, options, screens);
     lines.push(...actionLines);
   } else if (event.handlerType === 'custom' && event.customCode) {
     // Insert custom code
@@ -272,7 +275,7 @@ function generateEventHandler(
 /**
  * Generate ui_events.c source file
  */
-export function generateEventsSource(pages: Page[], options: CodeGenOptions): string {
+export function generateEventsSource(screens: Screen[], options: CodeGenOptions): string {
   const lines: string[] = [];
   
   // Includes
@@ -281,7 +284,7 @@ export function generateEventsSource(pages: Page[], options: CodeGenOptions): st
   lines.push('');
   
   // Event handlers
-  const allEvents = getAllEvents(pages);
+  const allEvents = getAllEvents(screens);
   
   if (allEvents.length > 0) {
     if (options.generateComments) {
@@ -290,7 +293,7 @@ export function generateEventsSource(pages: Page[], options: CodeGenOptions): st
     }
     
     for (const { component, event } of allEvents) {
-      lines.push(generateEventHandler(component, event, options, pages));
+      lines.push(generateEventHandler(component, event, options, screens));
       lines.push('');
     }
   } else {

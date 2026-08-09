@@ -7,7 +7,7 @@ type AlignType = 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom' |
 type LayoutType = 'equal-width' | 'equal-height' | 'space-h' | 'space-v' | 'compact-h' | 'compact-v' | 'same-y' | 'same-x' | 'canvas-row' | 'canvas-col';
 
 const AlignToolbar: React.FC = () => {
-  const { selection, pages, currentPageId, updateComponent, saveToHistory } = useEditorStore();
+  const { selection, screens, currentScreenId, updateComponent, saveToHistory } = useEditorStore();
   
   const selectedIds = selection.selectedIds;
   const hasSelection = selectedIds.length > 0;
@@ -15,11 +15,11 @@ const AlignToolbar: React.FC = () => {
 
   // Get selected components
   const getSelectedComponents = () => {
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return [];
+    const currentScreen = screens.find(p => p.id === currentScreenId);
+    if (!currentScreen) return [];
     
-    const findComponents = (components: typeof currentPage.components): typeof currentPage.components => {
-      const result: typeof currentPage.components = [];
+    const findComponents = (components: typeof currentScreen.components): typeof currentScreen.components => {
+      const result: typeof currentScreen.components = [];
       for (const comp of components) {
         if (selectedIds.includes(comp.id)) {
           result.push(comp);
@@ -31,7 +31,7 @@ const AlignToolbar: React.FC = () => {
       return result;
     };
     
-    return findComponents(currentPage.components);
+    return findComponents(currentScreen.components);
   };
 
   const handleAlign = (type: AlignType) => {
@@ -243,7 +243,7 @@ const AlignToolbar: React.FC = () => {
 
     // Batch update: single saveToHistory + single set
     saveToHistory();
-    const { currentPageId } = useEditorStore.getState();
+    const { currentScreenId } = useEditorStore.getState();
     useEditorStore.setState(state => {
       const applyUpdates = (comps: LvglComponent[]): LvglComponent[] => {
         let changed = false;
@@ -267,11 +267,11 @@ const AlignToolbar: React.FC = () => {
       };
 
       return {
-        pages: state.pages.map(page => {
-          if (page.id === currentPageId) {
-            return { ...page, components: applyUpdates(page.components) };
+        screens: state.screens.map(screen => {
+          if (screen.id === currentScreenId) {
+            return { ...screen, components: applyUpdates(screen.components) };
           }
-          return page;
+          return screen;
         }),
       };
     });

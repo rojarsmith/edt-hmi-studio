@@ -95,7 +95,10 @@ export interface ProjectFile {
     width: number;
     height: number;
   };
-  pages: ProjectPage[];
+  screens: ProjectScreen[];
+  screenGroups?: ProjectScreenGroup[];
+  /** @deprecated Pre-rename spelling of `screens`; still read from older project files. */
+  pages?: ProjectScreen[];
   resources: {
     images: ImageResource[];
     fonts: FontResource[];
@@ -124,11 +127,19 @@ export interface ProjectFile {
   };
 }
 
-export interface ProjectPage {
+export interface ProjectScreen {
   id: string;
   name: string;
   components: LvglComponent[];
   backgroundColor?: string;
+  groupId?: string | null;
+}
+
+/** Organisational folder for screens. See `ScreenGroup` in `src/types`. */
+export interface ProjectScreenGroup {
+  id: string;
+  name: string;
+  parentId?: string | null;
 }
 
 export interface ProjectVariable {

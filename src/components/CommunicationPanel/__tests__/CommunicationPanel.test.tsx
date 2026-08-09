@@ -32,11 +32,11 @@ vi.mock('../../../store/projectStore', () => ({
 vi.mock('../../../store/editorStore', () => ({
   useEditorStore: (
     selector: (state: {
-      pages: unknown[];
+      screens: unknown[];
       syncModbusBindings: typeof mocks.syncModbusBindings;
     }) => unknown,
   ) => selector({
-    pages: [],
+    screens: [],
     syncModbusBindings: mocks.syncModbusBindings,
   }),
 }));

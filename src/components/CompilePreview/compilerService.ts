@@ -150,7 +150,7 @@ async function loadEmscriptenModule(
   // Temporarily hide the global AMD `define` so the Emscripten UMD wrapper
   // doesn't try to register via define(), which causes
   // "Can only have one anonymous define call per script file" errors
-  // when Monaco Editor (or another AMD loader) is present on the page.
+  // when Monaco Editor (or another AMD loader) is present on the screen.
   const prevDefine = (globalThis as Record<string, unknown>).define;
   (globalThis as Record<string, unknown>).define = undefined;
   let factory: (opts: Record<string, unknown>) => Promise<EmscriptenModule>;

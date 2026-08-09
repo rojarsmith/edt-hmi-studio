@@ -44,7 +44,7 @@ const STRING_OPERATIONS: { value: StringOperation; label: string }[] = [
 
 const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
   const { getNode, updateNode, getVariables } = useLogicEditorStore();
-  const { pages, getAllComponents } = useEditorStore();
+  const { screens, getAllComponents } = useEditorStore();
   
   const node = getNode(nodeId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -199,14 +199,14 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
         return (
           <>
             <div className="param-group">
-              <label>Target Page</label>
+              <label>Target Screen</label>
               <select
-                value={params.targetPage || ''}
-                onChange={e => handleParamChange('targetPage', e.target.value)}
+                value={params.targetScreen || params.targetPage || ''}
+                onChange={e => handleParamChange('targetScreen', e.target.value)}
               >
-                <option value="">Select a page...</option>
-                {pages.map(page => (
-                  <option key={page.id} value={page.id}>{page.name}</option>
+                <option value="">Select a screen...</option>
+                {screens.map(screen => (
+                  <option key={screen.id} value={screen.id}>{screen.name}</option>
                 ))}
               </select>
             </div>

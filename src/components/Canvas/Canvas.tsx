@@ -102,8 +102,8 @@ const Canvas: React.FC = () => {
   useEditorStore(s => s.selection.selectedIds);
   useEditorStore(s => s.selection.hoveredId);
   const alignmentGuides = useEditorStore(s => s.alignmentGuides);
-  const pages = useEditorStore(s => s.pages);
-  const currentPageId = useEditorStore(s => s.currentPageId);
+  const screens = useEditorStore(s => s.screens);
+  const currentScreenId = useEditorStore(s => s.currentScreenId);
 
   // DO NOT subscribe to drag — it changes every frame during drag.
   // Read it via getState() inside event handlers.
@@ -127,10 +127,10 @@ const Canvas: React.FC = () => {
   const reparentComponent = useEditorStore(s => s.reparentComponent);
   const moveComponent = useEditorStore(s => s.moveComponent);
 
-  // Get current page and its components
-  const currentPage = pages.find(p => p.id === currentPageId);
-  const components = useMemo(() => currentPage?.components || [], [currentPage?.components]);
-  const pageBackgroundColor = currentPage?.backgroundColor || '#ffffff';
+  // Get current screen and its components
+  const currentScreen = screens.find(p => p.id === currentScreenId);
+  const components = useMemo(() => currentScreen?.components || [], [currentScreen?.components]);
+  const pageBackgroundColor = currentScreen?.backgroundColor || '#ffffff';
 
   const { setNodeRef, isOver } = useDroppable({
     id: 'canvas-drop-area',
@@ -437,7 +437,7 @@ const Canvas: React.FC = () => {
       const maxY = Math.max(bs.startY, bs.currentY);
       
       // Find components within the box
-      const { pages: p, currentPageId: cpId } = useEditorStore.getState();
+      const { screens: p, currentScreenId: cpId } = useEditorStore.getState();
       const cp = p.find(pg => pg.id === cpId);
       const comps = cp?.components || [];
       const flatComps = flattenComponents(comps);
@@ -478,8 +478,8 @@ const Canvas: React.FC = () => {
           Math.abs(draggedComp.y - dragStartCompPos.current.y) > 2
         );
         if (draggedComp && actuallyMoved) {
-          const currentPage = state.pages.find(p => p.id === state.currentPageId);
-          const allComps = currentPage?.components || [];
+          const currentScreen = state.screens.find(p => p.id === state.currentScreenId);
+          const allComps = currentScreen?.components || [];
 
           // Calculate the absolute position of the dragged component
           const draggedAbs = getAbsolutePosition(draggedComp, allComps);

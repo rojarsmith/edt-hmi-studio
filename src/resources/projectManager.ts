@@ -2,7 +2,7 @@
 
 import type { ProjectFile, ImageResource, FontResource } from './types';
 import type { LogicGraph } from '../components/LogicEditor/types';
-import type { CanvasState, Page } from '../types';
+import type { CanvasState, Screen, ScreenGroup } from '../types';
 import type { BoardId, CommunicationConfig } from '../types/hmi';
 import {
   DEFAULT_BOARD_ID,
@@ -16,13 +16,14 @@ const PROJECT_VERSION = '1.0.0';
  */
 export function createProjectFile(
   name: string,
-  pages: Page[],
+  screens: Screen[],
   canvas: CanvasState,
   images: ImageResource[],
   fonts: FontResource[],
   logicGraphs: LogicGraph[] = [],
   boardId: BoardId = DEFAULT_BOARD_ID,
   communication: CommunicationConfig = createDefaultCommunicationConfig(),
+  screenGroups: ScreenGroup[] = [],
 ): ProjectFile {
   return {
     version: PROJECT_VERSION,
@@ -33,12 +34,14 @@ export function createProjectFile(
       width: canvas.width,
       height: canvas.height,
     },
-    pages: pages.map(page => ({
-      id: page.id,
-      name: page.name,
-      components: page.components,
-      backgroundColor: page.backgroundColor,
+    screens: screens.map(screen => ({
+      id: screen.id,
+      name: screen.name,
+      components: screen.components,
+      backgroundColor: screen.backgroundColor,
+      groupId: screen.groupId ?? null,
     })),
+    screenGroups: screenGroups.map(group => ({ ...group })),
     resources: {
       images,
       fonts,
@@ -96,6 +99,10 @@ function migrateProject(project: ProjectFile): ProjectFile {
   // Ensure all required fields exist
   return {
     ...project,
+    // `pages` is what this field was called before the Page → Screen rename.
+    screens: project.screens ?? project.pages ?? [],
+    screenGroups: project.screenGroups || [],
+    pages: undefined,
     resources: project.resources || { images: [], fonts: [] },
     variables: project.variables || [],
     logicGraphs: project.logicGraphs || [],
@@ -250,7 +257,8 @@ export function validateProject(project: unknown): project is ProjectFile {
   if (typeof p.version !== 'string') return false;
   if (typeof p.name !== 'string') return false;
   if (!p.canvasSize || typeof p.canvasSize !== 'object') return false;
-  if (!Array.isArray(p.pages)) return false;
+  // Accept the pre-rename `pages` spelling so older files still validate.
+  if (!Array.isArray(p.screens) && !Array.isArray(p.pages)) return false;
   
   return true;
 }

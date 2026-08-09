@@ -1,6 +1,6 @@
 // Main code generator
 
-import type { Page, Theme } from '../types';
+import type { Screen, Theme } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type { ImageResource, FontResource } from '../resources/types';
 import type { CodeGenOptions, GeneratedCode } from './types';
@@ -18,10 +18,10 @@ import {
 } from '../resources/converters/imageConverter';
 
 /**
- * Generate all LVGL C code files from pages and logic graphs
+ * Generate all LVGL C code files from screens and logic graphs
  */
 export function generateCode(
-  pages: Page[],
+  screens: Screen[],
   options: Partial<CodeGenOptions> = {},
   logicGraphs: LogicGraph[] = [],
   theme?: Theme,
@@ -35,12 +35,12 @@ export function generateCode(
   const opts: CodeGenOptions = { ...DEFAULT_CODEGEN_OPTIONS, ...options };
   
   return {
-    'ui.h': generateUiHeader(pages, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols),
-    'ui.c': generateUiSource(pages, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont),
-    'ui_events.h': generateEventsHeader(pages, opts),
-    'ui_events.c': generateEventsSource(pages, opts),
+    'ui.h': generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols),
+    'ui.c': generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont),
+    'ui_events.h': generateEventsHeader(screens, opts),
+    'ui_events.c': generateEventsSource(screens, opts),
     'ui_logic.h': generateLogicHeader(opts, logicGraphs),
-    'ui_logic.c': generateLogicSource(opts, logicGraphs, pages),
+    'ui_logic.c': generateLogicSource(opts, logicGraphs, screens),
   };
 }
 
@@ -48,7 +48,7 @@ export function generateCode(
  * Generate a single file
  */
 export function generateSingleFile(
-  pages: Page[],
+  screens: Screen[],
   fileName: keyof GeneratedCode,
   options: Partial<CodeGenOptions> = {},
   logicGraphs: LogicGraph[] = [],
@@ -64,17 +64,17 @@ export function generateSingleFile(
   
   switch (fileName) {
     case 'ui.h':
-      return generateUiHeader(pages, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols);
+      return generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols);
     case 'ui.c':
-      return generateUiSource(pages, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont);
+      return generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont);
     case 'ui_events.h':
-      return generateEventsHeader(pages, opts);
+      return generateEventsHeader(screens, opts);
     case 'ui_events.c':
-      return generateEventsSource(pages, opts);
+      return generateEventsSource(screens, opts);
     case 'ui_logic.h':
       return generateLogicHeader(opts, logicGraphs);
     case 'ui_logic.c':
-      return generateLogicSource(opts, logicGraphs, pages);
+      return generateLogicSource(opts, logicGraphs, screens);
     default:
       throw new Error(`Unknown file: ${fileName}`);
   }
@@ -92,7 +92,7 @@ export function getGeneratedFileNames(): (keyof GeneratedCode)[] {
  * Note: This requires JSZip library to be installed
  */
 export async function generateZipBlob(
-  pages: Page[],
+  screens: Screen[],
   options: Partial<CodeGenOptions> = {},
   logicGraphs: LogicGraph[] = [],
   theme?: Theme,
@@ -101,7 +101,7 @@ export async function generateZipBlob(
   // Dynamic import to avoid bundling JSZip if not needed
   const JSZip = (await import('jszip')).default;
   
-  const code = generateCode(pages, options, logicGraphs, theme, imageResources);
+  const code = generateCode(screens, options, logicGraphs, theme, imageResources);
   const zip = new JSZip();
   
   // Add all files to zip
@@ -143,7 +143,7 @@ export async function generateZipBlob(
         walk(comp.children);
       }
     };
-    for (const page of pages) walk(page.components);
+    for (const screen of screens) walk(screen.components);
 
     const usedImages = imageResources.filter((img) => usedIds.has(img.id));
     for (const img of usedImages) {
@@ -165,14 +165,14 @@ export async function generateZipBlob(
  * Download generated code as ZIP file
  */
 export async function downloadAsZip(
-  pages: Page[],
+  screens: Screen[],
   options: Partial<CodeGenOptions> = {},
   logicGraphs: LogicGraph[] = [],
   zipFileName: string = 'lvgl_ui.zip',
   theme?: Theme,
   imageResources: ImageResource[] = []
 ): Promise<void> {
-  const blob = await generateZipBlob(pages, options, logicGraphs, theme, imageResources);
+  const blob = await generateZipBlob(screens, options, logicGraphs, theme, imageResources);
   
   // Create download link
   const url = URL.createObjectURL(blob);

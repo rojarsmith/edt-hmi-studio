@@ -10,17 +10,17 @@ const WasmPreview: React.FC = () => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [status, setStatus] = useState<Status>('loading');
 
-  const pages = useEditorStore((s) => s.pages);
-  const currentPageId = useEditorStore((s) => s.currentPageId);
+  const screens = useEditorStore((s) => s.screens);
+  const currentScreenId = useEditorStore((s) => s.currentScreenId);
   const canvas = useEditorStore((s) => s.canvas);
 
   // Send UI JSON to iframe
   const sendToWasm = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe?.contentWindow || status !== 'ready') return;
-    const json = editorStateToJson(pages, currentPageId, canvas);
+    const json = editorStateToJson(screens, currentScreenId, canvas);
     iframe.contentWindow.postMessage({ type: 'load-ui', json }, '*');
-  }, [pages, currentPageId, canvas, status]);
+  }, [screens, currentScreenId, canvas, status]);
 
   // Listen for lvgl-ready from iframe
   useEffect(() => {
@@ -43,7 +43,7 @@ const WasmPreview: React.FC = () => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [pages, currentPageId, canvas, status, sendToWasm]);
+  }, [screens, currentScreenId, canvas, status, sendToWasm]);
 
   // Timeout for loading — mark error after 15s
   useEffect(() => {

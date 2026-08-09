@@ -22,7 +22,7 @@ const project = {
   createdAt: 1,
   updatedAt: 1,
   canvasSize: { width: 480, height: 272 },
-  pages: [],
+  screens: [],
   resources: { images: [], fonts: [] },
   variables: [],
   codeGenOptions: {

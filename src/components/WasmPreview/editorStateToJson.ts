@@ -1,4 +1,4 @@
-import type { Page, CanvasState, LvglComponent } from '../../types';
+import type { Screen, CanvasState, LvglComponent } from '../../types';
 
 interface WasmUIJson {
   screen: {
@@ -130,19 +130,19 @@ function flattenTree(
 }
 
 export function editorStateToJson(
-  pages: Page[],
-  currentPageId: string,
+  screens: Screen[],
+  currentScreenId: string,
   canvas: CanvasState,
 ): string {
-  const page = pages.find((p) => p.id === currentPageId);
+  const screen = screens.find((p) => p.id === currentScreenId);
 
   const json: WasmUIJson = {
     screen: {
       width: canvas.width,
       height: canvas.height,
-      bgColor: page?.backgroundColor || '#ffffff',
+      bgColor: screen?.backgroundColor || '#ffffff',
     },
-    components: page ? flattenTree(page.components, null) : [],
+    components: screen ? flattenTree(screen.components, null) : [],
   };
 
   return JSON.stringify(json);

@@ -1,4 +1,4 @@
-import type { Page, LvglComponent } from '../types';
+import type { Screen, LvglComponent } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type {
   CommunicationConfig,
@@ -19,7 +19,7 @@ export interface GeneratedHmiBindings {
 
 interface BoundComponent {
   component: LvglComponent;
-  pageName: string;
+  screenName: string;
   variableName: string;
 }
 
@@ -103,47 +103,47 @@ function cFloat(value: number, fallback: number): string {
 }
 
 function collectBoundComponents(
-  pages: Page[],
+  screens: Screen[],
   options: CodeGenOptions,
 ): BoundComponent[] {
-  const allComponents: { component: LvglComponent; pageName: string }[] = [];
+  const allComponents: { component: LvglComponent; screenName: string }[] = [];
 
-  const walk = (components: LvglComponent[], pageName: string) => {
+  const walk = (components: LvglComponent[], screenName: string) => {
     for (const component of components) {
-      allComponents.push({ component, pageName });
-      walk(component.children, pageName);
+      allComponents.push({ component, screenName });
+      walk(component.children, screenName);
     }
   };
 
-  for (const page of pages) {
-    walk(page.components, page.name);
+  for (const screen of screens) {
+    walk(screen.components, screen.name);
   }
 
   // Keep this collision policy in lockstep with ui.c/ui.h generation.
-  const componentsByName = new Map<string, { component: LvglComponent; pageName: string }[]>();
+  const componentsByName = new Map<string, { component: LvglComponent; screenName: string }[]>();
   for (const entry of allComponents) {
     const entries = componentsByName.get(entry.component.name) ?? [];
     entries.push(entry);
     componentsByName.set(entry.component.name, entries);
   }
 
-  const needsPagePrefix = new Set<string>();
+  const needsScreenPrefix = new Set<string>();
   for (const entries of componentsByName.values()) {
-    if (entries.length > 1 && new Set(entries.map((entry) => entry.pageName)).size > 1) {
+    if (entries.length > 1 && new Set(entries.map((entry) => entry.screenName)).size > 1) {
       for (const entry of entries) {
-        needsPagePrefix.add(entry.component.id);
+        needsScreenPrefix.add(entry.component.id);
       }
     }
   }
 
   return allComponents
     .filter(({ component }) => component.modbusBinding?.enabled)
-    .map(({ component, pageName }) => ({
+    .map(({ component, screenName }) => ({
       component,
-      pageName,
+      screenName,
       variableName: getComponentVarName(
-        needsPagePrefix.has(component.id)
-          ? `${pageName}_${component.name}`
+        needsScreenPrefix.has(component.id)
+          ? `${screenName}_${component.name}`
           : component.name,
         options,
       ),
@@ -167,12 +167,12 @@ extern const size_t hmi_binding_descriptor_count;
 }
 
 function generateSource(
-  pages: Page[],
+  screens: Screen[],
   communication: CommunicationConfig,
   options: CodeGenOptions,
   logicGraphs: LogicGraph[],
 ): string {
-  const bindings = collectBoundComponents(pages, options);
+  const bindings = collectBoundComponents(screens, options);
   const logicHoldingRegisterAddresses =
     collectLogicHoldingRegisterAddresses(logicGraphs);
   const parity = {
@@ -267,7 +267,7 @@ function generateSource(
  * table consumed by the STM32 board runtime.
  */
 export function generateHmiBindings(
-  pages: Page[],
+  screens: Screen[],
   communication: CommunicationConfig,
   options: Partial<CodeGenOptions> = {},
   logicGraphs: LogicGraph[] = [],
@@ -280,7 +280,7 @@ export function generateHmiBindings(
   return {
     'hmi_bindings_generated.h': generateHeader(),
     'hmi_bindings_generated.c': generateSource(
-      pages,
+      screens,
       communication,
       resolvedOptions,
       logicGraphs,

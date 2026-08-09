@@ -12,7 +12,7 @@ import { toast } from '../Toast';
 import './CodePreview.css';
 
 const CodePreview: React.FC = () => {
-  const { pages } = useEditorStore();
+  const { screens } = useEditorStore();
   const { graphs: logicGraphs } = useLogicEditorStore();
   const { currentTheme } = useThemeStore();
   const imageResources = useResourceStore((s) => s.images);
@@ -47,12 +47,12 @@ const CodePreview: React.FC = () => {
 
   const generatedCode = useMemo(() => {
     try {
-      return generateCode(pages, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont);
+      return generateCode(screens, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont);
     } catch {
       console.error('Code generation error');
       return null;
     }
-  }, [pages, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont]);
+  }, [screens, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont]);
 
   const currentCode = generatedCode?.[selectedFile] || '// Code generation failed';
 

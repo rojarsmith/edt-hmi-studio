@@ -1,6 +1,6 @@
 // ui.h template generator
 
-import type { Page, LvglComponent } from '../../types';
+import type { Screen, LvglComponent } from '../../types';
 import type { FontResource } from '../../resources/types';
 import type { CodeGenOptions } from '../types';
 import {
@@ -17,20 +17,20 @@ import {
 } from '../formatters/cFormatter';
 
 /**
- * Flatten all components from all pages
+ * Flatten all components from all screens
  */
-function getAllComponents(pages: Page[]): { component: LvglComponent; pageName: string }[] {
-  const result: { component: LvglComponent; pageName: string }[] = [];
+function getAllComponents(screens: Screen[]): { component: LvglComponent; screenName: string }[] {
+  const result: { component: LvglComponent; screenName: string }[] = [];
   
-  const flatten = (components: LvglComponent[], pageName: string) => {
+  const flatten = (components: LvglComponent[], screenName: string) => {
     for (const comp of components) {
-      result.push({ component: comp, pageName });
-      flatten(comp.children, pageName);
+      result.push({ component: comp, screenName });
+      flatten(comp.children, screenName);
     }
   };
   
-  for (const page of pages) {
-    flatten(page.components, page.name);
+  for (const screen of screens) {
+    flatten(screen.components, screen.name);
   }
   
   return result;
@@ -39,7 +39,7 @@ function getAllComponents(pages: Page[]): { component: LvglComponent; pageName: 
 /**
  * Generate ui.h header file
  */
-export function generateUiHeader(pages: Page[], options: CodeGenOptions, fonts: FontResource[] = [], defaultFont?: string, defaultFontSize?: number, useBuiltinSymbols?: boolean): string {
+export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fonts: FontResource[] = [], defaultFont?: string, defaultFontSize?: number, useBuiltinSymbols?: boolean): string {
   const lines: string[] = [];
   
   // Includes
@@ -92,8 +92,8 @@ export function generateUiHeader(pages: Page[], options: CodeGenOptions, fonts: 
       }
     };
 
-    for (const page of pages) {
-      walkComponents(page.components);
+    for (const screen of screens) {
+      walkComponents(screen.components);
     }
 
     // Include project default font if custom
@@ -124,27 +124,27 @@ export function generateUiHeader(pages: Page[], options: CodeGenOptions, fonts: 
     lines.push('');
   }
   
-  for (const page of pages) {
-    const varName = getScreenVarName(page.name, options);
+  for (const screen of screens) {
+    const varName = getScreenVarName(screen.name, options);
     lines.push(formatExtern('lv_obj_t', varName));
   }
   lines.push('');
   
-  // Component declarations — detect cross-page name collisions
-  const allComponents = getAllComponents(pages);
-  const componentsByName = new Map<string, { component: LvglComponent; pageName: string }[]>();
+  // Component declarations — detect cross-screen name collisions
+  const allComponents = getAllComponents(screens);
+  const componentsByName = new Map<string, { component: LvglComponent; screenName: string }[]>();
   for (const entry of allComponents) {
     const existing = componentsByName.get(entry.component.name) || [];
     existing.push(entry);
     componentsByName.set(entry.component.name, existing);
   }
-  const needsPagePrefix = new Set<string>();
+  const needsScreenPrefix = new Set<string>();
   for (const [, entries] of componentsByName) {
     if (entries.length > 1) {
-      const uniquePages = new Set(entries.map(e => e.pageName));
+      const uniquePages = new Set(entries.map(e => e.screenName));
       if (uniquePages.size > 1) {
         for (const entry of entries) {
-          needsPagePrefix.add(entry.component.id);
+          needsScreenPrefix.add(entry.component.id);
         }
       }
     }
@@ -156,9 +156,9 @@ export function generateUiHeader(pages: Page[], options: CodeGenOptions, fonts: 
       lines.push('');
     }
 
-    for (const { component, pageName } of allComponents) {
-      const varName = needsPagePrefix.has(component.id)
-        ? getComponentVarName(`${pageName}_${component.name}`, options)
+    for (const { component, screenName } of allComponents) {
+      const varName = needsScreenPrefix.has(component.id)
+        ? getComponentVarName(`${screenName}_${component.name}`, options)
         : getComponentVarName(component.name, options);
       lines.push(formatExtern('lv_obj_t', varName));
     }
@@ -189,9 +189,9 @@ export function generateUiHeader(pages: Page[], options: CodeGenOptions, fonts: 
     ({ component }) => component.type === 'image-button',
   );
   if (imageButtons.length > 0) {
-    for (const { component, pageName } of imageButtons) {
-      const varName = needsPagePrefix.has(component.id)
-        ? getComponentVarName(`${pageName}_${component.name}`, options)
+    for (const { component, screenName } of imageButtons) {
+      const varName = needsScreenPrefix.has(component.id)
+        ? getComponentVarName(`${screenName}_${component.name}`, options)
         : getComponentVarName(component.name, options);
       lines.push(
         formatFuncDecl('float', `${varName}_get_value`, [
@@ -209,8 +209,8 @@ export function generateUiHeader(pages: Page[], options: CodeGenOptions, fonts: 
   }
   
   // Screen load functions
-  for (const page of pages) {
-    const funcName = getScreenLoadFuncName(page.name, options);
+  for (const screen of screens) {
+    const funcName = getScreenLoadFuncName(screen.name, options);
     lines.push(formatFuncDecl('void', funcName, []));
   }
   

@@ -1,6 +1,6 @@
 // ui_events.h template generator
 
-import type { Page, LvglComponent, EventBinding } from '../../types';
+import type { Screen, LvglComponent, EventBinding } from '../../types';
 import type { CodeGenOptions } from '../types';
 import { getEventHandlerName } from '../utils/nameUtils';
 import {
@@ -11,9 +11,9 @@ import {
 } from '../formatters/cFormatter';
 
 /**
- * Collect all events from all pages
+ * Collect all events from all screens
  */
-function getAllEvents(pages: Page[]): { component: LvglComponent; event: EventBinding }[] {
+function getAllEvents(screens: Screen[]): { component: LvglComponent; event: EventBinding }[] {
   const result: { component: LvglComponent; event: EventBinding }[] = [];
   
   const collectFromComponents = (components: LvglComponent[]) => {
@@ -25,8 +25,8 @@ function getAllEvents(pages: Page[]): { component: LvglComponent; event: EventBi
     }
   };
   
-  for (const page of pages) {
-    collectFromComponents(page.components);
+  for (const screen of screens) {
+    collectFromComponents(screen.components);
   }
   
   return result;
@@ -35,7 +35,7 @@ function getAllEvents(pages: Page[]): { component: LvglComponent; event: EventBi
 /**
  * Generate ui_events.h header file
  */
-export function generateEventsHeader(pages: Page[], options: CodeGenOptions): string {
+export function generateEventsHeader(screens: Screen[], options: CodeGenOptions): string {
   const lines: string[] = [];
   
   // Includes
@@ -43,7 +43,7 @@ export function generateEventsHeader(pages: Page[], options: CodeGenOptions): st
   lines.push('');
   
   // Event handler declarations
-  const allEvents = getAllEvents(pages);
+  const allEvents = getAllEvents(screens);
   
   if (allEvents.length > 0) {
     if (options.generateComments) {

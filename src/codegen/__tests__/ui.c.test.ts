@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateUiSource } from '../templates/ui.c';
 import {
   defaultOptions,
-  createPage,
+  createScreen,
   createComponent,
   createTheme,
   createImageResource,
@@ -21,54 +21,54 @@ describe('generateUiSource', () => {
     });
 
     it('generates screen variable definitions', () => {
-      const pages = [createPage({ name: 'main' }), createPage({ name: 'settings' })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main' }), createScreen({ name: 'settings' })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_t *ui_screen_main;');
       expect(result).toContain('lv_obj_t *ui_screen_settings;');
     });
 
     it('generates component variable definitions', () => {
       const btn = createComponent('btn', { name: 'myBtn' });
-      const pages = [createPage({ name: 'main', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_t *ui_my_btn;');
     });
 
     it('generates static screen init function', () => {
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('static void ui_screen_main_init(void)');
       expect(result).toContain('ui_screen_main = lv_obj_create(NULL);');
     });
 
     it('generates screen load function with lv_scr_load_anim', () => {
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('void ui_load_screen_main(void)');
       expect(result).toContain('lv_scr_load_anim(ui_screen_main,');
     });
 
     it('generates ui_init function', () => {
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('void ui_init(void)');
       expect(result).toContain('ui_screen_main_init();');
       expect(result).toContain('ui_load_screen_main();');
     });
 
-    it('loads first page in ui_init', () => {
-      const pages = [createPage({ name: 'home' }), createPage({ name: 'settings' })];
-      const result = generateUiSource(pages, defaultOptions());
+    it('loads first screen in ui_init', () => {
+      const screens = [createScreen({ name: 'home' }), createScreen({ name: 'settings' })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_load_screen_home();');
     });
 
-    it('generates page background color', () => {
-      const pages = [createPage({ name: 'main', backgroundColor: '#FF0000' })];
-      const result = generateUiSource(pages, defaultOptions());
+    it('generates screen background color', () => {
+      const screens = [createScreen({ name: 'main', backgroundColor: '#FF0000' })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_bg_color(ui_screen_main, lv_color_hex(0xFF0000), 0);');
     });
 
-    it('handles empty pages array', () => {
+    it('handles empty screens array', () => {
       const result = generateUiSource([], defaultOptions());
       expect(result).toContain('void ui_init(void)');
       expect(result).toContain('#include "ui.h"');
@@ -80,8 +80,8 @@ describe('generateUiSource', () => {
   describe('component creation', () => {
     it('creates btn with inner label', () => {
       const btn = createComponent('btn', { name: 'myBtn', props: { text: 'Click Me' } });
-      const pages = [createPage({ name: 'main', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_my_btn = lv_btn_create(ui_screen_main);');
       expect(result).toContain('lv_obj_t *ui_my_btn_label = lv_label_create(ui_my_btn);');
       expect(result).toContain('lv_label_set_text(ui_my_btn_label, "Click Me");');
@@ -90,8 +90,8 @@ describe('generateUiSource', () => {
 
     it('creates label with text', () => {
       const label = createComponent('label', { name: 'title', props: { text: 'Hello World' } });
-      const pages = [createPage({ name: 'main', components: [label] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [label] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_title = lv_label_create(ui_screen_main);');
       expect(result).toContain('lv_label_set_text(ui_title, "Hello World");');
     });
@@ -101,8 +101,8 @@ describe('generateUiSource', () => {
         name: 'vol',
         props: { min: 0, max: 200, value: 50 },
       });
-      const pages = [createPage({ name: 'main', components: [slider] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [slider] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_vol = lv_slider_create(ui_screen_main);');
       expect(result).toContain('lv_slider_set_range(ui_vol, 0, 200);');
       expect(result).toContain('lv_slider_set_value(ui_vol, 50, LV_ANIM_OFF);');
@@ -113,8 +113,8 @@ describe('generateUiSource', () => {
         name: 'progress',
         props: { min: 0, max: 100, value: 75 },
       });
-      const pages = [createPage({ name: 'main', components: [bar] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [bar] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_progress = lv_bar_create(ui_screen_main);');
       expect(result).toContain('lv_bar_set_value(ui_progress, 75, LV_ANIM_OFF);');
     });
@@ -124,8 +124,8 @@ describe('generateUiSource', () => {
         name: 'dial',
         props: { startAngle: 0, endAngle: 270, value: 60, mode: 'reverse' },
       });
-      const pages = [createPage({ name: 'main', components: [arc] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [arc] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_dial = lv_arc_create(ui_screen_main);');
       expect(result).toContain('lv_arc_set_bg_angles(ui_dial, 0, 270);');
       expect(result).toContain('lv_arc_set_value(ui_dial, 60);');
@@ -137,8 +137,8 @@ describe('generateUiSource', () => {
         name: 'agree',
         props: { text: 'I agree', checked: true },
       });
-      const pages = [createPage({ name: 'main', components: [cb] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [cb] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_agree = lv_checkbox_create(ui_screen_main);');
       expect(result).toContain('lv_checkbox_set_text(ui_agree, "I agree");');
       expect(result).toContain('lv_obj_add_state(ui_agree, LV_STATE_CHECKED);');
@@ -149,8 +149,8 @@ describe('generateUiSource', () => {
         name: 'toggle',
         props: { checked: true },
       });
-      const pages = [createPage({ name: 'main', components: [sw] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [sw] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_toggle = lv_switch_create(ui_screen_main);');
       expect(result).toContain('lv_obj_add_state(ui_toggle, LV_STATE_CHECKED);');
     });
@@ -160,8 +160,8 @@ describe('generateUiSource', () => {
         name: 'input',
         props: { placeholder: 'Enter text', password: true, oneLine: true },
       });
-      const pages = [createPage({ name: 'main', components: [ta] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
+      const screens = [createScreen({ name: 'main', components: [ta] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
       expect(result).toContain('ui_input = lv_textarea_create(ui_screen_main);');
       expect(result).toContain('lv_textarea_set_placeholder_text(ui_input, "Enter text");');
       expect(result).toContain('lv_textarea_set_password_mode(ui_input, true);');
@@ -173,8 +173,8 @@ describe('generateUiSource', () => {
         name: 'input',
         props: { oneLine: true },
       });
-      const pages = [createPage({ name: 'main', components: [ta] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
+      const screens = [createScreen({ name: 'main', components: [ta] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }));
       expect(result).toContain('lv_textarea_set_one_line(ui_input, true);');
     });
 
@@ -183,8 +183,8 @@ describe('generateUiSource', () => {
         name: 'color_picker',
         props: { options: ['Red', 'Green', 'Blue'], selected: 1 },
       });
-      const pages = [createPage({ name: 'main', components: [dd] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [dd] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_color_picker = lv_dropdown_create(ui_screen_main);');
       expect(result).toContain('lv_dropdown_set_options(ui_color_picker, "Red\\nGreen\\nBlue");');
       expect(result).toContain('lv_dropdown_set_selected(ui_color_picker, 1);');
@@ -192,16 +192,16 @@ describe('generateUiSource', () => {
 
     it('creates img with lv_image_create for v9', () => {
       const img = createComponent('img', { name: 'logo', props: { src: 'logo_img' } });
-      const pages = [createPage({ name: 'main', components: [img] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
+      const screens = [createScreen({ name: 'main', components: [img] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
       expect(result).toContain('ui_logo = lv_image_create(ui_screen_main);');
       expect(result).toContain('lv_image_set_src(ui_logo, &logo_img);');
     });
 
     it('creates img with lv_img_create for v8', () => {
       const img = createComponent('img', { name: 'logo', props: { src: 'logo_img' } });
-      const pages = [createPage({ name: 'main', components: [img] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
+      const screens = [createScreen({ name: 'main', components: [img] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }));
       expect(result).toContain('ui_logo = lv_img_create(ui_screen_main);');
       expect(result).toContain('lv_img_set_src(ui_logo, &logo_img);');
     });
@@ -227,11 +227,11 @@ describe('generateUiSource', () => {
           cycleOnClick: true,
         },
       });
-      const pages = [
-        createPage({ name: 'main', components: [imageButton] }),
+      const screens = [
+        createScreen({ name: 'main', components: [imageButton] }),
       ];
       const result = generateUiSource(
-        pages,
+        screens,
         defaultOptions({ lvglVersion: '9' }),
         undefined,
         [offImage, onImage],
@@ -255,8 +255,8 @@ describe('generateUiSource', () => {
 
     it('creates obj', () => {
       const obj = createComponent('obj', { name: 'panel' });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_panel = lv_obj_create(ui_screen_main);');
     });
 
@@ -269,8 +269,8 @@ describe('generateUiSource', () => {
           cellData: [['A', 'B', 'C'], ['1', '2', '3']],
         },
       });
-      const pages = [createPage({ name: 'main', components: [table] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [table] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_data_table = lv_table_create(ui_screen_main);');
       expect(result).toContain('lv_table_set_row_cnt(ui_data_table, 2);');
       expect(result).toContain('lv_table_set_col_cnt(ui_data_table, 3);');
@@ -286,8 +286,8 @@ describe('generateUiSource', () => {
           series: [{ color: '#FF0000', data: [10, 20, 30] }],
         },
       });
-      const pages = [createPage({ name: 'main', components: [chart] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [chart] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_temp_chart = lv_chart_create(ui_screen_main);');
       expect(result).toContain('lv_chart_set_type(ui_temp_chart, LV_CHART_TYPE_LINE);');
       expect(result).toContain('lv_chart_add_series(ui_temp_chart,');
@@ -299,8 +299,8 @@ describe('generateUiSource', () => {
         name: 'loader',
         props: { speed: 2000, arcLength: 90 },
       });
-      const pages = [createPage({ name: 'main', components: [spinner] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [spinner] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_loader = lv_spinner_create(ui_screen_main);');
       expect(result).toContain('lv_spinner_set_anim_params(ui_loader, 2000, 90);');
     });
@@ -310,8 +310,8 @@ describe('generateUiSource', () => {
         name: 'loader',
         props: { speed: 2000, arcLength: 90 },
       });
-      const pages = [createPage({ name: 'main', components: [spinner] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
+      const screens = [createScreen({ name: 'main', components: [spinner] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }));
       expect(result).toContain('ui_loader = lv_spinner_create(ui_screen_main, 2000, 90);');
     });
 
@@ -320,8 +320,8 @@ describe('generateUiSource', () => {
         name: 'tabs',
         props: { tabs: ['Home', 'Settings'], tabPosition: 'top' },
       });
-      const pages = [createPage({ name: 'main', components: [tv] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
+      const screens = [createScreen({ name: 'main', components: [tv] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
       expect(result).toContain('ui_tabs = lv_tabview_create(ui_screen_main);');
       expect(result).toContain('lv_tabview_set_tab_bar_position(ui_tabs, LV_DIR_TOP);');
       expect(result).toContain('lv_tabview_add_tab(ui_tabs, "Home");');
@@ -333,8 +333,8 @@ describe('generateUiSource', () => {
         name: 'tiles',
         props: { rows: 2, cols: 2 },
       });
-      const pages = [createPage({ name: 'main', components: [tv] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [tv] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_tiles = lv_tileview_create(ui_screen_main);');
       expect(result).toContain('lv_tileview_add_tile(ui_tiles, 0, 0, LV_DIR_ALL);');
       expect(result).toContain('lv_tileview_add_tile(ui_tiles, 1, 1, LV_DIR_ALL);');
@@ -345,8 +345,8 @@ describe('generateUiSource', () => {
         name: 'dialog',
         props: { title: 'My Window', showCloseBtn: true },
       });
-      const pages = [createPage({ name: 'main', components: [win] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
+      const screens = [createScreen({ name: 'main', components: [win] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
       expect(result).toContain('ui_dialog = lv_win_create(ui_screen_main);');
       expect(result).toContain('lv_win_add_title(ui_dialog, "My Window");');
       expect(result).toContain('lv_win_add_button(ui_dialog, LV_SYMBOL_CLOSE, 40);');
@@ -357,16 +357,16 @@ describe('generateUiSource', () => {
         name: 'cal',
         props: { year: 2025, month: 6 },
       });
-      const pages = [createPage({ name: 'main', components: [cal] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [cal] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_cal = lv_calendar_create(ui_screen_main);');
       expect(result).toContain('lv_calendar_set_showed_date(ui_cal, 2025, 6);');
     });
 
     it('creates line', () => {
       const line = createComponent('line', { name: 'divider' });
-      const pages = [createPage({ name: 'main', components: [line] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [line] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_divider = lv_line_create(ui_screen_main);');
     });
   });
@@ -379,8 +379,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { bgColor: '#FF0000' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_bg_color(ui_box, lv_color_hex(0xFF0000), 0);');
       expect(result).toContain('lv_obj_set_style_bg_opa(ui_box, LV_OPA_COVER, 0);');
     });
@@ -390,8 +390,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { bgColor: 'transparent' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_bg_opa(ui_box, LV_OPA_TRANSP, 0);');
     });
 
@@ -400,8 +400,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { borderColor: '#00FF00', borderWidth: 2, borderRadius: 8 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_border_color(ui_box, lv_color_hex(0x00FF00), 0);');
       expect(result).toContain('lv_obj_set_style_border_width(ui_box, 2, 0);');
       expect(result).toContain('lv_obj_set_style_radius(ui_box, 8, 0);');
@@ -412,8 +412,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { textColor: '#333333' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_text_color(ui_box, lv_color_hex(0x333333), 0);');
     });
 
@@ -422,8 +422,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { opacity: 0.5 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_opa(ui_box, 128, 0);');
     });
 
@@ -432,8 +432,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { padding: 10 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_pad_all(ui_box, 10, 0);');
     });
 
@@ -442,8 +442,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { paddingTop: 5, paddingBottom: 10, paddingLeft: 15, paddingRight: 20 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_pad_top(ui_box, 5, 0);');
       expect(result).toContain('lv_obj_set_style_pad_bottom(ui_box, 10, 0);');
       expect(result).toContain('lv_obj_set_style_pad_left(ui_box, 15, 0);');
@@ -464,8 +464,8 @@ describe('generateUiSource', () => {
           },
         },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_shadow_width(ui_box, 10, 0);');
       expect(result).toContain('lv_obj_set_style_shadow_color(ui_box, lv_color_hex(0x000000), 0);');
       expect(result).toContain('lv_obj_set_style_shadow_ofs_x(ui_box, 5, 0);');
@@ -479,8 +479,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { bgGradDir: 'ver', bgGradColor: '#0000FF', bgGradStop: 200 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_bg_grad_dir(ui_box, LV_GRAD_DIR_VER, 0);');
       expect(result).toContain('lv_obj_set_style_bg_grad_color(ui_box, lv_color_hex(0x0000FF), 0);');
       expect(result).toContain('lv_obj_set_style_bg_grad_stop(ui_box, 200, 0);');
@@ -491,8 +491,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { outlineWidth: 3, outlineColor: '#FF00FF', outlinePad: 2 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_outline_width(ui_box, 3, 0);');
       expect(result).toContain('lv_obj_set_style_outline_color(ui_box, lv_color_hex(0xFF00FF), 0);');
       expect(result).toContain('lv_obj_set_style_outline_pad(ui_box, 2, 0);');
@@ -503,8 +503,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { transformAngle: 450 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
       expect(result).toContain('lv_obj_set_style_transform_rotation(ui_box, 450, 0);');
     });
 
@@ -513,8 +513,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { transformAngle: 450 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }));
       expect(result).toContain('lv_obj_set_style_transform_angle(ui_box, 450, 0);');
     });
 
@@ -523,8 +523,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { transformZoomX: 512, transformZoomY: 300 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
       expect(result).toContain('lv_obj_set_style_transform_scale_x(ui_box, 512, 0);');
       expect(result).toContain('lv_obj_set_style_transform_scale_y(ui_box, 300, 0);');
     });
@@ -534,8 +534,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { transformZoomX: 512 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }));
       expect(result).toContain('lv_obj_set_style_transform_zoom(ui_box, 512, 0);');
     });
 
@@ -544,8 +544,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { transformPivotX: 50, transformPivotY: 50 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_transform_pivot_x(ui_box, 50, 0);');
       expect(result).toContain('lv_obj_set_style_transform_pivot_y(ui_box, 50, 0);');
     });
@@ -555,8 +555,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { textFont: 'montserrat_24' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_text_font(ui_box, &lv_font_montserrat_24, 0);');
     });
 
@@ -565,8 +565,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { textFont: 'my_custom_font' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_text_font(ui_box, &font_my_custom_font, 0);');
     });
 
@@ -575,8 +575,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { textLetterSpace: 2, textLineSpace: 5 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_text_letter_space(ui_box, 2, 0);');
       expect(result).toContain('lv_obj_set_style_text_line_space(ui_box, 5, 0);');
     });
@@ -586,8 +586,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { textDecor: 'underline' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_text_decor(ui_box, LV_TEXT_DECOR_UNDERLINE, 0);');
     });
 
@@ -596,8 +596,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { textDecor: 'strikethrough' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_text_decor(ui_box, LV_TEXT_DECOR_STRIKETHROUGH, 0);');
     });
 
@@ -606,8 +606,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { blendMode: 'additive' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_blend_mode(ui_box, LV_BLEND_MODE_ADDITIVE, 0);');
     });
 
@@ -616,8 +616,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { borderSide: 'bottom' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_border_side(ui_box, LV_BORDER_SIDE_BOTTOM, 0);');
     });
 
@@ -629,8 +629,8 @@ describe('generateUiSource', () => {
           pressed: { bgColor: '#FF0000' },
         },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_bg_color(ui_box, lv_color_hex(0xFF0000), LV_STATE_PRESSED);');
     });
 
@@ -642,8 +642,8 @@ describe('generateUiSource', () => {
           focused: { borderColor: '#0000FF', borderWidth: 3 },
         },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_border_color(ui_box, lv_color_hex(0x0000FF), LV_STATE_FOCUSED);');
       expect(result).toContain('lv_obj_set_style_border_width(ui_box, 3, LV_STATE_FOCUSED);');
     });
@@ -656,8 +656,8 @@ describe('generateUiSource', () => {
           disabled: { opacity: 0.3 },
         },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_style_opa(ui_box, 77, LV_STATE_DISABLED);');
     });
   });
@@ -676,8 +676,8 @@ describe('generateUiSource', () => {
           gap: 10,
         },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_layout(ui_container, LV_LAYOUT_FLEX);');
       expect(result).toContain('lv_obj_set_flex_flow(ui_container, LV_FLEX_FLOW_COLUMN);');
       expect(result).toContain('lv_obj_set_flex_align(ui_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,');
@@ -690,8 +690,8 @@ describe('generateUiSource', () => {
         name: 'container',
         props: { layout: 'flex', flexDirection: 'row', flexWrap: true },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_flex_flow(ui_container, LV_FLEX_FLOW_ROW_WRAP);');
     });
 
@@ -704,8 +704,8 @@ describe('generateUiSource', () => {
           gridRows: '1fr 50',
         },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
       expect(result).toContain('lv_obj_set_layout(ui_grid, LV_LAYOUT_GRID);');
       expect(result).toContain('int32_t ui_grid_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(2), 100, LV_GRID_TEMPLATE_LAST};');
       expect(result).toContain('int32_t ui_grid_row_dsc[] = {LV_GRID_FR(1), 50, LV_GRID_TEMPLATE_LAST};');
@@ -717,8 +717,8 @@ describe('generateUiSource', () => {
         name: 'grid',
         props: { layout: 'grid', gridColumns: '1fr' },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }));
       expect(result).toContain('lv_coord_t ui_grid_col_dsc[]');
     });
 
@@ -727,8 +727,8 @@ describe('generateUiSource', () => {
         name: 'child',
         props: { flexGrow: 2 },
       });
-      const pages = [createPage({ name: 'main', components: [child] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [child] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_flex_grow(ui_child, 2);');
     });
 
@@ -737,8 +737,8 @@ describe('generateUiSource', () => {
         name: 'cell',
         props: { gridColumn: 1, gridRow: 0, gridColumnSpan: 2, gridRowSpan: 1 },
       });
-      const pages = [createPage({ name: 'main', components: [child] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [child] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_grid_cell(ui_cell,');
       expect(result).toContain(', 1, 2,');
       expect(result).toContain(', 0, 1);');
@@ -750,8 +750,8 @@ describe('generateUiSource', () => {
   describe('size modes', () => {
     it('generates px size with lv_obj_set_size', () => {
       const obj = createComponent('obj', { name: 'box', width: 200, height: 100 });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_size(ui_box, 200, 100);');
     });
 
@@ -762,8 +762,8 @@ describe('generateUiSource', () => {
         height: 100,
         widthMode: 'percent',
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_width(ui_box, lv_pct(50));');
     });
 
@@ -774,8 +774,8 @@ describe('generateUiSource', () => {
         height: 50,
         widthMode: 'content',
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_width(ui_box, LV_SIZE_CONTENT);');
     });
 
@@ -786,8 +786,8 @@ describe('generateUiSource', () => {
         height: 50,
         heightMode: 'content',
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_height(ui_box, LV_SIZE_CONTENT);');
     });
 
@@ -798,8 +798,8 @@ describe('generateUiSource', () => {
         height: 80,
         heightMode: 'percent',
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_height(ui_box, lv_pct(80));');
     });
   });
@@ -814,22 +814,22 @@ describe('generateUiSource', () => {
         alignOffsetX: 10,
         alignOffsetY: -5,
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_align(ui_box, LV_ALIGN_CENTER, 10, -5);');
     });
 
     it('generates various alignment types', () => {
       const obj = createComponent('obj', { name: 'box', align: 'top_right' });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_align(ui_box, LV_ALIGN_TOP_RIGHT, 0, 0);');
     });
 
     it('does not generate alignment for default', () => {
       const obj = createComponent('obj', { name: 'box', align: 'default' });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).not.toContain('lv_obj_align(ui_box');
     });
   });
@@ -839,36 +839,36 @@ describe('generateUiSource', () => {
   describe('flags', () => {
     it('generates hidden flag', () => {
       const obj = createComponent('obj', { name: 'box', flags: { hidden: true } });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_add_flag(ui_box, LV_OBJ_FLAG_HIDDEN);');
     });
 
     it('generates disabled state', () => {
       const obj = createComponent('obj', { name: 'box', flags: { disabled: true } });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_add_state(ui_box, LV_STATE_DISABLED);');
     });
 
     it('clears clickable flag', () => {
       const obj = createComponent('obj', { name: 'box', flags: { clickable: false } });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_clear_flag(ui_box, LV_OBJ_FLAG_CLICKABLE);');
     });
 
     it('generates checkable flag', () => {
       const obj = createComponent('obj', { name: 'box', flags: { checkable: true } });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_add_flag(ui_box, LV_OBJ_FLAG_CHECKABLE);');
     });
 
     it('clears scrollable flag', () => {
       const obj = createComponent('obj', { name: 'box', flags: { scrollable: false } });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_clear_flag(ui_box, LV_OBJ_FLAG_SCROLLABLE);');
     });
   });
@@ -881,8 +881,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { scrollbarMode: 'off' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_set_scrollbar_mode(ui_box, LV_SCROLLBAR_MODE_OFF);');
     });
 
@@ -891,8 +891,8 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { scrollbarMode: 'auto' } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
       // Screens always turn their scrollbar off, so scope this to the widget.
       expect(result).not.toContain('lv_obj_set_scrollbar_mode(ui_box');
     });
@@ -906,8 +906,8 @@ describe('generateUiSource', () => {
         name: 'myBtn',
         events: [createEvent({ eventType: 'LV_EVENT_CLICKED' })],
       });
-      const pages = [createPage({ name: 'main', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_add_event_cb(ui_my_btn, ui_event_my_btn_clicked, LV_EVENT_CLICKED, NULL);');
     });
 
@@ -919,8 +919,8 @@ describe('generateUiSource', () => {
           createEvent({ eventType: 'LV_EVENT_RELEASED' }),
         ],
       });
-      const pages = [createPage({ name: 'main', components: [slider] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [slider] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_add_event_cb(ui_vol, ui_event_vol_value_changed, LV_EVENT_VALUE_CHANGED, NULL);');
       expect(result).toContain('lv_obj_add_event_cb(ui_vol, ui_event_vol_released, LV_EVENT_RELEASED, NULL);');
     });
@@ -945,8 +945,8 @@ describe('generateUiSource', () => {
           }),
         ],
       });
-      const pages = [createPage({ name: 'main', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_anim_t ui_my_btn_anim_0;');
       expect(result).toContain('lv_anim_init(&ui_my_btn_anim_0);');
       expect(result).toContain('lv_anim_set_var(&ui_my_btn_anim_0, ui_my_btn);');
@@ -968,7 +968,7 @@ describe('generateUiSource', () => {
         animations: [createAnimation({ property: 'opa', startValue: 0, endValue: 255 })],
       });
       const result = generateUiSource(
-        [createPage({ name: 'main', components: [btn] })],
+        [createScreen({ name: 'main', components: [btn] })],
         defaultOptions(),
       );
 
@@ -989,7 +989,7 @@ describe('generateUiSource', () => {
         ],
       });
       const result = generateUiSource(
-        [createPage({ name: 'main', components: [btn] })],
+        [createScreen({ name: 'main', components: [btn] })],
         defaultOptions(),
       );
 
@@ -1006,7 +1006,7 @@ describe('generateUiSource', () => {
         animations: [createAnimation({ property: 'x', startValue: 0, endValue: 100 })],
       });
       const result = generateUiSource(
-        [createPage({ name: 'main', components: [btn] })],
+        [createScreen({ name: 'main', components: [btn] })],
         defaultOptions(),
       );
 
@@ -1024,7 +1024,7 @@ describe('generateUiSource', () => {
         animations: [createAnimation({ property: 'x', startValue: -110, endValue: 0 })],
       });
       const result = generateUiSource(
-        [createPage({ name: 'main', components: [btn] })],
+        [createScreen({ name: 'main', components: [btn] })],
         defaultOptions(),
       );
 
@@ -1042,7 +1042,7 @@ describe('generateUiSource', () => {
 
     it('parks animated widgets on every screen load, not only the first', () => {
       // Widgets keep whatever the previous run left them at, so parking only at
-      // init means a second visit to the page shows them at their end position
+      // init means a second visit to the screen shows them at their end position
       // for the whole transition before the animation resets them.
       const btn = createComponent('btn', {
         name: 'slider_in',
@@ -1053,7 +1053,7 @@ describe('generateUiSource', () => {
         ],
       });
       const result = generateUiSource(
-        [createPage({ name: 'main', components: [btn] })],
+        [createScreen({ name: 'main', components: [btn] })],
         defaultOptions(),
       );
 
@@ -1080,21 +1080,21 @@ describe('generateUiSource', () => {
       const offEdge = createComponent('btn', { name: 'off_edge', x: 380, width: 200 });
       const result = generateUiSource(
         [
-          createPage({ name: 'main', components: [] }),
-          createPage({ name: 'page 2', components: [offEdge] }),
+          createScreen({ name: 'main', components: [] }),
+          createScreen({ name: 'screen 2', components: [offEdge] }),
         ],
         defaultOptions(),
       );
 
-      for (const screen of ['ui_screen_main', 'ui_screen_page_2']) {
+      for (const screen of ['ui_screen_main', 'ui_screen_screen_2']) {
         expect(result).toContain(`lv_obj_clear_flag(${screen}, LV_OBJ_FLAG_SCROLLABLE);`);
         expect(result).toContain(`lv_obj_set_scrollbar_mode(${screen}, LV_SCROLLBAR_MODE_OFF);`);
       }
     });
 
-    it('omits the animation callback for pages without animations', () => {
+    it('omits the animation callback for screens without animations', () => {
       const result = generateUiSource(
-        [createPage({ name: 'main', components: [createComponent('btn', { name: 'plain' })] })],
+        [createScreen({ name: 'main', components: [createComponent('btn', { name: 'plain' })] })],
         defaultOptions(),
       );
 
@@ -1108,7 +1108,7 @@ describe('generateUiSource', () => {
         animations: [createAnimation({ name: 'weird', property: 'bg_color' })],
       });
       const result = generateUiSource(
-        [createPage({ name: 'main', components: [btn] })],
+        [createScreen({ name: 'main', components: [btn] })],
         defaultOptions(),
       );
 
@@ -1121,8 +1121,8 @@ describe('generateUiSource', () => {
         name: 'b',
         animations: [createAnimation({ delay: 0 })],
       });
-      const pages = [createPage({ name: 'main', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).not.toContain('lv_anim_set_delay');
     });
 
@@ -1131,8 +1131,8 @@ describe('generateUiSource', () => {
         name: 'b',
         animations: [createAnimation({ repeat: 0 })],
       });
-      const pages = [createPage({ name: 'main', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).not.toContain('lv_anim_set_repeat_count');
     });
   });
@@ -1143,47 +1143,47 @@ describe('generateUiSource', () => {
     it('generates LV_IMAGE_DECLARE for v9', () => {
       const imgRes = createImageResource({ name: 'logo', cArrayName: 'img_logo' });
       const img = createComponent('img', { name: 'logo_img', props: { src: imgRes.name } });
-      const pages = [createPage({ name: 'main', components: [img] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }), undefined, [imgRes]);
+      const screens = [createScreen({ name: 'main', components: [img] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }), undefined, [imgRes]);
       expect(result).toContain('LV_IMAGE_DECLARE(img_logo);');
     });
 
     it('generates LV_IMG_DECLARE for v8', () => {
       const imgRes = createImageResource({ name: 'logo', cArrayName: 'img_logo' });
       const img = createComponent('img', { name: 'logo_img', props: { src: imgRes.name } });
-      const pages = [createPage({ name: 'main', components: [img] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }), undefined, [imgRes]);
+      const screens = [createScreen({ name: 'main', components: [img] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }), undefined, [imgRes]);
       expect(result).toContain('LV_IMG_DECLARE(img_logo);');
     });
 
     it('uses cArrayName in lv_image_set_src', () => {
       const imgRes = createImageResource({ name: 'bg', cArrayName: 'img_background' });
       const img = createComponent('img', { name: 'bg_img', props: { src: 'bg' } });
-      const pages = [createPage({ name: 'main', components: [img] })];
-      const result = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }), undefined, [imgRes]);
+      const screens = [createScreen({ name: 'main', components: [img] })];
+      const result = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }), undefined, [imgRes]);
       expect(result).toContain('lv_image_set_src(ui_bg_img, &img_background);');
     });
 
     it('does not declare unused image resources', () => {
       const imgRes = createImageResource({ name: 'unused', cArrayName: 'img_unused' });
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions(), undefined, [imgRes]);
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions(), undefined, [imgRes]);
       expect(result).not.toContain('LV_IMAGE_DECLARE');
       expect(result).not.toContain('LV_IMG_DECLARE');
     });
   });
 
-  // ─── Cross-Page Same-Name Components ──────────────────────────
+  // ─── Cross-Screen Same-Name Components ──────────────────────────
 
-  describe('cross-page component prefix', () => {
-    it('prefixes same-name components on different pages', () => {
+  describe('cross-screen component prefix', () => {
+    it('prefixes same-name components on different screens', () => {
       const btn1 = createComponent('btn', { id: 'b1', name: 'submit' });
       const btn2 = createComponent('btn', { id: 'b2', name: 'submit' });
-      const pages = [
-        createPage({ name: 'page1', components: [btn1] }),
-        createPage({ name: 'page2', components: [btn2] }),
+      const screens = [
+        createScreen({ name: 'page1', components: [btn1] }),
+        createScreen({ name: 'page2', components: [btn2] }),
       ];
-      const result = generateUiSource(pages, defaultOptions());
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_t *ui_page1_submit;');
       expect(result).toContain('lv_obj_t *ui_page2_submit;');
       expect(result).toContain('ui_page1_submit = lv_btn_create(ui_screen_page1);');
@@ -1193,11 +1193,11 @@ describe('generateUiSource', () => {
     it('does not prefix unique-name components', () => {
       const btn1 = createComponent('btn', { id: 'b1', name: 'ok' });
       const btn2 = createComponent('btn', { id: 'b2', name: 'cancel' });
-      const pages = [
-        createPage({ name: 'page1', components: [btn1] }),
-        createPage({ name: 'page2', components: [btn2] }),
+      const screens = [
+        createScreen({ name: 'page1', components: [btn1] }),
+        createScreen({ name: 'page2', components: [btn2] }),
       ];
-      const result = generateUiSource(pages, defaultOptions());
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('lv_obj_t *ui_ok;');
       expect(result).toContain('lv_obj_t *ui_cancel;');
       expect(result).not.toContain('ui_page1_ok');
@@ -1219,8 +1219,8 @@ describe('generateUiSource', () => {
           border: '#E0E0E0',
         },
       });
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions(), theme);
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions(), theme);
       expect(result).toContain('lv_theme_default_init(NULL, lv_color_hex(0x2196F3), lv_color_hex(0xFF9800), false, LV_FONT_DEFAULT);');
     });
 
@@ -1235,14 +1235,14 @@ describe('generateUiSource', () => {
           border: '#333333',
         },
       });
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions(), theme);
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions(), theme);
       expect(result).toContain('true, LV_FONT_DEFAULT);');
     });
 
     it('does not generate theme code when no theme provided', () => {
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions());
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions());
       expect(result).not.toContain('lv_theme_default_init');
     });
   });
@@ -1251,29 +1251,29 @@ describe('generateUiSource', () => {
 
   describe('user code markers', () => {
     it('generates user code markers when enabled', () => {
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions({ userCodeMarkers: true }));
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions({ userCodeMarkers: true }));
       expect(result).toContain('USER_CODE_START');
       expect(result).toContain('USER_CODE_END');
     });
 
-    it('generates page-specific user code section', () => {
-      const pages = [createPage({ name: 'home' })];
-      const result = generateUiSource(pages, defaultOptions({ userCodeMarkers: true }));
+    it('generates screen-specific user code section', () => {
+      const screens = [createScreen({ name: 'home' })];
+      const result = generateUiSource(screens, defaultOptions({ userCodeMarkers: true }));
       expect(result).toContain('USER_CODE_START: home_init');
       expect(result).toContain('USER_CODE_END: home_init');
     });
 
     it('generates ui_init user code section', () => {
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions({ userCodeMarkers: true }));
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions({ userCodeMarkers: true }));
       expect(result).toContain('USER_CODE_START: ui_init');
       expect(result).toContain('USER_CODE_END: ui_init');
     });
 
     it('omits user code markers when disabled', () => {
-      const pages = [createPage({ name: 'main' })];
-      const result = generateUiSource(pages, defaultOptions({ userCodeMarkers: false }));
+      const screens = [createScreen({ name: 'main' })];
+      const result = generateUiSource(screens, defaultOptions({ userCodeMarkers: false }));
       expect(result).not.toContain('USER_CODE_START');
       expect(result).not.toContain('USER_CODE_END');
     });
@@ -1284,9 +1284,9 @@ describe('generateUiSource', () => {
   describe('v8 vs v9 differences', () => {
     it('uses lv_image_create for v9 and lv_img_create for v8', () => {
       const img = createComponent('img', { name: 'pic', props: { src: 'test' } });
-      const pages = [createPage({ name: 'main', components: [img] })];
-      const v9 = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
-      const v8 = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
+      const screens = [createScreen({ name: 'main', components: [img] })];
+      const v9 = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
+      const v8 = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }));
       expect(v9).toContain('lv_image_create');
       expect(v8).toContain('lv_img_create');
       expect(v9).toContain('lv_image_set_src');
@@ -1298,9 +1298,9 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { transformAngle: 900 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const v9 = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
-      const v8 = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const v9 = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
+      const v8 = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }));
       expect(v9).toContain('transform_rotation');
       expect(v8).toContain('transform_angle');
     });
@@ -1310,9 +1310,9 @@ describe('generateUiSource', () => {
         name: 'box',
         styles: { default: { transformZoomX: 512 } },
       });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const v9 = generateUiSource(pages, defaultOptions({ lvglVersion: '9' }));
-      const v8 = generateUiSource(pages, defaultOptions({ lvglVersion: '8' }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const v9 = generateUiSource(screens, defaultOptions({ lvglVersion: '9' }));
+      const v8 = generateUiSource(screens, defaultOptions({ lvglVersion: '8' }));
       expect(v9).toContain('transform_scale_x');
       expect(v8).toContain('transform_zoom');
     });
@@ -1323,16 +1323,16 @@ describe('generateUiSource', () => {
   describe('naming style', () => {
     it('uses camelCase naming when configured', () => {
       const btn = createComponent('btn', { name: 'my_button' });
-      const pages = [createPage({ name: 'main_page', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions({ namingStyle: 'camelCase' }));
+      const screens = [createScreen({ name: 'main_page', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions({ namingStyle: 'camelCase' }));
       expect(result).toContain('ui_screen_mainPage');
       expect(result).toContain('ui_myButton');
     });
 
     it('uses snake_case naming by default', () => {
       const btn = createComponent('btn', { name: 'myButton' });
-      const pages = [createPage({ name: 'mainPage', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions({ namingStyle: 'snake_case' }));
+      const screens = [createScreen({ name: 'mainPage', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions({ namingStyle: 'snake_case' }));
       expect(result).toContain('ui_screen_main_page');
       expect(result).toContain('ui_my_button');
     });
@@ -1343,15 +1343,15 @@ describe('generateUiSource', () => {
   describe('indentation', () => {
     it('uses tabs when configured', () => {
       const obj = createComponent('obj', { name: 'box' });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions({ indentStyle: 'tabs' }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions({ indentStyle: 'tabs' }));
       expect(result).toContain('\tui_box = lv_obj_create(ui_screen_main);');
     });
 
     it('uses spaces when configured', () => {
       const obj = createComponent('obj', { name: 'box' });
-      const pages = [createPage({ name: 'main', components: [obj] })];
-      const result = generateUiSource(pages, defaultOptions({ indentStyle: 'spaces', indentSize: 4 }));
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions({ indentStyle: 'spaces', indentSize: 4 }));
       expect(result).toContain('    ui_box = lv_obj_create(ui_screen_main);');
     });
   });
@@ -1360,8 +1360,8 @@ describe('generateUiSource', () => {
 
   describe('comments', () => {
     it('generates section headers when comments enabled', () => {
-      const pages = [createPage({ name: 'main', components: [createComponent('btn', { name: 'b' })] })];
-      const result = generateUiSource(pages, defaultOptions({ generateComments: true }));
+      const screens = [createScreen({ name: 'main', components: [createComponent('btn', { name: 'b' })] })];
+      const result = generateUiSource(screens, defaultOptions({ generateComments: true }));
       expect(result).toContain('Screen Definitions');
       expect(result).toContain('Component Definitions');
       expect(result).toContain('Screen Init Functions');
@@ -1371,15 +1371,15 @@ describe('generateUiSource', () => {
 
     it('generates component creation comments', () => {
       const btn = createComponent('btn', { name: 'myBtn' });
-      const pages = [createPage({ name: 'main', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions({ generateComments: true }));
+      const screens = [createScreen({ name: 'main', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions({ generateComments: true }));
       expect(result).toContain('// Create btn: myBtn');
     });
 
     it('omits comments when disabled', () => {
       const btn = createComponent('btn', { name: 'myBtn' });
-      const pages = [createPage({ name: 'main', components: [btn] })];
-      const result = generateUiSource(pages, defaultOptions({ generateComments: false }));
+      const screens = [createScreen({ name: 'main', components: [btn] })];
+      const result = generateUiSource(screens, defaultOptions({ generateComments: false }));
       expect(result).not.toContain('// Create btn');
       expect(result).not.toContain('Screen Definitions');
     });

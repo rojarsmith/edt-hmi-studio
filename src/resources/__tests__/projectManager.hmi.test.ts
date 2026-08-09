@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CanvasState, LvglComponent, Page } from '../../types';
+import type { CanvasState, LvglComponent, Screen } from '../../types';
 import { createDefaultCommunicationConfig } from '../../types/hmi';
 import {
   createProjectFile,
@@ -52,9 +52,9 @@ const canvas: CanvasState = {
 };
 
 describe('HMI project file round-trip', () => {
-  it('preserves page appearance, Modbus configuration, tags, and widget bindings', () => {
-    const pages: Page[] = [{
-      id: 'page-1',
+  it('preserves screen appearance, Modbus configuration, tags, and widget bindings', () => {
+    const screens: Screen[] = [{
+      id: 'screen-1',
       name: 'Main',
       backgroundColor: '#123456',
       components: [createBoundButton()],
@@ -77,7 +77,7 @@ describe('HMI project file round-trip', () => {
 
     const created = createProjectFile(
       'Machine HMI',
-      pages,
+      screens,
       canvas,
       [],
       [],
@@ -88,9 +88,9 @@ describe('HMI project file round-trip', () => {
     const parsed = parseProject(serializeProject(created));
 
     expect(parsed.boardId).toBe('stm32f746g-disco');
-    expect(parsed.pages[0].backgroundColor).toBe('#123456');
-    expect(parsed.pages[0].components[0].modbusBinding).toEqual(
-      pages[0].components[0].modbusBinding,
+    expect(parsed.screens[0].backgroundColor).toBe('#123456');
+    expect(parsed.screens[0].components[0].modbusBinding).toEqual(
+      screens[0].components[0].modbusBinding,
     );
     expect(parsed.communication).toEqual(communication);
   });
@@ -102,7 +102,7 @@ describe('HMI project file round-trip', () => {
       createdAt: 1,
       updatedAt: 1,
       canvasSize: { width: 480, height: 272 },
-      pages: [],
+      screens: [],
       resources: { images: [], fonts: [] },
       variables: [],
       codeGenOptions: {

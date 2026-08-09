@@ -75,8 +75,8 @@ export function getComponentVarName(componentName: string, options: CodeGenOptio
 /**
  * Generate screen variable name
  */
-export function getScreenVarName(pageName: string, options: CodeGenOptions): string {
-  const baseName = toValidCIdentifier(pageName);
+export function getScreenVarName(screenName: string, options: CodeGenOptions): string {
+  const baseName = toValidCIdentifier(screenName);
   const converted = convertName(baseName, options);
   return `ui_screen_${converted}`;
 }
@@ -94,8 +94,8 @@ export function getEventHandlerName(componentName: string, eventType: string, op
 /**
  * Generate screen init function name
  */
-export function getScreenInitFuncName(pageName: string, options: CodeGenOptions): string {
-  const baseName = toValidCIdentifier(pageName);
+export function getScreenInitFuncName(screenName: string, options: CodeGenOptions): string {
+  const baseName = toValidCIdentifier(screenName);
   const converted = convertName(baseName, options);
   return `ui_screen_${converted}_init`;
 }
@@ -103,8 +103,8 @@ export function getScreenInitFuncName(pageName: string, options: CodeGenOptions)
 /**
  * Generate screen load function name
  */
-export function getScreenLoadFuncName(pageName: string, options: CodeGenOptions): string {
-  const baseName = toValidCIdentifier(pageName);
+export function getScreenLoadFuncName(screenName: string, options: CodeGenOptions): string {
+  const baseName = toValidCIdentifier(screenName);
   const converted = convertName(baseName, options);
   return `ui_load_screen_${converted}`;
 }

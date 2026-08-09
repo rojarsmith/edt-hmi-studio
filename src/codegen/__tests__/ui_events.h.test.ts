@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateEventsHeader } from '../templates/ui_events.h';
-import { defaultOptions, createPage, createComponent, createEvent } from './helpers';
+import { defaultOptions, createScreen, createComponent, createEvent } from './helpers';
 
 describe('generateEventsHeader', () => {
   it('generates include guard', () => {
@@ -30,8 +30,8 @@ describe('generateEventsHeader', () => {
       name: 'myBtn',
       events: [createEvent({ eventType: 'LV_EVENT_CLICKED' })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsHeader(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsHeader(screens, defaultOptions());
     expect(result).toContain('void ui_event_my_btn_clicked(lv_event_t *e);');
   });
 
@@ -47,8 +47,8 @@ describe('generateEventsHeader', () => {
       name: 'mySlider',
       events: [createEvent({ eventType: 'LV_EVENT_VALUE_CHANGED' })],
     });
-    const pages = [createPage({ name: 'main', components: [btn, slider] })];
-    const result = generateEventsHeader(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [btn, slider] })];
+    const result = generateEventsHeader(screens, defaultOptions());
     expect(result).toContain('void ui_event_my_btn_clicked(lv_event_t *e);');
     expect(result).toContain('void ui_event_my_btn_pressed(lv_event_t *e);');
     expect(result).toContain('void ui_event_my_slider_value_changed(lv_event_t *e);');
@@ -59,8 +59,8 @@ describe('generateEventsHeader', () => {
       name: 'b',
       events: [createEvent({ eventType: 'LV_EVENT_CLICKED' })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsHeader(pages, defaultOptions({ generateComments: true }));
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsHeader(screens, defaultOptions({ generateComments: true }));
     expect(result).toContain('Event Handler Declarations');
   });
 
@@ -69,8 +69,8 @@ describe('generateEventsHeader', () => {
       name: 'b',
       events: [createEvent({ eventType: 'LV_EVENT_CLICKED' })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsHeader(pages, defaultOptions({ generateComments: false }));
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsHeader(screens, defaultOptions({ generateComments: false }));
     expect(result).not.toContain('Event Handler Declarations');
   });
 
@@ -80,12 +80,12 @@ describe('generateEventsHeader', () => {
       events: [createEvent({ eventType: 'LV_EVENT_CLICKED' })],
     });
     const container = createComponent('obj', { name: 'box', children: [label] });
-    const pages = [createPage({ name: 'main', components: [container] })];
-    const result = generateEventsHeader(pages, defaultOptions());
+    const screens = [createScreen({ name: 'main', components: [container] })];
+    const result = generateEventsHeader(screens, defaultOptions());
     expect(result).toContain('void ui_event_inner_label_clicked(lv_event_t *e);');
   });
 
-  it('collects events from multiple pages', () => {
+  it('collects events from multiple screens', () => {
     const btn1 = createComponent('btn', {
       name: 'btn1',
       events: [createEvent({ eventType: 'LV_EVENT_CLICKED' })],
@@ -94,11 +94,11 @@ describe('generateEventsHeader', () => {
       name: 'btn2',
       events: [createEvent({ eventType: 'LV_EVENT_PRESSED' })],
     });
-    const pages = [
-      createPage({ name: 'page1', components: [btn1] }),
-      createPage({ name: 'page2', components: [btn2] }),
+    const screens = [
+      createScreen({ name: 'page1', components: [btn1] }),
+      createScreen({ name: 'page2', components: [btn2] }),
     ];
-    const result = generateEventsHeader(pages, defaultOptions());
+    const result = generateEventsHeader(screens, defaultOptions());
     expect(result).toContain('void ui_event_btn1_clicked(lv_event_t *e);');
     expect(result).toContain('void ui_event_btn2_pressed(lv_event_t *e);');
   });
@@ -108,12 +108,12 @@ describe('generateEventsHeader', () => {
       name: 'my_button',
       events: [createEvent({ eventType: 'LV_EVENT_CLICKED' })],
     });
-    const pages = [createPage({ name: 'main', components: [btn] })];
-    const result = generateEventsHeader(pages, defaultOptions({ namingStyle: 'camelCase' }));
+    const screens = [createScreen({ name: 'main', components: [btn] })];
+    const result = generateEventsHeader(screens, defaultOptions({ namingStyle: 'camelCase' }));
     expect(result).toContain('ui_event_myButtonClicked');
   });
 
-  it('handles empty pages array', () => {
+  it('handles empty screens array', () => {
     const result = generateEventsHeader([], defaultOptions());
     expect(result).toContain('#ifndef UI_EVENTS_H');
     expect(result).toContain('#endif /* UI_EVENTS_H */');

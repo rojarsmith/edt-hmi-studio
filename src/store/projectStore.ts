@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 import { v4 as uuidv4 } from 'uuid';
 import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '../resources/types';
-import type { Page } from '../types';
+import type { Screen, ScreenGroup } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type { BoardId, CommunicationConfig } from '../types/hmi';
 import {
@@ -49,7 +49,8 @@ export interface ProjectConfig {
 
 export interface ProjectData {
   projectId: string;
-  pages: Page[];
+  screens: Screen[];
+  screenGroups?: ScreenGroup[];
   logicGraphs: LogicGraph[];
   variables: { id: string; name: string; type: string; defaultValue: string }[];
 }
@@ -230,7 +231,7 @@ async function dbCreateProject(config: ProjectConfig): Promise<void> {
   await db.put('projects', normalizeProjectConfig(config));
   await db.put('projectData', {
     projectId: config.id,
-    pages: [{ id: uuidv4(), name: 'Page 1', components: [], backgroundColor: '#F5F5F5' }],
+    screens: [{ id: uuidv4(), name: 'Screen 1', components: [], backgroundColor: '#F5F5F5' }],
     logicGraphs: [],
     variables: [],
   } satisfies ProjectData);
@@ -242,9 +243,21 @@ async function dbGetProjectConfig(id: string): Promise<ProjectConfig | undefined
   return config ? normalizeProjectConfig(config) : undefined;
 }
 
+/**
+ * Records written before the Page → Screen rename carry `pages` instead of
+ * `screens`. Normalise on read so old projects open unchanged; the next save
+ * writes them back under the current name.
+ */
+function normalizeProjectData(data: ProjectData | undefined): ProjectData | undefined {
+  if (!data) return data;
+  const legacy = data as ProjectData & { pages?: Screen[] };
+  if (Array.isArray(data.screens)) return data;
+  return { ...data, screens: legacy.pages ?? [] };
+}
+
 async function dbGetProjectData(id: string): Promise<ProjectData | undefined> {
   const db = await getDB();
-  return db.get('projectData', id);
+  return normalizeProjectData(await db.get('projectData', id));
 }
 
 async function dbGetProjectResources(projectId: string): Promise<ProjectResource[]> {
@@ -308,9 +321,9 @@ interface ProjectStoreState {
   getProjectConfig: (id: string) => Promise<ProjectConfig | undefined>;
   updateProjectConfig: (config: ProjectConfig) => Promise<void>;
 
-  // Load / save project data (pages, logic, resources)
+  // Load / save project data (screens, logic, resources)
   loadProjectData: (id: string) => Promise<{ data: ProjectData; images: ImageResource[]; fonts: FontResource[] }>;
-  saveProjectData: (id: string, pages: Page[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[]) => Promise<void>;
+  saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[]) => Promise<void>;
 
   // Import / export
   exportProject: (id: string) => Promise<ProjectFile>;
@@ -398,12 +411,12 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     return { data, images, fonts };
   },
 
-  saveProjectData: async (id, pages, logicGraphs, images, fonts) => {
+  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = []) => {
     const config = await dbGetProjectConfig(id);
     if (config) {
       await dbUpdateProjectConfig({ ...config, updatedAt: Date.now() });
     }
-    await dbUpdateProjectData({ projectId: id, pages, logicGraphs, variables: [] });
+    await dbUpdateProjectData({ projectId: id, screens, screenGroups, logicGraphs, variables: [] });
     await get().syncResources(id, images, fonts);
   },
 
@@ -444,12 +457,14 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
       canvasSize: { width: config.display.width, height: config.display.height },
-      pages: data.pages.map(p => ({
-        id: p.id,
-        name: p.name,
-        components: p.components,
-        backgroundColor: p.backgroundColor,
+      screens: data.screens.map(s => ({
+        id: s.id,
+        name: s.name,
+        components: s.components,
+        backgroundColor: s.backgroundColor,
+        groupId: s.groupId ?? null,
       })),
+      screenGroups: (data.screenGroups || []).map(g => ({ ...g })),
       resources: { images, fonts },
       variables: data.variables.map(v => ({
         id: v.id,
@@ -495,15 +510,18 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     };
     await dbUpdateProjectConfig(config);
 
-    const pages: Page[] = (file.pages || []).map(p => ({
-      id: p.id,
-      name: p.name,
-      components: p.components,
-      backgroundColor: p.backgroundColor ?? '#F5F5F5',
+    // `pages` is the pre-rename spelling, still present in older project files.
+    const screens: Screen[] = (file.screens || file.pages || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      components: s.components,
+      backgroundColor: s.backgroundColor ?? '#F5F5F5',
+      groupId: s.groupId ?? null,
     }));
     await dbUpdateProjectData({
       projectId: id,
-      pages,
+      screens,
+      screenGroups: (file.screenGroups || []).map(g => ({ ...g })),
       logicGraphs: file.logicGraphs || [],
       variables: (file.variables || []).map(v => ({ ...v, type: v.type as string })),
     });

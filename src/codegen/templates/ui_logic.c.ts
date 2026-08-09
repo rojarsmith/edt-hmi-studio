@@ -2,7 +2,7 @@
 // Generates C code from logic orchestration graphs
 
 import type { CodeGenOptions } from '../types';
-import type { LvglComponent, Page } from '../../types';
+import type { LvglComponent, Screen } from '../../types';
 import type {
   LogicGraph,
   LogicNode,
@@ -23,12 +23,12 @@ import {
 
 interface ComponentReference {
   component?: LvglComponent;
-  pageName: string;
+  screenName: string;
   variableName: string;
 }
 
 interface PageReference {
-  page: Page;
+  screen: Screen;
   variableName: string;
   loadFunctionName: string;
   resolved: boolean;
@@ -48,9 +48,9 @@ interface LogicCodegenContext {
 export function generateLogicSource(
   options: CodeGenOptions,
   graphs: LogicGraph[] = [],
-  pages: Page[] = [],
+  screens: Screen[] = [],
 ): string {
-  const context = createLogicCodegenContext(pages, options);
+  const context = createLogicCodegenContext(screens, options);
   const lines: string[] = [];
   const hasHoldingRegisterNodes = graphs.some(graph =>
     graph.nodes.some(node => node.subType === 'modbus_holding_register')
@@ -197,26 +197,26 @@ function generateButtonSetTextHelper(options: CodeGenOptions): string {
 }
 
 function createLogicCodegenContext(
-  pages: Page[],
+  screens: Screen[],
   options: CodeGenOptions,
 ): LogicCodegenContext {
-  const componentEntries: Array<{ component: LvglComponent; pageName: string }> = [];
+  const componentEntries: Array<{ component: LvglComponent; screenName: string }> = [];
 
-  const collectComponents = (components: LvglComponent[], pageName: string) => {
+  const collectComponents = (components: LvglComponent[], screenName: string) => {
     for (const component of components) {
-      componentEntries.push({ component, pageName });
-      collectComponents(component.children, pageName);
+      componentEntries.push({ component, screenName });
+      collectComponents(component.children, screenName);
     }
   };
 
-  for (const page of pages) {
-    collectComponents(page.components, page.name);
+  for (const screen of screens) {
+    collectComponents(screen.components, screen.name);
   }
 
-  // Keep the cross-page collision policy in lockstep with ui.c/ui.h generation.
+  // Keep the cross-screen collision policy in lockstep with ui.c/ui.h generation.
   const componentsByOriginalName = new Map<
     string,
-    Array<{ component: LvglComponent; pageName: string }>
+    Array<{ component: LvglComponent; screenName: string }>
   >();
   for (const entry of componentEntries) {
     const matchingEntries = componentsByOriginalName.get(entry.component.name) ?? [];
@@ -224,14 +224,14 @@ function createLogicCodegenContext(
     componentsByOriginalName.set(entry.component.name, matchingEntries);
   }
 
-  const needsPagePrefix = new Set<string>();
+  const needsScreenPrefix = new Set<string>();
   for (const matchingEntries of componentsByOriginalName.values()) {
     if (
       matchingEntries.length > 1
-      && new Set(matchingEntries.map(entry => entry.pageName)).size > 1
+      && new Set(matchingEntries.map(entry => entry.screenName)).size > 1
     ) {
       for (const entry of matchingEntries) {
-        needsPagePrefix.add(entry.component.id);
+        needsScreenPrefix.add(entry.component.id);
       }
     }
   }
@@ -240,13 +240,13 @@ function createLogicCodegenContext(
   const componentsByName = new Map<string, ComponentReference>();
   const ambiguousComponentNames = new Set<string>();
 
-  for (const { component, pageName } of componentEntries) {
+  for (const { component, screenName } of componentEntries) {
     const reference: ComponentReference = {
       component,
-      pageName,
+      screenName,
       variableName: getComponentVarName(
-        needsPagePrefix.has(component.id)
-          ? `${pageName}_${component.name}`
+        needsScreenPrefix.has(component.id)
+          ? `${screenName}_${component.name}`
           : component.name,
         options,
       ),
@@ -262,15 +262,15 @@ function createLogicCodegenContext(
 
   const pagesById = new Map<string, PageReference>();
   const pagesByName = new Map<string, PageReference>();
-  for (const page of pages) {
+  for (const screen of screens) {
     const reference: PageReference = {
-      page,
-      variableName: getScreenVarName(page.name, options),
-      loadFunctionName: getScreenLoadFuncName(page.name, options),
+      screen,
+      variableName: getScreenVarName(screen.name, options),
+      loadFunctionName: getScreenLoadFuncName(screen.name, options),
       resolved: true,
     };
-    pagesById.set(page.id, reference);
-    pagesByName.set(page.name, reference);
+    pagesById.set(screen.id, reference);
+    pagesByName.set(screen.name, reference);
   }
 
   return {
@@ -299,12 +299,12 @@ function resolveComponent(
   }
 
   return {
-    pageName: '',
+    screenName: '',
     variableName: getComponentVarName(targetValue, options),
   };
 }
 
-function resolvePage(
+function resolveScreen(
   target: unknown,
   context: LogicCodegenContext,
   options: CodeGenOptions,
@@ -321,7 +321,7 @@ function resolvePage(
   }
 
   return {
-    page: {
+    screen: {
       id: targetValue,
       name: targetValue,
       components: [],
@@ -954,13 +954,18 @@ function generateNavigatePageCode(
   context: LogicCodegenContext,
   indent: string,
 ): string {
-  const targetPage = resolvePage(node.params.targetPage, context, options);
+  // `targetPage` is the pre-rename spelling, still present in older projects.
+  const targetScreen = resolveScreen(
+    node.params.targetScreen ?? node.params.targetPage,
+    context,
+    options,
+  );
   const animation = node.params.animation || 'none';
-  const legacyVariableName = `ui_${toSnakeCase(targetPage.page.name)}`;
+  const legacyVariableName = `ui_${toSnakeCase(targetScreen.screen.name)}`;
   
   if (animation === 'none') {
-    return targetPage.resolved
-      ? `${indent}${targetPage.loadFunctionName}();`
+    return targetScreen.resolved
+      ? `${indent}${targetScreen.loadFunctionName}();`
       : `${indent}lv_scr_load(${legacyVariableName});`;
   }
   const animMap: Record<string, string> = {
@@ -971,8 +976,8 @@ function generateNavigatePageCode(
     slide_down: 'LV_SCR_LOAD_ANIM_MOVE_BOTTOM',
   };
   const animType = animMap[animation] || 'LV_SCR_LOAD_ANIM_FADE_IN';
-  const variableName = targetPage.resolved
-    ? targetPage.variableName
+  const variableName = targetScreen.resolved
+    ? targetScreen.variableName
     : legacyVariableName;
   return `${indent}lv_scr_load_anim(${variableName}, ${animType}, 300, 0, false);`;
 }
@@ -1024,7 +1029,7 @@ function generateSetTextCode(
     dropdown: `lv_dropdown_set_options(${targetName}, ${text});`,
   };
 
-  // Preserve legacy graphs that stored a component name without page metadata.
+  // Preserve legacy graphs that stored a component name without screen metadata.
   return `${indent}${setters[target.component?.type ?? 'label'] ?? `// Set Text is not supported for ${target.component?.type ?? 'this component'}`}`;
 }
 

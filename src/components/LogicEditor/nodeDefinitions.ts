@@ -149,12 +149,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'navigate_page',
-    label: 'Navigate to Page',
-    description: 'Switches to the specified page',
+    label: 'Navigate to Screen',
+    description: 'Switches to the specified screen',
     icon: '📄',
     color: NODE_COLORS.action,
     defaultParams: {
-      targetPage: '',
+      targetScreen: '',
       animation: 'none',
     },
     inputs: [

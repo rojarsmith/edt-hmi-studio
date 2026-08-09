@@ -251,8 +251,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
 const HierarchyPanel: React.FC = () => {
   const {
-    pages,
-    currentPageId,
+    screens,
+    currentScreenId,
     selection,
     selectComponent,
     updateComponent,
@@ -264,8 +264,8 @@ const HierarchyPanel: React.FC = () => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [draggedId, setDraggedId] = useState<string | null>(null);
   
-  const currentPage = pages.find(p => p.id === currentPageId);
-  const components = useMemo(() => currentPage?.components || [], [currentPage?.components]);
+  const currentScreen = screens.find(p => p.id === currentScreenId);
+  const components = useMemo(() => currentScreen?.components || [], [currentScreen?.components]);
   
   const handleSelect = useCallback((id: string, addToSelection: boolean) => {
     selectComponent(id, addToSelection);

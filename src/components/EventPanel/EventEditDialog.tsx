@@ -14,7 +14,7 @@ interface EventEditDialogProps {
 }
 
 const BUILTIN_ACTIONS: { type: BuiltinActionType; label: string; description: string }[] = [
-  { type: 'navigate', label: 'Navigate to Page', description: 'Switch to the specified page' },
+  { type: 'navigate', label: 'Navigate to Screen', description: 'Switch to the specified screen' },
   { type: 'setProperty', label: 'Set Property', description: 'Set a component property value' },
   { type: 'show', label: 'Show Component', description: 'Show the specified component' },
   { type: 'hide', label: 'Hide Component', description: 'Hide the specified component' },
@@ -41,10 +41,10 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   onSave,
   onClose,
 }) => {
-  const { pages, currentPageId, getAllComponents } = useEditorStore();
+  const { screens, currentScreenId, getAllComponents } = useEditorStore();
   
-  // Suppress unused variable warning - currentPageId is used for reactivity
-  void currentPageId;
+  // Suppress unused variable warning - currentScreenId is used for reactivity
+  void currentScreenId;
   
   // Form state
   const [eventType, setEventType] = useState<LvglEventType>(
@@ -56,7 +56,10 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [actionType, setActionType] = useState<BuiltinActionType>(
     event?.action?.type || 'navigate'
   );
-  const [targetPage, setTargetPage] = useState(event?.action?.targetPage || '');
+  // `targetPage` is the pre-rename spelling, still present in older projects.
+  const [targetScreen, setTargetScreen] = useState(
+    event?.action?.targetScreen || event?.action?.targetPage || ''
+  );
   const [targetComponent, setTargetComponent] = useState(event?.action?.targetComponent || '');
   const [property, setProperty] = useState(event?.action?.property || '');
   const [value, setValue] = useState<string>(
@@ -72,7 +75,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   useEffect(() => {
     if (!event) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset fields when action type changes
-      setTargetPage('');
+      setTargetScreen('');
       setTargetComponent('');
       setProperty('');
       setValue('');
@@ -91,7 +94,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       
       switch (actionType) {
         case 'navigate':
-          action.targetPage = targetPage;
+          action.targetScreen = targetScreen;
           break;
         case 'setProperty':
           action.targetComponent = targetComponent;
@@ -122,7 +125,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     onSave(newEvent);
   }, [
     event, eventType, handlerType, actionType,
-    targetPage, targetComponent, property, value, customCode, onSave
+    targetScreen, targetComponent, property, value, customCode, onSave
   ]);
 
   const generateCodePreview = (): string => {
@@ -137,8 +140,8 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
 
     switch (actionType) {
       case 'navigate':
-        code += `        // Navigate to page: ${targetPage || 'page_name'}\n`;
-        code += `        lv_scr_load(${targetPage || 'page_name'});\n`;
+        code += `        // Navigate to screen: ${targetScreen || 'page_name'}\n`;
+        code += `        lv_scr_load(${targetScreen || 'page_name'});\n`;
         break;
       case 'setProperty':
         code += `        // Set property: ${property || 'property'} = ${value || 'value'}\n`;
@@ -182,15 +185,15 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
         return (
           <div className="action-config">
             <div className="config-row">
-              <label>Target Page</label>
+              <label>Target Screen</label>
               <select 
-                value={targetPage} 
-                onChange={(e) => setTargetPage(e.target.value)}
+                value={targetScreen} 
+                onChange={(e) => setTargetScreen(e.target.value)}
               >
-                <option value="">Select a page...</option>
-                {pages?.map(page => (
-                  <option key={page.id} value={page.name}>
-                    {page.name}
+                <option value="">Select a screen...</option>
+                {screens?.map(screen => (
+                  <option key={screen.id} value={screen.name}>
+                    {screen.name}
                   </option>
                 ))}
               </select>

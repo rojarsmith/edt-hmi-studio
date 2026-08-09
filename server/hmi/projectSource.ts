@@ -9,7 +9,7 @@ import {
 } from '../../src/resources/converters/imageConverter';
 import type { ProjectFile } from '../../src/resources/types';
 import type { ImageResource } from '../../src/resources/types';
-import type { LvglComponent, Page } from '../../src/types';
+import type { LvglComponent, Screen } from '../../src/types';
 import type { CommunicationConfig } from '../../src/types/hmi';
 import { isRecord } from './validation';
 
@@ -28,8 +28,13 @@ interface ImageGenerationPlan {
 }
 
 function asProjectFile(project: Record<string, unknown>): ProjectFile {
-  if (!Array.isArray(project.pages)) {
-    throw new Error('project.pages must be an array');
+  // `pages` is the pre-rename spelling, still sent by older clients and present
+  // in project.json files written before the rename.
+  if (!Array.isArray(project.screens) && Array.isArray(project.pages)) {
+    project = { ...project, screens: project.pages };
+  }
+  if (!Array.isArray(project.screens)) {
+    throw new Error('project.screens must be an array');
   }
   if (!isRecord(project.resources)) {
     throw new Error('project.resources must be an object');
@@ -42,7 +47,7 @@ function asProjectFile(project: Record<string, unknown>): ProjectFile {
 }
 
 function collectUsedImageResources(
-  pages: Page[],
+  screens: Screen[],
   imageResources: ImageResource[],
 ): ImageGenerationPlan[] {
   const plans = new Map<string, ImageGenerationPlan>();
@@ -112,7 +117,7 @@ function collectUsedImageResources(
     }
   };
 
-  for (const page of pages) walk(page.components);
+  for (const screen of screens) walk(screen.components);
   return imageResources.flatMap((image) => {
     const plan = plans.get(image.id);
     return plan ? [plan] : [];
@@ -172,7 +177,7 @@ export async function writeGeneratedProjectSource(
   projectSourceDirectory: string,
 ): Promise<string[]> {
   const projectFile = asProjectFile(project);
-  const pages = projectFile.pages as Page[];
+  const screens = projectFile.screens as Screen[];
   const communication = projectFile.communication as CommunicationConfig;
   const imageResources = projectFile.resources.images ?? [];
   const fontResources = projectFile.resources.fonts ?? [];
@@ -181,7 +186,7 @@ export async function writeGeneratedProjectSource(
   const codeOptions = { lvglVersion: '9' as const };
 
   const generatedCode = generateCode(
-    pages,
+    screens,
     codeOptions,
     logicGraphs,
     undefined,
@@ -193,7 +198,7 @@ export async function writeGeneratedProjectSource(
     lvglConfig?.symbolFont,
   );
   const generatedBindings = generateHmiBindings(
-    pages,
+    screens,
     communication,
     codeOptions,
     logicGraphs,
@@ -203,7 +208,7 @@ export async function writeGeneratedProjectSource(
     ...generatedBindings,
   };
 
-  for (const plan of collectUsedImageResources(pages, imageResources)) {
+  for (const plan of collectUsedImageResources(screens, imageResources)) {
     generatedFiles[`${plan.image.cArrayName}.c`] =
       await generateImageSource(plan.image, plan.targetSize);
   }

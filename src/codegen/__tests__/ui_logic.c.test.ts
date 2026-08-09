@@ -8,7 +8,7 @@ import {
   createLogicConnection,
   createLogicPort,
   createComponent,
-  createPage,
+  createScreen,
 } from './helpers';
 import { getNodeDefinition } from '../../components/LogicEditor/nodeDefinitions';
 
@@ -216,7 +216,7 @@ describe('generateLogicSource', () => {
     it('generates lv_scr_load for no animation', () => {
       const node = createLogicNode('navigate_page', {
         id: 'n1',
-        params: { targetPage: 'settings', animation: 'none' },
+        params: { targetScreen: 'settings', animation: 'none' },
         inputs: [],
         outputs: [],
       });
@@ -228,7 +228,7 @@ describe('generateLogicSource', () => {
     it('generates lv_scr_load_anim for fade animation', () => {
       const node = createLogicNode('navigate_page', {
         id: 'n1',
-        params: { targetPage: 'home', animation: 'fade' },
+        params: { targetScreen: 'home', animation: 'fade' },
         inputs: [],
         outputs: [],
       });
@@ -240,7 +240,7 @@ describe('generateLogicSource', () => {
     it('generates lv_scr_load_anim for slide_left', () => {
       const node = createLogicNode('navigate_page', {
         id: 'n1',
-        params: { targetPage: 'page2', animation: 'slide_left' },
+        params: { targetScreen: 'page2', animation: 'slide_left' },
         inputs: [],
         outputs: [],
       });
@@ -1244,9 +1244,9 @@ describe('generateLogicSource', () => {
           type: 'data',
         })],
       });
-      const page = createPage({
-        id: 'page-id',
-        name: 'Page 1',
+      const screen = createScreen({
+        id: 'screen-id',
+        name: 'Screen 1',
         components: [createComponent('textarea', {
           id: 'c5f1da51-7871-4da3-9e0b-75f1e493a8e1',
           name: 'Textarea_c5f1',
@@ -1256,7 +1256,7 @@ describe('generateLogicSource', () => {
       const result = generateLogicSource(
         defaultOptions({ generateComments: false }),
         [graph],
-        [page],
+        [screen],
       );
 
       expect(result).toContain('static char* var_aaa1 = "abc";');
@@ -1270,8 +1270,8 @@ describe('generateLogicSource', () => {
         id: 'button-uuid',
         name: 'Run Button',
       });
-      const destination = createPage({
-        id: 'destination-page-uuid',
+      const destination = createScreen({
+        id: 'destination-screen-uuid',
         name: 'Machine Status',
       });
       const eventTrigger = createLogicNode('event_trigger', {
@@ -1285,7 +1285,7 @@ describe('generateLogicSource', () => {
       const navigate = createLogicNode('navigate_page', {
         id: 'navigate',
         params: {
-          targetPage: destination.id,
+          targetScreen: destination.id,
           animation: 'none',
         },
         outputs: [],
@@ -1306,7 +1306,7 @@ describe('generateLogicSource', () => {
         defaultOptions({ generateComments: false }),
         [graph],
         [
-          createPage({ id: 'main-page', name: 'Main', components: [button] }),
+          createScreen({ id: 'main-screen', name: 'Main', components: [button] }),
           destination,
         ],
       );
@@ -1349,7 +1349,7 @@ describe('generateLogicSource', () => {
       const result = generateLogicSource(
         defaultOptions({ generateComments: false }),
         [createLogicGraph({ name: 'set_text', nodes: [node] })],
-        [createPage({ components: [component] })],
+        [createScreen({ components: [component] })],
       );
 
       expect(result).toContain(expectedCode);
