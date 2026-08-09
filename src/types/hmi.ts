@@ -23,6 +23,21 @@ export interface BoardDefinition {
    * build cannot be flashed onto a different board by mistake.
    */
   probeBoardPattern: string;
+  /**
+   * LVGL build settings that follow from the hardware, one-to-one with the
+   * board. These mirror `firmware/<board>/include/lv_conf.h`, which is what the
+   * firmware is actually compiled against; keep the two in step when either
+   * changes. Selecting a board fixes them, so the New Project dialog does not
+   * ask for them.
+   */
+  lvgl: {
+    /** `LV_FONT_FMT_TXT_LARGE` */
+    fontLarge: boolean;
+    /** `LV_FONT_DEFAULT`, without the `lv_font_` prefix. */
+    defaultFont: string;
+    /** `LV_MEM_SIZE`, in KB. See docs/lvgl-configuration.md. */
+    memSizeKb: number;
+  };
 }
 
 export const DEFAULT_BOARD_ID: BoardId = 'stm32f746g-disco';
@@ -40,6 +55,11 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     },
     flashBytes: 1024 * 1024,
     probeBoardPattern: '(?:32)?F746GDISCOVERY',
+    lvgl: {
+      fontLarge: true,
+      defaultFont: 'montserrat_14',
+      memSizeKb: 96,
+    },
   },
   {
     id: 'stm32h747i-disco',
@@ -55,6 +75,11 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     // and is not part of this image — see docs/stm32h747i-disco-dual-core.md.
     flashBytes: 1024 * 1024,
     probeBoardPattern: 'DISCO-H747XI',
+    lvgl: {
+      fontLarge: true,
+      defaultFont: 'montserrat_14',
+      memSizeKb: 256,
+    },
   },
 ] as const;
 

@@ -23,15 +23,6 @@ const RESOLUTION_PRESETS: { label: string; w: number; h: number }[] = [
   { label: '1024×600', w: 1024, h: 600 },
 ];
 
-const FONT_OPTIONS = [
-  'montserrat_14',
-  'montserrat_16',
-  'montserrat_20',
-  'montserrat_24',
-  'montserrat_28',
-  'montserrat_32',
-];
-
 const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }) => {
   const defaultBoard = getBoardDefinition(DEFAULT_BOARD_ID);
   const defaultPreset = RESOLUTION_PRESETS.find(
@@ -43,9 +34,6 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
   const [customW, setCustomW] = useState(DEFAULT_DISPLAY.width);
   const [customH, setCustomH] = useState(DEFAULT_DISPLAY.height);
   const [colorDepth, setColorDepth] = useState<16 | 24 | 32>(DEFAULT_DISPLAY.colorDepth);
-  const [fontLarge, setFontLarge] = useState(DEFAULT_LVGL_CONFIG.fontLarge);
-  const [defaultFont, setDefaultFont] = useState(DEFAULT_LVGL_CONFIG.defaultFont);
-  const [memSize, setMemSize] = useState(DEFAULT_LVGL_CONFIG.memSize);
 
   const isCustom = preset === 'custom';
 
@@ -69,14 +57,16 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
       colorDepth: board.display.colorDepth,
       rotation: 0,
     };
+    // The LVGL build settings are a property of the board, not a user choice —
+    // they mirror firmware/<board>/include/lv_conf.h.
     const lvglConfig: LvglConfig = {
       version: '9',
       colorFormat: board.display.colorFormat,
-      fontLarge,
-      defaultFont,
+      fontLarge: board.lvgl.fontLarge,
+      defaultFont: board.lvgl.defaultFont,
       useBuiltinSymbols: DEFAULT_LVGL_CONFIG.useBuiltinSymbols,
       symbolFont: DEFAULT_LVGL_CONFIG.symbolFont,
-      memSize,
+      memSize: board.lvgl.memSizeKb,
     };
     onCreate(projectName, boardId, display, lvglConfig);
   };
@@ -99,9 +89,10 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
             />
           </label>
 
-          {/* Target board */}
+          {/* Target board. Also fixes the colour depth and the LVGL build
+              settings, so none of those are asked for separately. */}
           <label className="npd-label">
-            Development Board
+            Hardware Model Number
             <select
               className="npd-select"
               value={boardId}
@@ -160,29 +151,6 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
             </select>
           </label>
 
-          <div className="npd-section-title">LVGL Configuration</div>
-
-          {/* Font large */}
-          <label className="npd-label npd-checkbox-label">
-            <input type="checkbox" checked={fontLarge} onChange={e => setFontLarge(e.target.checked)} />
-            LV_FONT_FMT_TXT_LARGE (large font support)
-          </label>
-
-          {/* Default font */}
-          <label className="npd-label">
-            Default Font
-            <select className="npd-select" value={defaultFont} onChange={e => setDefaultFont(e.target.value)}>
-              {FONT_OPTIONS.map(f => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          </label>
-
-          {/* Memory size */}
-          <label className="npd-label">
-            Memory Size (KB)
-            <input className="npd-input" type="number" min={16} max={1024} step={8} value={memSize} onChange={e => setMemSize(Number(e.target.value))} />
-          </label>
         </div>
 
         <div className="modal-dialog-footer">
