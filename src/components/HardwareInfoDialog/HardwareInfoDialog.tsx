@@ -29,6 +29,7 @@ function formatBytes(bytes: number): string {
 
 const HardwareInfoDialog: React.FC<HardwareInfoDialogProps> = ({ onClose }) => {
   const currentProjectId = useAppStore((state) => state.currentProjectId);
+  const factoryDevMode = useAppStore((state) => state.factoryDevMode);
   const getProjectConfig = useProjectStore((state) => state.getProjectConfig);
   const [config, setConfig] = useState<ProjectConfig | null>(null);
 
@@ -87,19 +88,29 @@ const HardwareInfoDialog: React.FC<HardwareInfoDialogProps> = ({ onClose }) => {
           <dl className="hwinfo-meta">
             <dt>Flash</dt>
             <dd>{formatBytes(board.flashBytes)}</dd>
-
-            <dt>LVGL heap</dt>
-            <dd>{board.lvgl.memSizeKb} KB</dd>
           </dl>
 
-          <div className="hwinfo-section">LVGL</div>
-          <dl className="hwinfo-meta">
-            <dt>Default font</dt>
-            <dd>{board.lvgl.defaultFont}</dd>
+          {/* The LVGL build settings are an implementation detail of the
+              firmware rather than a property of the board, so they are for EDT
+              engineers — see docs/factory-dev-mode.md. */}
+          {factoryDevMode && (
+            <>
+              <div className="hwinfo-section">
+                LVGL
+                <span className="hwinfo-dev-badge">Factory Dev Mode</span>
+              </div>
+              <dl className="hwinfo-meta">
+                <dt>LVGL heap</dt>
+                <dd>{board.lvgl.memSizeKb} KB</dd>
 
-            <dt>Large font support</dt>
-            <dd>{board.lvgl.fontLarge ? 'Enabled' : 'Disabled'}</dd>
-          </dl>
+                <dt>Default font</dt>
+                <dd>{board.lvgl.defaultFont}</dd>
+
+                <dt>Large font support</dt>
+                <dd>{board.lvgl.fontLarge ? 'Enabled' : 'Disabled'}</dd>
+              </dl>
+            </>
+          )}
 
           <div className="hwinfo-section">Field bus</div>
           <dl className="hwinfo-meta">

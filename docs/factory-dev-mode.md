@@ -63,8 +63,17 @@ The passphrase itself is exported as `FACTORY_DEV_MODE_PASSPHRASE` from
 | --- | --- | --- |
 | **Code** editor tab (generated C source), last in the tab row | shown | hidden |
 | **View → Code** menu item, after Preview | shown | hidden |
+| **LVGL** section of the toolbar **Info** dialog — heap size, default font, large font support | shown | hidden |
 
 More surfaces will be added here as they are decided.
+
+### Notes on the Info dialog
+
+Everything else in that dialog describes the board: resolution, colour format,
+frame buffer size, flash, the field bus, and the ST-LINK board name. Those are
+facts an operator can reasonably need. The LVGL rows are build settings of the
+firmware rather than properties of the hardware, which is why only they are
+gated. The section carries a badge so it is clear why it appeared.
 
 ### Notes on the Code tab
 
