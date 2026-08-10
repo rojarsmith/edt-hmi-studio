@@ -105,6 +105,9 @@ LVGL v9 取得記憶體的方式有兩種，由 `LV_USE_STDLIB_MALLOC` 決定：
 ARGB8888 → 32。必須與面板及其驅動的預期相符。「New Project」對話框以唯讀方式顯示，
 供你確認。
 
+兩片板子都跑 RGB565。[色彩深度](./color-depth.md) 說明把 H747I 改成 32-bit 的
+代價，以及為什麼 Project Settings 裡的這個選項目前傳不到韌體。
+
 ### 2.2 大字型支援
 
 `LV_FONT_FMT_TXT_LARGE` 會放寬 LVGL 壓縮字型格式的內部位移量寬度。當轉換後的字型

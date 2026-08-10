@@ -482,5 +482,7 @@ STM32_Programmer_CLI -c port=SWD mode=UR -ob BCM4=0
   dependency, pinned to an immutable commit.
 - `firmware/vendor/README.md` — how to drop a pre-downloaded archive in to skip
   the ~100 MB LVGL fetch on a board's first build.
+- `docs/color-depth.md` — why this board runs RGB565, and the measured cost of
+  moving it to 32-bit. Uses the MPU and clock configuration described above.
 - `docs/stm32f746g-disco-modbus-hmi-poc.md` — the equivalent notes for the other
   supported board.
