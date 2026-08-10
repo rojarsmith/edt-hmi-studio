@@ -52,9 +52,14 @@ add_compile_definitions(
 # properties intentionally precede add_subdirectory so they also reach LVGL.
 include_directories("${BOARD_ROOT}/include")
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(LV_CONF_BUILD_DISABLE_EXAMPLES ON CACHE BOOL "" FORCE)
-set(LV_CONF_BUILD_DISABLE_DEMOS ON CACHE BOOL "" FORCE)
-set(LV_CONF_BUILD_DISABLE_THORVG_INTERNAL ON CACHE BOOL "" FORCE)
+# LVGL v9.5 looks for lv_conf.h in the top-level project directory and fails the
+# configure step when it is not there; ours lives under include/.
+set(LV_BUILD_CONF_DIR "${BOARD_ROOT}/include" CACHE PATH "" FORCE)
+# Examples, demos and the bundled ThorVG all default to ON upstream and would
+# otherwise be compiled and linked into the firmware image.
+set(CONFIG_LV_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
+set(CONFIG_LV_USE_THORVG_INTERNAL OFF CACHE BOOL "" FORCE)
 add_subdirectory("${LVGL_ROOT}" "${CMAKE_BINARY_DIR}/lvgl" EXCLUDE_FROM_ALL)
 
 set(HAL_SOURCES
