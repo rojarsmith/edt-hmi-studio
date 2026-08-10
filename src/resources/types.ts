@@ -14,6 +14,13 @@ export type ImageFormat = 'RGB565' | 'RGB888' | 'ARGB8888';
 export interface ImageResource {
   id: string;
   name: string;
+  /**
+   * Slash-separated folder path this image sits under, taken from the relative
+   * path of an uploaded directory. Empty string means the root. Only used to
+   * group the resource list; it has no effect on generated code, where every
+   * image is a flat C array.
+   */
+  folder?: string;
   originalName: string;
   width: number;
   height: number;

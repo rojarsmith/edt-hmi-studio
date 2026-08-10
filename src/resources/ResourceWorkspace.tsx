@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useResourceStore } from './resourceStore';
-import ImageManager from './ImageManager';
+import ImageResourceManager from './ImageResourceManager';
 import FontManager from './FontManager';
 import IconLibrary from './IconLibrary';
 import './ResourceWorkspace.css';
@@ -51,6 +51,10 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
     : kind === 'text'
       ? fonts.length
       : null;
+  // The image manager is a two-pane layout that owns its own search and needs
+  // the full height, so the shared search box and view toggle would only get in
+  // its way.
+  const ownsItsChrome = kind === 'image';
 
   return (
     <div className="resource-workspace">
@@ -64,7 +68,7 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
           </h2>
           <p>{view.subtitle}</p>
         </div>
-        <div className="view-toggle">
+        <div className="view-toggle" hidden={ownsItsChrome}>
           <button
             className={viewMode === 'grid' ? 'active' : ''}
             onClick={() => setViewMode('grid')}
@@ -84,29 +88,34 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
         </div>
       </div>
 
-      <div className="resource-search">
-        <input
-          type="text"
-          placeholder={view.searchPlaceholder}
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-        />
-        {searchQuery && (
-          <button
-            className="clear-search"
-            onClick={() => setSearchQuery('')}
-            aria-label="Clear search"
-          >
-            ×
-          </button>
-        )}
-      </div>
+      {!ownsItsChrome && (
+        <div className="resource-search">
+          <input
+            type="text"
+            placeholder={view.searchPlaceholder}
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          {searchQuery && (
+            <button
+              className="clear-search"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
 
-      <div className="resource-content">
-        {kind === 'image' && <ImageManager viewMode={viewMode} />}
-        {kind === 'text' && <FontManager viewMode={viewMode} />}
-        {kind === 'icon' && <IconLibrary viewMode={viewMode} />}
-      </div>
+      {kind === 'image' ? (
+        <ImageResourceManager />
+      ) : (
+        <div className="resource-content">
+          {kind === 'text' && <FontManager viewMode={viewMode} />}
+          {kind === 'icon' && <IconLibrary viewMode={viewMode} />}
+        </div>
+      )}
     </div>
   );
 };

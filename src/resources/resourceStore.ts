@@ -43,7 +43,8 @@ interface ResourceState {
   selectedResourceId: string | null;
   
   // Actions - Images
-  addImage: (file: File) => Promise<ImageResource>;
+  /** `folder` is the slash-separated group path, from an uploaded directory. */
+  addImage: (file: File, folder?: string) => Promise<ImageResource>;
   updateImage: (id: string, updates: Partial<ImageResource>) => void;
   deleteImage: (id: string) => void;
   getImageById: (id: string) => ImageResource | undefined;
@@ -85,16 +86,17 @@ export const useResourceStore = create<ResourceState>((set, get) => ({
   selectedResourceId: null,
   
   // Image actions
-  addImage: async (file: File) => {
+  addImage: async (file: File, folder?: string) => {
     const base64Data = await fileToBase64(file);
     const { width, height } = await getImageDimensions(base64Data);
-    
+
     const baseName = file.name.replace(/\.[^/.]+$/, '');
     const cArrayName = `ui_img_${toCName(baseName)}`;
-    
+
     const newImage: ImageResource = {
       id: generateId(),
       name: baseName,
+      folder: folder || '',
       originalName: file.name,
       width,
       height,

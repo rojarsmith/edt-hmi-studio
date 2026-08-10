@@ -56,7 +56,7 @@ function getLvglColorFormatV9(format: EmittedImageFormat): string {
  * RGB565A8 is planar — a w*h*2 color plane followed by a w*h alpha plane — so
  * it averages 3 bytes per pixel even though its row stride is only w*2.
  */
-function getBytesPerPixel(format: EmittedImageFormat): number {
+export function getBytesPerPixel(format: EmittedImageFormat): number {
   switch (format) {
     case 'RGB565':
       return 2;

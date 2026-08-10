@@ -1,0 +1,232 @@
+/* Two-pane image resource manager: folder tree left, batch table right. */
+
+.imgres {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------- tree --- */
+
+.imgres-tree {
+  display: flex;
+  width: 240px;
+  min-width: 160px;
+  max-width: 420px;
+  flex: none;
+  flex-direction: column;
+  border-right: 1px solid #e0e0e0;
+  background: #fff;
+}
+
+.imgres-tree-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eceff3;
+  color: #667188;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.imgres-tree-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 0 12px;
+}
+
+.imgres-node {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px 5px 0;
+  border: none;
+  background: none;
+  color: #3b4557;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.imgres-node:hover {
+  background: #f4f7fb;
+}
+
+.imgres-node.selected {
+  background: #e6eefa;
+  color: #21548f;
+  font-weight: 600;
+}
+
+.imgres-twisty {
+  width: 16px;
+  flex: none;
+  color: #8a94a4;
+  font-size: 9px;
+  text-align: center;
+}
+
+.imgres-twisty-spacer {
+  width: 16px;
+  flex: none;
+}
+
+.imgres-node-name {
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.imgres-node-count {
+  flex: none;
+  color: #8a94a4;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* --------------------------------------------------------------- table --- */
+
+.imgres-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.imgres-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff;
+}
+
+.imgres-search {
+  min-width: 0;
+  max-width: 320px;
+  flex: 1;
+  height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.imgres-search:focus {
+  border-color: #4a90d9;
+  outline: none;
+}
+
+.imgres-crumb {
+  overflow: hidden;
+  color: #667188;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.imgres-spacer {
+  flex: 1;
+}
+
+.imgres-selection {
+  color: #21548f;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.imgres-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.imgres-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.imgres-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 10px;
+  border-bottom: 1px solid #dce2eb;
+  background: #f7f9fc;
+  color: #667188;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.imgres-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #edf0f4;
+  color: #3b4557;
+  vertical-align: middle;
+}
+
+.imgres-table tbody tr:hover {
+  background: #f7f9fc;
+}
+
+.imgres-table tbody tr.selected {
+  background: #e6eefa;
+}
+
+.imgres-col-check {
+  width: 34px;
+}
+
+.imgres-col-thumb {
+  width: 64px;
+}
+
+.imgres-thumb {
+  display: block;
+  width: 48px;
+  height: 32px;
+  border: 1px solid #e3e8ef;
+  border-radius: 3px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.imgres-name {
+  font-weight: 500;
+}
+
+.imgres-folder {
+  color: #8a94a4;
+  font-size: 11px;
+}
+
+.imgres-muted {
+  color: #a8b0bd;
+}
+
+.imgres-table select {
+  width: 100%;
+  min-width: 96px;
+  height: 26px;
+  padding: 2px 4px;
+  border: 1px solid #cbd3df;
+  border-radius: 3px;
+  background: #fff;
+  color: #253044;
+  font: inherit;
+  font-size: 11px;
+}
+
+.imgres-empty {
+  padding: 48px 20px;
+  color: #8a94a4;
+  text-align: center;
+}
