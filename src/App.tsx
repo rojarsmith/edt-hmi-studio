@@ -19,6 +19,7 @@ import StatusBar from './components/StatusBar';
 import AlignToolbar from './components/AlignToolbar';
 import HelpPanel from './components/HelpPanel';
 import AboutDialog from './components/AboutDialog';
+import HardwareInfoDialog from './components/HardwareInfoDialog';
 import Toast, { useToast } from './components/Toast';
 import Modal, { modal } from './components/Modal';
 import CodePreview from './components/CodePreview';
@@ -160,6 +161,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   // UI State
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [showAboutDialog, setShowAboutDialog] = useState(false);
+  const [showHardwareInfo, setShowHardwareInfo] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('design');
   // The Code tab is factory-dev-mode only — see docs/factory-dev-mode.md.
   const factoryDevMode = useAppStore(s => s.factoryDevMode);
@@ -652,6 +654,11 @@ const EditorView: React.FC<EditorViewProps> = ({
             <ToolbarButton icon="↪️" label="Redo" onClick={() => useEditorStore.getState().redo()} shortcut="Ctrl+Y" />
             <div className="toolbar-divider" />
             <ToolbarButton
+              icon="ℹ️"
+              label="Info"
+              onClick={() => setShowHardwareInfo(true)}
+            />
+            <ToolbarButton
               icon="⚙️"
               label="Settings"
               onClick={() => setShowProjectSettings(true)}
@@ -684,6 +691,11 @@ const EditorView: React.FC<EditorViewProps> = ({
 
       {/* About */}
       {showAboutDialog && <AboutDialog onClose={() => setShowAboutDialog(false)} />}
+
+      {/* Hardware information — read-only counterpart to Project Settings */}
+      {showHardwareInfo && (
+        <HardwareInfoDialog onClose={() => setShowHardwareInfo(false)} />
+      )}
 
       {/* Project Settings */}
       {showProjectSettings && <ProjectSettings />}

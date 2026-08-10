@@ -99,23 +99,6 @@ const ProjectSettings: React.FC = () => {
             Project Name
             <input className="npd-input" type="text" value={name} onChange={e => setName(e.target.value)} />
           </label>
-
-          <div className="npd-section-title">Hardware</div>
-
-          <label className="npd-label">
-            Hardware Model Number
-            <input className="npd-input" type="text" value={board.name} disabled />
-            <span className="npd-hint">
-              {board.display.width}×{board.display.height} ·{' '}
-              {board.display.colorFormat} ({board.display.colorDepth}-bit) ·{' '}
-              LVGL heap {board.lvgl.memSizeKb} KB · default font{' '}
-              {board.lvgl.defaultFont}
-            </span>
-            <span className="npd-hint">
-              Fixed by the board. The firmware is built against these values, so
-              the editor does not offer to change them.
-            </span>
-          </label>
         </div>
 
         <div className="modal-dialog-footer">

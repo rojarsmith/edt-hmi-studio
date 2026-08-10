@@ -1,0 +1,64 @@
+.hardware-info-dialog {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+}
+
+.hwinfo-body {
+  padding: 20px 24px 8px;
+}
+
+.hwinfo-board {
+  margin: 0;
+  color: #e6e6f0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.hwinfo-vendor {
+  margin: 2px 0 0;
+  color: #8a8a9e;
+  font-size: 12px;
+}
+
+.hwinfo-note {
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #3a3a5c;
+  border-radius: 6px;
+  background: #1a1a2e;
+  color: #7c7c96;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.hwinfo-section {
+  margin: 16px 0 0;
+  color: #6f6f88;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hwinfo-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.hwinfo-meta dt {
+  color: #8a8a9e;
+  white-space: nowrap;
+}
+
+.hwinfo-meta dd {
+  margin: 0;
+  color: #d8d8e4;
+}
+
+.hwinfo-mono {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 11px;
+}
