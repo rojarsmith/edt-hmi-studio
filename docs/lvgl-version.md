@@ -36,6 +36,10 @@ The cache invalidates on the `-Name` value, so changing the pin changes the name
 and the next bootstrap re-downloads automatically. No manual cache clearing is
 needed.
 
+The archive is 104 MB. An equivalent archive placed in `firmware/vendor` is used
+instead of downloading it — matched by the commit GitHub embeds in the zip rather
+than by filename, so it satisfies the same pin. See `firmware/vendor/README.md`.
+
 ### 1.2 WASM preview — **not pinned, and its prebuilt artifacts are still 9.2**
 
 This path has no version pin at all. `wasm/build_lvgl_lib.sh` compiles whatever
@@ -93,6 +97,25 @@ renamed or removed in 9.3–9.5.
 See [LVGL Configuration](./lvgl-configuration.md) for what the individual
 options mean and which of them the project drives from the board definition.
 
+### 3.1 The CMake options are a separate matter, and they did change
+
+`lv_conf.h` options survived 9.3–9.5, but the options the firmware passes to
+LVGL's own CMake did not, and the old names fail silently rather than loudly:
+
+| Removed in v9.5 | Replacement | Upstream default |
+| --- | --- | --- |
+| `LV_CONF_BUILD_DISABLE_EXAMPLES` | `CONFIG_LV_BUILD_EXAMPLES` | **ON** |
+| `LV_CONF_BUILD_DISABLE_DEMOS` | `CONFIG_LV_BUILD_DEMOS` | **ON** |
+| `LV_CONF_BUILD_DISABLE_THORVG_INTERNAL` | `CONFIG_LV_USE_THORVG_INTERNAL` | **ON** |
+
+Because the replacements default to ON, leaving the old names in place compiles
+and links the demos, examples and ThorVG into the firmware image instead of
+erroring.
+
+v9.5 also resolves `lv_conf.h` from the top-level project directory and issues a
+`FATAL_ERROR` when it is not there. Ours lives under `include/`, so both boards
+set `LV_BUILD_CONF_DIR` before `add_subdirectory`.
+
 ## 4. Bumping the version in future
 
 1. Find the release commit: `https://api.github.com/repos/lvgl/lvgl/git/ref/tags/vX.Y.Z`.
@@ -102,15 +125,30 @@ options mean and which of them the project drives from the board definition.
 4. Rebuild and replace the WASM artifacts in `public/lvgl-wasi/` (§1.2).
 5. Check the upstream changelog for `lv_conf.h` options and widget API renames
    that affect `src/codegen/templates/`.
-6. Update the table at the top of this file.
+6. Diff `env_support/cmake/os_desktop.cmake` against the previous release for
+   renamed build options, and confirm every `CONFIG_LV_*` the boards set still
+   exists (§3.1). A dropped option does not warn.
+7. Actually run a firmware build. A configure or link failure here is the normal
+   outcome of a bump, not an unlikely one.
+8. Update the table at the top of this file.
 
 ## 5. Verification status
 
-The pin, the manifest and the config headers were changed and reviewed against
-the upstream changelog for 9.3–9.5, which records no `lv_conf.h` or widget API
-breaks affecting this project.
+The pin, the manifest and the config headers were reviewed against the upstream
+changelog for 9.3–9.5, which records no `lv_conf.h` or widget API breaks
+affecting this project.
 
-**Neither build has been run against v9.5.0.** The firmware build needs the ARM
-toolchain and the WASM build needs emsdk, neither of which was available when
-this change was made. The first real bootstrap on v9.5.0 is still unverified —
-treat a first failed firmware build as a likely consequence of this bump.
+**Firmware — built.** Both boards configure, compile and link against v9.5.0
+with CubeCLT 1.22.0 (`arm-none-eabi-gcc` 14.3.1), producing `elf`, `hex`, `bin`
+and `map`:
+
+| Board | text | data | bss |
+| --- | --- | --- | --- |
+| STM32H747I-DISCO | 281344 | 812 | 279516 |
+| STM32F746G-DISCO | 273368 | 608 | 112948 |
+
+This required the CMake changes in §3.1; the pin alone does not build.
+
+**Not verified:** neither image has been flashed, so rendering, touch and the
+Modbus loop are unexercised on v9.5. The WASM preview is untouched and still
+runs the 9.2 artifacts described in §1.2.

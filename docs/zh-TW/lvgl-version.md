@@ -35,6 +35,10 @@ Install-PinnedArchive `
 快取以 `-Name` 的值作為失效判斷，因此改版本就會改名稱，下次 bootstrap 會自動重新
 下載，不需要手動清快取。
 
+這個壓縮檔有 104 MB。若 `firmware/vendor` 底下已有同等的壓縮檔，就會直接採用而不下載
+—— 比對的是 GitHub 內嵌在 zip 裡的 commit 而非檔名，因此同樣受釘選約束。詳見
+`firmware/vendor/README.md`。
+
 ### 1.2 WASM 預覽 — **未釘選，且 prebuilt 產物仍是 9.2**
 
 這條路徑完全沒有版本釘選。`wasm/build_lvgl_lib.sh` 編譯的是某個寫死絕對路徑底下
@@ -88,6 +92,24 @@ LVGL_DIR="/home/xcssa/.openclaw/workspace/tools/lvgl"
 各選項的意義、以及哪些是由板子定義帶入的，參見
 [LVGL 設定](./lvgl-configuration.md)。
 
+### 3.1 CMake 選項是另一回事，而且它確實改了
+
+`lv_conf.h` 的選項在 9.3–9.5 之間存活了下來，但韌體傳給 LVGL 自身 CMake 的那些選項
+沒有 —— 而且舊名稱是**無聲失效**，不會報錯：
+
+| v9.5 移除 | 取代者 | 上游預設 |
+| --- | --- | --- |
+| `LV_CONF_BUILD_DISABLE_EXAMPLES` | `CONFIG_LV_BUILD_EXAMPLES` | **ON** |
+| `LV_CONF_BUILD_DISABLE_DEMOS` | `CONFIG_LV_BUILD_DEMOS` | **ON** |
+| `LV_CONF_BUILD_DISABLE_THORVG_INTERNAL` | `CONFIG_LV_USE_THORVG_INTERNAL` | **ON** |
+
+由於取代者一律預設為 ON，沿用舊名稱的後果不是編譯失敗，而是把 demos、examples 與
+ThorVG 一起編進韌體映像。
+
+此外 v9.5 只會從專案頂層目錄尋找 `lv_conf.h`，找不到就直接 `FATAL_ERROR`。本專案的
+放在 `include/` 底下，因此兩片板子都在 `add_subdirectory` 之前設定
+`LV_BUILD_CONF_DIR`。
+
 ## 4. 日後升版步驟
 
 1. 查出發布 commit：`https://api.github.com/repos/lvgl/lvgl/git/ref/tags/vX.Y.Z`。
@@ -97,13 +119,25 @@ LVGL_DIR="/home/xcssa/.openclaw/workspace/tools/lvgl"
 4. 重新建置並替換 `public/lvgl-wasi/` 底下的 WASM 產物（§1.2）。
 5. 檢查上游 changelog 中影響 `src/codegen/templates/` 的 `lv_conf.h` 選項與
    widget API 改名。
-6. 更新本文件開頭的表格。
+6. 比對前一版的 `env_support/cmake/os_desktop.cmake`，確認板子設定的每一個
+   `CONFIG_LV_*` 都還存在（§3.1）。選項被移除時不會有任何警告。
+7. 實際跑一次韌體建置。升版導致 configure 或連結失敗是常態，不是意外。
+8. 更新本文件開頭的表格。
 
 ## 5. 驗證狀態
 
-釘選、manifest 與設定檔標頭都已修改，並比對過 9.3–9.5 的上游 changelog，其中沒有
-影響本專案的 `lv_conf.h` 或 widget API 破壞性變更。
+釘選、manifest 與設定檔標頭都已比對過 9.3–9.5 的上游 changelog，其中沒有影響本專案的
+`lv_conf.h` 或 widget API 破壞性變更。
 
-**但兩條建置路徑都尚未實際對 v9.5.0 建置過。** 韌體建置需要 ARM 工具鏈、WASM 建置
-需要 emsdk，進行這項變更時兩者都不具備。第一次真正以 v9.5.0 bootstrap 仍屬未驗證 —
-若第一次韌體建置失敗，請優先懷疑是這次升版造成的。
+**韌體 — 已建置。** 兩片板子都能對 v9.5.0 完成 configure、編譯與連結，使用
+CubeCLT 1.22.0（`arm-none-eabi-gcc` 14.3.1），並產出 `elf`、`hex`、`bin` 與 `map`：
+
+| 板子 | text | data | bss |
+| --- | --- | --- | --- |
+| STM32H747I-DISCO | 281344 | 812 | 279516 |
+| STM32F746G-DISCO | 273368 | 608 | 112948 |
+
+這需要 §3.1 的 CMake 變更；只改釘選是建不起來的。
+
+**尚未驗證：** 兩個映像都還沒燒錄，因此 v9.5 上的畫面渲染、觸控與 Modbus 迴圈都未經
+實機執行。WASM 預覽未動，仍是 §1.2 所述的 9.2 產物。
