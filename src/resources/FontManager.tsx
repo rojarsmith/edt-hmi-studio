@@ -17,10 +17,6 @@ import {
 } from './converters/fontConverter';
 import './FontManager.css';
 
-interface FontManagerProps {
-  viewMode: 'grid' | 'list';
-}
-
 /** Track which @font-face rules we've already injected */
 const loadedFontFaces = new Set<string>();
 
@@ -44,7 +40,7 @@ function ensureFontFaceLoaded(font: FontResource): string {
 
 const BPP_OPTIONS: (1 | 2 | 4 | 8)[] = [1, 2, 4, 8];
 
-const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
+const FontManager: React.FC = () => {
   const {
     getFilteredFonts,
     addFont,
@@ -200,7 +196,7 @@ const FontManager: React.FC<FontManagerProps> = ({ viewMode }) => {
       </div>
       
       {/* Font List */}
-      <div className={`font-list ${viewMode}`}>
+      <div className="font-list">
         {fonts.length === 0 ? (
           <div className="empty-state">
             <span className="empty-icon">🔤</span>

@@ -5,10 +5,6 @@ import { toast } from '../components/Toast';
 import { useResourceStore } from './resourceStore';
 import './IconLibrary.css';
 
-interface IconLibraryProps {
-  viewMode: 'grid' | 'list';
-}
-
 // Built-in Material Design Icons (subset)
 const BUILT_IN_ICONS = [
   // Navigation
@@ -69,7 +65,7 @@ const CATEGORIES = [
   { id: 'alert', name: 'Alerts' },
 ];
 
-const IconLibrary: React.FC<IconLibraryProps> = ({ viewMode }) => {
+const IconLibrary: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
   // The filter below was already written but read local state nothing ever set,
@@ -127,7 +123,7 @@ const IconLibrary: React.FC<IconLibraryProps> = ({ viewMode }) => {
       </div>
       
       {/* Icon Grid */}
-      <div className={`icon-grid ${viewMode}`}>
+      <div className="icon-grid">
         {filteredIcons.length === 0 ? (
           <div className="empty-state">
             <span className="empty-icon">⭐</span>
@@ -144,9 +140,6 @@ const IconLibrary: React.FC<IconLibraryProps> = ({ viewMode }) => {
               <svg viewBox="0 0 24 24" width="24" height="24">
                 <path d={icon.path} fill="currentColor" />
               </svg>
-              {viewMode === 'list' && (
-                <span className="icon-name">{icon.name}</span>
-              )}
             </div>
           ))
         )}

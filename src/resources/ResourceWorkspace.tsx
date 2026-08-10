@@ -37,8 +37,6 @@ const VIEWS: Record<ResourceKind, {
 };
 
 const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
-  const viewMode = useResourceStore((state) => state.viewMode);
-  const setViewMode = useResourceStore((state) => state.setViewMode);
   const searchQuery = useResourceStore((state) => state.searchQuery);
   const setSearchQuery = useResourceStore((state) => state.setSearchQuery);
   const images = useResourceStore((state) => state.images);
@@ -68,24 +66,6 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
           </h2>
           <p>{view.subtitle}</p>
         </div>
-        <div className="view-toggle" hidden={ownsItsChrome}>
-          <button
-            className={viewMode === 'grid' ? 'active' : ''}
-            onClick={() => setViewMode('grid')}
-            title="Grid view"
-            aria-label="Grid view"
-          >
-            ▦
-          </button>
-          <button
-            className={viewMode === 'list' ? 'active' : ''}
-            onClick={() => setViewMode('list')}
-            title="List view"
-            aria-label="List view"
-          >
-            ☰
-          </button>
-        </div>
       </div>
 
       {!ownsItsChrome && (
@@ -112,8 +92,8 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
         <ImageResourceManager />
       ) : (
         <div className="resource-content">
-          {kind === 'text' && <FontManager viewMode={viewMode} />}
-          {kind === 'icon' && <IconLibrary viewMode={viewMode} />}
+          {kind === 'text' && <FontManager />}
+          {kind === 'icon' && <IconLibrary />}
         </div>
       )}
     </div>

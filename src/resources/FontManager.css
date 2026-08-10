@@ -9,22 +9,13 @@
 
 /* Font List */
 .font-list {
+  display: grid;
   flex: 1;
+  align-content: start;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   overflow-y: auto;
   padding: 8px;
-}
-
-.font-list.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-  align-content: start;
-}
-
-.font-list.list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 /* Font Item - Grid View */

@@ -22,6 +22,43 @@ import {
 // Generate unique ID
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+/** Local copies so the store does not depend on the view layer's tree module. */
+const normalizeFolder = (input: string | undefined): string => (input || '')
+  .replace(/\\/g, '/')
+  .split('/')
+  .filter((segment) => segment !== '' && segment !== '.' && segment !== '..')
+  .join('/');
+
+const isWithin = (path: string, folder: string): boolean =>
+  folder === '' || path === folder || path.startsWith(`${folder}/`);
+
+/** A path plus every ancestor, so creating a/b/c materializes a and a/b too. */
+const chainOf = (path: string): string[] => {
+  const segments = path.split('/');
+  return segments.map((_, index) => segments.slice(0, index + 1).join('/'));
+};
+
+/** Rewrites `from` and everything under it to sit at `to`. */
+function remapFolders(
+  state: { imageFolders: string[]; images: ImageResource[] },
+  from: string,
+  to: string,
+) {
+  const rewrite = (path: string) => (
+    isWithin(path, from) ? to + path.slice(from.length) : path
+  );
+  return {
+    imageFolders: [...new Set([
+      ...state.imageFolders.map(rewrite),
+      ...chainOf(to),
+    ])].sort(),
+    images: state.images.map((image) => {
+      const path = normalizeFolder(image.folder);
+      return isWithin(path, from) ? { ...image, folder: rewrite(path) } : image;
+    }),
+  };
+}
+
 // Generate C-safe name
 const toCName = (name: string): string => {
   return name
@@ -33,12 +70,17 @@ const toCName = (name: string): string => {
 interface ResourceState {
   // Resources
   images: ImageResource[];
+  /**
+   * Folders that exist independently of the images in them. Folder paths are
+   * otherwise derivable from image.folder, but an empty folder has no image to
+   * derive it from and would vanish on reload.
+   */
+  imageFolders: string[];
   fonts: FontResource[];
   icons: IconResource[];
   
   // UI State. Which resource kind is showing is a routing concern now that
   // Image, Text and Icon are top-level tabs, so it no longer lives here.
-  viewMode: 'grid' | 'list';
   searchQuery: string;
   selectedResourceId: string | null;
   
@@ -60,8 +102,15 @@ interface ResourceState {
   addIcon: (icon: Omit<IconResource, 'id'>) => IconResource;
   deleteIcon: (id: string) => void;
   
+  // Actions - Folders
+  createFolder: (path: string) => void;
+  renameFolder: (path: string, nextName: string) => void;
+  moveFolder: (path: string, nextParent: string) => void;
+  /** Removes the folder and its subfolders; images inside move to the parent. */
+  deleteFolder: (path: string) => void;
+  moveImages: (ids: readonly string[], folder: string) => void;
+
   // Actions - UI
-  setViewMode: (mode: 'grid' | 'list') => void;
   setSearchQuery: (query: string) => void;
   setSelectedResource: (id: string | null) => void;
   
@@ -79,9 +128,9 @@ interface ResourceState {
 export const useResourceStore = create<ResourceState>((set, get) => ({
   // Initial state
   images: [],
+  imageFolders: [],
   fonts: [],
   icons: [],
-  viewMode: 'grid',
   searchQuery: '',
   selectedResourceId: null,
   
@@ -217,11 +266,67 @@ export const useResourceStore = create<ResourceState>((set, get) => ({
     }));
   },
   
-  // UI actions
-  setViewMode: (mode) => {
-    set({ viewMode: mode });
+  // Folder actions
+  createFolder: (path) => {
+    const clean = normalizeFolder(path);
+    if (clean === '') return;
+    set((state) => ({
+      imageFolders: [...new Set([...state.imageFolders, ...chainOf(clean)])].sort(),
+    }));
   },
-  
+
+  renameFolder: (path, nextName) => {
+    const from = normalizeFolder(path);
+    const leaf = normalizeFolder(nextName);
+    // A rename replaces the last segment only; a slash would silently reparent.
+    if (from === '' || leaf === '' || leaf.includes('/')) return;
+    const parent = from.includes('/') ? from.slice(0, from.lastIndexOf('/')) : '';
+    const to = parent === '' ? leaf : `${parent}/${leaf}`;
+    if (to === from) return;
+    set((state) => remapFolders(state, from, to));
+  },
+
+  moveFolder: (path, nextParent) => {
+    const from = normalizeFolder(path);
+    const parent = normalizeFolder(nextParent);
+    if (from === '') return;
+    // Moving a folder inside itself would detach the whole subtree.
+    if (parent === from || parent.startsWith(`${from}/`)) return;
+    const leaf = from.slice(from.lastIndexOf('/') + 1);
+    const to = parent === '' ? leaf : `${parent}/${leaf}`;
+    if (to === from) return;
+    set((state) => remapFolders(state, from, to));
+  },
+
+  deleteFolder: (path) => {
+    const target = normalizeFolder(path);
+    if (target === '') return;
+    const parent = target.includes('/') ? target.slice(0, target.lastIndexOf('/')) : '';
+    set((state) => ({
+      imageFolders: state.imageFolders.filter(
+        (folder) => folder !== target && !folder.startsWith(`${target}/`),
+      ),
+      // Images are never destroyed by a folder operation; they surface in the
+      // parent instead.
+      images: state.images.map((image) => (
+        isWithin(normalizeFolder(image.folder), target)
+          ? { ...image, folder: parent }
+          : image
+      )),
+    }));
+  },
+
+  moveImages: (ids, folder) => {
+    const target = normalizeFolder(folder);
+    const wanted = new Set(ids);
+    set((state) => ({
+      images: state.images.map((image) => (
+        wanted.has(image.id) ? { ...image, folder: target } : image
+      )),
+    }));
+  },
+
+  // UI actions
   setSearchQuery: (query) => {
     set({ searchQuery: query });
   },
@@ -246,6 +351,7 @@ export const useResourceStore = create<ResourceState>((set, get) => ({
   clearAllResources: () => {
     set({
       images: [],
+      imageFolders: [],
       fonts: [],
       icons: [],
       selectedResourceId: null,

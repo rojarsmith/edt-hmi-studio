@@ -37,11 +37,18 @@ describe('normalizeFolderPath', () => {
 });
 
 describe('folderFromRelativePath', () => {
-  it('drops the file name', () => {
-    expect(folderFromRelativePath('images/battery/x.png')).toBe('images/battery');
+  it('drops the file name and the chosen directory itself', () => {
+    // Picking `images/` should not nest everything under an `images` node.
+    expect(folderFromRelativePath('images/battery/x.png')).toBe('battery');
+    expect(folderFromRelativePath('images/ui/icons/small/x.png'))
+      .toBe('ui/icons/small');
   });
 
-  it('returns the root for a file at the top level', () => {
+  it('puts a file sitting directly in the chosen directory at the root', () => {
+    expect(folderFromRelativePath('images/logo.png')).toBe('');
+  });
+
+  it('returns the root when there is no directory at all', () => {
     expect(folderFromRelativePath('x.png')).toBe('');
   });
 });
@@ -108,6 +115,18 @@ describe('selectImages', () => {
   it('includes subfolders of the selected folder', () => {
     expect(selectImages(images, 'ui', '').map((i) => i.name))
       .toEqual(['battery_full', 'battery_low', 'arrow']);
+  });
+
+  it('excludes subfolders when Show child is off', () => {
+    // Nothing sits directly in ui — everything is one level deeper.
+    expect(selectImages(images, 'ui', '', false)).toEqual([]);
+    expect(selectImages(images, 'ui/battery', '', false).map((i) => i.name))
+      .toEqual(['battery_full', 'battery_low']);
+  });
+
+  it('shows only unfoldered images at the root with Show child off', () => {
+    expect(selectImages(images, '', '', false).map((i) => i.name))
+      .toEqual(['logo']);
   });
 
   it('narrows to one folder when that folder is selected', () => {

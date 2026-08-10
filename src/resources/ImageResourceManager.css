@@ -230,3 +230,69 @@
   color: #8a94a4;
   text-align: center;
 }
+
+/* ------------------------------------------------- folder editing / DnD --- */
+
+.imgres-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.imgres-tree-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.imgres-tree-actions button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: #667188;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.imgres-tree-actions button:hover:not(:disabled) {
+  border-color: #c9d3e0;
+  background: #f2f6fc;
+}
+
+.imgres-tree-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.imgres-node.droptarget {
+  outline: 2px solid #4a90d9;
+  outline-offset: -2px;
+  background: #dcebfb;
+}
+
+.imgres-rename {
+  width: calc(100% - 24px);
+  height: 26px;
+  margin: 2px 0;
+  padding: 2px 6px;
+  border: 1px solid #4a90d9;
+  border-radius: 3px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.imgres-showchild {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #526076;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.imgres-table tbody tr[draggable='true'] {
+  cursor: grab;
+}

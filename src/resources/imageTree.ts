@@ -41,14 +41,17 @@ export function normalizeFolderPath(input: string | undefined): string {
 }
 
 /**
- * The folder of a File from a directory upload. `webkitRelativePath` includes
- * the file name and the dropped directory itself, both of which are stripped:
- * `images/battery/x.png` becomes `images/battery`.
+ * The folder of a File from a directory upload.
+ *
+ * `webkitRelativePath` is `<chosen dir>/<subdirs...>/<file>`. Both the file
+ * name and the chosen directory itself are dropped, so picking `images/`
+ * puts `images/ui/battery/x.png` in `ui/battery` rather than nesting
+ * everything under a redundant `images` node.
  */
 export function folderFromRelativePath(relativePath: string): string {
-  const normalized = normalizeFolderPath(relativePath);
-  const cut = normalized.lastIndexOf('/');
-  return cut === -1 ? ROOT_PATH : normalized.slice(0, cut);
+  const segments = normalizeFolderPath(relativePath).split('/');
+  // segments = [chosenDir, ...subdirs, fileName]
+  return segments.length <= 2 ? ROOT_PATH : segments.slice(1, -1).join('/');
 }
 
 /** Every ancestor of a path, root first, excluding the path itself. */
@@ -62,7 +65,15 @@ function ancestorsOf(path: string): string[] {
   return result;
 }
 
-export function buildImageTree(images: readonly ImageResource[]): ImageFolderNode {
+/**
+ * @param folders Paths that exist on their own. A folder the user created but
+ *   has not put anything in yet has no image to derive it from, so it has to be
+ *   supplied separately or it would not appear.
+ */
+export function buildImageTree(
+  images: readonly ImageResource[],
+  folders: readonly string[] = [],
+): ImageFolderNode {
   const nodes = new Map<string, ImageFolderNode>();
   const makeNode = (path: string): ImageFolderNode => ({
     path,
@@ -73,6 +84,13 @@ export function buildImageTree(images: readonly ImageResource[]): ImageFolderNod
   });
 
   nodes.set(ROOT_PATH, makeNode(ROOT_PATH));
+
+  for (const folder of folders) {
+    const path = normalizeFolderPath(folder);
+    for (const ancestor of [...ancestorsOf(path), path]) {
+      if (!nodes.has(ancestor)) nodes.set(ancestor, makeNode(ancestor));
+    }
+  }
 
   for (const image of images) {
     const path = normalizeFolderPath(image.folder);
@@ -112,18 +130,27 @@ export function isWithinFolder(path: string, folder: string): boolean {
 }
 
 /**
- * Images shown for a selected folder: everything in it and in its subfolders,
- * optionally narrowed by a case-insensitive search over name and folder.
+ * Images shown for a selected folder, narrowed by a case-insensitive search
+ * over name and folder path.
+ *
+ * `includeChildren` is the Show child toggle. Off, only images sitting directly
+ * in the folder appear; on, the whole subtree does. Note that the root with
+ * children off means "images in no folder at all", which is a real answer
+ * rather than a degenerate one.
  */
 export function selectImages(
   images: readonly ImageResource[],
   folder: string,
   query: string,
+  includeChildren = true,
 ): ImageResource[] {
   const needle = query.trim().toLowerCase();
   return images.filter((image) => {
     const path = normalizeFolderPath(image.folder);
-    if (!isWithinFolder(path, folder)) return false;
+    const inScope = includeChildren
+      ? isWithinFolder(path, folder)
+      : path === folder;
+    if (!inScope) return false;
     if (needle === '') return true;
     return image.name.toLowerCase().includes(needle)
       || path.toLowerCase().includes(needle);

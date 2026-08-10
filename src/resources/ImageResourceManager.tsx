@@ -40,23 +40,68 @@ interface TreeRowProps {
   depth: number;
   selected: string;
   expanded: Set<string>;
+  dropTarget: string | null;
+  renaming: string | null;
   onSelect: (path: string) => void;
   onToggle: (path: string) => void;
+  onDropOn: (path: string) => void;
+  onDragOverNode: (path: string | null) => void;
+  onDragFolder: (path: string) => void;
+  onRenameCommit: (path: string, name: string) => void;
+  onRenameCancel: () => void;
 }
 
 const TreeRow: React.FC<TreeRowProps> = ({
-  node, depth, selected, expanded, onSelect, onToggle,
+  node, depth, selected, expanded, dropTarget, renaming,
+  onSelect, onToggle, onDropOn, onDragOverNode, onDragFolder,
+  onRenameCommit, onRenameCancel,
 }) => {
   const hasChildren = node.children.length > 0;
   const isOpen = expanded.has(node.path);
+  const isRoot = node.path === ROOT_PATH;
+
+  if (renaming === node.path) {
+    return (
+      <input
+        className="imgres-rename"
+        style={{ marginLeft: 8 + depth * 14 }}
+        defaultValue={node.name}
+        autoFocus
+        onBlur={(event) => onRenameCommit(node.path, event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') onRenameCommit(node.path, event.currentTarget.value);
+          if (event.key === 'Escape') onRenameCancel();
+        }}
+      />
+    );
+  }
 
   return (
     <>
       <button
         type="button"
-        className={`imgres-node ${selected === node.path ? 'selected' : ''}`}
+        className={`imgres-node ${selected === node.path ? 'selected' : ''} ${dropTarget === node.path ? 'droptarget' : ''}`}
         style={{ paddingLeft: 8 + depth * 14 }}
         onClick={() => onSelect(node.path)}
+        draggable={!isRoot}
+        onDragStart={(event) => {
+          event.dataTransfer.setData('application/x-edt-folder', node.path);
+          event.dataTransfer.effectAllowed = 'move';
+          onDragFolder(node.path);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+          onDragOverNode(node.path);
+        }}
+        onDragLeave={() => onDragOverNode(null)}
+        onDrop={(event) => {
+          event.preventDefault();
+          // The scroll container treats a drop as "move to the root". Without
+          // this the node's own drop bubbles into it and is overwritten.
+          event.stopPropagation();
+          onDropOn(node.path);
+        }}
       >
         {hasChildren ? (
           <span
@@ -82,8 +127,15 @@ const TreeRow: React.FC<TreeRowProps> = ({
           depth={depth + 1}
           selected={selected}
           expanded={expanded}
+          dropTarget={dropTarget}
+          renaming={renaming}
           onSelect={onSelect}
           onToggle={onToggle}
+          onDropOn={onDropOn}
+          onDragOverNode={onDragOverNode}
+          onDragFolder={onDragFolder}
+          onRenameCommit={onRenameCommit}
+          onRenameCancel={onRenameCancel}
         />
       ))}
     </>
@@ -95,20 +147,34 @@ const ImageResourceManager: React.FC = () => {
   const addImage = useResourceStore((state) => state.addImage);
   const updateImage = useResourceStore((state) => state.updateImage);
   const deleteImage = useResourceStore((state) => state.deleteImage);
+  const imageFolders = useResourceStore((state) => state.imageFolders);
+  const createFolder = useResourceStore((state) => state.createFolder);
+  const renameFolder = useResourceStore((state) => state.renameFolder);
+  const moveFolder = useResourceStore((state) => state.moveFolder);
+  const deleteFolder = useResourceStore((state) => state.deleteFolder);
+  const moveImages = useResourceStore((state) => state.moveImages);
   const screens = useEditorStore((state) => state.screens);
 
   const [selectedFolder, setSelectedFolder] = useState<string>(ROOT_PATH);
   const [expanded, setExpanded] = useState<Set<string>>(new Set([ROOT_PATH]));
   const [query, setQuery] = useState('');
+  const [showChildren, setShowChildren] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  /** Set while a folder is being dragged, so a drop knows what it carries. */
+  const draggingFolder = useRef<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
 
-  const tree = useMemo(() => buildImageTree(images), [images]);
+  const tree = useMemo(
+    () => buildImageTree(images, imageFolders),
+    [images, imageFolders],
+  );
   const usage = useMemo(() => countImageUsage(screens), [screens]);
   const rows = useMemo(
-    () => selectImages(images, selectedFolder, query),
-    [images, selectedFolder, query],
+    () => selectImages(images, selectedFolder, query, showChildren),
+    [images, selectedFolder, query, showChildren],
   );
 
   const visibleIds = useMemo(() => new Set(rows.map((r) => r.id)), [rows]);
@@ -168,6 +234,51 @@ const ImageResourceManager: React.FC = () => {
     if (added > 0) toast.success(`Added ${added} image${added === 1 ? '' : 's'}`);
   };
 
+  const handleNewFolder = () => {
+    const base = selectedFolder === ROOT_PATH ? 'New Folder' : `${selectedFolder}/New Folder`;
+    createFolder(base);
+    setExpanded((current) => new Set(current).add(selectedFolder));
+    setRenaming(base);
+  };
+
+  const handleRenameCommit = (path: string, name: string) => {
+    setRenaming(null);
+    const trimmed = name.trim();
+    if (trimmed === '') return;
+    renameFolder(path, trimmed);
+    // The selection follows the folder rather than being left on a dead path.
+    const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ROOT_PATH;
+    const next = parent === ROOT_PATH ? trimmed : `${parent}/${trimmed}`;
+    if (selectedFolder === path) setSelectedFolder(next);
+  };
+
+  const handleDeleteFolder = () => {
+    if (selectedFolder === ROOT_PATH) return;
+    const parent = selectedFolder.includes('/')
+      ? selectedFolder.slice(0, selectedFolder.lastIndexOf('/'))
+      : ROOT_PATH;
+    deleteFolder(selectedFolder);
+    setSelectedFolder(parent);
+    toast.info('Folder removed. Any images it held moved to the parent.');
+  };
+
+  /** A tree node accepts either a dragged folder or the checked images. */
+  const handleDropOn = (path: string) => {
+    setDropTarget(null);
+    const folder = draggingFolder.current;
+    draggingFolder.current = null;
+    if (folder !== null) {
+      moveFolder(folder, path);
+      setExpanded((current) => new Set(current).add(path));
+      return;
+    }
+    const ids = checkedVisible.map((row) => row.id);
+    if (ids.length === 0) return;
+    moveImages(ids, path);
+    setChecked(new Set());
+    toast.success(`Moved ${ids.length} image${ids.length === 1 ? '' : 's'}`);
+  };
+
   const applyFormatToChecked = (format: ImageFormat) => {
     for (const row of checkedVisible) updateImage(row.id, { format });
   };
@@ -182,15 +293,51 @@ const ImageResourceManager: React.FC = () => {
   return (
     <div className="imgres">
       <div className="imgres-tree">
-        <div className="imgres-tree-header">Folders</div>
-        <div className="imgres-tree-scroll">
+        <div className="imgres-tree-header">
+          <span>Folders</span>
+          <span className="imgres-tree-actions">
+            <button type="button" title="New folder" onClick={handleNewFolder}>+</button>
+            <button
+              type="button"
+              title="Rename folder"
+              disabled={selectedFolder === ROOT_PATH}
+              onClick={() => setRenaming(selectedFolder)}
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              title="Delete folder"
+              disabled={selectedFolder === ROOT_PATH}
+              onClick={handleDeleteFolder}
+            >
+              ×
+            </button>
+          </span>
+        </div>
+        <div
+          className="imgres-tree-scroll"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            // A drop on empty space below the tree means the root.
+            event.preventDefault();
+            handleDropOn(ROOT_PATH);
+          }}
+        >
           <TreeRow
             node={tree}
             depth={0}
             selected={selectedFolder}
             expanded={expanded}
+            dropTarget={dropTarget}
+            renaming={renaming}
             onSelect={selectFolder}
             onToggle={toggleExpanded}
+            onDropOn={handleDropOn}
+            onDragOverNode={setDropTarget}
+            onDragFolder={(path) => { draggingFolder.current = path; }}
+            onRenameCommit={handleRenameCommit}
+            onRenameCancel={() => setRenaming(null)}
           />
         </div>
       </div>
@@ -207,6 +354,14 @@ const ImageResourceManager: React.FC = () => {
           <span className="imgres-crumb">
             {crumb} · {rows.length} shown
           </span>
+          <label className="imgres-showchild">
+            <input
+              type="checkbox"
+              checked={showChildren}
+              onChange={(event) => setShowChildren(event.target.checked)}
+            />
+            Show child
+          </label>
           <span className="imgres-spacer" />
           {checkedVisible.length > 0 && (
             <>
@@ -299,7 +454,16 @@ const ImageResourceManager: React.FC = () => {
                 const uses = usageFor(usage, image);
                 const folder = normalizeFolderPath(image.folder);
                 return (
-                  <tr key={image.id} className={checked.has(image.id) ? 'selected' : ''}>
+                  <tr
+                    key={image.id}
+                    className={checked.has(image.id) ? 'selected' : ''}
+                    draggable={checked.has(image.id)}
+                    onDragStart={(event) => {
+                      draggingFolder.current = null;
+                      event.dataTransfer.setData('application/x-edt-images', '1');
+                      event.dataTransfer.effectAllowed = 'move';
+                    }}
+                  >
                     <td>
                       <input
                         type="checkbox"
