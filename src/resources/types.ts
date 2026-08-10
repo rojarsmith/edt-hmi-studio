@@ -2,7 +2,12 @@
 
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type { LvglComponent } from '../types';
-import type { BoardId, CommunicationConfig } from '../types/hmi';
+import type {
+  BoardId,
+  CanBusConfig,
+  CommunicationConfig,
+  ProtocolId,
+} from '../types/hmi';
 
 export type ImageFormat = 'RGB565' | 'RGB888' | 'ARGB8888';
 
@@ -108,7 +113,10 @@ export interface ProjectFile {
   codeGenOptions: CodeGenOptions;
   // Extended fields (optional, for project round-trip)
   boardId?: BoardId;
+  /** Absent in files written before the Protocol/Deploy split; those are Modbus. */
+  protocol?: ProtocolId;
   communication?: CommunicationConfig;
+  canBus?: CanBusConfig;
   display?: {
     width: number;
     height: number;

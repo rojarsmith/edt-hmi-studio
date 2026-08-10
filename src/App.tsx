@@ -33,7 +33,8 @@ import { ResourcePanel, useResourceStore } from './resources';
 import { useLogicEditorStore } from './components/LogicEditor';
 import { ProjectListPage } from './components/ProjectManager';
 import { ProjectSettings } from './components/ProjectSettings';
-import CommunicationPanel from './components/CommunicationPanel';
+import ProtocolPanel from './components/ProtocolPanel';
+import DeployPanel from './components/DeployPanel';
 import {
   downloadProject,
   loadProjectFromFile,
@@ -46,7 +47,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { getComponentDefinition } from './utils/componentDefinitions';
 import './App.css';
 
-type TabType = 'design' | 'logic' | 'communication' | 'code' | 'preview';
+type TabType = 'design' | 'logic' | 'protocol' | 'preview' | 'deploy' | 'code';
 const isCompilePreviewEnabled = import.meta.env.VITE_ENABLE_COMPILE_PREVIEW !== 'false';
 
 const App: React.FC = () => {
@@ -479,10 +480,17 @@ const EditorView: React.FC<EditorViewProps> = ({
           </div>
         );
 
-      case 'communication':
+      case 'protocol':
         return (
           <div className="app-body full-panel">
-            <CommunicationPanel />
+            <ProtocolPanel />
+          </div>
+        );
+
+      case 'deploy':
+        return (
+          <div className="app-body full-panel">
+            <DeployPanel />
           </div>
         );
 
@@ -578,16 +586,22 @@ const EditorView: React.FC<EditorViewProps> = ({
               🔗 Logic
             </button>
             <button
-              className={`tab-btn ${effectiveTab === 'communication' ? 'active' : ''}`}
-              onClick={() => setActiveTab('communication')}
+              className={`tab-btn ${effectiveTab === 'protocol' ? 'active' : ''}`}
+              onClick={() => setActiveTab('protocol')}
             >
-              🔌 Communication
+              🔌 Protocol
             </button>
             <button
               className={`tab-btn ${effectiveTab === 'preview' ? 'active' : ''}`}
               onClick={() => setActiveTab('preview')}
             >
               📱 Preview
+            </button>
+            <button
+              className={`tab-btn ${effectiveTab === 'deploy' ? 'active' : ''}`}
+              onClick={() => setActiveTab('deploy')}
+            >
+              🚀 Deploy
             </button>
             {/* Last in the row: it only exists in factory dev mode, so keeping
                 it on the end leaves the normal tab order undisturbed. */}

@@ -1,0 +1,236 @@
+/*
+ * Chrome shared by the Protocol and Deploy tabs. Both are full-width settings
+ * pages built from the same cards, fields and buttons, so the layout lives here
+ * and each panel's own stylesheet carries only what is specific to it.
+ */
+
+.hmi-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  background: #eef1f5;
+  color: #253044;
+}
+
+.hmi-panel-empty {
+  align-items: center;
+  justify-content: center;
+  color: #657085;
+}
+
+.hmi-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #d8dee8;
+  background: #fff;
+}
+
+.hmi-panel-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.hmi-panel-header p,
+.hmi-panel-card-title p {
+  margin: 4px 0 0;
+  color: #6f7b8f;
+  font-size: 12px;
+}
+
+.hmi-service-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #26734d;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.hmi-service-status span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #27ae60;
+}
+
+.hmi-service-status.offline {
+  color: #a63d3d;
+}
+
+.hmi-service-status.offline span {
+  background: #d9534f;
+}
+
+.hmi-panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 24px 36px;
+}
+
+.hmi-panel-card {
+  max-width: 1180px;
+  margin: 0 auto 18px;
+  padding: 18px;
+  border: 1px solid #dce2eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(25, 40, 65, 0.05);
+}
+
+.hmi-panel-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.hmi-panel-card-title h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.hmi-panel-enable {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.hmi-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.hmi-panel-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hmi-panel-field-wide {
+  grid-column: 1 / -1;
+}
+
+.hmi-panel-field > span {
+  color: #526076;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hmi-panel-field small {
+  color: #7f8999;
+  font-size: 11px;
+}
+
+.hmi-panel-field input,
+.hmi-panel-field select {
+  min-width: 0;
+  height: 32px;
+  padding: 5px 8px;
+  border: 1px solid #cbd3df;
+  border-radius: 4px;
+  background: #fff;
+  color: #253044;
+  font: inherit;
+  font-size: 12px;
+}
+
+.hmi-panel-field input:disabled,
+.hmi-panel-field select:disabled {
+  background: #f2f4f7;
+  color: #7f8999;
+}
+
+.hmi-panel-inline {
+  display: flex;
+  gap: 8px;
+}
+
+.hmi-panel-inline select {
+  flex: 1;
+}
+
+.hmi-panel button {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid #c4ccda;
+  border-radius: 4px;
+  background: #fff;
+  color: #334057;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.hmi-panel button:hover:not(:disabled) {
+  border-color: #6c84aa;
+  background: #f7f9fc;
+}
+
+.hmi-panel button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.hmi-panel .hmi-panel-primary {
+  border-color: #3276c8;
+  background: #3276c8;
+  color: #fff;
+}
+
+.hmi-panel .hmi-panel-primary:hover:not(:disabled) {
+  background: #2868b3;
+}
+
+.hmi-panel .hmi-panel-danger {
+  border-color: #ca4d4d;
+  background: #ca4d4d;
+  color: #fff;
+}
+
+.hmi-panel .hmi-panel-danger:hover:not(:disabled) {
+  background: #b63f3f;
+}
+
+.hmi-panel-dirty {
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: #fff0cc;
+  color: #8a6215;
+  font-size: 11px;
+}
+
+/* Reused by the Protocol tab for an unimplemented protocol and by Deploy for a
+   project it refuses to build. */
+.hmi-panel-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid #e0bd70;
+  border-radius: 5px;
+  background: #fff8e8;
+  color: #6f5117;
+  font-size: 12px;
+}
+
+.hmi-panel-notice small {
+  flex-basis: 100%;
+  color: #80662d;
+  font-size: 11px;
+}
+
+@media (max-width: 980px) {
+  .hmi-panel-grid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}

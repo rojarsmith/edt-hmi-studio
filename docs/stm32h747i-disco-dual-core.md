@@ -466,7 +466,7 @@ STM32_Programmer_CLI -c port=SWD mode=UR -ob BCM4=0
    unreachable — work through the recovery steps above, starting with a full
    power cycle.
 5. **Modbus baud rate.** The generated `hmi_bindings_generated.c` carries what
-   the project's Communication panel is set to. If the peer disagrees you get
+   the project's Protocol tab is set to. If the peer disagrees you get
    framing errors and all-zero bytes on the wire, not a silent link.
 6. **LVGL asserts halt everything.** `lv_timer_handler()` shares the main loop
    with `hmi_runtime_task()`, so an LVGL assertion stops Modbus too. If the UART

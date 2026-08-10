@@ -11,7 +11,7 @@ import { toast } from '../Toast';
 import ProjectCard from './ProjectCard';
 import NewProjectDialog from './NewProjectDialog';
 import type { Screen } from '../../types';
-import type { BoardId } from '../../types/hmi';
+import type { BoardId, ProtocolId } from '../../types/hmi';
 import './ProjectListPage.css';
 
 const ProjectListPage: React.FC = () => {
@@ -73,9 +73,15 @@ const ProjectListPage: React.FC = () => {
     }
   };
 
-  const handleCreate = async (name: string, boardId: BoardId, display: DisplayConfig, lvglConfig: LvglConfig) => {
+  const handleCreate = async (
+    name: string,
+    boardId: BoardId,
+    display: DisplayConfig,
+    lvglConfig: LvglConfig,
+    protocol: ProtocolId,
+  ) => {
     try {
-      const id = await createProject(name, boardId, display, lvglConfig);
+      const id = await createProject(name, boardId, display, lvglConfig, protocol);
       setShowNewDialog(false);
       await handleOpenProject(id);
     } catch (err) {

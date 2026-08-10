@@ -1,0 +1,178 @@
+/* Protocol tab specifics. Shared chrome lives in ../HmiPanel/hmiPanel.css. */
+
+.modbus-wire-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #e0bd70;
+  border-radius: 5px;
+  background: #fff8e8;
+  color: #6f5117;
+  font-size: 12px;
+}
+
+.modbus-wire-settings small {
+  flex-basis: 100%;
+  color: #80662d;
+  font-size: 11px;
+}
+
+.protocol-status {
+  margin: 0;
+  color: #4a6b52;
+  font-size: 12px;
+}
+
+.protocol-status.error {
+  color: #a63d3d;
+}
+
+.protocol-badge {
+  padding: 3px 9px;
+  border: 1px solid #c8d3e2;
+  border-radius: 10px;
+  background: #f2f6fc;
+  color: #40587c;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tag-table-wrap {
+  overflow-x: auto;
+}
+
+.tag-table {
+  width: 100%;
+  min-width: 940px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.tag-table th {
+  padding: 7px 6px;
+  border-bottom: 1px solid #dce2eb;
+  color: #667188;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.tag-table td {
+  padding: 6px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.tag-table input,
+.tag-table select {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 5px 8px;
+  border: 1px solid #cbd3df;
+  border-radius: 4px;
+  background: #fff;
+  color: #253044;
+  font: inherit;
+  font-size: 12px;
+}
+
+.tag-table select:disabled {
+  background: #f2f4f7;
+  color: #7f8999;
+}
+
+.tag-table .tag-empty {
+  padding: 24px;
+  color: #8a94a4;
+  text-align: center;
+}
+
+.hmi-panel .tag-delete {
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-color: transparent;
+  color: #bd3e3e;
+  font-size: 18px;
+}
+
+/* Modbus register table column widths. */
+.modbus-tag-table th:first-child {
+  width: 145px;
+}
+
+.modbus-tag-table th:nth-child(2) {
+  width: 175px;
+}
+
+.modbus-tag-table th:nth-child(3),
+.modbus-tag-table th:nth-child(6),
+.modbus-tag-table th:nth-child(7) {
+  width: 90px;
+}
+
+.modbus-tag-table th:nth-child(4),
+.modbus-tag-table th:nth-child(5) {
+  width: 115px;
+}
+
+.modbus-tag-table th:last-child {
+  width: 42px;
+}
+
+/* CAN signal table: wider, because a signal is addressed by frame plus bit
+   window rather than by a single register number. */
+.can-tag-table {
+  min-width: 1120px;
+}
+
+.can-tag-table th:first-child {
+  width: 140px;
+}
+
+.can-tag-table th:nth-child(2) {
+  width: 110px;
+}
+
+.can-tag-table th:nth-child(3) {
+  width: 105px;
+}
+
+.can-tag-table th:nth-child(4),
+.can-tag-table th:nth-child(5) {
+  width: 80px;
+}
+
+.can-tag-table th:nth-child(6) {
+  width: 125px;
+}
+
+.can-tag-table th:nth-child(7),
+.can-tag-table th:nth-child(8) {
+  width: 110px;
+}
+
+.can-tag-table th:nth-child(9),
+.can-tag-table th:nth-child(10),
+.can-tag-table th:nth-child(11) {
+  width: 85px;
+}
+
+.can-tag-table th:last-child {
+  width: 42px;
+}
+
+.can-frame-id {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.can-frame-id-prefix {
+  color: #8a94a4;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 11px;
+}

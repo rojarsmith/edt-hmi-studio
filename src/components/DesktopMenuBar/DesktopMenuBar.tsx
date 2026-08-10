@@ -3,7 +3,7 @@ import { isDesktopHostAvailable } from '../../utils/desktopHost';
 import { useAppStore } from '../../store/appStore';
 import './DesktopMenuBar.css';
 
-type EditorTab = 'design' | 'logic' | 'communication' | 'code' | 'preview';
+type EditorTab = 'design' | 'logic' | 'protocol' | 'preview' | 'deploy' | 'code';
 
 interface MenuAction {
   id: string;
@@ -99,9 +99,10 @@ const DesktopMenuBar = ({
         items: [
           { id: 'design', label: 'Design', active: activeTab === 'design', onClick: () => onSelectTab('design') },
           { id: 'logic', label: 'Logic', active: activeTab === 'logic', onClick: () => onSelectTab('logic') },
-          { id: 'communication', label: 'Communication', active: activeTab === 'communication', onClick: () => onSelectTab('communication') },
+          { id: 'protocol', label: 'Protocol', active: activeTab === 'protocol', onClick: () => onSelectTab('protocol') },
           { id: 'preview', label: 'Preview', active: activeTab === 'preview', onClick: () => onSelectTab('preview') },
-          // Code is factory-dev-mode only, and sits after Preview to match the
+          { id: 'deploy', label: 'Deploy', active: activeTab === 'deploy', onClick: () => onSelectTab('deploy') },
+          // Code is factory-dev-mode only, and sits after Deploy to match the
           // tab row — see docs/factory-dev-mode.md.
           ...(factoryDevMode
             ? [{ id: 'code', label: 'Code', active: activeTab === 'code', onClick: () => onSelectTab('code') }]

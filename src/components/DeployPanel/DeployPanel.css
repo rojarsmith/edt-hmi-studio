@@ -1,0 +1,107 @@
+/* Deploy tab specifics. Shared chrome lives in ../HmiPanel/hmiPanel.css. */
+
+.deploy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.deploy-step {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #526076;
+  font-size: 12px;
+}
+
+.deploy-step-index {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #e6ecf5;
+  color: #40587c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.deploy-step.done .deploy-step-index {
+  background: #27ae60;
+  color: #fff;
+}
+
+.artifact-link {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 6px 10px;
+  color: #2868b3;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.deploy-target {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin: 14px 0;
+  color: #68758a;
+  font-size: 11px;
+}
+
+.deploy-log {
+  overflow: hidden;
+  border: 1px solid #263247;
+  border-radius: 5px;
+  background: #172033;
+}
+
+.deploy-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-bottom: 1px solid #2d3b54;
+  color: #aebbd0;
+  font-size: 11px;
+}
+
+.deploy-log-header button {
+  min-height: 24px;
+  padding: 2px 8px;
+  border-color: #43516a;
+  background: transparent;
+  color: #aebbd0;
+}
+
+.deploy-log-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deploy-log-feedback {
+  margin-right: 2px;
+  color: #88d4a5;
+}
+
+.deploy-log-feedback.error {
+  color: #ff9b9b;
+}
+
+.deploy-log pre {
+  min-height: 130px;
+  max-height: 280px;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  color: #d7e2f2;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}

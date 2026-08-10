@@ -6,11 +6,19 @@ import { v4 as uuidv4 } from 'uuid';
 import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '../resources/types';
 import type { Screen, ScreenGroup } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
-import type { BoardId, CommunicationConfig } from '../types/hmi';
+import type {
+  BoardId,
+  CanBusConfig,
+  CommunicationConfig,
+  ProtocolId,
+} from '../types/hmi';
 import {
   DEFAULT_BOARD_ID,
+  DEFAULT_PROTOCOL_ID,
+  createDefaultCanBusConfig,
   createDefaultCommunicationConfig,
   getBoardDefinition,
+  isSupportedProtocolId,
 } from '../types/hmi';
 
 // ---------------------------------------------------------------------------
@@ -43,7 +51,15 @@ export interface ProjectConfig {
   boardId: BoardId;
   display: DisplayConfig;
   lvglConfig: LvglConfig;
+  /**
+   * Which field bus the project drives, chosen from the board's supported set
+   * when the project is created. The per-protocol settings below are kept side
+   * by side rather than replaced, so switching back and forth does not discard
+   * a tag table the user already built.
+   */
+  protocol: ProtocolId;
   communication: CommunicationConfig;
+  canBus: CanBusConfig;
   codeGenOptions: CodeGenOptions;
 }
 
@@ -93,6 +109,8 @@ export const DEFAULT_LVGL_CONFIG: LvglConfig = {
 export const DEFAULT_COMMUNICATION_CONFIG: CommunicationConfig =
   createDefaultCommunicationConfig();
 
+export const DEFAULT_CAN_BUS_CONFIG: CanBusConfig = createDefaultCanBusConfig();
+
 export const DEFAULT_CODEGEN_OPTIONS: CodeGenOptions = {
   outputFormat: 'single-file',
   includeComments: true,
@@ -115,6 +133,9 @@ const STORE_NAMES = ['projects', 'projectData', 'projectResources'] as const;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
+/** Tail of every configuration write issued so far. See flushProjectConfigWrites. */
+let configWriteQueue: Promise<void> = Promise.resolve();
+
 function normalizeCommunicationConfig(
   communication?: Partial<CommunicationConfig>,
 ): CommunicationConfig {
@@ -132,16 +153,45 @@ function normalizeCommunicationConfig(
   };
 }
 
+function normalizeCanBusConfig(
+  canBus?: Partial<CanBusConfig>,
+): CanBusConfig {
+  const defaults = createDefaultCanBusConfig();
+  return {
+    ...defaults,
+    ...canBus,
+    signals: (canBus?.signals || []).map((signal) => ({
+      ...signal,
+      scale: Number.isFinite(signal.scale) ? signal.scale : 1,
+      offset: Number.isFinite(signal.offset) ? signal.offset : 0,
+      pollIntervalMs: Number.isFinite(signal.pollIntervalMs)
+        ? signal.pollIntervalMs
+        : defaults.pollIntervalMs,
+    })),
+  };
+}
+
 function normalizeProjectConfig(
-  config: ProjectConfig | (Omit<ProjectConfig, 'boardId' | 'communication'> & {
+  config: ProjectConfig | (Omit<
+    ProjectConfig,
+    'boardId' | 'communication' | 'protocol' | 'canBus'
+  > & {
     boardId?: BoardId;
+    protocol?: ProtocolId;
     communication?: Partial<CommunicationConfig>;
+    canBus?: Partial<CanBusConfig>;
   }),
 ): ProjectConfig {
   return {
     ...config,
     boardId: config.boardId ?? DEFAULT_BOARD_ID,
+    // Projects created before the protocol split carry no value, and every one
+    // of them is Modbus.
+    protocol: isSupportedProtocolId(config.protocol)
+      ? config.protocol
+      : DEFAULT_PROTOCOL_ID,
     communication: normalizeCommunicationConfig(config.communication),
+    canBus: normalizeCanBusConfig(config.canBus),
   };
 }
 
@@ -316,7 +366,14 @@ interface ProjectStoreState {
   // Actions
   init: () => Promise<void>;
   refreshList: () => Promise<void>;
-  createProject: (name: string, boardId: BoardId, display: DisplayConfig, lvglConfig: LvglConfig) => Promise<string>;
+  createProject: (name: string, boardId: BoardId, display: DisplayConfig, lvglConfig: LvglConfig, protocol?: ProtocolId) => Promise<string>;
+  /**
+   * Resolves once every configuration write issued so far has landed. Panels
+   * that edit configuration debounce their saves, so an action on another tab —
+   * a firmware build, most importantly — awaits this before reading the project
+   * back, rather than racing whatever the user typed last.
+   */
+  flushProjectConfigWrites: () => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   getProjectConfig: (id: string) => Promise<ProjectConfig | undefined>;
   updateProjectConfig: (config: ProjectConfig) => Promise<void>;
@@ -363,7 +420,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     set({ projects: items });
   },
 
-  createProject: async (name, boardId, display, lvglConfig) => {
+  createProject: async (name, boardId, display, lvglConfig, protocol) => {
     const id = uuidv4();
     const now = Date.now();
     const config: ProjectConfig = {
@@ -374,7 +431,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       boardId,
       display,
       lvglConfig,
+      protocol: protocol ?? DEFAULT_PROTOCOL_ID,
       communication: createDefaultCommunicationConfig(),
+      canBus: createDefaultCanBusConfig(),
       codeGenOptions: { ...DEFAULT_CODEGEN_OPTIONS },
     };
     await dbCreateProject(config);
@@ -392,8 +451,19 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   },
 
   updateProjectConfig: async (config) => {
-    await dbUpdateProjectConfig({ ...config, updatedAt: Date.now() });
-    await get().refreshList();
+    const write = (async () => {
+      await dbUpdateProjectConfig({ ...config, updatedAt: Date.now() });
+      await get().refreshList();
+    })();
+    // Chained so flushProjectConfigWrites() waits for every write in flight,
+    // including ones a panel issued on its way out during an unmount. The queue
+    // itself never rejects; a failure reaches whoever awaited `write` below.
+    configWriteQueue = configWriteQueue.then(() => write).catch(() => undefined);
+    await write;
+  },
+
+  flushProjectConfigWrites: async () => {
+    await configWriteQueue;
   },
 
   loadProjectData: async (id) => {
@@ -478,7 +548,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       boardId: config.boardId,
       display: config.display,
       lvglConfig: config.lvglConfig,
+      protocol: config.protocol,
       communication: config.communication,
+      canBus: config.canBus,
     };
     return projectFile;
   },
@@ -497,7 +569,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     const boardId = file.boardId ?? DEFAULT_BOARD_ID;
     const communication = normalizeCommunicationConfig(file.communication);
 
-    const config: ProjectConfig = {
+    const config: ProjectConfig = normalizeProjectConfig({
       id,
       name: name || file.name || 'Imported Project',
       createdAt: now,
@@ -505,9 +577,11 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       boardId,
       display,
       lvglConfig,
+      protocol: file.protocol,
       communication,
+      canBus: file.canBus,
       codeGenOptions: file.codeGenOptions || { ...DEFAULT_CODEGEN_OPTIONS },
-    };
+    });
     await dbUpdateProjectConfig(config);
 
     // `pages` is the pre-rename spelling, still present in older project files.

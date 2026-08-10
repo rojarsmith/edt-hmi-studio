@@ -1,17 +1,25 @@
 import React, { useState } from 'react';
 import type { DisplayConfig, LvglConfig } from '../../store/projectStore';
 import { DEFAULT_DISPLAY, DEFAULT_LVGL_CONFIG } from '../../store/projectStore';
-import type { BoardId } from '../../types/hmi';
+import type { BoardId, ProtocolId } from '../../types/hmi';
 import {
   DEFAULT_BOARD_ID,
   SUPPORTED_BOARDS,
   getBoardDefinition,
+  getBoardProtocols,
+  getProtocolDefinition,
 } from '../../types/hmi';
 import './NewProjectDialog.css';
 
 interface NewProjectDialogProps {
   onClose: () => void;
-  onCreate: (name: string, boardId: BoardId, display: DisplayConfig, lvglConfig: LvglConfig) => void;
+  onCreate: (
+    name: string,
+    boardId: BoardId,
+    display: DisplayConfig,
+    lvglConfig: LvglConfig,
+    protocol: ProtocolId,
+  ) => void;
 }
 
 const RESOLUTION_PRESETS: { label: string; w: number; h: number }[] = [
@@ -30,6 +38,9 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
   )?.label ?? 'custom';
   const [name, setName] = useState('');
   const [boardId, setBoardId] = useState<BoardId>(DEFAULT_BOARD_ID);
+  const [protocol, setProtocol] = useState<ProtocolId>(
+    () => getBoardProtocols(DEFAULT_BOARD_ID)[0],
+  );
   const [preset, setPreset] = useState(defaultPreset);
   const [customW, setCustomW] = useState(DEFAULT_DISPLAY.width);
   const [customH, setCustomH] = useState(DEFAULT_DISPLAY.height);
@@ -68,8 +79,10 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
       symbolFont: DEFAULT_LVGL_CONFIG.symbolFont,
       memSize: board.lvgl.memSizeKb,
     };
-    onCreate(projectName, boardId, display, lvglConfig);
+    onCreate(projectName, boardId, display, lvglConfig, protocol);
   };
+
+  const boardProtocols = getBoardProtocols(boardId);
 
   return (
     <div className="modal-global-overlay" onClick={onClose}>
@@ -107,6 +120,12 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
                 setCustomW(board.display.width);
                 setCustomH(board.display.height);
                 setColorDepth(board.display.colorDepth);
+                // A board only offers the buses it is wired for, so a protocol
+                // the previous board supported may not exist on this one.
+                const nextProtocols = getBoardProtocols(nextBoardId);
+                setProtocol((current) => (
+                  nextProtocols.includes(current) ? current : nextProtocols[0]
+                ));
               }}
             >
               {SUPPORTED_BOARDS.map((board) => (
@@ -115,6 +134,30 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
                 </option>
               ))}
             </select>
+          </label>
+
+          {/* Fixed for the life of the project: the generated bindings and the
+              firmware runtime are built around one bus. */}
+          <label className="npd-label">
+            Field Bus Protocol
+            <select
+              className="npd-select"
+              value={protocol}
+              onChange={(e) => setProtocol(e.target.value as ProtocolId)}
+              disabled={boardProtocols.length < 2}
+            >
+              {boardProtocols.map((id) => (
+                <option key={id} value={id}>
+                  {getProtocolDefinition(id).name}
+                </option>
+              ))}
+            </select>
+            <span className="npd-hint">
+              {getProtocolDefinition(protocol).summary}
+              {boardProtocols.length < 2
+                ? ` ${getBoardDefinition(boardId).name} supports this bus only.`
+                : ''}
+            </span>
           </label>
 
           {/* Resolution */}

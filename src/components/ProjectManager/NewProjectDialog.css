@@ -27,6 +27,12 @@
   color: #aaa;
 }
 
+.npd-hint {
+  color: #7c7c96;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .npd-input {
   padding: 7px 10px;
   background: #1a1a2e;
