@@ -1,6 +1,7 @@
 // Resources module exports
 
-export { default as ResourcePanel } from './ResourcePanel';
+export { default as ResourceWorkspace } from './ResourceWorkspace';
+export type { ResourceKind } from './ResourceWorkspace';
 export { default as ImageManager } from './ImageManager';
 export { default as FontManager } from './FontManager';
 export { default as IconLibrary } from './IconLibrary';

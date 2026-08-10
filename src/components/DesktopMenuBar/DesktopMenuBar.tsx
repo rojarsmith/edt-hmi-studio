@@ -3,7 +3,16 @@ import { isDesktopHostAvailable } from '../../utils/desktopHost';
 import { useAppStore } from '../../store/appStore';
 import './DesktopMenuBar.css';
 
-type EditorTab = 'design' | 'logic' | 'protocol' | 'preview' | 'deploy' | 'code';
+type EditorTab =
+  | 'design'
+  | 'image'
+  | 'text'
+  | 'icon'
+  | 'logic'
+  | 'protocol'
+  | 'preview'
+  | 'deploy'
+  | 'code';
 
 interface MenuAction {
   id: string;
@@ -22,7 +31,6 @@ interface MenuGroup {
 interface DesktopMenuBarProps {
   projectName: string;
   activeTab: EditorTab;
-  showResourcePanel: boolean;
   onNewProject: () => void;
   onOpenProject: () => void;
   onSaveProject: () => void;
@@ -31,7 +39,6 @@ interface DesktopMenuBarProps {
   onUndo: () => void;
   onRedo: () => void;
   onSelectTab: (tab: EditorTab) => void;
-  onToggleResources: () => void;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
   onOpenAbout: () => void;
@@ -40,7 +47,6 @@ interface DesktopMenuBarProps {
 const DesktopMenuBar = ({
   projectName,
   activeTab,
-  showResourcePanel,
   onNewProject,
   onOpenProject,
   onSaveProject,
@@ -49,7 +55,6 @@ const DesktopMenuBar = ({
   onUndo,
   onRedo,
   onSelectTab,
-  onToggleResources,
   onOpenSettings,
   onOpenHelp,
   onOpenAbout,
@@ -98,6 +103,9 @@ const DesktopMenuBar = ({
         label: 'View',
         items: [
           { id: 'design', label: 'Design', active: activeTab === 'design', onClick: () => onSelectTab('design') },
+          { id: 'image', label: 'Image', active: activeTab === 'image', onClick: () => onSelectTab('image') },
+          { id: 'text', label: 'Text', active: activeTab === 'text', onClick: () => onSelectTab('text') },
+          { id: 'icon', label: 'Icon', active: activeTab === 'icon', onClick: () => onSelectTab('icon') },
           { id: 'logic', label: 'Logic', active: activeTab === 'logic', onClick: () => onSelectTab('logic') },
           { id: 'protocol', label: 'Protocol', active: activeTab === 'protocol', onClick: () => onSelectTab('protocol') },
           { id: 'preview', label: 'Preview', active: activeTab === 'preview', onClick: () => onSelectTab('preview') },
@@ -107,7 +115,6 @@ const DesktopMenuBar = ({
           ...(factoryDevMode
             ? [{ id: 'code', label: 'Code', active: activeTab === 'code', onClick: () => onSelectTab('code') }]
             : []),
-          { id: 'resources', label: showResourcePanel ? 'Hide Resources' : 'Show Resources', active: showResourcePanel, onClick: onToggleResources },
           { id: 'settings', label: 'Project Settings', onClick: onOpenSettings },
         ] satisfies MenuAction[],
       },
@@ -134,9 +141,7 @@ const DesktopMenuBar = ({
       onRedo,
       onSaveProject,
       onSelectTab,
-      onToggleResources,
       onUndo,
-      showResourcePanel,
     ],
   );
 

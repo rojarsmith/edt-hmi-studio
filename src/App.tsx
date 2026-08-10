@@ -29,7 +29,7 @@ import WasmPreview from './components/WasmPreview';
 import CompilePreview from 'virtual:compile-preview';
 import { HierarchyPanel } from './components/HierarchyPanel';
 // ThemeSelector is intentionally unmounted for now — see the toolbar below.
-import { ResourcePanel, useResourceStore } from './resources';
+import { ResourceWorkspace, useResourceStore } from './resources';
 import { useLogicEditorStore } from './components/LogicEditor';
 import { ProjectListPage } from './components/ProjectManager';
 import { ProjectSettings } from './components/ProjectSettings';
@@ -47,7 +47,16 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { getComponentDefinition } from './utils/componentDefinitions';
 import './App.css';
 
-type TabType = 'design' | 'logic' | 'protocol' | 'preview' | 'deploy' | 'code';
+type TabType =
+  | 'design'
+  | 'image'
+  | 'text'
+  | 'icon'
+  | 'logic'
+  | 'protocol'
+  | 'preview'
+  | 'deploy'
+  | 'code';
 const isCompilePreviewEnabled = import.meta.env.VITE_ENABLE_COMPILE_PREVIEW !== 'false';
 
 const App: React.FC = () => {
@@ -149,7 +158,6 @@ const EditorView: React.FC<EditorViewProps> = ({
   const { messages, removeToast, success, error } = useToast();
 
   // UI State
-  const [showResourcePanel, setShowResourcePanel] = useState(false);
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [showAboutDialog, setShowAboutDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('design');
@@ -461,16 +469,20 @@ const EditorView: React.FC<EditorViewProps> = ({
                 <EventPanel />
                 <AnimationPanel />
               </div>
-              {showResourcePanel && (
-                <div className="resource-panel-container">
-                  <ResourcePanel />
-                </div>
-              )}
             </div>
             <DragOverlay dropAnimation={null}>
               {renderDragOverlay()}
             </DragOverlay>
           </DndContext>
+        );
+
+      case 'image':
+      case 'text':
+      case 'icon':
+        return (
+          <div className="app-body full-panel">
+            <ResourceWorkspace kind={effectiveTab} />
+          </div>
         );
 
       case 'logic':
@@ -547,7 +559,6 @@ const EditorView: React.FC<EditorViewProps> = ({
         <DesktopMenuBar
           projectName={projectName}
           activeTab={effectiveTab}
-          showResourcePanel={showResourcePanel}
           onNewProject={handleNewProjectClick}
           onOpenProject={handleImportProject}
           onSaveProject={handleSaveProject}
@@ -556,7 +567,6 @@ const EditorView: React.FC<EditorViewProps> = ({
           onUndo={() => useEditorStore.getState().undo()}
           onRedo={() => useEditorStore.getState().redo()}
           onSelectTab={setActiveTab}
-          onToggleResources={() => setShowResourcePanel(prev => !prev)}
           onOpenSettings={() => setShowProjectSettings(true)}
           onOpenHelp={() => setShowHelpPanel(true)}
           onOpenAbout={() => setShowAboutDialog(true)}
@@ -578,6 +588,24 @@ const EditorView: React.FC<EditorViewProps> = ({
               onClick={() => setActiveTab('design')}
             >
               🎨 Design
+            </button>
+            <button
+              className={`tab-btn ${effectiveTab === 'image' ? 'active' : ''}`}
+              onClick={() => setActiveTab('image')}
+            >
+              🖼️ Image
+            </button>
+            <button
+              className={`tab-btn ${effectiveTab === 'text' ? 'active' : ''}`}
+              onClick={() => setActiveTab('text')}
+            >
+              🔤 Text
+            </button>
+            <button
+              className={`tab-btn ${effectiveTab === 'icon' ? 'active' : ''}`}
+              onClick={() => setActiveTab('icon')}
+            >
+              ⭐ Icon
             </button>
             <button
               className={`tab-btn ${effectiveTab === 'logic' ? 'active' : ''}`}
@@ -623,12 +651,6 @@ const EditorView: React.FC<EditorViewProps> = ({
             <ToolbarButton icon="↩️" label="Undo" onClick={() => useEditorStore.getState().undo()} shortcut="Ctrl+Z" />
             <ToolbarButton icon="↪️" label="Redo" onClick={() => useEditorStore.getState().redo()} shortcut="Ctrl+Y" />
             <div className="toolbar-divider" />
-            <ToolbarButton
-              icon="📦"
-              label="Resources"
-              onClick={() => setShowResourcePanel(!showResourcePanel)}
-              active={showResourcePanel}
-            />
             <ToolbarButton
               icon="⚙️"
               label="Settings"

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { toast } from '../components/Toast';
+import { useResourceStore } from './resourceStore';
 import './IconLibrary.css';
 
 interface IconLibraryProps {
@@ -71,11 +72,11 @@ const CATEGORIES = [
 const IconLibrary: React.FC<IconLibraryProps> = ({ viewMode }) => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
-  const [searchQuery, _setSearchQuery] = useState('');
-  
-  // Note: Search functionality can be added later by exposing setSearchQuery
-  void _setSearchQuery;
-  
+  // The filter below was already written but read local state nothing ever set,
+  // so the search box did nothing on this tab. Now that Icon is a page of its
+  // own with its own search box, read the shared query.
+  const searchQuery = useResourceStore((state) => state.searchQuery);
+
   const filteredIcons = useMemo(() => {
     let icons = BUILT_IN_ICONS;
     

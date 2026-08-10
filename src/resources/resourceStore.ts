@@ -36,8 +36,8 @@ interface ResourceState {
   fonts: FontResource[];
   icons: IconResource[];
   
-  // UI State
-  activeTab: 'images' | 'fonts' | 'icons';
+  // UI State. Which resource kind is showing is a routing concern now that
+  // Image, Text and Icon are top-level tabs, so it no longer lives here.
   viewMode: 'grid' | 'list';
   searchQuery: string;
   selectedResourceId: string | null;
@@ -60,7 +60,6 @@ interface ResourceState {
   deleteIcon: (id: string) => void;
   
   // Actions - UI
-  setActiveTab: (tab: 'images' | 'fonts' | 'icons') => void;
   setViewMode: (mode: 'grid' | 'list') => void;
   setSearchQuery: (query: string) => void;
   setSelectedResource: (id: string | null) => void;
@@ -81,7 +80,6 @@ export const useResourceStore = create<ResourceState>((set, get) => ({
   images: [],
   fonts: [],
   icons: [],
-  activeTab: 'images',
   viewMode: 'grid',
   searchQuery: '',
   selectedResourceId: null,
@@ -218,10 +216,6 @@ export const useResourceStore = create<ResourceState>((set, get) => ({
   },
   
   // UI actions
-  setActiveTab: (tab) => {
-    set({ activeTab: tab, selectedResourceId: null });
-  },
-  
   setViewMode: (mode) => {
     set({ viewMode: mode });
   },
