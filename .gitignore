@@ -25,6 +25,8 @@ dist-ssr
 wasm/build/
 .hmi-builds/
 .hmi-cache/
+firmware/vendor/*
+!firmware/vendor/README.md
 bin/
 obj/
 /.vs

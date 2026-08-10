@@ -446,7 +446,11 @@ export class HmiService {
             HMI_PROJECT_SOURCE: projectSourceDirectory,
             HMI_BUILD_DIR: buildDirectory,
           },
-          timeoutMs: 10 * 60_000,
+          // The first build for a board downloads ~150 MB of pinned upstream
+          // dependencies before a single file compiles, and that is where the
+          // old 10 minute budget went. Later builds hit the cache and finish in
+          // well under a minute.
+          timeoutMs: 30 * 60_000,
         },
       );
       log.push(...commandLog(buildResult));

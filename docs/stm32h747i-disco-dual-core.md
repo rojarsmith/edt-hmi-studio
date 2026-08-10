@@ -480,5 +480,7 @@ STM32_Programmer_CLI -c port=SWD mode=UR -ob BCM4=0
 
 - `firmware/stm32h747i-disco/scripts/bootstrap-deps.ps1` — every upstream
   dependency, pinned to an immutable commit.
+- `firmware/vendor/README.md` — how to drop a pre-downloaded archive in to skip
+  the ~100 MB LVGL fetch on a board's first build.
 - `docs/stm32f746g-disco-modbus-hmi-poc.md` — the equivalent notes for the other
   supported board.

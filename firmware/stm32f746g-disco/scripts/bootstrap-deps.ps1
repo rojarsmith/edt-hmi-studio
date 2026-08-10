@@ -1,10 +1,16 @@
 [CmdletBinding()]
 param(
-    [string]$CacheRoot = ""
+    [string]$CacheRoot = "",
+    [string]$VendorRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+# Windows PowerShell repaints the progress bar on every read, which is the
+# difference between minutes and seconds on the large archives below.
+$ProgressPreference = "SilentlyContinue"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $boardRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 if ([string]::IsNullOrWhiteSpace($CacheRoot)) {
@@ -20,6 +26,78 @@ $downloadsRoot = Join-Path $CacheRoot ".downloads"
 $stagingRoot = Join-Path $CacheRoot ".staging"
 New-Item -ItemType Directory -Force -Path $CacheRoot, $downloadsRoot, $stagingRoot | Out-Null
 
+# A transfer cut short by a build timeout leaves a partial *.download behind.
+# Nothing resumes those, and a re-pinned dependency orphans them under the old
+# name, so sweep them rather than let the cache grow without bound.
+Get-ChildItem -LiteralPath $downloadsRoot -Filter "*.download" -File -ErrorAction SilentlyContinue |
+    Remove-Item -Force
+
+if ([string]::IsNullOrWhiteSpace($VendorRoot)) {
+    $VendorRoot = if ([string]::IsNullOrWhiteSpace($env:HMI_VENDOR_ROOT)) {
+        Join-Path $boardRoot "..\vendor"
+    } else {
+        $env:HMI_VENDOR_ROOT
+    }
+}
+$VendorRoot = [IO.Path]::GetFullPath($VendorRoot)
+
+function Get-ArchiveCommit {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    # GitHub stamps the source commit into the archive's end-of-central-directory
+    # comment. Reading it is what lets a hand-downloaded zip satisfy a pin: the
+    # filename is whatever the browser chose, but the commit cannot be faked by
+    # renaming, so a vendored archive is held to the same pin as a fetched one.
+    try {
+        $stream = [IO.File]::OpenRead($Path)
+    } catch {
+        return ""
+    }
+    try {
+        $tailSize = [Math]::Min(512, $stream.Length)
+        if ($tailSize -lt 22) {
+            return ""
+        }
+        $stream.Seek(-$tailSize, [IO.SeekOrigin]::End) | Out-Null
+        $tail = New-Object byte[] $tailSize
+        $read = 0
+        while ($read -lt $tailSize) {
+            $chunk = $stream.Read($tail, $read, $tailSize - $read)
+            if ($chunk -le 0) { break }
+            $read += $chunk
+        }
+    } finally {
+        $stream.Dispose()
+    }
+
+    for ($offset = $tailSize - 22; $offset -ge 0; $offset--) {
+        if ($tail[$offset] -eq 0x50 -and $tail[$offset + 1] -eq 0x4B -and
+            $tail[$offset + 2] -eq 0x05 -and $tail[$offset + 3] -eq 0x06) {
+            $length = [BitConverter]::ToUInt16($tail, $offset + 20)
+            if ($length -le 0 -or ($offset + 22 + $length) -gt $tailSize) {
+                return ""
+            }
+            return [Text.Encoding]::ASCII.GetString($tail, $offset + 22, $length).Trim()
+        }
+    }
+    return ""
+}
+
+# Index the drop-in directory by commit once, rather than re-reading every
+# archive for each of the pins below.
+$vendoredArchives = @{}
+if (Test-Path -LiteralPath $VendorRoot -PathType Container) {
+    foreach ($candidate in (Get-ChildItem -LiteralPath $VendorRoot -Filter "*.zip" -File)) {
+        $candidateCommit = Get-ArchiveCommit -Path $candidate.FullName
+        if ($candidateCommit -match "^[0-9a-f]{40}$" -and
+            -not $vendoredArchives.ContainsKey($candidateCommit)) {
+            $vendoredArchives[$candidateCommit] = $candidate.FullName
+        }
+    }
+}
+
 function Get-PinnedFile {
     param(
         [Parameter(Mandatory = $true)][string]$Uri,
@@ -34,7 +112,31 @@ function Get-PinnedFile {
     New-Item -ItemType Directory -Force -Path $parent | Out-Null
     $temporary = "$Destination.download"
     Write-Host "Downloading $Uri"
-    Invoke-WebRequest -Uri $Uri -UseBasicParsing -OutFile $temporary
+
+    # Invoke-WebRequest buffers the whole body before it writes anything, so a
+    # dropped connection on the ~100 MB LVGL archive costs the entire transfer
+    # and the caller's build timeout with it. WebClient streams to disk, and the
+    # retry absorbs the transient resets codeload hands out under load.
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        if (Test-Path -LiteralPath $temporary) {
+            Remove-Item -LiteralPath $temporary -Force
+        }
+        $client = New-Object System.Net.WebClient
+        $client.Headers.Add("User-Agent", "edt-gui-studio-bootstrap")
+        try {
+            $client.DownloadFile($Uri, $temporary)
+            break
+        } catch {
+            if ($attempt -ge 3) {
+                throw "Failed to download $Uri after $attempt attempts: $($_.Exception.Message)"
+            }
+            Write-Host "  attempt $attempt failed, retrying: $($_.Exception.Message)"
+            Start-Sleep -Seconds (2 * $attempt)
+        } finally {
+            $client.Dispose()
+        }
+    }
+
     if ((Get-Item -LiteralPath $temporary).Length -eq 0) {
         throw "Downloaded an empty file from $Uri"
     }
@@ -58,7 +160,18 @@ function Install-PinnedArchive {
     }
 
     $archive = Join-Path $downloadsRoot "$Name.zip"
-    Get-PinnedFile -Uri $Uri -Destination $archive
+    if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) {
+        # An archive dropped into the vendor directory is used in place of the
+        # download when it carries the pinned commit, which turns a ~100 MB
+        # transfer into a local read. See firmware/vendor/README.md.
+        $commit = ($Uri -split "/")[-1]
+        if ($commit -match "^[0-9a-f]{40}$" -and $vendoredArchives.ContainsKey($commit)) {
+            $archive = $vendoredArchives[$commit]
+            Write-Host "Using vendored $Name from $archive"
+        } else {
+            Get-PinnedFile -Uri $Uri -Destination $archive
+        }
+    }
 
     $stage = Join-Path $stagingRoot $Name
     if (Test-Path -LiteralPath $stage) {
@@ -124,8 +237,8 @@ Install-PinnedArchive `
     -Sentinel "ft5336.c"
 
 Install-PinnedArchive `
-    -Name "lvgl-7f07a12" `
-    -Uri "https://codeload.github.com/lvgl/lvgl/zip/7f07a129e8d77f4984fff8e623fd5be18ff42e74" `
+    -Name "lvgl-85aa60d" `
+    -Uri "https://codeload.github.com/lvgl/lvgl/zip/85aa60d18b3d5e5588d7b247abf90198f07c8a63" `
     -Target (Join-Path $CacheRoot "Middlewares\Third_Party\lvgl") `
     -Sentinel "src\lv_init.c"
 
@@ -170,7 +283,7 @@ CMSIS Core v5.4.0 9f95ff5b6ba01db09552b84a0ab79607060a2666
 RK043FN48H 448cfae87110a37df9e490c48f3e21d12196b5c9
 BSP Common 1e18c5afdf1f5971a35c8e2f88b6a21e5568ed92
 FT5336 8edacf0e2195deceec0c1644ebaadc05fea62b93
-LVGL v9.2.2 7f07a129e8d77f4984fff8e623fd5be18ff42e74
+LVGL v9.5.0 85aa60d18b3d5e5588d7b247abf90198f07c8a63
 STM32CubeF7 fonts v1.17.4 e5939c26775f313f376b68c80c2a212a795a2993
 "@
 Set-Content -LiteralPath (Join-Path $CacheRoot "DEPENDENCIES.txt") -Value $manifest -Encoding ASCII

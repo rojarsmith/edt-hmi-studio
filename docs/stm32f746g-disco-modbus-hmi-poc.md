@@ -36,7 +36,9 @@ value.
   can be supplied through `STM32_CUBE_CLT_ROOT`.
 - Internet access for the first firmware build. The bootstrap script downloads
   pinned official STM32CubeF7, CMSIS and LVGL sources into the target's
-  `.hmi-cache` directory.
+  `.hmi-cache` directory. Archives already present in `firmware/vendor` are used
+  instead of being fetched — see `firmware/vendor/README.md`, which matters most
+  for LVGL at ~100 MB.
 
 The local HMI service is intentionally exposed only by the Vite development or
 preview server and accepts only loopback browser origins.
