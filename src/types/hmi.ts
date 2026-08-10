@@ -122,8 +122,10 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     display: {
       width: 800,
       height: 480,
-      colorDepth: 16,
-      colorFormat: 'RGB565',
+      // The BSP drives a 24-bit DSI link from a 32-bit ARGB8888 frame buffer;
+      // there is no packed 24 bpp path. Matches firmware/stm32h747i-disco.
+      colorDepth: 32,
+      colorFormat: 'ARGB8888',
     },
     // Flash bank 1, which is the Cortex-M7's. Bank 2 belongs to the Cortex-M4
     // and is not part of this image — see docs/stm32h747i-disco-dual-core.md.

@@ -4,7 +4,9 @@
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
-#define LV_COLOR_DEPTH 16
+/* 32, not 24: LVGL maps LV_COLOR_DEPTH 24 to packed RGB888, which is exactly
+   the format this board's BSP cannot scan out. See docs/color-depth.md. */
+#define LV_COLOR_DEPTH 32
 
 #define LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN
 #define LV_USE_STDLIB_STRING LV_STDLIB_BUILTIN

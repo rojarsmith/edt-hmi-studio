@@ -11,7 +11,7 @@
 #define HMI_LCD_LAYER 0U
 
 #define HMI_FRAMEBUFFER_BYTES \
-    (HMI_DISPLAY_WIDTH * HMI_DISPLAY_HEIGHT * sizeof(uint16_t))
+    (HMI_DISPLAY_WIDTH * HMI_DISPLAY_HEIGHT * sizeof(uint32_t))
 
 /*
  * Two full frame buffers in the board's SDRAM. LVGL renders straight into the
@@ -21,8 +21,9 @@
  * beam — most visible on a control that redraws continuously, such as a slider
  * being dragged.
  *
- * The addresses match the two layer slots the BSP configuration reserves, which
- * leaves 2 MB per buffer against the 768 KB actually needed.
+ * The addresses match the two layer slots the BSP configuration reserves: 2 MB
+ * apart, against the 1500 KB an ARGB8888 frame needs. The margin is why moving
+ * from RGB565 to ARGB8888 did not require relocating anything.
  */
 #define HMI_FRAMEBUFFER_0 ((uint32_t)LCD_LAYER_0_ADDRESS)
 #define HMI_FRAMEBUFFER_1 ((uint32_t)LCD_LAYER_1_ADDRESS)
@@ -157,13 +158,19 @@ bool board_display_init(void)
     lv_indev_t *touch_device;
     TS_Init_t touch_init = {0};
 
-    /* InitEx rather than Init: the plain entry point defaults to RGB888, and a
-       16-bit frame buffer halves both the SDRAM footprint and the bandwidth the
-       LTDC needs per frame. It brings up the SDRAM controller itself. */
+    /* LCD_PIXEL_FORMAT_RGB888 is the BSP's name for a 24-bit DSI link driven
+       from a 32-bit frame buffer: it configures the LTDC layer as
+       LTDC_PIXEL_FORMAT_ARGB8888 and sets BppFactor to 4. There is no packed
+       24 bpp path here, so this doubles both the SDRAM footprint and the
+       bandwidth the LTDC needs per frame against RGB565. See
+       docs/color-depth.md for the measurements.
+
+       InitEx rather than Init because it takes the width and height; it brings
+       up the SDRAM controller itself. */
     if (BSP_LCD_InitEx(
             HMI_LCD_INSTANCE,
             LCD_ORIENTATION_LANDSCAPE,
-            LCD_PIXEL_FORMAT_RGB565,
+            LCD_PIXEL_FORMAT_RGB888,
             HMI_DISPLAY_WIDTH,
             HMI_DISPLAY_HEIGHT) != BSP_ERROR_NONE) {
         return false;
@@ -215,7 +222,13 @@ bool board_display_init(void)
     if (display == NULL) {
         return false;
     }
-    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    /* ARGB8888, not the XRGB8888 that LV_COLOR_DEPTH 32 makes LVGL's native
+       format. The BSP configures both LTDC blending factors as PAxCA, so the
+       per-pixel alpha byte is multiplied into the output rather than ignored,
+       and XRGB8888 leaves that byte undefined by contract. A draw path that
+       leaves it at zero would produce fully transparent pixels showing the
+       layer's black backcolor — a failure a build cannot catch. */
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_ARGB8888);
     lv_display_set_flush_cb(display, display_flush);
     lv_display_set_buffers(
         display,

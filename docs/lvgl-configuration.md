@@ -120,9 +120,9 @@ and do take effect there.
 RGB888 → 24, ARGB8888 → 32. Must match what the panel and its driver expect.
 The New Project dialog shows it read-only for confirmation.
 
-Both boards run RGB565. [Color Depth](./color-depth.md) covers what moving the
-H747I to 32-bit would cost, and why the Project Settings control for this does
-not currently reach the firmware.
+The F746G runs RGB565; the H747I runs ARGB8888. [Color Depth](./color-depth.md)
+covers what that costs, what is still unverified on hardware, and why the
+Project Settings control for this does not currently reach the firmware.
 
 ### 2.2 Large font support
 

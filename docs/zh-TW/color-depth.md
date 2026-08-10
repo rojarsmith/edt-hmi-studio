@@ -4,29 +4,34 @@
   <a href="../color-depth.md">English</a> · <strong>繁體中文</strong>
 </p>
 
-兩片支援的板子目前都跑 **16-bit RGB565**。本文記錄原因、STM32H747I-DISCO 改成
-32-bit 的實際代價，以及 ST 資料上「ARGB8888 via DMA2D」那句話的正確與不正確解讀。
+> **本分支狀態。** `feat/h747-32bit-color` 把 STM32H747I-DISCO 改為 32-bit
+> ARGB8888。它可以建置，且已用反組譯確認改動確實存在於映像中（§4.1），但
+> **尚未在實機上執行過**。§4.3 與 §5 的頻寬分析正是這件事重要的原因 ——
+> 該觀察什麼見 §7。`main` 仍維持 16-bit。
+
+本文記錄各板子目前的設定、STM32H747I-DISCO 改成 32-bit 的代價，以及 ST 資料上
+「ARGB8888 via DMA2D」那句話的正確與不正確解讀。
 
 ## 1. 目前的設定
 
 | 板子 | 面板 | `LV_COLOR_DEPTH` | LTDC layer 格式 | Frame buffer |
 | --- | --- | --- | --- | --- |
 | STM32F746G-DISCO | 480×272 | 16 | RGB565 | 2 × 255 KB |
-| STM32H747I-DISCO | 800×480 | 16 | RGB565 | 2 × 750 KB |
+| STM32H747I-DISCO | 800×480 | **32** | **ARGB8888** | **2 × 1500 KB** |
 
 H747I 是在三個地方設定的，三者必須一致：
 
 | 位置 | 設定 |
 | --- | --- |
-| `firmware/stm32h747i-disco/include/lv_conf.h` | `LV_COLOR_DEPTH 16` |
-| `firmware/stm32h747i-disco/src/board_display.c` | `BSP_LCD_InitEx(..., LCD_PIXEL_FORMAT_RGB565, ...)` |
-| `firmware/stm32h747i-disco/src/board_display.c` | `lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565)` |
+| `firmware/stm32h747i-disco/include/lv_conf.h` | `LV_COLOR_DEPTH 32` |
+| `firmware/stm32h747i-disco/src/board_display.c` | `BSP_LCD_InitEx(..., LCD_PIXEL_FORMAT_RGB888, ...)` |
+| `firmware/stm32h747i-disco/src/board_display.c` | `lv_display_set_color_format(display, LV_COLOR_FORMAT_ARGB8888)` |
 
-`src/types/hmi.ts` 的板子定義帶有對應的 `colorDepth: 16, colorFormat: 'RGB565'`。
-那份是描述性的，見 §6。
+`src/types/hmi.ts` 的板子定義帶有對應的 `colorDepth: 32, colorFormat: 'ARGB8888'`。
+那份對韌體而言是描述性的，但它會驅動 WASM 預覽 —— 見 §6。
 
-16-bit 是刻意的選擇，不是預設值。`board_display.c` 用 `BSP_LCD_InitEx` 而非
-`BSP_LCD_Init`，正是因為後者預設 RGB888。
+兩項都不是預設值。`board_display.c` 明確把格式傳給 `BSP_LCD_InitEx`，而
+`LV_COLOR_DEPTH` 用 32 而非 24 的理由見 §7。
 
 ## 2. 這片板子上的「24-bit」實際是每像素 32 bit
 
@@ -191,7 +196,7 @@ opacity 或 transform 的 —— 會被切成大約兩倍數量的區塊。
 [LVGL 設定](./lvgl-configuration.md) §1.2。現在在那裡改色彩深度，會讓預覽與板子
 無聲地不一致。真要改成 32 bpp，應該同時修掉這點，否則這個設定會變成主動誤導。
 
-## 7. 若仍要進行
+## 7. 本分支改了什麼
 
 三處韌體修改，加上編輯器端：
 
@@ -201,20 +206,23 @@ opacity 或 transform 的 —— 會被切成大約兩倍數量的區塊。
    `LCD_PIXEL_FORMAT_RGB888`、`LV_COLOR_FORMAT_ARGB8888`。
 3. `src/types/hmi.ts` —— 板子定義的 `colorDepth` / `colorFormat`。
 
-然後**必須在實機上驗證**，因為上述沒有任何一項能靠建置定案。跑一個持續重繪的
-畫面 —— 拖曳 slider，或播放動畫 —— 觀察是否出現撕裂與扭曲線條。那就是 §5 描述的
-LTDC FIFO underrun 指紋。
+## 8. 還必須在實機上確認的事
 
-## 8. 建議
+以下沒有任何一項能靠建置定案，這也是本分支尚不算完成品的原因。
 
-目前維持 16 bpp。
+**撕裂與扭曲線條。** 跑一個持續重繪的畫面 —— 拖曳 slider，或播放動畫。那是 §5
+描述的 LTDC FIFO underrun 指紋，也正是 §4.3 的頻寬翻倍所冒的具體風險。
 
-32 bpp 的晶片內部成本確實是零，SDRAM 容量也不是問題，所以反對的理由很集中：就是
-頻寬，而這片板子的餘裕已有紀錄顯示曾經薄到出事。
+**透明或消失的內容。** 如果有東西畫成黑洞，或整個 widget 不見了，先懷疑 alpha
+位元組（§6）。顯示端刻意設為 `ARGB8888` 而非 LVGL 原生的 `XRGB8888` 就是為了
+避開這點，但只有在面板上才能確認。
 
-如果目標是畫質，請先確認 RGB565 真的是瓶頸 —— 800×480 的工控 HMI 內容通常不是，
-而且 LVGL 的 dithering 是更便宜的嘗試。如果目標是速度，§3 有更好的槓桿：在目前
-深度下開啟 `LV_USE_DRAW_DMA2D` 再量測，因為它完全不增加頻寬。
+**既有專案的色彩。** 在這次改動之前建立的專案，其儲存的 `lvglConfig` 仍帶著
+`colorDepth: 16`，而 WASM 預覽用的正是那個儲存值。這類專案會出現預覽 16-bit、
+韌體 32-bit 的情況。新建專案則會從板子定義取得 32。
+
+如果實機上撐不住，退路不是「再調調看」，而是 §3：改回 RGB565 並改為啟用
+`LV_USE_DRAW_DMA2D` —— 它完全不增加頻寬就能換到 CPU 時間，而且兩種色深都適用。
 
 ## 相關文件
 

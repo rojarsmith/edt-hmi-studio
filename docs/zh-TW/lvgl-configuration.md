@@ -105,8 +105,8 @@ LVGL v9 取得記憶體的方式有兩種，由 `LV_USE_STDLIB_MALLOC` 決定：
 ARGB8888 → 32。必須與面板及其驅動的預期相符。「New Project」對話框以唯讀方式顯示，
 供你確認。
 
-兩片板子都跑 RGB565。[色彩深度](./color-depth.md) 說明把 H747I 改成 32-bit 的
-代價，以及為什麼 Project Settings 裡的這個選項目前傳不到韌體。
+F746G 跑 RGB565，H747I 跑 ARGB8888。[色彩深度](./color-depth.md) 說明其代價、
+哪些部分尚未在實機驗證，以及為什麼 Project Settings 裡的這個選項傳不到韌體。
 
 ### 2.2 大字型支援
 

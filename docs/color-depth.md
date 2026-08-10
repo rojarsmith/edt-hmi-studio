@@ -4,31 +4,38 @@
   <strong>English</strong> · <a href="./zh-TW/color-depth.md">繁體中文</a>
 </p>
 
-Both supported boards run **16-bit RGB565** today. This document records why, what
-moving the STM32H747I-DISCO to 32-bit would actually cost, and what the
-"ARGB8888 via DMA2D" line in ST's material does and does not mean.
+> **Status on this branch.** `feat/h747-32bit-color` moves the STM32H747I-DISCO
+> to 32-bit ARGB8888. It builds, and the change is confirmed present in the
+> image by disassembly (§4.1), but **it has not been run on hardware**. The
+> bandwidth analysis in §4.3 and §5 is the reason that matters — see §7 for what
+> to watch for. `main` remains on 16-bit.
+
+This document records what each board runs, what moving the STM32H747I-DISCO to
+32-bit costs, and what the "ARGB8888 via DMA2D" line in ST's material does and
+does not mean.
 
 ## 1. What each board runs
 
 | Board | Panel | `LV_COLOR_DEPTH` | LTDC layer format | Frame buffer |
 | --- | --- | --- | --- | --- |
 | STM32F746G-DISCO | 480×272 | 16 | RGB565 | 2 × 255 KB |
-| STM32H747I-DISCO | 800×480 | 16 | RGB565 | 2 × 750 KB |
+| STM32H747I-DISCO | 800×480 | **32** | **ARGB8888** | **2 × 1500 KB** |
 
 For the H747I this is set in three places, and all three have to agree:
 
 | Location | Setting |
 | --- | --- |
-| `firmware/stm32h747i-disco/include/lv_conf.h` | `LV_COLOR_DEPTH 16` |
-| `firmware/stm32h747i-disco/src/board_display.c` | `BSP_LCD_InitEx(..., LCD_PIXEL_FORMAT_RGB565, ...)` |
-| `firmware/stm32h747i-disco/src/board_display.c` | `lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565)` |
+| `firmware/stm32h747i-disco/include/lv_conf.h` | `LV_COLOR_DEPTH 32` |
+| `firmware/stm32h747i-disco/src/board_display.c` | `BSP_LCD_InitEx(..., LCD_PIXEL_FORMAT_RGB888, ...)` |
+| `firmware/stm32h747i-disco/src/board_display.c` | `lv_display_set_color_format(display, LV_COLOR_FORMAT_ARGB8888)` |
 
-`src/types/hmi.ts` carries a matching `colorDepth: 16, colorFormat: 'RGB565'` on
-the board definition. That copy is descriptive — see §6.
+`src/types/hmi.ts` carries a matching `colorDepth: 32, colorFormat: 'ARGB8888'`
+on the board definition. That copy is descriptive for the firmware, but it does
+drive the WASM preview — see §6.
 
-16-bit was a deliberate choice, not a default. `board_display.c` uses
-`BSP_LCD_InitEx` rather than `BSP_LCD_Init` precisely because the plain entry
-point defaults to RGB888.
+Neither setting is a default. `board_display.c` passes the format to
+`BSP_LCD_InitEx` explicitly, and `LV_COLOR_DEPTH` is 32 rather than 24 for the
+reason in §7.
 
 ## 2. "24-bit" on this board means 32 bits per pixel
 
@@ -209,7 +216,7 @@ preview substitutes `LV_COLOR_DEPTH` — see
 disagree silently. Any real move to 32 bpp should fix that at the same time, or
 the setting becomes actively misleading.
 
-## 7. If you do it anyway
+## 7. What this branch changed
 
 Three firmware edits, plus the editor side:
 
@@ -220,24 +227,28 @@ Three firmware edits, plus the editor side:
    `LCD_PIXEL_FORMAT_RGB888`, and `LV_COLOR_FORMAT_ARGB8888`.
 3. `src/types/hmi.ts` — the board definition's `colorDepth` / `colorFormat`.
 
-Then verify on hardware, because nothing above can be settled by a build. Run a
-screen that redraws continuously — drag a slider, or play an animation — and
-watch for tearing and warped lines. That is the LTDC FIFO underrun signature
-described in §5.
+## 8. What still has to be checked on hardware
 
-## 8. Recommendation
+Nothing below can be settled by a build, which is why this branch is not a
+finished change.
 
-Stay on 16 bpp for now.
+**Tearing and warped lines.** Run a screen that redraws continuously — drag a
+slider, or play an animation. That is the LTDC FIFO underrun signature described
+in §5, and it is the specific failure the bandwidth doubling in §4.3 risks.
 
-The on-chip cost of 32 bpp is genuinely zero and SDRAM capacity is not a problem,
-so the objection is narrow: it is the bandwidth, on a board whose margin is
-documented as having been too thin once already.
+**Transparent or missing content.** If anything renders as black holes or
+whole widgets vanish, suspect the alpha byte (§6). The display is configured as
+`ARGB8888` rather than LVGL's native `XRGB8888` specifically to avoid this, but
+it can only be confirmed on the panel.
 
-If the goal is image quality, confirm that RGB565 is actually the limitation
-first — 800×480 industrial HMI content rarely is, and LVGL's dithering is a
-cheaper thing to try. If the goal is speed, §3 has the better lever: turn on
-`LV_USE_DRAW_DMA2D` at the current depth and measure, since it costs no extra
-bandwidth at all.
+**Colour of existing projects.** A project created before this change still
+carries `colorDepth: 16` in its stored `lvglConfig`, and that stored value is
+what the WASM preview uses. Such a project will preview at 16-bit while its
+firmware runs 32-bit. New projects pick up 32 from the board definition.
+
+If it does not hold up, the fallback is not "tune it" — it is §3. Revert to
+RGB565 and enable `LV_USE_DRAW_DMA2D` instead, which buys CPU time at no
+bandwidth cost at all and works at either depth.
 
 ## Related
 
