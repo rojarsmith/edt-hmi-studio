@@ -1,6 +1,6 @@
 /**
  * @file lv_conf.h
- * Configuration file for LVGL v9.2 WASM build
+ * Configuration file for LVGL v9.5 WASM build
  */
 
 #ifndef LV_CONF_H

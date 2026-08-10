@@ -1,5 +1,5 @@
 /**
- * LVGL 9.2 configuration for the STM32F746G-DISCO runtime.
+ * LVGL 9.5 configuration for the STM32F746G-DISCO runtime.
  */
 #ifndef LV_CONF_H
 #define LV_CONF_H

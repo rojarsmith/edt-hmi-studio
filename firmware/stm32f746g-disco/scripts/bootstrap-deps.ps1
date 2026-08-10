@@ -124,8 +124,8 @@ Install-PinnedArchive `
     -Sentinel "ft5336.c"
 
 Install-PinnedArchive `
-    -Name "lvgl-7f07a12" `
-    -Uri "https://codeload.github.com/lvgl/lvgl/zip/7f07a129e8d77f4984fff8e623fd5be18ff42e74" `
+    -Name "lvgl-85aa60d" `
+    -Uri "https://codeload.github.com/lvgl/lvgl/zip/85aa60d18b3d5e5588d7b247abf90198f07c8a63" `
     -Target (Join-Path $CacheRoot "Middlewares\Third_Party\lvgl") `
     -Sentinel "src\lv_init.c"
 
@@ -170,7 +170,7 @@ CMSIS Core v5.4.0 9f95ff5b6ba01db09552b84a0ab79607060a2666
 RK043FN48H 448cfae87110a37df9e490c48f3e21d12196b5c9
 BSP Common 1e18c5afdf1f5971a35c8e2f88b6a21e5568ed92
 FT5336 8edacf0e2195deceec0c1644ebaadc05fea62b93
-LVGL v9.2.2 7f07a129e8d77f4984fff8e623fd5be18ff42e74
+LVGL v9.5.0 85aa60d18b3d5e5588d7b247abf90198f07c8a63
 STM32CubeF7 fonts v1.17.4 e5939c26775f313f376b68c80c2a212a795a2993
 "@
 Set-Content -LiteralPath (Join-Path $CacheRoot "DEPENDENCIES.txt") -Value $manifest -Encoding ASCII

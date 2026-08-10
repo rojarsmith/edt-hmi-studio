@@ -150,8 +150,8 @@ Install-PinnedArchive `
     -Sentinel "ts.h"
 
 Install-PinnedArchive `
-    -Name "lvgl-7f07a12" `
-    -Uri "https://codeload.github.com/lvgl/lvgl/zip/7f07a129e8d77f4984fff8e623fd5be18ff42e74" `
+    -Name "lvgl-85aa60d" `
+    -Uri "https://codeload.github.com/lvgl/lvgl/zip/85aa60d18b3d5e5588d7b247abf90198f07c8a63" `
     -Target (Join-Path $CacheRoot "Middlewares\Third_Party\lvgl") `
     -Sentinel "src\lv_init.c"
 
@@ -185,7 +185,7 @@ IS42S32800J d8069315a8ecdd218358d9ae67ca6c4312cf9ed5
 FT6X06 d4d40ad52b495b650222addb4549257c0b9c0059
 ADV7533 ef0f7e8782205a33560f54712ba9b2306b322d96
 BSP Common 6893c33e9a5ebbcea1b23f3137f8a1d87753947d
-LVGL v9.2.2 7f07a129e8d77f4984fff8e623fd5be18ff42e74
+LVGL v9.5.0 85aa60d18b3d5e5588d7b247abf90198f07c8a63
 "@
 Set-Content -LiteralPath (Join-Path $CacheRoot "DEPENDENCIES.txt") -Value $manifest -Encoding ASCII
 
