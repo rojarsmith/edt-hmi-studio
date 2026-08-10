@@ -296,3 +296,83 @@
 .imgres-table tbody tr[draggable='true'] {
   cursor: grab;
 }
+
+/* ------------------------------------------------------ toolbar buttons --- */
+
+/* Sized to match .imgres-search so the toolbar reads as one row of controls
+   rather than a styled input next to browser-default buttons. */
+.imgres-btn {
+  display: inline-flex;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #d3dae4;
+  border-radius: 6px;
+  background: #fff;
+  color: #3b4557;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.imgres-btn:hover {
+  border-color: #a9b6c8;
+  background: #f4f7fb;
+}
+
+.imgres-btn:active {
+  background: #e9eff7;
+}
+
+.imgres-btn-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.imgres-btn-primary {
+  border-color: #3276c8;
+  background: #3276c8;
+  color: #fff;
+}
+
+.imgres-btn-primary:hover {
+  border-color: #2868b3;
+  background: #2868b3;
+}
+
+.imgres-btn-primary:active {
+  background: #235c9f;
+}
+
+.imgres-btn-danger {
+  border-color: #e2b6b6;
+  background: #fff;
+  color: #b03d3d;
+}
+
+.imgres-btn-danger:hover {
+  border-color: #ca4d4d;
+  background: #fdf3f3;
+}
+
+/* The bulk format picker sits between them and has to match. */
+.imgres-toolbar select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #d3dae4;
+  border-radius: 6px;
+  background: #fff;
+  color: #3b4557;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.imgres-toolbar select:hover {
+  border-color: #a9b6c8;
+}

@@ -21,7 +21,7 @@ const VIEWS: Record<ResourceKind, {
 }> = {
   image: {
     title: 'Image',
-    subtitle: 'Upload images and convert them to LVGL C arrays.',
+    subtitle: 'Import artwork, group it into folders, and pick the colour format that decides each image\'s size on the board.',
     searchPlaceholder: 'Search images...',
   },
   text: {

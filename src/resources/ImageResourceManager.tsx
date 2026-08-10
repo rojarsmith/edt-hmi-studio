@@ -382,13 +382,29 @@ const ImageResourceManager: React.FC = () => {
                   <option key={format} value={format}>{format}</option>
                 ))}
               </select>
-              <button type="button" onClick={deleteChecked}>Delete</button>
+              <button
+                type="button"
+                className="imgres-btn imgres-btn-danger"
+                onClick={deleteChecked}
+              >
+                Delete
+              </button>
             </>
           )}
-          <button type="button" onClick={() => fileInput.current?.click()}>
+          <button
+            type="button"
+            className="imgres-btn imgres-btn-primary"
+            onClick={() => fileInput.current?.click()}
+          >
+            <span className="imgres-btn-icon" aria-hidden="true">＋</span>
             Add Images
           </button>
-          <button type="button" onClick={() => folderInput.current?.click()}>
+          <button
+            type="button"
+            className="imgres-btn"
+            onClick={() => folderInput.current?.click()}
+          >
+            <span className="imgres-btn-icon" aria-hidden="true">🗀</span>
             Add Folder
           </button>
           <input
