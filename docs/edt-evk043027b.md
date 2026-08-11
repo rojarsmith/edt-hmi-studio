@@ -4,9 +4,13 @@
   <strong>English</strong> · <a href="./zh-TW/edt-evk043027b.md">繁體中文</a>
 </p>
 
-> **Status.** Builds, flashes and boots. **The panel does not light yet** — the
-> cause is not yet known, and §7 is the procedure for finding it. Build, flash
-> and memory layout are verified; anything past the flasher is not.
+> **Status.** Working on hardware: builds, flashes, boots, the panel lights, and
+> the Type-C port enumerates as a COM port carrying Modbus. Confirmed by eye on
+> a board — the colour bars of §7 came up in the right order, which also
+> verifies the 32-bit pixel format end to end.
+>
+> Not yet exercised: a full Modbus round trip against a PC-side server, and
+> touch. §7 remains the procedure when something does not come up.
 
 The EVK043027B is the 4.3" member of EDT's EVKxxxx27B family, built on an
 STM32U599NJH6Q. It is the first supported board that is not an ST Discovery kit,
