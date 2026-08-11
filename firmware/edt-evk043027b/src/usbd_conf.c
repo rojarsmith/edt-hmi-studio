@@ -11,6 +11,7 @@
 
 #include "usbd_conf.h"
 
+#include "usbd_cdc.h"
 #include "usbd_core.h"
 #include "usbd_def.h"
 
@@ -19,9 +20,19 @@ PCD_HandleTypeDef hpcd_USB_OTG_HS;
 /*
  * Storage for the CDC class handle. USBD_malloc is mapped here rather than to
  * the C library's — see usbd_conf.h. One block is enough because exactly one
- * class is ever registered.
+ * class is ever registered, which is also why usbd_cdc.h is included from what
+ * is otherwise class-agnostic glue: the size has to come from the real type.
+ *
+ * Sizing this by eye is a trap. USBD_CDC_HandleTypeDef carries a whole
+ * high-speed packet buffer (512 bytes) plus its bookkeeping, so it is larger
+ * than the round number it invites — and being short is close to invisible.
+ * USBD_malloc is not called until SET_CONFIGURATION, long after the descriptors
+ * have been read, so the device still enumerates, Windows still binds usbser.sys
+ * and still assigns a COM number, and only then fails to start. The symptom is
+ * a COM port that appears in Device Manager with a warning triangle.
  */
-static uint32_t class_handle_storage[512U / 4U];
+static uint32_t class_handle_storage[
+    (sizeof(USBD_CDC_HandleTypeDef) + sizeof(uint32_t) - 1U) / sizeof(uint32_t)];
 static bool class_handle_taken;
 
 void *USBD_static_malloc(uint32_t size)
