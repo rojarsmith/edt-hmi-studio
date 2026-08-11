@@ -58,6 +58,10 @@ add_compile_definitions(
     USE_STM32H747I_DISCO
     USE_PWR_DIRECT_SMPS_SUPPLY
     LV_CONF_INCLUDE_SIMPLE
+    # Moves generated image pixel data into .ext_flash_images, which the linker
+    # script places in the QSPI NOR rather than the 1 MB internal flash.
+    # See docs/images-external-flash.md.
+    HMI_IMAGES_IN_EXTERNAL_FLASH
 )
 
 # LVGL reads lv_conf.h through this directory-level include path.  Directory
@@ -90,6 +94,7 @@ set(HAL_SOURCES
     "${HAL_ROOT}/Src/stm32h7xx_hal_ltdc.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_ltdc_ex.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_mdma.c"
+    "${HAL_ROOT}/Src/stm32h7xx_hal_qspi.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_pwr.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_pwr_ex.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_rcc.c"
@@ -104,6 +109,7 @@ set(BSP_SOURCES
     "${BOARD_BSP_ROOT}/stm32h747i_discovery.c"
     "${BOARD_BSP_ROOT}/stm32h747i_discovery_bus.c"
     "${BOARD_BSP_ROOT}/stm32h747i_discovery_lcd.c"
+    "${BOARD_BSP_ROOT}/stm32h747i_discovery_qspi.c"
     "${BOARD_BSP_ROOT}/stm32h747i_discovery_sdram.c"
     "${BOARD_BSP_ROOT}/stm32h747i_discovery_ts.c"
     "${BSP_ROOT}/Components/otm8009a/otm8009a.c"
@@ -116,6 +122,7 @@ set(BSP_SOURCES
     "${BSP_ROOT}/Components/ft6x06/ft6x06.c"
     "${BSP_ROOT}/Components/ft6x06/ft6x06_reg.c"
     "${BSP_ROOT}/Components/is42s32800j/is42s32800j.c"
+    "${BSP_ROOT}/Components/mt25tl01g/mt25tl01g.c"
 )
 
 file(GLOB BOARD_SOURCES CONFIGURE_DEPENDS "${BOARD_ROOT}/src/*.c")
@@ -152,6 +159,7 @@ target_include_directories(firmware PRIVATE
     "${BSP_ROOT}/Components/otm8009a"
     "${BSP_ROOT}/Components/ft6x06"
     "${BSP_ROOT}/Components/is42s32800j"
+    "${BSP_ROOT}/Components/mt25tl01g"
     "${LVGL_ROOT}"
     "${LVGL_ROOT}/src"
 )
@@ -176,11 +184,22 @@ set_property(TARGET firmware APPEND PROPERTY
     LINK_DEPENDS "${BOARD_ROOT}/STM32H747XIHx_FLASH.ld"
 )
 
+# .ext_flash_images sits at 0x90000000, four gigabytes past the internal flash.
+# A plain `objcopy -O binary` pads the gap, so the two images have to be cut
+# apart: firmware.bin is the internal image with that section removed, and
+# firmware_extflash.bin is the section on its own, programmed through the
+# MT25TL01G external loader. The .hex drops it too — CubeProgrammer would
+# otherwise try to write those records without a loader loaded.
 add_custom_command(TARGET firmware POST_BUILD
     COMMAND "${CMAKE_SIZE}" "$<TARGET_FILE:firmware>"
     COMMAND "${CMAKE_OBJCOPY}" -O ihex
+        --remove-section .ext_flash_images
         "$<TARGET_FILE:firmware>" "${HMI_ARTIFACT_DIR}/firmware.hex"
     COMMAND "${CMAKE_OBJCOPY}" -O binary
+        --remove-section .ext_flash_images
         "$<TARGET_FILE:firmware>" "${HMI_ARTIFACT_DIR}/firmware.bin"
+    COMMAND "${CMAKE_OBJCOPY}" -O binary
+        -j .ext_flash_images
+        "$<TARGET_FILE:firmware>" "${HMI_ARTIFACT_DIR}/firmware_extflash.bin"
     VERBATIM
 )

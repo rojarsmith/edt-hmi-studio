@@ -262,6 +262,14 @@ Install-PinnedArchive `
     -Target (Join-Path $CacheRoot "Drivers\BSP\Components\Common") `
     -Sentinel "ts.h"
 
+# The QSPI NOR fitted to this board, used to hold image resources outside the
+# 1 MB internal flash. stm32h747i_discovery_qspi.h includes it directly.
+Install-PinnedArchive `
+    -Name "stm32-mt25tl01g-d13cf81" `
+    -Uri "https://codeload.github.com/STMicroelectronics/stm32-mt25tl01g/zip/d13cf81bba79f9cae3592dfbd9509aeffc884e40" `
+    -Target (Join-Path $CacheRoot "Drivers\BSP\Components\mt25tl01g") `
+    -Sentinel "mt25tl01g.h"
+
 Install-PinnedArchive `
     -Name "lvgl-85aa60d" `
     -Uri "https://codeload.github.com/lvgl/lvgl/zip/85aa60d18b3d5e5588d7b247abf90198f07c8a63" `
@@ -298,6 +306,7 @@ IS42S32800J d8069315a8ecdd218358d9ae67ca6c4312cf9ed5
 FT6X06 d4d40ad52b495b650222addb4549257c0b9c0059
 ADV7533 ef0f7e8782205a33560f54712ba9b2306b322d96
 BSP Common 6893c33e9a5ebbcea1b23f3137f8a1d87753947d
+MT25TL01G v2.3.0 d13cf81bba79f9cae3592dfbd9509aeffc884e40
 LVGL v9.5.0 85aa60d18b3d5e5588d7b247abf90198f07c8a63
 "@
 Set-Content -LiteralPath (Join-Path $CacheRoot "DEPENDENCIES.txt") -Value $manifest -Encoding ASCII

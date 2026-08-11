@@ -1,5 +1,7 @@
 #include "board.h"
 
+#include "stm32h747i_discovery_qspi.h"
+
 UART_HandleTypeDef huart1;
 
 /*
@@ -85,6 +87,26 @@ static void mpu_config(void)
     region.Size = MPU_REGION_SIZE_32MB;
     region.AccessPermission = MPU_REGION_FULL_ACCESS;
     region.IsBufferable = MPU_ACCESS_BUFFERABLE;
+    region.IsCacheable = MPU_ACCESS_CACHEABLE;
+    region.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+    region.TypeExtField = MPU_TEX_LEVEL0;
+    region.SubRegionDisable = 0x00U;
+    region.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
+    HAL_MPU_ConfigRegion(&region);
+
+    /*
+     * The QSPI window (0x90000000) is Device memory by default, same trap as
+     * the SDRAM above: every image byte LVGL reads would be an unbuffered,
+     * unmergeable single access straight down the QSPI bus. Re-type it as
+     * Normal cacheable read-only so the D-Cache can hold image data and the
+     * controller can burst. Read-only because nothing writes it at run time --
+     * the contents are programmed by the flasher, not by the firmware.
+     */
+    region.Number = MPU_REGION_NUMBER1;
+    region.BaseAddress = 0x90000000U;
+    region.Size = MPU_REGION_SIZE_128MB;
+    region.AccessPermission = MPU_REGION_PRIV_RO_URO;
+    region.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
     region.IsCacheable = MPU_ACCESS_CACHEABLE;
     region.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
     region.TypeExtField = MPU_TEX_LEVEL0;
@@ -210,10 +232,41 @@ bool board_init(void)
         return false;
     }
 
+    /*
+     * Image resources are linked at 0x90000000 and are dereferenced by ui_init,
+     * so the QSPI has to be mapped before main() gets that far. Failing here is
+     * fatal for a project that uses images and harmless for one that does not,
+     * but there is no way to tell the two apart from here -- board_init reports
+     * the failure and main stops, which is the safer of the two.
+     */
+    if (!board_external_flash_init()) {
+        return false;
+    }
+
     return board_uart1_apply(
         115200U,
         UART_PARITY_NONE,
         UART_STOPBITS_1);
+}
+
+bool board_external_flash_init(void)
+{
+    BSP_QSPI_Init_t init;
+
+    init.InterfaceMode = BSP_QSPI_QPI_MODE;
+    init.TransferRate = BSP_QSPI_STR_TRANSFER;
+    /* The board wires two dies as one device. stm32h747i_discovery_qspi.h only
+       exposes BSP_QSPI_DUALFLASH_DISABLE — and labels it "Dual flash mode
+       enabled", which it is not — so take the value from the component driver.
+       BSP_QSPI_Init forces dual mode for this board regardless. */
+    init.DualFlashMode = (BSP_QSPI_DualFlash_t)MT25TL01G_DUALFLASH_ENABLE;
+
+    if (BSP_QSPI_Init(0U, &init) != BSP_ERROR_NONE) {
+        return false;
+    }
+
+    /* Until this succeeds the window reads as bus faults rather than data. */
+    return BSP_QSPI_EnableMemoryMappedMode(0U) == BSP_ERROR_NONE;
 }
 
 void HAL_UART_MspInit(UART_HandleTypeDef *uart)

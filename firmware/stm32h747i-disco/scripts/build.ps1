@@ -79,6 +79,18 @@ $artifacts = @(
     (Join-Path $OutputDir "firmware.bin"),
     (Join-Path $OutputDir "firmware.map")
 )
+
+# Image resources live in the QSPI NOR, programmed separately through the
+# MT25TL01G external loader. A project with no images produces an empty file,
+# which is a valid outcome rather than a failure -- unlike the artifacts above,
+# so it is checked apart from them.
+$externalImage = Join-Path $OutputDir "firmware_extflash.bin"
+if (Test-Path -LiteralPath $externalImage -PathType Leaf) {
+    $externalBytes = (Get-Item -LiteralPath $externalImage).Length
+    Write-Host ("External flash image: {0} bytes" -f $externalBytes)
+} else {
+    Write-Host "External flash image: not produced"
+}
 foreach ($artifact in $artifacts) {
     if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
         throw "Expected firmware artifact was not produced: $artifact"

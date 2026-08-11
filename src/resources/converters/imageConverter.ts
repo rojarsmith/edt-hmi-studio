@@ -243,8 +243,20 @@ export function generateImageCCode(
 #define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
+/* Where the pixel data is linked. The firmware defines
+ * HMI_IMAGES_IN_EXTERNAL_FLASH to move image resources out of the 1 MB internal
+ * flash and into the board's QSPI NOR; every other build, including the WASM
+ * preview, gets no attribute and keeps them alongside the code. */
+#ifndef HMI_IMAGE_ATTRIBUTE
+#  ifdef HMI_IMAGES_IN_EXTERNAL_FLASH
+#    define HMI_IMAGE_ATTRIBUTE __attribute__((section(".ext_flash_images")))
+#  else
+#    define HMI_IMAGE_ATTRIBUTE
+#  endif
+#endif
+
 #ifndef LV_ATTRIBUTE_IMG_${name.toUpperCase()}
-#define LV_ATTRIBUTE_IMG_${name.toUpperCase()}
+#define LV_ATTRIBUTE_IMG_${name.toUpperCase()} HMI_IMAGE_ATTRIBUTE
 #endif
 
 static LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_IMG_${name.toUpperCase()} const uint8_t ${dataArrayName}[] = {
@@ -278,8 +290,20 @@ const lv_image_dsc_t ${name} = {
 #define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
+/* Where the pixel data is linked. The firmware defines
+ * HMI_IMAGES_IN_EXTERNAL_FLASH to move image resources out of the 1 MB internal
+ * flash and into the board's QSPI NOR; every other build, including the WASM
+ * preview, gets no attribute and keeps them alongside the code. */
+#ifndef HMI_IMAGE_ATTRIBUTE
+#  ifdef HMI_IMAGES_IN_EXTERNAL_FLASH
+#    define HMI_IMAGE_ATTRIBUTE __attribute__((section(".ext_flash_images")))
+#  else
+#    define HMI_IMAGE_ATTRIBUTE
+#  endif
+#endif
+
 #ifndef LV_ATTRIBUTE_IMG_${name.toUpperCase()}
-#define LV_ATTRIBUTE_IMG_${name.toUpperCase()}
+#define LV_ATTRIBUTE_IMG_${name.toUpperCase()} HMI_IMAGE_ATTRIBUTE
 #endif
 
 static LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_IMG_${name.toUpperCase()} const uint8_t ${dataArrayName}[] = {

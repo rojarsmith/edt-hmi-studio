@@ -7,7 +7,7 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { runExecutable, type CommandResult } from './command';
 import {
@@ -34,6 +34,14 @@ import type { BoardId } from '../../src/types/hmi';
 const DEFAULT_TOOLCHAIN_ROOT = 'C:\\ST\\STM32CubeCLT_1.22.0';
 const BUILD_METADATA_FILE = 'build-metadata.json';
 const FLASH_ARTIFACT_NAME = 'firmware.hex';
+/**
+ * Image resources, linked at 0x90000000 and written through the QSPI external
+ * loader. Absent or empty when the project uses no images, which is normal.
+ */
+const EXTERNAL_FLASH_ARTIFACT_NAME = 'firmware_extflash.bin';
+const EXTERNAL_FLASH_BASE_ADDRESS = '0x90000000';
+/** Ships with CubeProgrammer; matches the MT25TL01G fitted to this board. */
+const EXTERNAL_LOADER_NAME = 'MT25TL01G_STM32H747I-DISCO.stldr';
 const ARTIFACT_NAMES = [
   'firmware.hex',
   'firmware.elf',
@@ -566,6 +574,51 @@ export class HmiService {
           + `"${selectedProbe.boardName ?? 'an unknown board'}". `
           + `Connect a ${target.name}, or rebuild the project for the board you have.`,
         );
+      }
+
+      // Images first: the internal image is programmed last so that a reset
+      // into a running application never happens with stale image data behind
+      // it. The loader is only needed for this step.
+      const externalImagePath = join(buildDirectory, EXTERNAL_FLASH_ARTIFACT_NAME);
+      const externalImageBytes = existsSync(externalImagePath)
+        ? (await stat(externalImagePath)).size
+        : 0;
+      if (externalImageBytes > 0) {
+        const loaderPath = join(
+          dirname(this.paths.programmerCli),
+          'ExternalLoader',
+          EXTERNAL_LOADER_NAME,
+        );
+        if (!existsSync(loaderPath)) {
+          throw new Error(
+            `This project stores images in external flash, but the loader `
+            + `${EXTERNAL_LOADER_NAME} was not found at ${loaderPath}.`,
+          );
+        }
+        const externalResult = await runExecutable(
+          this.paths.programmerCli,
+          [
+            '-c',
+            'port=SWD',
+            `sn=${selectedProbe.serialNumber}`,
+            'mode=UR',
+            'reset=HWrst',
+            '-el',
+            loaderPath,
+            '-d',
+            externalImagePath,
+            EXTERNAL_FLASH_BASE_ADDRESS,
+            '-v',
+          ],
+          { timeoutMs: 5 * 60_000 },
+        );
+        log.push(...commandLog(externalResult));
+        if (externalResult.exitCode !== 0) {
+          throw new Error(
+            `Programming external flash exited with code ${externalResult.exitCode}`,
+          );
+        }
+        log.push(`Wrote ${externalImageBytes} bytes of images to external flash.`);
       }
 
       const flashResult = await runExecutable(

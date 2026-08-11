@@ -26,6 +26,9 @@ MEMORY
     RAM_D2  (xrw) : ORIGIN = 0x30000000, LENGTH = 288K
     RAM_D3  (xrw) : ORIGIN = 0x38000000, LENGTH = 64K
     SDRAM   (xrw) : ORIGIN = 0xD0000000, LENGTH = 32M
+    /* MT25TL01G QSPI NOR, readable at 0x90000000 once memory mapped mode is
+       enabled. Image resources live here; nothing is executed from it. */
+    EXTFLASH (r)  : ORIGIN = 0x90000000, LENGTH = 128M
 }
 
 SECTIONS
@@ -58,6 +61,20 @@ SECTIONS
         *(.rodata*)
         . = ALIGN(4);
     } > FLASH
+
+    /* Image resources, placed by HMI_IMAGE_ATTRIBUTE in the generated sources.
+       NOLOAD is wrong here: the contents are real and are written to the QSPI
+       by a separate programming step, so the section has to carry its bytes
+       into the ELF for objcopy to extract them. */
+    .ext_flash_images :
+    {
+        . = ALIGN(4);
+        __ext_flash_images_start = .;
+        *(.ext_flash_images)
+        *(.ext_flash_images.*)
+        . = ALIGN(4);
+        __ext_flash_images_end = .;
+    } > EXTFLASH
 
     .ARM.extab :
     {
