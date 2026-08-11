@@ -19,11 +19,10 @@ export interface ImageFolderNode {
 export const ROOT_PATH = '';
 
 /**
- * Not 'images': uploading a directory called `images` creates a real folder of
- * that name directly under the root, and two identically named nodes in a row
- * is unreadable.
+ * Capitalised so it reads as a heading rather than as a folder. Export writes
+ * this level to disk as lowercase `images`; see planImageExport.
  */
-export const ROOT_NAME = 'All Images';
+export const ROOT_NAME = 'Images';
 
 /**
  * Normalizes a folder path: no leading or trailing slashes, no empty or

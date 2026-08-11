@@ -376,3 +376,10 @@
 .imgres-toolbar select:hover {
   border-color: #a9b6c8;
 }
+
+.imgres-btn:disabled {
+  cursor: not-allowed;
+  border-color: #e3e8ef;
+  background: #f6f8fa;
+  color: #a8b0bd;
+}

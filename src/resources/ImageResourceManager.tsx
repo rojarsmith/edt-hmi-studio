@@ -16,6 +16,7 @@ import {
   type ImageFolderNode,
 } from './imageTree';
 import { getBytesPerPixel } from './converters/imageConverter';
+import { EXPORT_ROOT_DIR, exportImages } from './exportImages';
 import type { ImageFormat } from './types';
 import { toast } from '../components/Toast';
 import './ImageResourceManager.css';
@@ -162,6 +163,7 @@ const ImageResourceManager: React.FC = () => {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   /** Set while a folder is being dragged, so a drop knows what it carries. */
   const draggingFolder = useRef<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -279,6 +281,28 @@ const ImageResourceManager: React.FC = () => {
     toast.success(`Moved ${ids.length} image${ids.length === 1 ? '' : 's'}`);
   };
 
+  const handleExport = async () => {
+    if (images.length === 0) {
+      toast.info('There are no images to export.');
+      return;
+    }
+    setExporting(true);
+    try {
+      const result = await exportImages(images);
+      // null means the user dismissed the directory picker.
+      if (result === null) return;
+      toast.success(
+        result.via === 'directory'
+          ? `Exported ${result.written} images to ${EXPORT_ROOT_DIR}/`
+          : `This browser cannot write to a folder, so ${result.written} images were downloaded as ${EXPORT_ROOT_DIR}.zip`,
+      );
+    } catch (error) {
+      toast.error(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const applyFormatToChecked = (format: ImageFormat) => {
     for (const row of checkedVisible) updateImage(row.id, { format });
   };
@@ -360,7 +384,7 @@ const ImageResourceManager: React.FC = () => {
               checked={showChildren}
               onChange={(event) => setShowChildren(event.target.checked)}
             />
-            Show child
+            Show Child
           </label>
           <span className="imgres-spacer" />
           {checkedVisible.length > 0 && (
@@ -391,6 +415,16 @@ const ImageResourceManager: React.FC = () => {
               </button>
             </>
           )}
+          <button
+            type="button"
+            className="imgres-btn"
+            onClick={handleExport}
+            disabled={exporting || images.length === 0}
+            title={`Write every image to a folder you choose, under ${EXPORT_ROOT_DIR}/, keeping the folder tree`}
+          >
+            <span className="imgres-btn-icon" aria-hidden="true">↥</span>
+            {exporting ? 'Exporting...' : 'Export'}
+          </button>
           <button
             type="button"
             className="imgres-btn imgres-btn-primary"
