@@ -62,7 +62,37 @@ D-Cache can hold image data and the controller can burst.
 Read-only is deliberate: nothing writes it at run time. The contents are
 programmed by the flasher.
 
-## 5. Verification status
+## 5. Dummy cycles, and why a wrong value looks like a corrupt image
+
+`MT25TL01G_DUMMY_CYCLES_READ` is the value the QSPI controller uses for the
+`QUAD_INOUT_FAST_READ` (0xEB) command, both in `MT25TL01G_ReadSTR` and in the
+memory mapped configuration. ST's `mt25tl01g_conf_template.h` sets it to 8.
+**On this board it has to be 10**, and `include/mt25tl01g_conf.h` overrides it.
+
+Nothing programs the die's volatile configuration register —
+`CONF_QSPI_DUMMY_CLOCK` exists in the template but is referenced by no code in
+the BSP or the component driver — so the flash keeps its factory default of 10
+dummy clocks for 0xEB, and the controller has to agree with it.
+
+With 8, the controller starts sampling two clocks early. In dual-flash QPI the
+two dies present eight data lines, so one clock carries one byte, and every
+memory mapped read comes back displaced by exactly two bytes.
+
+The failure is worth recognising because of how it presents:
+
+- The flash contents are **correct**. Reading through the external loader
+  returns the file byte for byte.
+- Only the CPU's memory mapped view is wrong.
+- So the firmware runs, images are found at the right addresses, and the panel
+  shows a recognisably structured but scrambled picture rather than nothing.
+
+A repeating test pattern will not catch it. A displaced read of `11 22 33 FF`
+repeated is still `11 22 33 FF` repeated, rotated. Comparing a real image's
+bytes against the file through the CPU path is what exposes it — reading
+through `-el` does not, because that uses the loader's own read routine rather
+than the memory mapped window.
+
+## 6. Verification status
 
 Measured on the board, not inferred:
 
@@ -77,12 +107,10 @@ Measured on the board, not inferred:
 | Read-back at `0x90000000` | `FF332211` — the probe's `11 22 33 FF` pattern |
 | Read-back at `0x90004000` | `FFFFFFFF` — erased, so exactly 16 KB was written |
 | Runtime | Three PC samples after reset, all differing and none in `board_error_handler`, so `board_external_flash_init()` succeeded and the main loop runs |
+| CPU memory mapped read | With `MT25TL01G_DUMMY_CYCLES_READ` at 10, seven offsets spread across a real 198 KB image match the file exactly. At 8 every read was displaced by two bytes. |
 
-**Not yet verified: an image displayed on the panel from external flash.** The
-probe above is a synthetic 64×64 array referenced from `ui_init` to hold it
-through `--gc-sections`; it is never drawn. Everything up to and including the
-firmware reading `0x90000000` is confirmed, but a real project with an image
-widget has not been built, flashed and looked at.
+A real project — 35 images, 198 KB of them — has been built, flashed and shown
+on the panel. Images render, buttons work and screen switching works.
 
 ## Related
 
