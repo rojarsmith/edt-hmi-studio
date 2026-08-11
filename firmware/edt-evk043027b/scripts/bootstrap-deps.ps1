@@ -217,6 +217,15 @@ Install-PinnedArchive `
     -Target (Join-Path $CacheRoot "Drivers\CMSIS\Device\ST\STM32U5xx") `
     -Sentinel "Source\Templates\gcc\startup_stm32u599xx.s"
 
+# The USB device stack behind the Type-C virtual COM port. ST's own middleware,
+# and the only part of the USB path that is genuinely upstream — the descriptors
+# and the low-level glue are board specific and live in src/.
+Install-PinnedArchive `
+    -Name "stm32-usb-device-2df324b" `
+    -Uri "https://codeload.github.com/STMicroelectronics/stm32_mw_usb_device/zip/2df324bd60d4b0bb27404fd70b1c089b467f0e09" `
+    -Target (Join-Path $CacheRoot "Middlewares\ST\STM32_USB_Device_Library") `
+    -Sentinel "Core\Src\usbd_core.c"
+
 Install-PinnedArchive `
     -Name "lvgl-85aa60d" `
     -Uri "https://codeload.github.com/lvgl/lvgl/zip/85aa60d18b3d5e5588d7b247abf90198f07c8a63" `
@@ -249,6 +258,7 @@ $manifest = @"
 STM32U5 HAL v1.6.2 2c5e2568fbdb1900a13ca3b2901fdd302cac3444
 CMSIS Device U5 v1.4.2 6e67187dec98035893692ab2923914cb5f4e0117
 CMSIS Core v5.6.0 96d6da4e252b06dcfdc041e7df23e86161c33007
+STM32 USB Device Library v2.11.6 2df324bd60d4b0bb27404fd70b1c089b467f0e09
 LVGL v9.5.0 85aa60d18b3d5e5588d7b247abf90198f07c8a63
 MX25LM51245G vendored, see vendor/README.md
 EDT board drivers vendored, see vendor/README.md

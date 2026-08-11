@@ -1,6 +1,16 @@
 #include "modbus_rtu_async_client.h"
 
+#include "hmi_usb_cdc.h"
+
 #include <string.h>
+
+/*
+ * Defined at the foot of this file, next to each other, because they are the
+ * whole of what differs from the UART boards' copies of this client.
+ */
+static void consume_rx_byte(modbus_rtu_async_client_t *client, uint8_t byte);
+static void begin_receiving(modbus_rtu_async_client_t *client);
+static void drain_received_bytes(modbus_rtu_async_client_t *client);
 
 static modbus_rtu_async_client_t *g_irq_client;
 
@@ -12,7 +22,7 @@ static bool time_reached(uint32_t now, uint32_t target)
 static uint32_t interframe_delay_ms(
     const modbus_rtu_async_client_t *client)
 {
-    const uint32_t baud_rate = client->uart->Init.BaudRate;
+    const uint32_t baud_rate = client->baud_rate;
 
     if (baud_rate > 19200U) {
         return 2U;
@@ -28,7 +38,7 @@ static uint32_t interframe_delay_ms(
 static uint32_t transmit_budget_ms(
     const modbus_rtu_async_client_t *client)
 {
-    const uint32_t baud_rate = client->uart->Init.BaudRate;
+    const uint32_t baud_rate = client->baud_rate;
     uint32_t duration_ms;
 
     if (baud_rate == 0U) {
@@ -64,12 +74,9 @@ static bool frame_crc_is_valid(const uint8_t *frame, uint16_t frame_length)
            received_crc;
 }
 
-static void discard_stale_rx_data(UART_HandleTypeDef *uart)
+static void discard_stale_rx_data(void)
 {
-    __HAL_UART_CLEAR_OREFLAG(uart);
-    while (__HAL_UART_GET_FLAG(uart, UART_FLAG_RXNE) != RESET) {
-        __HAL_UART_FLUSH_DRREGISTER(uart);
-    }
+    hmi_usb_cdc_flush_rx();
 }
 
 static bool queue_request(
@@ -82,7 +89,7 @@ static bool queue_request(
 {
     uint32_t now;
 
-    if ((client == NULL) || (client->uart == NULL) ||
+    if ((client == NULL) ||
         (client->phase != MODBUS_RTU_ASYNC_IDLE) ||
         (unit_id == 0U) || (unit_id > 247U) ||
         (request_length > sizeof(client->tx_frame))) {
@@ -118,18 +125,6 @@ static void finish_from_interrupt(
     client->last_frame_end_ms = HAL_GetTick();
     client->completed_result = result;
     client->phase = MODBUS_RTU_ASYNC_FINISHED;
-}
-
-static bool arm_next_rx_byte(modbus_rtu_async_client_t *client)
-{
-    if (HAL_UART_Receive_IT(
-            client->uart,
-            &client->rx_byte,
-            1U) != HAL_OK) {
-        finish_from_interrupt(client, MODBUS_CLIENT_IO_ERROR);
-        return false;
-    }
-    return true;
 }
 
 static modbus_client_result_t validate_response(
@@ -191,7 +186,7 @@ static modbus_client_result_t validate_response(
 
 void modbus_rtu_async_client_init(
     modbus_rtu_async_client_t *client,
-    UART_HandleTypeDef *uart,
+    uint32_t baud_rate,
     uint32_t timeout_ms)
 {
     if (client == NULL) {
@@ -199,7 +194,7 @@ void modbus_rtu_async_client_init(
     }
 
     memset(client, 0, sizeof(*client));
-    client->uart = uart;
+    client->baud_rate = baud_rate;
     client->timeout_ms = (timeout_ms == 0U) ? 1000U : timeout_ms;
     client->phase = MODBUS_RTU_ASYNC_IDLE;
     g_irq_client = client;
@@ -217,34 +212,39 @@ modbus_client_result_t modbus_rtu_async_poll(
     uint32_t now;
     modbus_client_result_t result;
 
-    if ((client == NULL) || (client->uart == NULL)) {
+    if (client == NULL) {
         return MODBUS_CLIENT_INVALID_ARGUMENT;
     }
+
+    drain_received_bytes(client);
 
     now = HAL_GetTick();
     if ((client->phase == MODBUS_RTU_ASYNC_WAIT_GAP) &&
         time_reached(now, client->not_before_ms)) {
-        discard_stale_rx_data(client->uart);
+        discard_stale_rx_data();
         client->deadline_ms =
             now + transmit_budget_ms(client) + client->timeout_ms;
         client->phase = MODBUS_RTU_ASYNC_TRANSMITTING;
-        if (HAL_UART_Transmit_IT(
-                client->uart,
-                client->tx_frame,
-                client->tx_length) != HAL_OK) {
+        if (hmi_usb_cdc_write(client->tx_frame, client->tx_length)) {
+            /*
+             * USB delivers or it does not; there is no partial send and no
+             * line to wait on. Once the frame is queued the transaction is in
+             * the receive phase, which is what HAL_UART_TxCpltCallback does on
+             * the other boards.
+             */
+            begin_receiving(client);
+        } else {
             finish_from_interrupt(client, MODBUS_CLIENT_IO_ERROR);
         }
     }
 
     if ((client->phase == MODBUS_RTU_ASYNC_TRANSMITTING) &&
         time_reached(now, client->deadline_ms)) {
-        (void)HAL_UART_AbortTransmit(client->uart);
         finish_from_interrupt(client, MODBUS_CLIENT_TIMEOUT);
     }
 
     if ((client->phase == MODBUS_RTU_ASYNC_RECEIVING) &&
         time_reached(now, client->deadline_ms)) {
-        (void)HAL_UART_AbortReceive(client->uart);
         finish_from_interrupt(client, MODBUS_CLIENT_TIMEOUT);
     }
 
@@ -263,13 +263,12 @@ modbus_client_result_t modbus_rtu_async_poll(
 
 void modbus_rtu_async_cancel(modbus_rtu_async_client_t *client)
 {
-    if ((client == NULL) || (client->uart == NULL) ||
+    if ((client == NULL) ||
         (client->phase == MODBUS_RTU_ASYNC_IDLE)) {
         return;
     }
 
-    (void)HAL_UART_Abort(client->uart);
-    discard_stale_rx_data(client->uart);
+    discard_stale_rx_data();
     client->last_frame_end_ms = HAL_GetTick();
     client->completed_result = MODBUS_CLIENT_TIMEOUT;
     client->phase = MODBUS_RTU_ASYNC_IDLE;
@@ -451,37 +450,23 @@ uint16_t modbus_rtu_async_get_register(
     return client->registers[register_index];
 }
 
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *uart)
+/*
+ * One received byte, from the CDC ring buffer.
+ *
+ * Body-for-body what HAL_UART_RxCpltCallback does on the UART boards: grow the
+ * frame, work out how long the response should be as soon as the function code
+ * and byte count are known, and finish when it is complete. Only where the byte
+ * comes from has changed.
+ */
+static void consume_rx_byte(modbus_rtu_async_client_t *client, uint8_t byte)
 {
-    modbus_rtu_async_client_t *client = g_irq_client;
-
-    if ((client == NULL) || (uart != client->uart) ||
-        (client->phase != MODBUS_RTU_ASYNC_TRANSMITTING)) {
-        return;
-    }
-
-    client->rx_length = 0U;
-    client->expected_rx_length = 0U;
-    client->deadline_ms = HAL_GetTick() + client->timeout_ms;
-    client->phase = MODBUS_RTU_ASYNC_RECEIVING;
-    (void)arm_next_rx_byte(client);
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart)
-{
-    modbus_rtu_async_client_t *client = g_irq_client;
     uint16_t expected_length;
-
-    if ((client == NULL) || (uart != client->uart) ||
-        (client->phase != MODBUS_RTU_ASYNC_RECEIVING)) {
-        return;
-    }
 
     if (client->rx_length >= sizeof(client->rx_frame)) {
         finish_from_interrupt(client, MODBUS_CLIENT_BAD_RESPONSE);
         return;
     }
-    client->rx_frame[client->rx_length++] = client->rx_byte;
+    client->rx_frame[client->rx_length++] = byte;
 
     expected_length = client->expected_rx_length;
     if (client->rx_length >= 2U) {
@@ -511,19 +496,38 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart)
     if ((expected_length != 0U) &&
         (client->rx_length >= expected_length)) {
         finish_from_interrupt(client, MODBUS_CLIENT_OK);
-        return;
     }
-    (void)arm_next_rx_byte(client);
 }
 
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *uart)
+static void begin_receiving(modbus_rtu_async_client_t *client)
 {
-    modbus_rtu_async_client_t *client = g_irq_client;
+    client->rx_length = 0U;
+    client->expected_rx_length = 0U;
+    client->deadline_ms = HAL_GetTick() + client->timeout_ms;
+    client->phase = MODBUS_RTU_ASYNC_RECEIVING;
+}
 
-    if ((client == NULL) || (uart != client->uart) ||
-        (client->phase == MODBUS_RTU_ASYNC_IDLE)) {
+/*
+ * Moves whatever the host has sent into the frame under construction.
+ *
+ * Stops as soon as consume_rx_byte completes a frame, so trailing bytes are
+ * left where they are rather than being folded into the next transaction; the
+ * flush at the start of each request discards them. A UART gets this for free
+ * by not re-arming its receive.
+ */
+static void drain_received_bytes(modbus_rtu_async_client_t *client)
+{
+    uint8_t buffer[64];
+    uint16_t count;
+
+    if (client->phase != MODBUS_RTU_ASYNC_RECEIVING) {
         return;
     }
-    (void)HAL_UART_AbortReceive(uart);
-    finish_from_interrupt(client, MODBUS_CLIENT_IO_ERROR);
+
+    count = hmi_usb_cdc_read(buffer, (uint16_t)sizeof(buffer));
+    for (uint16_t index = 0U;
+         (index < count) && (client->phase == MODBUS_RTU_ASYNC_RECEIVING);
+         index++) {
+        consume_rx_byte(client, buffer[index]);
+    }
 }

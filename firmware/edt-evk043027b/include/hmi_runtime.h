@@ -120,8 +120,11 @@ extern const hmi_runtime_config_t hmi_runtime_config;
 extern const hmi_binding_descriptor_t hmi_binding_descriptors[];
 extern const size_t hmi_binding_descriptor_count;
 
+/*
+ * No UART parameter, unlike the other boards: the Modbus transport here is the
+ * Type-C USB virtual COM port, brought up by board_init. See hmi_usb_cdc.h.
+ */
 bool hmi_runtime_init(
-    UART_HandleTypeDef *uart,
     const hmi_runtime_config_t *config,
     const hmi_binding_descriptor_t *descriptors,
     size_t descriptor_count);

@@ -1,5 +1,6 @@
 #include "board.h"
 
+#include "hmi_usb_cdc.h"
 #include "mx25lm51245g.h"
 
 #include <stddef.h>
@@ -14,6 +15,7 @@ static DCACHE_HandleTypeDef hdcache1;
 volatile board_stage_t board_init_stage = BOARD_STAGE_RESET;
 volatile bool board_external_flash_ready = false;
 volatile bool board_touch_ready = false;
+volatile bool board_usb_ready = false;
 
 /*
  * Nothing on the start-up path may wait forever. A board stuck in an early spin
@@ -93,8 +95,12 @@ static bool system_clock_config(void)
         return false;
     }
 
-    oscillator.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+    /* HSI48 alongside HSE, as the vendor's SystemClock_Config does. The USB
+       stack needs it available; leaving it off is the kind of omission that
+       shows up only as a device that never enumerates. */
+    oscillator.OscillatorType = RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_HSI48;
     oscillator.HSEState = RCC_HSE_BYPASS;
+    oscillator.HSI48State = RCC_HSI48_ON;
     oscillator.PLL.PLLState = RCC_PLL_ON;
     oscillator.PLL.PLLSource = RCC_PLLSOURCE_HSE;
     /* The EPOD booster runs off HSE/PLLMBOOST and has to land under 16 MHz
@@ -275,6 +281,14 @@ bool board_init(void)
         return false;
     }
     board_init_stage = BOARD_STAGE_TOUCH_BUS;
+
+    /*
+     * The Type-C virtual COM port, which is the Modbus transport on this board.
+     * Not fatal: a panel with no host attached still has to run the HMI, and a
+     * USB stack that failed to start is reported through board_usb_ready rather
+     * than by refusing to boot.
+     */
+    board_usb_ready = hmi_usb_cdc_init();
 
     if (!board_uart1_apply(
             115200U,

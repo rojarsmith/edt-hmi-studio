@@ -1,8 +1,9 @@
 #include "hmi_runtime.h"
 
-/* For board_uart1_apply — see configure_uart, which is where this copy of the
-   runtime departs from the other boards'. */
+/* The Modbus transport on this board is the Type-C virtual COM port, not a
+   UART — see configure_transport below, and hmi_usb_cdc.h. */
 #include "board.h"
+#include "hmi_usb_cdc.h"
 #include "modbus_rtu_async_client.h"
 
 #include <stdio.h>
@@ -452,44 +453,28 @@ static lv_event_code_t write_event_for_widget(hmi_widget_t widget)
 }
 
 /*
- * Applies the project's serial settings to the Modbus USART.
+ * There is no UART to configure on this board.
  *
- * This one differs from the other board templates' copies of hmi_runtime.c,
- * which set uart->Init directly and call HAL_UART_Init. On this board the
- * Modbus link is RS-485, and HAL_UART_Init rewrites CR3 wholesale — including
- * the driver-enable bit that board_init set with HAL_RS485Ex_Init. The transmit
- * path would still look healthy from the firmware's side while the transceiver
- * never actually drove the bus, which is a fault with no local symptom at all:
- * every transaction simply times out.
- *
- * Going back through board_uart1_apply keeps the knowledge that this USART is
- * RS-485 in board.c, where the rest of the wiring lives, rather than in two
- * places that have to agree.
+ * The Modbus link is the Type-C USB virtual COM port, brought up by board_init.
+ * Baud rate, parity and stop bits have no meaning on a USB transport — the host
+ * sets them and nothing on the wire honours them — so the only one this runtime
+ * can still act on is the baud rate, which the client uses to derive the RTU
+ * inter-frame silence. Passing it through is what keeps the Protocol tab's
+ * timing settings real rather than decorative.
  */
-static bool configure_uart(
-    UART_HandleTypeDef *uart,
-    const hmi_runtime_config_t *config)
+static bool configure_transport(const hmi_runtime_config_t *config)
 {
-    uint32_t parity = UART_PARITY_NONE;
-
-    if (HAL_UART_DeInit(uart) != HAL_OK) {
-        return false;
-    }
-
-    if (config->parity == HMI_PARITY_EVEN) {
-        parity = UART_PARITY_EVEN;
-    } else if (config->parity == HMI_PARITY_ODD) {
-        parity = UART_PARITY_ODD;
-    }
-
-    return board_uart1_apply(
-        config->baud_rate,
-        parity,
-        (config->stop_bits == 2U) ? UART_STOPBITS_2 : UART_STOPBITS_1);
+    (void)config;
+    /*
+     * Deliberately does not require the host to be present. The panel has to
+     * run whether or not a PC is plugged in, so transactions simply time out
+     * until the port is opened — the same behaviour as an RS-485 bus with
+     * nothing on the other end.
+     */
+    return true;
 }
 
 bool hmi_runtime_init(
-    UART_HandleTypeDef *uart,
     const hmi_runtime_config_t *config,
     const hmi_binding_descriptor_t *descriptors,
     size_t descriptor_count)
@@ -504,7 +489,7 @@ bool hmi_runtime_init(
     g_write_cursor = 0U;
     memset(&g_transaction, 0, sizeof(g_transaction));
 
-    if ((uart == NULL) || (config == NULL) ||
+    if ((config == NULL) ||
         ((descriptor_count > 0U) && (descriptors == NULL)) ||
         (descriptor_count > HMI_RUNTIME_MAX_BINDINGS) ||
         (config->unit_id == 0U) || (config->unit_id > 247U) ||
@@ -512,12 +497,12 @@ bool hmi_runtime_init(
         return false;
     }
 
-    if (!configure_uart(uart, config)) {
+    if (!configure_transport(config)) {
         return false;
     }
     modbus_rtu_async_client_init(
         &g_modbus_client,
-        uart,
+        config->baud_rate,
         config->timeout_ms);
 
     g_binding_count = descriptor_count;

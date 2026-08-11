@@ -21,6 +21,8 @@ set(CMSIS_CORE_ROOT "${HMI_DEPS_ROOT}/Drivers/CMSIS/Core")
 set(CMSIS_DEVICE_ROOT "${HMI_DEPS_ROOT}/Drivers/CMSIS/Device/ST/STM32U5xx")
 set(HAL_ROOT "${HMI_DEPS_ROOT}/Drivers/STM32U5xx_HAL_Driver")
 set(LVGL_ROOT "${HMI_DEPS_ROOT}/Middlewares/Third_Party/lvgl")
+# ST's USB device stack, behind the Type-C virtual COM port that carries Modbus.
+set(USBD_ROOT "${HMI_DEPS_ROOT}/Middlewares/ST/STM32_USB_Device_Library")
 # There is no ST BSP for this board — it is not an ST Discovery kit. The panel,
 # touch controller and OctoSPI NOR drivers are vendored instead; see
 # vendor/README.md.
@@ -86,6 +88,9 @@ set(HAL_SOURCES
     "${HAL_ROOT}/Src/stm32u5xx_hal_icache.c"
     "${HAL_ROOT}/Src/stm32u5xx_hal_ltdc.c"
     "${HAL_ROOT}/Src/stm32u5xx_hal_ospi.c"
+    "${HAL_ROOT}/Src/stm32u5xx_hal_pcd.c"
+    "${HAL_ROOT}/Src/stm32u5xx_hal_pcd_ex.c"
+    "${HAL_ROOT}/Src/stm32u5xx_ll_usb.c"
     "${HAL_ROOT}/Src/stm32u5xx_hal_pwr.c"
     "${HAL_ROOT}/Src/stm32u5xx_hal_pwr_ex.c"
     "${HAL_ROOT}/Src/stm32u5xx_hal_rcc.c"
@@ -94,6 +99,13 @@ set(HAL_SOURCES
     "${HAL_ROOT}/Src/stm32u5xx_hal_tim_ex.c"
     "${HAL_ROOT}/Src/stm32u5xx_hal_uart.c"
     "${HAL_ROOT}/Src/stm32u5xx_hal_uart_ex.c"
+)
+
+set(USBD_SOURCES
+    "${USBD_ROOT}/Core/Src/usbd_core.c"
+    "${USBD_ROOT}/Core/Src/usbd_ctlreq.c"
+    "${USBD_ROOT}/Core/Src/usbd_ioreq.c"
+    "${USBD_ROOT}/Class/CDC/Src/usbd_cdc.c"
 )
 
 set(VENDOR_SOURCES
@@ -111,6 +123,7 @@ add_executable(firmware
     ${BOARD_SOURCES}
     ${GENERATED_SOURCES}
     ${HAL_SOURCES}
+    ${USBD_SOURCES}
     ${VENDOR_SOURCES}
     "${CMSIS_DEVICE_ROOT}/Source/Templates/system_stm32u5xx.c"
     "${CMSIS_DEVICE_ROOT}/Source/Templates/gcc/startup_stm32u599xx.s"
@@ -129,6 +142,8 @@ target_include_directories(firmware PRIVATE
     "${CMSIS_DEVICE_ROOT}/Include"
     "${HAL_ROOT}/Inc"
     "${HAL_ROOT}/Inc/Legacy"
+    "${USBD_ROOT}/Core/Inc"
+    "${USBD_ROOT}/Class/CDC/Inc"
     "${VENDOR_ROOT}/st"
     # The EDT drivers include each other as "Common/ts.h" and "ctp/mxt336u.h",
     # so this directory — not its subdirectories — is what goes on the path.

@@ -3,6 +3,8 @@
 #include "board.h"
 #include "stm32u5xx_hal.h"
 
+extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
+
 extern LTDC_HandleTypeDef hltdc;
 
 void NMI_Handler(void)
@@ -69,4 +71,14 @@ void LTDC_IRQHandler(void)
 void LTDC_ER_IRQHandler(void)
 {
     HAL_LTDC_IRQHandler(&hltdc);
+}
+
+/*
+ * The USB device stack runs entirely from this interrupt: enumeration, control
+ * transfers and every CDC packet. Without it the Type-C port powers up but
+ * never answers the host, and Windows reports an unknown device.
+ */
+void OTG_HS_IRQHandler(void)
+{
+    HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
 }

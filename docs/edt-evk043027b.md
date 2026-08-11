@@ -26,7 +26,7 @@ reaches a PC, and where its drivers come from.
 | Touch | Atmel maXTouch MXT336U on I²C2 (PH4/PH5) |
 | Backlight | TIM3 CH3 PWM on PE5, ~320 Hz |
 | External Flash | Macronix MX25LM51245G, 64 MB, OctoSPI1, mapped at `0x90000000` — mapped but unused, see §4 |
-| Modbus link | **USART2 over RS-485**, driver-enable on PD4 |
+| Modbus link | **USB CDC on the Type-C port** — a virtual COM port; see §5 |
 | Programming | **standalone ST-LINK/V2** on the SWD header |
 
 ## 2. The two cables
@@ -48,9 +48,9 @@ built for an F746 or an H747 landing here, where a wrong flash size and a wrong
 external loader do lasting damage.
 
 **The USB Type-C port** enumerates as `USB Serial Device (COMxx)` — the MCU's own
-USB CDC, `STM32 Virtual ComPort`. **The HMI runtime does not use it.** It is the
-vendor demo firmware's debug console, and once this firmware is flashed the port
-stops appearing at all. Do not select it in the Communication tab.
+USB CDC, reporting as `STM32 Virtual ComPort` on VID 0x0483 / PID 0x5740. **This
+is the Modbus link**, and it is the port to pick in the Communication tab. It
+needs no driver: Windows binds its inbox `usbser.sys` to that identity.
 
 ## 3. Only bank 1 of the Flash
 
@@ -120,24 +120,63 @@ protocols it might already be in, then told its dummy-cycle count **before**
 being switched to octal STR mode, and only then memory-mapped. Reads before that
 return bus faults, not data.
 
-## 5. Modbus RTU over RS-485
+## 5. Modbus RTU over the USB virtual COM port
 
 The Discovery boards speak Modbus over a UART wired to their on-board ST-LINK's
-virtual COM port, so a PC sees it directly. This board has no such path: USART2
-goes to an RS-485 transceiver, which is the field wiring Modbus RTU is for.
+virtual COM port, so a PC sees it directly. This board has no such path: its
+ST-LINK is a separate probe. What it does have is a USB device peripheral of its
+own, so **the Type-C port is the virtual COM port**, and that is what carries
+Modbus.
 
-**A PC therefore needs a USB-to-RS-485 adapter to talk to it.** The workflow is
-otherwise unchanged — the Communication tab's COM port is the adapter's, and
-`tools\modbus-rtu-test-server.ps1` runs on it the same way.
+The workflow is therefore the same as the Discovery boards': plug the Type-C
+cable in, pick the port in the Communication tab, and run
+`tools\modbus-rtu-test-server.ps1` on it. No adapter, no driver.
 
-One consequence is worth stating plainly, because it has no local symptom.
-PD4 is the transceiver's driver-enable, and the USART drives it itself once
-`HAL_RS485Ex_Init` has set the DEM bit. `HAL_UART_Init` rewrites CR3 wholesale
-and clears that bit. The shared `hmi_runtime.c` re-initialises the UART when it
-applies the project's baud rate and parity, so **this board's copy of
-`configure_uart` routes through `board_uart1_apply` instead** — the one place
-that knows this USART is RS-485. Undo that and the firmware transmits happily
-into a transceiver that never enables, and every transaction simply times out.
+| | Value |
+| --- | --- |
+| Peripheral | USB_OTG_HS, embedded HS PHY, PA11/PA12 = D-/D+ |
+| Identity | VID 0x0483, PID 0x5740, `STM32 Virtual ComPort` |
+| Windows driver | inbox `usbser.sys`, bound by that VID/PID |
+| Appears as | `USB Serial Device (COMxx)` |
+
+Three things in `HAL_PCD_MspInit` are each individually fatal to enumeration and
+have no equivalent elsewhere in this firmware: the PHY needs its own kernel
+clock *and* a reference-clock selection, VDDUSB is an isolated supply domain
+that reads as dead until enabled, and the HS transceiver has a further supply
+plus a SYSCFG enable of its own. All are taken from the vendor package.
+
+### What a USB transport does not have
+
+**A baud rate.** The host sets one with `SET_LINE_CODING` and nothing on the
+wire honours it — bytes cross as USB transfers, at USB's pace. The Protocol
+tab's baud rate is still used, as the number the RTU **inter-frame silence** is
+derived from, so it remains a real setting rather than a dead control. Parity
+and stop bits are stored, echoed back to the host, and otherwise ignored.
+
+**A per-byte interrupt.** A UART hands the client one byte at a time; USB hands
+over whole packets, and a response may arrive in one packet or several. So
+`hmi_usb_cdc.c` buffers received bytes in a ring and
+`modbus_rtu_async_poll` drains them. The client's framing logic — count the
+bytes the response should have, then check the CRC — is unchanged from the UART
+boards, which is why `consume_rx_byte` is body-for-body their
+`HAL_UART_RxCpltCallback`.
+
+**Back pressure.** A queued frame either goes or does not; there is no partial
+write. `hmi_usb_cdc_write` refuses while a previous frame is in flight, and the
+client treats that as an I/O error and retries.
+
+The panel does not require a host. With nothing plugged in, `board_usb_ready` is
+still true, the HMI runs normally, and Modbus transactions time out — the same
+behaviour as an RS-485 bus with nothing on the other end.
+
+### The RS-485 transceiver
+
+Still fitted, on USART2 with its driver-enable on PD4, and no longer driven by
+this firmware. `board_uart1_apply` in `board.c` remains and still configures it
+correctly through `HAL_RS485Ex_Init`; nothing calls it. If a project needs the
+field bus rather than a PC link, that function and the transport primitives at
+the head of `modbus_rtu_async_client.c` are the two places to reconnect — and
+git history before this change has them wired up.
 
 ## 6. Where the drivers come from
 
@@ -287,8 +326,9 @@ Then, in order:
    `board_external_flash_ready` reports whether the NOR came up, but nothing
    reads it while `HMI_IMAGES_IN_EXTERNAL_FLASH` is off, so a false there is
    currently harmless.
-5. **Do Modbus transactions all time out?** Check the DE line on PD4 with a
-   scope before anything else — see §5.
+5. **Do Modbus transactions all time out?** Check that Windows lists
+   `USB Serial Device (COMxx)` and that `board_usb_ready` is true. No COM port
+   means USB did not come up (§5), which is not a Modbus problem at all.
 
 ## See also
 

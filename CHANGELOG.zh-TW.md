@@ -10,6 +10,10 @@
 
 ## [Unreleased]
 
+### 變更
+- **EVK043027B 的 Modbus RTU 改走 Type-C USB 虛擬 COM port**，不再走 RS-485。這塊板子沒有 ST-LINK VCP（它是用外掛探針燒錄的），但它自己有 USB device 周邊，所以 Type-C 埠會以 VID 0x0483 / PID 0x5740 列舉成 `USB Serial Device (COMxx)`，Windows 直接綁內建的 `usbser.sys`。不需轉換器也不需驅動：插上、在 Communication 分頁選那個 port、跑測試伺服器。ST 的 USB Device Library 由 `bootstrap-deps.ps1` 抓取；描述符、低層黏合與帶 ring buffer 的 CDC 傳輸層則在 `src/`。RS-485 收發器還在板上，`board_uart1_apply` 也還會正確設定它，只是沒人呼叫 —— 見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md) §5
+- **Modbus 的時間設定在 USB 上仍然有意義** —— USB 傳輸沒有 baud rate，所以 Protocol 分頁的那個值改用來推導 RTU 幀間靜默時間，而不是被忽略。Parity 與 stop bits 依 CDC 規定記錄並回報給主機，除此之外不作用
+
 ### 新增
 - **支援 EDT EVK043027B** — STM32U599NJH6Q、由 LTDC 直接驅動的 480×272 面板（ARGB8888 32-bit）、maXTouch MXT336U 觸控，圖片資源留在 2 MB 的內部 flash。完整韌體樣板位於 `firmware/edt-evk043027b/`，含 vendor 進來的 EDT 面板與觸控驅動。詳見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md)
 - **以獨立探針燒錄的板子改用目標晶片辨識** — 獨立的 ST-LINK/V2 不會回報板名，因此 `probeBoardPattern` 現在可以是 `null`；燒錄器改為先連線（不寫入）並比對回報的 device ID 與板子定義是否相符

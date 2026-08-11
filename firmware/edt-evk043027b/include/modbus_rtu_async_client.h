@@ -30,7 +30,13 @@ typedef enum {
 } modbus_rtu_async_operation_t;
 
 typedef struct {
-    UART_HandleTypeDef *uart;
+    /*
+     * Not a UART on this board: the transport is the Type-C USB virtual COM
+     * port, see hmi_usb_cdc.h. The configured baud rate is kept because the RTU
+     * inter-frame silence is still derived from it — USB has no baud rate of
+     * its own, so this is what preserves the Protocol tab's framing settings.
+     */
+    uint32_t baud_rate;
     uint32_t timeout_ms;
     uint32_t last_frame_end_ms;
     uint32_t not_before_ms;
@@ -54,7 +60,7 @@ typedef struct {
 
 void modbus_rtu_async_client_init(
     modbus_rtu_async_client_t *client,
-    UART_HandleTypeDef *uart,
+    uint32_t baud_rate,
     uint32_t timeout_ms);
 
 bool modbus_rtu_async_is_busy(const modbus_rtu_async_client_t *client);

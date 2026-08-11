@@ -24,7 +24,7 @@ EVK043027B 是 EDT EVKxxxx27B 系列中 4.3 吋的那一款，MCU 為 STM32U599N
 | 觸控 | Atmel maXTouch MXT336U，掛在 I²C2（PH4/PH5） |
 | 背光 | TIM3 CH3 PWM，PE5，約 320 Hz |
 | 外部 Flash | Macronix MX25LM51245G，64 MB，OCTOSPI1，映射於 `0x90000000` —— 有映射但未使用，見 §4 |
-| Modbus 線路 | **USART2 走 RS-485**，driver-enable 在 PD4 |
+| Modbus 線路 | **Type-C 上的 USB CDC** —— 虛擬 COM port，見 §5 |
 | 燒錄 | SWD 排針上的**獨立 ST-LINK/V2** |
 
 ## 2. 兩條線
@@ -103,23 +103,53 @@ SPI，必須在它可能已經處於的三種協定下各重設一次，接著�
 **之前**先告訴它 dummy cycle 數，最後才做記憶體映射。在那之前讀取只會得到
 bus fault，不是資料。
 
-## 5. Modbus RTU 走 RS-485
+## 5. Modbus RTU 走 USB 虛擬 COM port
 
 Discovery 板的 Modbus 走的是接到板載 ST-LINK virtual COM port 的 UART，所以 PC
-直接就看得到。這塊板子沒有這條路：USART2 接的是 RS-485 收發器，也就是 Modbus
-RTU 本來就該用的現場佈線。
+直接就看得到。這塊板子沒有這條路：它的 ST-LINK 是外掛的探針。但它自己有 USB
+device 周邊，所以 **Type-C 埠就是那個虛擬 COM port**，Modbus 也走它。
 
-**因此 PC 端需要一顆 USB 轉 RS-485 的轉換器才能跟它對話。** 其餘流程完全不變 ——
-Communication 分頁選的 COM port 就是轉換器的，`tools\modbus-rtu-test-server.ps1`
-照樣在那個埠上跑。
+因此流程與 Discovery 板完全一樣：插上 Type-C 線、在 Communication 分頁選那個
+port、在上面跑 `tools\modbus-rtu-test-server.ps1`。不需要轉換器，也不需要驅動程式。
 
-有一件事值得明講，因為它在本地端沒有任何徵兆。PD4 是收發器的 driver-enable，
-只要 `HAL_RS485Ex_Init` 設了 DEM 位元，USART 就會自己驅動它。而
-`HAL_UART_Init` 會整個改寫 CR3，把那個位元清掉。共用的 `hmi_runtime.c` 在套用
-專案的 baud rate 與 parity 時會重新初始化 UART，所以**這塊板子的
-`configure_uart` 改成透過 `board_uart1_apply`** —— 唯一知道這個 USART 是
-RS-485 的地方。改回去的話，韌體會愉快地把資料送進一顆永遠不會啟用的收發器，
-然後每一筆交易都只是逾時而已。
+| | 值 |
+| --- | --- |
+| 周邊 | USB_OTG_HS，內建 HS PHY，PA11/PA12 = D-/D+ |
+| 識別 | VID 0x0483、PID 0x5740、`STM32 Virtual ComPort` |
+| Windows 驅動 | 內建的 `usbser.sys`，靠這組 VID/PID 綁定 |
+| 顯示為 | `USB Serial Device (COMxx)` |
+
+`HAL_PCD_MspInit` 裡有三件事少一件就熟不了，而且在這份韌體別處都找不到對應物：
+PHY 需要自己的 kernel clock **以及**一個 reference clock 選擇；VDDUSB 是一個獨立的
+供電域，沒開之前讀起來就像死的；HS 收發器另外還有它自己的供電與一個 SYSCFG
+enable。這些都是從原廠套件搬過來的。
+
+### USB 傳輸沒有的東西
+
+**沒有 baud rate。** 主機會用 `SET_LINE_CODING` 設一個，但線上根本沒人理它 ——
+資料是以 USB transfer、用 USB 自己的節奏在跑。Protocol 分頁的 baud rate 仍然有用，
+它是推導 RTU **幀間靜默時間**的那個數字，所以它還是一個真的設定，而不是死控件。
+Parity 與 stop bits 會被記下來、回報給主機，除此之外忽略。
+
+**沒有逐 byte 的中斷。** UART 是一次給一個 byte；USB 是整包給，而一個回應可能一包
+就到、也可能分幾包。所以 `hmi_usb_cdc.c` 把收到的 byte 排進 ring buffer，再由
+`modbus_rtu_async_poll` 去拿。client 的分幀邏輯 —— 算出回應應該有幾個 byte、然後核
+CRC —— 跟 UART 板子完全一樣，這也是為什麼 `consume_rx_byte` 跟他們的
+`HAL_UART_RxCpltCallback` 是逐行對應的。
+
+**沒有 back pressure。** 一個 frame 要麼送出去、要麼沒有，不存在只送一半。
+前一個 frame 還在飛的時候 `hmi_usb_cdc_write` 會拒絕，client 就當成 I/O 錯誤重試。
+
+面板不需要主機也能跑。什麼都沒插的時候，`board_usb_ready` 依舊是 true、HMI 正常
+運作，Modbus 交易則會逐筆逾時 —— 跟一條對端沒接東西的 RS-485 彙流排行為完全一樣。
+
+### RS-485 收發器
+
+還在板上，接在 USART2、driver-enable 在 PD4，只是這份韌體已經不再驅動它。
+`board.c` 裡的 `board_uart1_apply` 還在，也仍然會透過 `HAL_RS485Ex_Init` 正確地
+設定它，只是沒有人呼叫。如果哪個專案需要的是現場彙流排而不是 PC 連線，
+要接回去的就是那個函式與 `modbus_rtu_async_client.c` 開頭那幾個傳輸原語 ——
+本次變更之前的 git 歷史裡就是接好的狀態。
 
 ## 6. 驅動從哪裡來
 
@@ -249,8 +279,9 @@ callback，也無法回報 PLL3 失敗。因此改由 `ltdc_clock_ready` 手動�
    請回頭懷疑第 2 點的色彩格式。`board_external_flash_ready` 會回報 NOR 有沒有
    起來，但在 `HMI_IMAGES_IN_EXTERNAL_FLASH` 關閉的情況下沒有任何程式碼會去讀
    它，所以那裡是 false 目前無害。
-5. **Modbus 全部逾時？** 在做任何其他事之前，先用示波器看 PD4 的 DE 訊號 ——
-   見 §5。
+5. **Modbus 全部逾時？** 先確認 Windows 有沒有列出 `USB Serial Device (COMxx)`，
+   以及 `board_usb_ready` 是不是 true。沒有 COM port 就是 USB 沒熟起來（§5），
+   而不是 Modbus 的問題。
 
 ## 延伸閱讀
 

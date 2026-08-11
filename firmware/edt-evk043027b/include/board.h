@@ -66,6 +66,13 @@ extern volatile bool board_external_flash_ready;
  */
 extern volatile bool board_touch_ready;
 
+/**
+ * Whether the USB device stack started, i.e. whether the Type-C port can
+ * enumerate as a virtual COM port. False means Modbus has no transport and
+ * every transaction will time out; the HMI itself still runs.
+ */
+extern volatile bool board_usb_ready;
+
 bool board_init(void);
 
 /**

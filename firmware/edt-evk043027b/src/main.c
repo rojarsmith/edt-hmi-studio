@@ -21,7 +21,6 @@ int main(void)
 
     ui_init();
     if (!hmi_runtime_init(
-            &huart1,
             &hmi_runtime_config,
             hmi_binding_descriptors,
             hmi_binding_descriptor_count)) {
