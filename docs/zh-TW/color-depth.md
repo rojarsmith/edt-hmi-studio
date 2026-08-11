@@ -18,6 +18,26 @@
 | --- | --- | --- | --- | --- |
 | STM32F746G-DISCO | 480×272 | 16 | RGB565 | 2 × 255 KB |
 | STM32H747I-DISCO | 800×480 | **32** | **ARGB8888** | **2 × 1500 KB** |
+| EDT EVK043027B | 480×272 | **32** | **ARGB8888** | **2 × 510 KB** |
+
+EVK043027B 是這裡唯一「24-bit 真的只花 24 bit」的板子 —— 它的 LTDC 直接驅動
+並列 RGB 面板，路徑上沒有 DSI host 逼出補位 byte，原廠自己的 TouchGFX 範例跑的
+就是 packed 的 `480*272*3` frame buffer。**但它還是跑 32-bit**，因為這是 LVGL
+產品，32-bit 色彩是產品需求。下面 §2 講的是 H747I，那塊板子則是根本沒得選。
+
+代價值得寫清楚：整顆 2496 KB SRAM 中有 1020 KB 給了兩個 frame buffer（24-bit
+的話是 765 KB）。剩下 1472 KB 留給應用程式，`LV_MEM_SIZE`（256 KB）就是從這裡來的。
+
+這塊板子有**四處**必須一致，而不是三處，因為中間沒有 BSP 做轉譯：
+
+| 位置 | 設定 |
+| --- | --- |
+| `firmware/edt-evk043027b/include/lv_conf.h` | `LV_COLOR_DEPTH 32` |
+| `firmware/edt-evk043027b/include/board_display.h` | `HMI_DISPLAY_BYTES_PER_PIXEL 4` |
+| `firmware/edt-evk043027b/src/board_display.c` | `LTDC_PIXEL_FORMAT_ARGB8888` 與 `LV_COLOR_FORMAT_ARGB8888` |
+| `firmware/edt-evk043027b/STM32U599NJHXQ_FLASH.ld` | `FRAMEBUFFER` 區段 ≥ 2 × 寬 × 高 × 4 |
+
+會咬人的是 linker script：設錯不會建置失敗，而是 frame buffer 直接壓到 `.bss` 上。
 
 H747I 是在三個地方設定的，三者必須一致：
 

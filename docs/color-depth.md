@@ -20,6 +20,31 @@ does not mean.
 | --- | --- | --- | --- | --- |
 | STM32F746G-DISCO | 480×272 | 16 | RGB565 | 2 × 255 KB |
 | STM32H747I-DISCO | 800×480 | **32** | **ARGB8888** | **2 × 1500 KB** |
+| EDT EVK043027B | 480×272 | **32** | **ARGB8888** | **2 × 510 KB** |
+
+The EVK043027B is the one board here where 24-bit would genuinely have cost 24
+bits — its LTDC drives a parallel RGB panel directly, with no DSI host forcing a
+padding byte, and the vendor's own TouchGFX demo runs a packed `480*272*3` frame
+buffer. **It runs 32-bit anyway**, because this is an LVGL product and 32-bit
+colour is the product requirement; §2 below is about the H747I, where 32 bits is
+not a choice at all.
+
+The cost is worth stating: 1020 KB of the part's 2496 KB of SRAM goes to the two
+frame buffers, against 765 KB at 24-bit. That still leaves 1472 KB for the
+application, which is where `LV_MEM_SIZE` (256 KB) comes from.
+
+Four things have to agree on this board, not three, because there is no BSP
+translating between them:
+
+| Location | Setting |
+| --- | --- |
+| `firmware/edt-evk043027b/include/lv_conf.h` | `LV_COLOR_DEPTH 32` |
+| `firmware/edt-evk043027b/include/board_display.h` | `HMI_DISPLAY_BYTES_PER_PIXEL 4` |
+| `firmware/edt-evk043027b/src/board_display.c` | `LTDC_PIXEL_FORMAT_ARGB8888` and `LV_COLOR_FORMAT_ARGB8888` |
+| `firmware/edt-evk043027b/STM32U599NJHXQ_FLASH.ld` | `FRAMEBUFFER` region ≥ 2 × width × height × 4 |
+
+The linker script is the one that bites: get it wrong and the frame buffers
+overlap `.bss` rather than failing to build.
 
 For the H747I this is set in three places, and all three have to agree:
 

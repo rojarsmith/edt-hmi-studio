@@ -8,6 +8,15 @@
 QSPI NOR，而不是 1 MB 的內部 flash。本文記錄原因、各環節如何銜接，以及哪些
 已經驗證過。
 
+**本文只適用於 STM32H747I-DISCO。** 另外兩塊板子都把圖片留在內部 flash，板子
+定義帶著 `externalFlash: null`，燒錄時會完全跳過外部這一步：
+
+- **STM32F746G-DISCO** 從來沒用過。
+- **EDT EVK043027B** 有 2 MB 內部 flash，韌體約 285 KB、一張滿版背景圖 383 KB，
+  根本不需要 —— 見 [edt-evk043027b.md](./edt-evk043027b.md) §4，那裡也記錄了為什麼
+  ST 為對應 Discovery 套件準備的載入器目前燒不動它的 NOR。下面這套機制與板子
+  無關，等那個問題解決後可以原封不動套用。
+
 ## 1. 為什麼
 
 內部 flash 只有 1 MB，韌體本身已經佔掉約 285 KB，剩下約 740 KB。而單單一張
@@ -28,7 +37,7 @@ QSPI NOR，而不是 1 MB 的內部 flash。本文記錄原因、各環節如何
 | `STM32H747XIHx_FLASH.ld` | 新增 `0x90000000` 的 `EXTFLASH` 區段，並把 `.ext_flash_images` 放進去 |
 | `board.c` | 一個把該視窗設為 Normal / cacheable / 唯讀的 MPU region，以及 `board_external_flash_init()` 負責啟動 QSPI 並開啟 memory mapped 模式 |
 | `CMakeLists.txt` post-build | 把 ELF 切成 `firmware.bin`/`.hex`（移除外部區段）與 `firmware_extflash.bin`（只有該區段） |
-| `service.ts` | 先用外部載入器把 `firmware_extflash.bin` 燒到 `0x90000000`，再燒內部映像 |
+| `service.ts` | 先用外部載入器把 `firmware_extflash.bin` 燒進外部 flash，再燒內部映像。位址與載入器名稱都來自板子定義的 `externalFlash`，沒有的板子就跳過這一步 |
 
 只有專案實際用到的圖片才會被產生 —— `projectSource.ts` 的
 `collectUsedImageResources` 本來就在做這件事，早於這次改動。

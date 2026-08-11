@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  parseProgrammerDeviceId,
   parseProgrammerStLinkList,
   parseProgrammerUartList,
 } from '../programmerParser';
@@ -97,5 +98,34 @@ describe('parseProgrammerStLinkList', () => {
 
   it('returns an empty list when no probes are connected', () => {
     expect(parseProgrammerStLinkList('No ST-LINK detected')).toEqual([]);
+  });
+});
+
+describe('parseProgrammerDeviceId', () => {
+  it('reads the device ID out of a connection banner', () => {
+    // Abridged from a real `-c port=SWD` connect. A board flashed through a
+    // standalone ST-LINK is identified from this line and nothing else.
+    const output = `
+ST-LINK SN  : 53FF6C064882524825422287
+ST-LINK FW  : V2J48M35
+Board       : --
+Voltage     : 3.25V
+SWD freq    : 4000 KHz
+Connect mode: Under Reset
+Reset mode  : Hardware reset
+Device ID   : 0x481
+Revision ID : Rev X
+`;
+    expect(parseProgrammerDeviceId(output)).toBe('0x481');
+  });
+
+  it('normalizes case so a board definition can be written either way', () => {
+    expect(parseProgrammerDeviceId('Device ID : 0X4B1')).toBe('0x4b1');
+  });
+
+  it('returns null when the connection produced no device ID', () => {
+    expect(
+      parseProgrammerDeviceId('Error: No STM32 target found!'),
+    ).toBeNull();
   });
 });

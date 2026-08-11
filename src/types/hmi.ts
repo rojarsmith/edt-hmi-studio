@@ -1,4 +1,7 @@
-export type BoardId = 'stm32f746g-disco' | 'stm32h747i-disco';
+export type BoardId =
+  | 'stm32f746g-disco'
+  | 'stm32h747i-disco'
+  | 'edt-evk043027b';
 
 export type ProtocolId = 'modbus-rtu' | 'can-bus';
 
@@ -63,8 +66,36 @@ export interface BoardDefinition {
    * ST-LINK probe list — the "Board Name" field of
    * `STM32_Programmer_CLI -l st-link-only`. Matched case-insensitively so a
    * build cannot be flashed onto a different board by mistake.
+   *
+   * `null` for a board programmed through a *standalone* probe. An ST-LINK/V2
+   * on a flying lead has no idea what it is plugged into and reports no board
+   * name at all, so there is nothing to match; `deviceId` is what identifies
+   * the target instead.
    */
-  probeBoardPattern: string;
+  probeBoardPattern: string | null;
+  /**
+   * The MCU's DBGMCU identity code, as the programmer prints it on connect
+   * ("Device ID : 0x450"). Checked before anything is written when
+   * `probeBoardPattern` is null — it does not tell one board from another
+   * board built on the same part, but it does stop an image reaching a
+   * different STM32 family, which is where a stray flash does real damage.
+   */
+  deviceId: string;
+  /**
+   * The NOR flash image resources are linked into, when they do not fit
+   * alongside the code. `null` keeps them in internal flash — see
+   * docs/images-external-flash.md.
+   */
+  externalFlash: {
+    /** Where the part is memory mapped, and where the flasher writes it. */
+    baseAddress: string;
+    /**
+     * External loader driving that part, as named in CubeProgrammer's
+     * `bin/ExternalLoader` directory. Programming external flash is the one
+     * step SWD cannot do on its own.
+     */
+    loaderName: string;
+  } | null;
   /**
    * Field buses this board can drive, in the order the New Project dialog
    * offers them. A board lists a protocol only when it carries the wiring for
@@ -108,6 +139,8 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     },
     flashBytes: 1024 * 1024,
     probeBoardPattern: '(?:32)?F746GDISCOVERY',
+    deviceId: '0x449',
+    externalFlash: null,
     protocols: ['modbus-rtu'],
     lvgl: {
       fontLarge: true,
@@ -131,7 +164,59 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     // and is not part of this image — see docs/stm32h747i-disco-dual-core.md.
     flashBytes: 1024 * 1024,
     probeBoardPattern: 'DISCO-H747XI',
+    deviceId: '0x450',
+    externalFlash: {
+      baseAddress: '0x90000000',
+      /** Ships with CubeProgrammer; matches the MT25TL01G fitted to this board. */
+      loaderName: 'MT25TL01G_STM32H747I-DISCO.stldr',
+    },
     protocols: ['modbus-rtu'],
+    lvgl: {
+      fontLarge: true,
+      defaultFont: 'montserrat_14',
+      memSizeKb: 256,
+    },
+  },
+  {
+    id: 'edt-evk043027b',
+    name: 'EDT EVK043027B',
+    vendor: 'Emerging Display Technologies',
+    display: {
+      width: 480,
+      height: 272,
+      // 32-bit. The LTDC drives this parallel RGB panel directly and could scan
+      // a packed 24 bpp layer — the vendor's TouchGFX demo does — but this is
+      // an LVGL product and runs ARGB8888. Costs 1020 KB of the part's 2496 KB
+      // SRAM for the two frame buffers. See docs/color-depth.md.
+      colorDepth: 32,
+      colorFormat: 'ARGB8888',
+    },
+    // Bank 1 of the STM32U599NJ's two 2 MB banks. Bank 2 is left erased and out
+    // of this image — see docs/edt-evk043027b.md.
+    flashBytes: 2 * 1024 * 1024,
+    // Programmed through a standalone ST-LINK/V2 on the SWD header, which
+    // reports no board name. See `deviceId`.
+    probeBoardPattern: null,
+    /** STM32U59x/5Ax. */
+    deviceId: '0x481',
+    /*
+     * Images live in internal flash. There is 2 MB of it and the firmware uses
+     * about 285 KB, so even several full-screen 480x272 RGB888 backgrounds
+     * (383 KB each) fit alongside the code — the pressure that forces the
+     * H747I's images into external flash simply does not exist here.
+     *
+     * The board does carry a 64 MB MX25LM51245G, and board.c still maps it at
+     * 0x90000000, so a project that genuinely outgrows internal flash has
+     * somewhere to go. Switching to it needs a loader that works on this board:
+     * ST's MX25LM51245G_STM32U599J-DK.stldr drives the right pins but fails to
+     * erase here. See docs/edt-evk043027b.md §4.
+     */
+    externalFlash: null,
+    // The only board here with a CAN transceiver fitted (FDCAN1, behind the
+    // CAN_STB pin). CAN has no firmware support yet, so a project using it
+    // still cannot be built — the Protocol tab says so rather than letting the
+    // build fail later.
+    protocols: ['modbus-rtu', 'can-bus'],
     lvgl: {
       fontLarge: true,
       defaultFont: 'montserrat_14',

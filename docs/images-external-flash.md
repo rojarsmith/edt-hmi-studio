@@ -8,6 +8,18 @@ On the STM32H747I-DISCO, the pixel data of every image a project uses is linked
 into the board's QSPI NOR instead of the 1 MB internal flash. This document
 records why, how the pieces fit, and what is verified.
 
+**This is the STM32H747I-DISCO only.** The other two boards keep their images in
+internal flash and carry `externalFlash: null` on their board definitions, so
+the flasher skips the external programming step for them entirely:
+
+- The **STM32F746G-DISCO** has never used it.
+- The **EDT EVK043027B** has 2 MB of internal flash against ~285 KB of firmware
+  and 383 KB for a full-screen background, so it does not need it — see
+  [edt-evk043027b.md](./edt-evk043027b.md) §4, which also records why ST's
+  loader for the equivalent Discovery kit cannot currently program its NOR.
+  The machinery below is board-agnostic and would apply to it unchanged once
+  that is solved.
+
 ## 1. Why
 
 The internal flash is 1 MB and the firmware already occupies roughly 285 KB,
@@ -29,7 +41,7 @@ an `lv_image_dsc_t.data` pointer into `0x9xxxxxxx` reads like any other pointer.
 | `STM32H747XIHx_FLASH.ld` | Adds an `EXTFLASH` region at `0x90000000` and places `.ext_flash_images` in it |
 | `board.c` | An MPU region typing the window as Normal, cacheable, read-only, and `board_external_flash_init()` which brings up the QSPI and enables memory mapped mode |
 | `CMakeLists.txt` post-build | Splits the ELF into `firmware.bin`/`.hex` (external section removed) and `firmware_extflash.bin` (that section alone) |
-| `service.ts` | Programs `firmware_extflash.bin` at `0x90000000` through the external loader, then the internal image |
+| `service.ts` | Programs `firmware_extflash.bin` through the external loader, then the internal image. The address and the loader name both come from the board definition's `externalFlash`, so a board with none skips the step |
 
 Only images the project actually uses are emitted at all —
 `collectUsedImageResources` in `projectSource.ts` already walked the screens for

@@ -59,6 +59,22 @@ export function parseProgrammerUartList(output: string): HmiSerialPort[] {
   return ports;
 }
 
+/**
+ * The MCU identity `STM32_Programmer_CLI` prints once it has connected:
+ *
+ *   Device ID    : 0x481
+ *
+ * Normalized to lower case with the `0x` kept, which is how a board definition
+ * writes it. Returns null when the output carries no such line, which is what a
+ * failed connection looks like.
+ */
+export function parseProgrammerDeviceId(output: string): string | null {
+  const match = /^\s*device\s+id\s*:\s*(0x[0-9a-f]+)\s*$/im.exec(
+    normalizeOutput(output),
+  );
+  return match ? match[1].toLowerCase() : null;
+}
+
 export function parseProgrammerStLinkList(output: string): StLinkProbe[] {
   const normalized = normalizeOutput(output);
   const probePattern = /ST-Link Probe\s+(\d+)\s*:/gi;

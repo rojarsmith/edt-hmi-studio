@@ -8,6 +8,32 @@
 
 格式依循 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，版本編號依循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [Unreleased]
+
+### 新增
+- **支援 EDT EVK043027B** — STM32U599NJH6Q、由 LTDC 直接驅動的 480×272 RGB888 面板、maXTouch MXT336U 觸控，圖片資源放在映射於 `0x90000000` 的 MX25LM51245G OctoSPI NOR。完整韌體樣板位於 `firmware/edt-evk043027b/`，含 vendor 進來的 EDT 面板與觸控驅動。詳見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md)
+- **以獨立探針燒錄的板子改用目標晶片辨識** — 獨立的 ST-LINK/V2 不會回報板名，因此 `probeBoardPattern` 現在可以是 `null`；燒錄器改為先連線（不寫入）並比對回報的 device ID 與板子定義是否相符
+- **外部 flash 設定改為逐板配置** — 外部載入器名稱與基底位址從 `server/hmi/service.ts` 的常數搬到板子定義上，每塊板子指名自己的顆粒。定義中 `externalFlash: null` 的板子會跳過外部燒錄步驟
+
+### 變更
+- **EVK043027B 改跑 32-bit 色彩** — 使用 ARGB8888，而不是原廠 TouchGFX 範例的 packed RGB888，因為這是 LVGL 產品。`LV_COLOR_DEPTH 32`、ARGB8888 的 LTDC layer、`LV_COLOR_FORMAT_ARGB8888`，以及把 `FRAMEBUFFER` linker 區段從 768 KB 加大到 1024 KB 以容納兩個 510 KB 的 buffer。四者必須一致；其中 linker script 是會無聲失敗的那一個 —— 它不會拒絕建置，而是直接壓到 `.bss` 上
+
+### 新增
+- **EVK043027B 狀態 LED** — 主迴圈固定 1 Hz 心跳；進入 `board_error_handler` 時則重複閃 `board_init_stage` + 1 下。它是唯一不依賴面板、背光與切換式供電軌的輸出，因此不需要除錯器就能區分「韌體沒在跑」與「韌體在跑但顯示設定錯了」。見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md) §7
+
+### 修正
+- **EVK043027B 根本沒跑過 `board_init` 的第一行** — STM32U5 的 PWR 周邊是被時脈閘控的（`RCC_AHB3ENR_PWREN`），時脈沒開時 `HAL_PWREx_ConfigSupply` 輪詢到的暫存器永遠讀成 0，於是回傳 `HAL_TIMEOUT`。開那個時脈是 `HAL_Init` 呼叫 `HAL_MspInit` 的工作，而 HAL 自己的版本是 weak 且空的；原廠套件把它放在 `stm32u5xx_hal_msp.c`，而本樣板漏了沒移植。結果時脈樹、OctoSPI、LTDC 與顯示流程全都沒跑到，唯一的徵兆就是面板全黑
+- **EVK043027B 主迴圈會一次卡住好幾秒** — vendor 進來的 maXTouch 驅動在 I²C 收發兩邊都用 1000 ms timeout，而 LVGL 每約 30 ms 就輪詢一次輸入裝置，所以觸控控制器不在或沒回應時，卡住的不只是觸控，而是整個 HMI 迴圈。`board_display_init` 現在會先用 50 ms 的 `HAL_I2C_IsDeviceReady` 探測一次，沒回應就完全不向 LVGL 註冊輸入裝置，並把結果記在 `board_touch_ready`
+- **EVK043027B 觸控控制器從來沒有真的被 reset 過** — `CTP_RST`（PH6）只是一直被拉高，所以熱開機時那顆 IC 根本沒經歷過 reset。現在改為先拉低再放開，並等待 datasheet 要求的啟動時間
+- **EVK043027B 的錯誤閃爍碼數不出來** — spin loop 的常數大約快了八倍，把十二下的階段碼變成一片閃爍
+- **EVK043027B 燒錄失敗於「Error: failed to erase memory」** — 這塊板子不再把圖片資源連結到外部 flash，因此不再依賴任何外部載入器。這個做法是從 STM32H747I-DISCO 樣板抄過來的，那塊板子只有 1 MB 內部 flash 所以非用不可；本板有 2 MB，韌體約 285 KB、一張滿版 480×272 背景圖 383 KB，圖片跟程式碼放在一起還綽綽有餘。NOR 顆粒仍在板上、也仍映射於 `0x90000000`，供真的塞不下的專案使用 —— 見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md) §4，那裡記錄了為什麼 ST 的 `MX25LM51245G_STM32U599J-DK.stldr` 目前抹不掉它
+- **EVK043027B 燒錄後面板全黑** — `backlight_init` 沒有呼叫 `HAL_TIM_MspPostInit`，導致 PE5 從未切換成 AF2/TIM3_CH3，背光驅動收不到任何 PWM。`HAL_TIM_MspPostInit` 是 CubeMX 的慣例而非 HAL callback，HAL 也沒有替它宣告原型，所以那個定義被當成死碼 link 掉，而每一個 HAL 呼叫仍然回報成功
+- **`FS_PW_SW`（PI15）沒有拉高** — 原廠初始化在碰面板之前會先把這條切換式供電軌拉高；`panel_power_init` 現在也照做
+
+### 變更
+- **EVK043027B 的啟動失敗現在查得出來** — `board_init` 會把進度記在 `board_init_stage`；OctoSPI NOR 初始化失敗也不再是致命錯誤，改為把 `board_external_flash_ready` 設為 false，讓沒有用到圖片的專案照常執行，而不是讓面板全黑又講不出原因
+- **Modbus RTU 可以走 RS-485** — EVK043027B 透過 USART2 驅動收發器，driver-enable 由硬體在 PD4 上控制，而不是接到 ST-LINK virtual COM port 的 UART。PC 端需要一顆 USB 轉 RS-485 轉換器才能連上；Communication 分頁與測試伺服器的用法不變
+
 ## [1.1.0] - 2026-02-11
 
 ### 新增

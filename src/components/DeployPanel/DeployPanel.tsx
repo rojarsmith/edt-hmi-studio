@@ -418,7 +418,9 @@ const DeployPanel: React.FC = () => {
               ) : (
                 <>
                   <div className="deploy-target">
-                    <span>Region base: {layout.externalFlashBase}</span>
+                    {layout.externalFlashBase !== '' && (
+                      <span>Region base: {layout.externalFlashBase}</span>
+                    )}
                     <span>
                       External flash image: {formatSize(layout.externalImageBytes)}
                     </span>

@@ -11,6 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { runExecutable, type CommandResult } from './command';
 import {
+  parseProgrammerDeviceId,
   parseProgrammerStLinkList,
   parseProgrammerUartList,
   type HmiSerialPort,
@@ -36,13 +37,11 @@ const DEFAULT_TOOLCHAIN_ROOT = 'C:\\ST\\STM32CubeCLT_1.22.0';
 const BUILD_METADATA_FILE = 'build-metadata.json';
 const FLASH_ARTIFACT_NAME = 'firmware.hex';
 /**
- * Image resources, linked at 0x90000000 and written through the QSPI external
- * loader. Absent or empty when the project uses no images, which is normal.
+ * Image resources, linked into the board's external NOR and written through its
+ * loader. Absent or empty when the project uses no images, which is normal, and
+ * always absent for a board whose definition carries no `externalFlash`.
  */
 const EXTERNAL_FLASH_ARTIFACT_NAME = 'firmware_extflash.bin';
-const EXTERNAL_FLASH_BASE_ADDRESS = '0x90000000';
-/** Ships with CubeProgrammer; matches the MT25TL01G fitted to this board. */
-const EXTERNAL_LOADER_NAME = 'MT25TL01G_STM32H747I-DISCO.stldr';
 const ARTIFACT_NAMES = [
   'firmware.hex',
   'firmware.elf',
@@ -240,12 +239,19 @@ async function collectArtifacts(
 /**
  * Whether an attached probe is the board a build was produced for. Guards
  * against flashing an image built for one board onto another.
+ *
+ * A board whose definition has no `probeBoardPattern` is programmed through a
+ * standalone probe that reports nothing about its target, so there is nothing
+ * to check here; `verifyTargetDeviceId` covers that case instead.
  */
 function probeMatchesBoard(probe: StLinkProbe, boardId: BoardId): boolean {
+  const pattern = getBoardDefinition(boardId).probeBoardPattern;
+  if (pattern === null) {
+    return true;
+  }
   if (!probe.boardName) {
     return false;
   }
-  const pattern = getBoardDefinition(boardId).probeBoardPattern;
   return new RegExp(pattern, 'i').test(probe.boardName);
 }
 
@@ -567,11 +573,12 @@ export class HmiService {
       cArrayNames,
     );
     const externalImagePath = join(buildDirectory, EXTERNAL_FLASH_ARTIFACT_NAME);
+    const board = getBoardDefinition(metadata.boardId as BoardId);
     return {
       success: true,
       buildId: String(buildIdValue),
       boardId: metadata.boardId,
-      externalFlashBase: EXTERNAL_FLASH_BASE_ADDRESS,
+      externalFlashBase: board.externalFlash?.baseAddress ?? '',
       externalImageBytes: existsSync(externalImagePath)
         ? (await stat(externalImagePath)).size
         : 0,
@@ -580,6 +587,54 @@ export class HmiService {
         name: imageNames.get(placement.cArrayName) ?? placement.cArrayName,
       })),
     };
+  }
+
+  /**
+   * Connects without writing anything and checks that the part on the other end
+   * of the probe is the one the build was compiled for.
+   *
+   * This is the identity check for a board flashed through a *standalone*
+   * ST-LINK, which reports no board name — see `probeMatchesBoard`. It cannot
+   * tell two boards built on the same MCU apart, and does not pretend to; what
+   * it stops is an image reaching a different STM32 family, where a wrong flash
+   * size or a wrong external loader does lasting damage.
+   *
+   * Returns the log lines to carry into the flash result.
+   */
+  private async verifyTargetDeviceId(
+    probe: StLinkProbe,
+    boardId: BoardId,
+  ): Promise<string[]> {
+    const board = getBoardDefinition(boardId);
+    const result = await runExecutable(
+      this.paths.programmerCli,
+      ['-c', 'port=SWD', `sn=${probe.serialNumber}`, 'mode=UR', 'reset=HWrst'],
+      { timeoutMs: 60_000 },
+    );
+    const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Could not connect to the target through ST-LINK ${probe.serialNumber}:\n`
+        + (commandLog(result).join('\n')
+          || `STM32 programmer exited with code ${result.exitCode}`),
+      );
+    }
+
+    const deviceId = parseProgrammerDeviceId(output);
+    if (deviceId === null) {
+      throw new Error(
+        'Connected to the target, but the STM32 programmer did not report a '
+        + 'device ID, so the board could not be identified before writing.',
+      );
+    }
+    if (deviceId !== board.deviceId.toLowerCase()) {
+      throw new Error(
+        `This build targets ${board.name} (device ID ${board.deviceId}), but `
+        + `the connected part reports ${deviceId}. Connect a ${board.name}, or `
+        + `rebuild the project for the board you have.`,
+      );
+    }
+    return [`Target device ID ${deviceId} matches ${board.name}.`];
   }
 
   async flashBuild(
@@ -636,12 +691,17 @@ export class HmiService {
         );
       }
       const targetBoardId = metadata.boardId as BoardId;
+      const target = getBoardDefinition(targetBoardId);
       if (!probeMatchesBoard(selectedProbe, targetBoardId)) {
-        const target = getBoardDefinition(targetBoardId);
         throw new Error(
           `This build targets ${target.name}, but the attached ST-LINK reports `
           + `"${selectedProbe.boardName ?? 'an unknown board'}". `
           + `Connect a ${target.name}, or rebuild the project for the board you have.`,
+        );
+      }
+      if (target.probeBoardPattern === null) {
+        log.push(
+          ...(await this.verifyTargetDeviceId(selectedProbe, targetBoardId)),
         );
       }
 
@@ -653,15 +713,22 @@ export class HmiService {
         ? (await stat(externalImagePath)).size
         : 0;
       if (externalImageBytes > 0) {
+        if (!target.externalFlash) {
+          throw new Error(
+            `This build produced an external flash image, but ${target.name} `
+            + `has no external flash configured.`,
+          );
+        }
+        const loaderName = target.externalFlash.loaderName;
         const loaderPath = join(
           dirname(this.paths.programmerCli),
           'ExternalLoader',
-          EXTERNAL_LOADER_NAME,
+          loaderName,
         );
         if (!existsSync(loaderPath)) {
           throw new Error(
             `This project stores images in external flash, but the loader `
-            + `${EXTERNAL_LOADER_NAME} was not found at ${loaderPath}.`,
+            + `${loaderName} was not found at ${loaderPath}.`,
           );
         }
         const externalResult = await runExecutable(
@@ -676,7 +743,7 @@ export class HmiService {
             loaderPath,
             '-d',
             externalImagePath,
-            EXTERNAL_FLASH_BASE_ADDRESS,
+            target.externalFlash.baseAddress,
             '-v',
           ],
           { timeoutMs: 5 * 60_000 },

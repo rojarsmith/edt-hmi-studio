@@ -216,6 +216,7 @@ export interface HmiImageLayout {
   success: boolean;
   buildId: string;
   boardId: string;
+  /** Empty for a board that keeps image resources in internal flash. */
   externalFlashBase: string;
   externalImageBytes: number;
   images: HmiImageLayoutEntry[];
@@ -237,7 +238,7 @@ export async function getHmiImageLayout(
     success: response.ok && raw.success !== false,
     buildId,
     boardId: raw.boardId ?? '',
-    externalFlashBase: raw.externalFlashBase ?? '0x90000000',
+    externalFlashBase: raw.externalFlashBase ?? '',
     externalImageBytes: raw.externalImageBytes ?? 0,
     images: raw.images ?? [],
     ...(raw.error ? { error: raw.error } : {}),
