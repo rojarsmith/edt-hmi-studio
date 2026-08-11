@@ -58,18 +58,21 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *timer);
 #define HMI_LTDC_TOTAL_HEIGHT 291U
 
 /*
- * Bring-up aid: paint colour bars straight into the frame buffer and hold them
- * before LVGL takes over. Set to 0 once the panel is trusted.
+ * Bring-up aid, off by default: paints colour bars straight into the frame
+ * buffer, sweeps the backlight, and holds both for this many milliseconds
+ * before LVGL takes over. Enable it by building with, say,
+ * -DHMI_DISPLAY_BRINGUP_PATTERN_MS=10000.
  *
- * This is the one test that separates the two halves of the display path. Bars
- * appear => LTDC, panel, backlight and the supply rail all work, and anything
- * still wrong is LVGL or the flush callback. No bars => the fault is below
- * LVGL, and nothing about the UI is worth looking at yet. Wrong colours or bars
- * in the wrong order => the pixel format is mismatched somewhere in the four
- * places docs/color-depth.md lists.
+ * It stays here because it is the one test that separates the two halves of the
+ * display path, and the next panel in this family will need it. Bars appear =>
+ * LTDC, panel, backlight and the supply rail all work, and anything still wrong
+ * is LVGL or the flush callback. No bars => the fault is below LVGL, and
+ * nothing about the UI is worth looking at yet. Wrong colours or bars in the
+ * wrong order => the pixel format is mismatched somewhere in the four places
+ * docs/color-depth.md lists.
  */
 #ifndef HMI_DISPLAY_BRINGUP_PATTERN_MS
-#define HMI_DISPLAY_BRINGUP_PATTERN_MS 10000U
+#define HMI_DISPLAY_BRINGUP_PATTERN_MS 0U
 #endif
 
 /* Backlight PWM: TIM3 at 160 MHz / 2500 / 200 = 320 Hz, well above anything the

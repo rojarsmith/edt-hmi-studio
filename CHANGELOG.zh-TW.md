@@ -11,7 +11,7 @@
 ## [Unreleased]
 
 ### 新增
-- **支援 EDT EVK043027B** — STM32U599NJH6Q、由 LTDC 直接驅動的 480×272 RGB888 面板、maXTouch MXT336U 觸控，圖片資源放在映射於 `0x90000000` 的 MX25LM51245G OctoSPI NOR。完整韌體樣板位於 `firmware/edt-evk043027b/`，含 vendor 進來的 EDT 面板與觸控驅動。詳見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md)
+- **支援 EDT EVK043027B** — STM32U599NJH6Q、由 LTDC 直接驅動的 480×272 面板（ARGB8888 32-bit）、maXTouch MXT336U 觸控，圖片資源留在 2 MB 的內部 flash。完整韌體樣板位於 `firmware/edt-evk043027b/`，含 vendor 進來的 EDT 面板與觸控驅動。詳見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md)
 - **以獨立探針燒錄的板子改用目標晶片辨識** — 獨立的 ST-LINK/V2 不會回報板名，因此 `probeBoardPattern` 現在可以是 `null`；燒錄器改為先連線（不寫入）並比對回報的 device ID 與板子定義是否相符
 - **外部 flash 設定改為逐板配置** — 外部載入器名稱與基底位址從 `server/hmi/service.ts` 的常數搬到板子定義上，每塊板子指名自己的顆粒。定義中 `externalFlash: null` 的板子會跳過外部燒錄步驟
 
@@ -19,6 +19,8 @@
 - **EVK043027B 改跑 32-bit 色彩** — 使用 ARGB8888，而不是原廠 TouchGFX 範例的 packed RGB888，因為這是 LVGL 產品。`LV_COLOR_DEPTH 32`、ARGB8888 的 LTDC layer、`LV_COLOR_FORMAT_ARGB8888`，以及把 `FRAMEBUFFER` linker 區段從 768 KB 加大到 1024 KB 以容納兩個 510 KB 的 buffer。四者必須一致；其中 linker script 是會無聲失敗的那一個 —— 它不會拒絕建置，而是直接壓到 `.bss` 上
 
 ### 新增
+- **EVK043027B 會自己驗證 LTDC** — `HAL_LTDC_Init` 與 `HAL_LTDC_ConfigLayer` 寫完暫存器就回傳 `HAL_OK`，完全不回讀，所以匯流排時脈關著時每一次寫入都被丟掉、兩者卻都回報成功。`HAL_LTDC_MspInit` 是 `void` callback，連 PLL3 失敗都無法回報。現在由 `ltdc_clock_ready` 把結果帶出來、`ltdc_is_configured` 回讀 `GCR`/`TWCR`/`CR`/`CFBAR`，再由 `ltdc_is_scanning` 盯 `CPSR` 證明**像素**時脈真的在跑 —— 那是與匯流排時脈不同、且其他檢查都看不見的一個時脈
+- **EVK043027B 開機測試圖樣（預設關閉）** — 不經過 LVGL 直接寫進 frame buffer 的色條，加上背光由暗到亮的掃描。用來區分「顯示路徑整條死掉」與「LVGL 沒在畫」，以及「有背光但畫面全黑」與「背光根本沒亮」。用 `-DHMI_DISPLAY_BRINGUP_PATTERN_MS=10000` 打開；正常建置開機會直接進入 UI
 - **EVK043027B 狀態 LED** — 主迴圈固定 1 Hz 心跳；進入 `board_error_handler` 時則重複閃 `board_init_stage` + 1 下。它是唯一不依賴面板、背光與切換式供電軌的輸出，因此不需要除錯器就能區分「韌體沒在跑」與「韌體在跑但顯示設定錯了」。見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md) §7
 
 ### 修正

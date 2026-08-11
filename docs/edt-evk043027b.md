@@ -235,10 +235,12 @@ and the screen is still blank, stop looking at the LTDC.
 
 Then, in order:
 
-1. **Watch the first two seconds for colour bars.** `board_display_init` paints
+1. **Turn on the colour bars.** Rebuild with
+   `-DHMI_DISPLAY_BRINGUP_PATTERN_MS=10000` — it is **off by default**, so a
+   normal build boots straight into the UI. `board_display_init` then paints
    red / green / blue / white bars straight into the frame buffer — not through
-   LVGL — and holds them before handing over. This is the single most useful
-   test on the board, because it cuts the display path in half:
+   LVGL — and holds them for that long before handing over. This is the single
+   most useful test on the board, because it cuts the display path in half:
 
    | What you see | What it means |
    | --- | --- |
@@ -257,8 +259,9 @@ Then, in order:
    | The panel visibly brightens and dims | PE5, TIM3 and the backlight driver all work — the fault is the LTDC data path or the panel's own supply |
    | Nothing changes at all | The backlight or the panel's power is the fault. Check LCD_CTRL (PH13), LCD_RESET (PH15) and the switched rail FS_PW_SW (PI15), then PE5 with a scope |
 
-   Turn both off with `-DHMI_DISPLAY_BRINGUP_PATTERN_MS=0` once the panel is
-   trusted.
+   Both the bars and the ramp live behind the same switch, and both are off in a
+   normal build — they exist for the next panel in this family, not for
+   shipping firmware.
 
    The trap here has bitten once already, and it is silent.
    `HAL_TIM_MspPostInit` — the function that puts PE5 into AF2 — is **a CubeMX

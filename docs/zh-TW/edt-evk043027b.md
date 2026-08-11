@@ -205,9 +205,11 @@ callback，也無法回報 PLL3 失敗。因此改由 `ltdc_clock_ready` 手動�
 
 接著依序：
 
-1. **注意開機頭兩秒有沒有色條。** `board_display_init` 會把紅／綠／藍／白四條
-   色條**不經過 LVGL**直接畫進 frame buffer，並停留兩秒才交棒。這是這塊板子上
-   最有用的一個測試，因為它把顯示路徑一刀切成兩半：
+1. **先把色條打開。** 用 `-DHMI_DISPLAY_BRINGUP_PATTERN_MS=10000` 重新建置 ——
+   它**預設是關閉的**，所以正常建置開機後會直接進入 UI。打開後
+   `board_display_init` 會把紅／綠／藍／白四條色條**不經過 LVGL**直接畫進
+   frame buffer，並停留指定的時間才交棒。這是這塊板子上最有用的一個測試，
+   因為它把顯示路徑一刀切成兩半：
 
    | 你看到什麼 | 代表什麼 |
    | --- | --- |
@@ -225,7 +227,8 @@ callback，也無法回報 PLL3 失敗。因此改由 `ltdc_clock_ready` 手動�
    | 面板明顯有亮度變化 | PE5、TIM3 與背光驅動都正常 —— 問題在 LTDC 資料路徑或面板本身的供電 |
    | 完全沒有變化 | 問題就是背光或面板電源。檢查 LCD_CTRL（PH13）、LCD_RESET（PH15）與切換式供電軌 FS_PW_SW（PI15），再用示波器量 PE5 |
 
-   面板確認正常後，用 `-DHMI_DISPLAY_BRINGUP_PATTERN_MS=0` 把兩者一起關掉。
+   色條與背光掃描共用同一個開關，正常建置下兩者都是關的 —— 它們是為了這個系列的
+   下一片面板而留的，不是給出貨韌體用的。
 
    這裡有個已經踩過一次的坑，而且完全沒有徵兆。把 PE5 設成 AF2 的
    `HAL_TIM_MspPostInit` **是 CubeMX 的慣例，不是 HAL 的 callback**。HAL 裡沒有
