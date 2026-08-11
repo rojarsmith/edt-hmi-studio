@@ -64,6 +64,7 @@ The passphrase itself is exported as `FACTORY_DEV_MODE_PASSPHRASE` from
 | **Code** editor tab (generated C source), last in the tab row | shown | hidden |
 | **View → Code** menu item, after Preview | shown | hidden |
 | **LVGL** section of the toolbar **Info** dialog — heap size, default font, large font support | shown | hidden |
+| **Image Placement** section of the **Deploy** tab — each flashed image's address, size and memory region | shown | hidden |
 
 More surfaces will be added here as they are decided.
 

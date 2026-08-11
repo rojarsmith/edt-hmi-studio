@@ -17,6 +17,7 @@ import {
   type StLinkProbe,
 } from './programmerParser';
 import { writeGeneratedProjectSource } from './projectSource';
+import { parseImageLayout, type ImagePlacement } from './imageLayout';
 import {
   assertBuildId,
   assertSupportedProject,
@@ -90,6 +91,20 @@ export interface HmiBuildResult {
   artifacts?: HmiArtifact[];
   log: string[];
   error?: string;
+}
+
+export interface HmiImageLayoutEntry extends ImagePlacement {
+  /** The name shown in the editor, not the C identifier. */
+  name: string;
+}
+
+export interface HmiImageLayoutResult {
+  success: boolean;
+  buildId: string;
+  boardId: string;
+  externalFlashBase: string;
+  externalImageBytes: number;
+  images: HmiImageLayoutEntry[];
 }
 
 export interface HmiFlashResult {
@@ -511,6 +526,60 @@ export class HmiService {
         error: message,
       };
     }
+  }
+
+  /**
+   * Where each image ended up in the flashed image, read from the linker map
+   * the build produced. Reported rather than predicted: alignment, link order
+   * and --gc-sections all move things.
+   */
+  async getImageLayout(buildIdValue: unknown): Promise<HmiImageLayoutResult> {
+    assertBuildId(buildIdValue);
+    const buildDirectory = resolveBuildDirectory(
+      this.paths.buildRoot,
+      buildIdValue,
+    );
+    const metadata = await readBuildMetadata(buildDirectory);
+    const mapPath = join(buildDirectory, 'firmware.map');
+    if (!existsSync(mapPath)) {
+      throw new Error('This build produced no linker map.');
+    }
+
+    // project.json is written next to the generated sources and carries the
+    // resource list the build was made from, which is what names the arrays.
+    const projectPath = join(buildDirectory, 'project-source', 'project.json');
+    const cArrayNames: string[] = [];
+    const imageNames = new Map<string, string>();
+    if (existsSync(projectPath)) {
+      const parsed = JSON.parse(await readFile(projectPath, 'utf-8')) as {
+        resources?: { images?: { cArrayName?: string; name?: string }[] };
+      };
+      for (const image of parsed.resources?.images ?? []) {
+        if (typeof image.cArrayName === 'string') {
+          cArrayNames.push(image.cArrayName);
+          imageNames.set(image.cArrayName, image.name ?? image.cArrayName);
+        }
+      }
+    }
+
+    const placements = parseImageLayout(
+      await readFile(mapPath, 'utf-8'),
+      cArrayNames,
+    );
+    const externalImagePath = join(buildDirectory, EXTERNAL_FLASH_ARTIFACT_NAME);
+    return {
+      success: true,
+      buildId: String(buildIdValue),
+      boardId: metadata.boardId,
+      externalFlashBase: EXTERNAL_FLASH_BASE_ADDRESS,
+      externalImageBytes: existsSync(externalImagePath)
+        ? (await stat(externalImagePath)).size
+        : 0,
+      images: placements.map((placement) => ({
+        ...placement,
+        name: imageNames.get(placement.cArrayName) ?? placement.cArrayName,
+      })),
+    };
   }
 
   async flashBuild(

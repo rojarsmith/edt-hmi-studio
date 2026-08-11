@@ -178,6 +178,18 @@ function createHmiMiddleware(
         return;
       }
 
+      const layoutMatch = path.match(
+        /^\/api\/hmi\/builds\/([^/]+)\/image-layout$/,
+      );
+      if (layoutMatch) {
+        if (request.method !== 'GET') {
+          methodNotAllowed(response, 'GET');
+          return;
+        }
+        sendJson(response, 200, await service.getImageLayout(layoutMatch[1]));
+        return;
+      }
+
       const artifactMatch = path.match(
         /^\/api\/hmi\/builds\/([^/]+)\/artifacts\/([^/]+)$/,
       );

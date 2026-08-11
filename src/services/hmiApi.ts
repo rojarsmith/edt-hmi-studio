@@ -202,3 +202,44 @@ export async function flashHmiBuild(
   const data = (typeof raw === 'object' && raw !== null ? raw : {}) as JsonRecord;
   return normalizeOperationResult(data);
 }
+
+export interface HmiImageLayoutEntry {
+  cArrayName: string;
+  name: string;
+  address: number;
+  size: number;
+  region: 'external-flash' | 'internal-flash' | 'other';
+  section: string;
+}
+
+export interface HmiImageLayout {
+  success: boolean;
+  buildId: string;
+  boardId: string;
+  externalFlashBase: string;
+  externalImageBytes: number;
+  images: HmiImageLayoutEntry[];
+  error?: string;
+}
+
+/**
+ * Where each image ended up in the build that would be flashed. Read from the
+ * linker map rather than predicted, so it is only available after a build.
+ */
+export async function getHmiImageLayout(
+  buildId: string,
+): Promise<HmiImageLayout> {
+  const response = await fetch(
+    `/api/hmi/builds/${encodeURIComponent(buildId)}/image-layout`,
+  );
+  const raw = (await response.json()) as Partial<HmiImageLayout>;
+  return {
+    success: response.ok && raw.success !== false,
+    buildId,
+    boardId: raw.boardId ?? '',
+    externalFlashBase: raw.externalFlashBase ?? '0x90000000',
+    externalImageBytes: raw.externalImageBytes ?? 0,
+    images: raw.images ?? [],
+    ...(raw.error ? { error: raw.error } : {}),
+  };
+}

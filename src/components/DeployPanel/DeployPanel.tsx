@@ -20,8 +20,10 @@ import {
   buildHmiProject,
   flashHmiBuild,
   getHmiCapabilities,
+  getHmiImageLayout,
   listHmiPorts,
   type HmiCapabilities,
+  type HmiImageLayout,
   type HmiSerialPort,
 } from '../../services/hmiApi';
 import '../HmiPanel/hmiPanel.css';
@@ -34,8 +36,26 @@ type LogCopyFeedback = {
   message: string;
 } | null;
 
+
+function formatAddress(address: number): string {
+  return `0x${address.toString(16).toUpperCase().padStart(8, '0')}`;
+}
+
+function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} B`;
+}
+
+const REGION_LABEL: Record<string, string> = {
+  'external-flash': 'External Flash (QSPI NOR)',
+  'internal-flash': 'Internal Flash',
+  other: 'Other',
+};
+
 const DeployPanel: React.FC = () => {
   const currentProjectId = useAppStore((state) => state.currentProjectId);
+  const factoryDevMode = useAppStore((state) => state.factoryDevMode);
   const {
     getProjectConfig,
     saveProjectData,
@@ -58,6 +78,7 @@ const DeployPanel: React.FC = () => {
   const [artifactUrl, setArtifactUrl] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
   const [logCopyFeedback, setLogCopyFeedback] = useState<LogCopyFeedback>(null);
+  const [layout, setLayout] = useState<HmiImageLayout | null>(null);
 
   const board = useMemo(() => getBoardDefinition(boardId), [boardId]);
   const protocolDefinition = useMemo(
@@ -178,6 +199,7 @@ const DeployPanel: React.FC = () => {
     setBusy('building');
     setBuildId('');
     setArtifactUrl('');
+    setLayout(null);
     try {
       // Anything the user typed on the Protocol tab has to be on disk before
       // the project is exported, or the firmware is built from stale settings.
@@ -192,6 +214,14 @@ const DeployPanel: React.FC = () => {
       }
       if (result.buildId) setBuildId(result.buildId);
       if (result.artifact?.downloadUrl) setArtifactUrl(result.artifact.downloadUrl);
+      if (result.buildId && factoryDevMode) {
+        // Only read back when the section is on screen; it is a file parse.
+        try {
+          setLayout(await getHmiImageLayout(result.buildId));
+        } catch {
+          // The layout is diagnostic; a build is not less successful without it.
+        }
+      }
       appendLog(
         result.buildId
           ? `Firmware build complete, buildId: ${result.buildId}`
@@ -210,6 +240,7 @@ const DeployPanel: React.FC = () => {
     fonts,
     images,
     logicGraphs,
+    factoryDevMode,
     saveProjectData,
     screens,
   ]);
@@ -357,6 +388,81 @@ const DeployPanel: React.FC = () => {
             <pre>{logs.length > 0 ? logs.join('\n') : 'Waiting for an operation...'}</pre>
           </div>
         </section>
+
+          {/* Where the images physically land. Diagnostic rather than
+              operational, and reads addresses out of the linker map, so it is
+              for EDT engineers -- see docs/factory-dev-mode.md. */}
+          {factoryDevMode && (
+            <section className="hmi-panel-card">
+              <div className="hmi-panel-card-title">
+                <div>
+                  <h3>
+                    Image Placement
+                    <span className="hwinfo-dev-badge">Factory Dev Mode</span>
+                  </h3>
+                  <p>
+                    Where each flashed image sits in memory, read from the
+                    linker map of the build above rather than predicted.
+                  </p>
+                </div>
+              </div>
+
+              {layout === null ? (
+                <p className="deploy-placement-empty">
+                  Build the firmware to read the placement back.
+                </p>
+              ) : layout.images.length === 0 ? (
+                <p className="deploy-placement-empty">
+                  This project flashes no images.
+                </p>
+              ) : (
+                <>
+                  <div className="deploy-target">
+                    <span>Region base: {layout.externalFlashBase}</span>
+                    <span>
+                      External flash image: {formatSize(layout.externalImageBytes)}
+                    </span>
+                    <span>{layout.images.length} images</span>
+                  </div>
+                  <div className="tag-table-wrap">
+                    <table className="deploy-placement-table">
+                      <thead>
+                        <tr>
+                          <th>Image</th>
+                          <th>Address</th>
+                          <th>Size</th>
+                          <th>Memory</th>
+                          <th>Section</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {layout.images.map((entry) => (
+                          <tr key={entry.cArrayName}>
+                            <td>
+                              {entry.name}
+                              <span className="deploy-carray">{entry.cArrayName}</span>
+                            </td>
+                            <td className="deploy-mono">{formatAddress(entry.address)}</td>
+                            <td>{formatSize(entry.size)}</td>
+                            <td
+                              className={
+                                entry.region === 'external-flash'
+                                  ? 'deploy-region-ext'
+                                  : 'deploy-region-int'
+                              }
+                            >
+                              {REGION_LABEL[entry.region] ?? entry.region}
+                            </td>
+                            <td className="deploy-mono">{entry.section}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
       </div>
     </div>
   );

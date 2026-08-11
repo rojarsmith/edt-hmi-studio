@@ -61,6 +61,7 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 | **Code** 編輯分頁（產生的 C 原始碼），位於分頁列最右側 | 顯示 | 隱藏 |
 | **View → Code** 選單項目，位於 Preview 之後 | 顯示 | 隱藏 |
 | 工具列 **Info** 對話框的 **LVGL** 區段 —— heap 大小、預設字型、大字型支援 | 顯示 | 隱藏 |
+| **Deploy** 分頁的 **Image Placement** 區段 —— 每張已燒錄圖片的位址、大小與所在記憶體 | 顯示 | 隱藏 |
 
 日後決定的項目請繼續補充於此表。
 
