@@ -17,6 +17,7 @@ import {
 import {
   fontFileToBase64,
   parseFontMetadata,
+  migrateFontResource,
 } from './converters/fontConverter';
 
 // Generate unique ID
@@ -212,6 +213,9 @@ export const useResourceStore = create<ResourceState>((set, get) => ({
       family: metadata.family !== 'Unknown' ? metadata.family : baseName,
       style: metadata.style,
       sizes: [16],
+      // New fonts derive their coverage from the project's text; existing ones
+      // keep whatever they were tuned to. See docs/charset-trimming-design.md §4.
+      charsetMode: 'auto',
       charset: 'ascii',
       bpp: 4,
       data: base64Data,
@@ -344,7 +348,8 @@ export const useResourceStore = create<ResourceState>((set, get) => ({
   importResources: (resources) => {
     set({
       images: resources.images || [],
-      fonts: resources.fonts || [],
+      // Fonts saved before charsetMode existed carry no mode of their own
+      fonts: (resources.fonts || []).map(migrateFontResource),
     });
   },
   

@@ -2,7 +2,138 @@
 // Note: Full font conversion requires lv_font_conv or similar tool
 // This provides basic font management and C code generation structure
 
-import type { CharsetType, FontConversionOptions, CharsetPreset } from '../types';
+import type { CharsetType, FontConversionOptions, CharsetPreset, FontResource } from '../types';
+
+/** ASCII 0x20-0x7E, included unconditionally in `auto` mode. */
+export const ASCII_BASELINE = '0x20-0x7e';
+
+/**
+ * A font's resolved coverage, in the shape `FontCompileRequest` wants:
+ * `ranges` goes to `--range`, `symbols` goes to `--symbols`, and
+ * `lv_font_conv` takes the union of the two.
+ */
+export interface CharsetSelection {
+  /** Comma-separated, e.g. `"0x20-0x7e,0x4e00-0x4eff"`. May be empty. */
+  ranges: string;
+  /** Literal characters. May be empty. */
+  symbols: string;
+}
+
+/** Format ranges the way the compile request and `lv_font_conv` expect. */
+export function rangesToString(ranges: [number, number][]): string {
+  return ranges
+    .map(([start, end]) => `0x${start.toString(16)}-0x${end.toString(16)}`)
+    .join(',');
+}
+
+/** Parse a `"0x20-0x7e,0x4e00-0x4eff"` string back into pairs. */
+function parseRanges(text: string): [number, number][] {
+  const out: [number, number][] = [];
+  for (const part of text.split(',')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const [from, to] = trimmed.split('-');
+    const start = Number.parseInt(from, 16);
+    const end = to !== undefined ? Number.parseInt(to, 16) : start;
+    if (Number.isNaN(start) || Number.isNaN(end)) continue;
+    out.push([start, end]);
+  }
+  return out;
+}
+
+/** Code points of a string, iterated by character so surrogate pairs stay whole. */
+function stringCodePoints(text: string): number[] {
+  const out: number[] = [];
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    if (cp !== undefined) out.push(cp);
+  }
+  return out;
+}
+
+/**
+ * Render code points as a `--symbols` string: sorted and deduplicated, so the
+ * value is stable across runs and safe to use in a conversion cache key.
+ */
+function toSymbols(points: Iterable<number>, dropAscii: boolean): string {
+  const sorted = [...new Set(points)]
+    .filter((cp) => !dropAscii || cp < 0x20 || cp > 0x7e)
+    .sort((a, b) => a - b);
+  return String.fromCodePoint(...sorted);
+}
+
+/**
+ * The mode a font written before `charsetMode` existed should be read as.
+ * Never `auto`: switching an existing project to usage-derived coverage would
+ * change what ships without the author asking.
+ */
+function legacyMode(font: FontResource): 'preset' | 'manual' {
+  return font.charset === 'custom' ? 'manual' : 'preset';
+}
+
+/**
+ * Bring a font resource loaded from an older project up to date.
+ * Idempotent, and output-preserving — see the tests in
+ * `converters/__tests__/charsetResolution.test.ts`.
+ */
+export function migrateFontResource(font: FontResource): FontResource {
+  if (font.charsetMode) return font;
+
+  if (font.charset === 'custom') {
+    return {
+      ...font,
+      charsetMode: 'manual',
+      extraChars: font.customChars ?? '',
+      customChars: undefined,
+    };
+  }
+
+  return { ...font, charsetMode: 'preset' };
+}
+
+/**
+ * Work out which glyphs a font should be converted with.
+ *
+ * `collected` is the code point set from `collectGlyphs`, and is only consulted
+ * in `auto` mode — the other two modes are the author saying what they want.
+ */
+export function resolveFontCharset(
+  font: FontResource,
+  collected?: Iterable<number>,
+): CharsetSelection {
+  const mode = font.charsetMode ?? legacyMode(font);
+
+  if (mode === 'preset') {
+    return { ranges: rangesToString(getCharsetRanges(font.charset)), symbols: '' };
+  }
+
+  if (mode === 'manual') {
+    const chars = font.extraChars ?? font.customChars ?? '';
+    const ranges = font.extraRanges ?? '';
+    // Matches what an empty custom charset did before: fall back to ASCII
+    if (!chars && !ranges) return { ranges: ASCII_BASELINE, symbols: '' };
+    // Characters go out as symbols rather than one range each — scattered CJK
+    // used to produce a command line too long for cmd.exe
+    return { ranges, symbols: toSymbols(stringCodePoints(chars), false) };
+  }
+
+  const points = new Set<number>(collected ?? []);
+  for (const cp of stringCodePoints(font.extraChars ?? '')) points.add(cp);
+  const ranges = [ASCII_BASELINE, font.extraRanges?.trim()].filter(Boolean).join(',');
+  // ASCII is already covered by the baseline range; repeating it in the symbols
+  // string would only make the command longer
+  return { ranges, symbols: toSymbols(points, true) };
+}
+
+/** Expand a selection into the glyph set it asks for. Used by the editor's counters. */
+export function charsetCodePoints(selection: CharsetSelection): Set<number> {
+  const out = new Set<number>();
+  for (const [start, end] of parseRanges(selection.ranges)) {
+    for (let cp = start; cp <= end; cp++) out.add(cp);
+  }
+  for (const cp of stringCodePoints(selection.symbols)) out.add(cp);
+  return out;
+}
 
 export interface ConvertedFont {
   cCode: string;

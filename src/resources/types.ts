@@ -37,8 +37,16 @@ export interface FontResource {
   family: string;
   style: string;
   sizes: number[];
+  /** How the glyph coverage is decided. See `CharsetMode`. */
+  charsetMode: CharsetMode;
+  /** Which preset to use. Only meaningful when `charsetMode` is `preset`. */
   charset: CharsetType;
-  customChars?: string; // For custom charset
+  /** Characters to include on top of the mode's own set — TouchGFX's "wildcard characters". */
+  extraChars?: string;
+  /** Ranges to include on top, e.g. `"0x4E00-0x4EFF,0xFF00-0xFFEF"`. */
+  extraRanges?: string;
+  /** @deprecated Pre-`charsetMode` field; `migrateFontResource` moves it into `extraChars`. */
+  customChars?: string;
   bpp: 1 | 2 | 4 | 8;
   data: string; // Base64 encoded TTF/OTF
   cFontName: string;
@@ -47,6 +55,18 @@ export interface FontResource {
 }
 
 export type CharsetType = 'ascii' | 'latin' | 'cjk-basic' | 'custom';
+
+/**
+ * How a font's glyph coverage is decided.
+ *
+ * - `auto`   — the characters the project's text actually uses, plus an ASCII
+ *              baseline and whatever extras the author declares
+ * - `preset` — a fixed Unicode block from `CHARSET_PRESETS`
+ * - `manual` — exactly the characters and ranges the author lists
+ *
+ * See docs/charset-trimming-design.md §4.
+ */
+export type CharsetMode = 'auto' | 'preset' | 'manual';
 
 export interface CharsetPreset {
   id: CharsetType;

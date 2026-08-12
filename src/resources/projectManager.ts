@@ -8,6 +8,7 @@ import {
   DEFAULT_BOARD_ID,
   createDefaultCommunicationConfig,
 } from '../types/hmi';
+import { migrateFontResource } from './converters/fontConverter';
 
 const PROJECT_VERSION = '1.0.0';
 
@@ -103,7 +104,12 @@ function migrateProject(project: ProjectFile): ProjectFile {
     screens: project.screens ?? project.pages ?? [],
     screenGroups: project.screenGroups || [],
     pages: undefined,
-    resources: project.resources || { images: [], fonts: [] },
+    resources: {
+      images: project.resources?.images || [],
+      // Fonts saved before charsetMode existed are read as the mode that keeps
+      // their output the same — see docs/charset-trimming-design.md §4
+      fonts: (project.resources?.fonts || []).map(migrateFontResource),
+    },
     variables: project.variables || [],
     logicGraphs: project.logicGraphs || [],
     boardId: project.boardId || DEFAULT_BOARD_ID,

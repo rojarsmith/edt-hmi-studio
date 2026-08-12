@@ -130,6 +130,8 @@ export function createFontResource(overrides: Partial<FontResource> = {}): FontR
     family: 'Roboto',
     style: 'Regular',
     sizes: [16, 24],
+    // 'preset' + 'ascii' is what these fixtures meant before charsetMode existed
+    charsetMode: 'preset',
     charset: 'ascii',
     bpp: 4,
     data: 'base64fontdata',
