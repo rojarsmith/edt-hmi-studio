@@ -9,6 +9,7 @@ import type {
   AlignmentGuide,
   Screen,
   ScreenGroup,
+  Typography,
 } from '../types';
 import { MAX_SCREEN_GROUP_DEPTH } from '../types';
 import type { ModbusRegisterTag } from '../types/hmi';
@@ -54,6 +55,12 @@ interface EditorState {
 
   /** Organisational folders shown in the screen manager. */
   screenGroups: ScreenGroup[];
+
+  /**
+   * Named text styles. Widgets reference one by id; a widget with none
+   * inherits the screen's default font, as an unstyled widget always has.
+   */
+  typographies: Typography[];
 
   /**
    * Screens with a tab open along the bottom of the canvas, in tab order.
@@ -121,7 +128,13 @@ interface EditorState {
   ) => void;
   clearComponents: () => void;
   setComponents: (components: LvglComponent[]) => void;
-  setScreens: (screens: Screen[], screenGroups?: ScreenGroup[]) => void;
+  setScreens: (screens: Screen[], screenGroups?: ScreenGroup[], typographies?: Typography[]) => void;
+
+  /** Create a typography and return its id. Seeded from the project default. */
+  addTypography: (seed?: Partial<Typography>) => string;
+  updateTypography: (id: string, updates: Partial<Typography>) => void;
+  /** Removing one leaves its widgets inheriting the screen default again. */
+  deleteTypography: (id: string) => void;
   syncModbusBindings: (tags: ModbusRegisterTag[]) => void;
   
   // Actions - Z-order
@@ -500,6 +513,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state - Multi-screen
   screens: [initialScreen],
   currentScreenId: initialScreen.id,
+  typographies: [],
   screenGroups: [],
   openScreenIds: [initialScreen.id],
 
@@ -1020,12 +1034,70 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  setScreens: (screens, screenGroups) => {
+  addTypography: (seed = {}) => {
+    const existing = get().typographies;
+    const id = `typo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const taken = new Set(existing.map((t) => t.name));
+    let name = seed.name ?? 'New typography';
+    for (let suffix = 2; taken.has(name); suffix++) {
+      name = `${seed.name ?? 'New typography'} (${suffix})`;
+    }
+
+    set({
+      typographies: [
+        ...existing,
+        {
+          id,
+          name,
+          fontResource: seed.fontResource ?? 'montserrat_14',
+          fontSize: seed.fontSize ?? 14,
+          letterSpace: seed.letterSpace ?? 0,
+          lineSpace: seed.lineSpace ?? 0,
+          align: seed.align ?? 'auto',
+          decor: seed.decor ?? 'none',
+          baseDir: seed.baseDir ?? 'auto',
+        },
+      ],
+    });
+    return id;
+  },
+
+  updateTypography: (id, updates) => {
+    set({
+      typographies: get().typographies.map((typography) =>
+        typography.id === id ? { ...typography, ...updates } : typography,
+      ),
+    });
+  },
+
+  deleteTypography: (id) => {
+    get().saveToHistory();
+    // Widgets pointing at it fall back to inheriting the screen default, which
+    // is what they did before a typography existed
+    const clearReferences = (components: LvglComponent[]): LvglComponent[] =>
+      components.map((comp) => ({
+        ...comp,
+        ...(comp.typographyId === id ? { typographyId: undefined } : {}),
+        children: clearReferences(comp.children ?? []),
+      }));
+
+    set({
+      typographies: get().typographies.filter((typography) => typography.id !== id),
+      screens: get().screens.map((screen) => ({
+        ...screen,
+        components: clearReferences(screen.components),
+      })),
+    });
+  },
+
+  setScreens: (screens, screenGroups, typographies) => {
     get().saveToHistory();
     const firstId = screens.length > 0 ? screens[0].id : get().currentScreenId;
     set({
       screens: cloneScreens(screens),
       screenGroups: screenGroups ? screenGroups.map(g => ({ ...g })) : [],
+      typographies: typographies ? typographies.map(t => ({ ...t })) : [],
       // A freshly loaded project starts with just its first screen open.
       openScreenIds: screens.length > 0 ? [firstId] : [],
       currentScreenId: firstId,

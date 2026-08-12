@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 import { v4 as uuidv4 } from 'uuid';
 import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '../resources/types';
-import type { Screen, ScreenGroup } from '../types';
+import type { Screen, ScreenGroup, Typography } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type {
   BoardId,
@@ -67,6 +67,8 @@ export interface ProjectData {
   projectId: string;
   screens: Screen[];
   screenGroups?: ScreenGroup[];
+  /** Named text styles shared across widgets. */
+  typographies?: Typography[];
   logicGraphs: LogicGraph[];
   variables: { id: string; name: string; type: string; defaultValue: string }[];
 }
@@ -380,7 +382,7 @@ interface ProjectStoreState {
 
   // Load / save project data (screens, logic, resources)
   loadProjectData: (id: string) => Promise<{ data: ProjectData; images: ImageResource[]; fonts: FontResource[] }>;
-  saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[]) => Promise<void>;
+  saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[], typographies?: Typography[]) => Promise<void>;
 
   // Import / export
   exportProject: (id: string) => Promise<ProjectFile>;
@@ -481,12 +483,12 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     return { data, images, fonts };
   },
 
-  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = []) => {
+  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = [], typographies = []) => {
     const config = await dbGetProjectConfig(id);
     if (config) {
       await dbUpdateProjectConfig({ ...config, updatedAt: Date.now() });
     }
-    await dbUpdateProjectData({ projectId: id, screens, screenGroups, logicGraphs, variables: [] });
+    await dbUpdateProjectData({ projectId: id, screens, screenGroups, typographies, logicGraphs, variables: [] });
     await get().syncResources(id, images, fonts);
   },
 

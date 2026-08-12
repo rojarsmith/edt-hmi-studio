@@ -1,11 +1,12 @@
 // Full-page host for one resource kind. Image, Text and Icon are top-level
 // tabs; this supplies the header, view toggle and search they share.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useResourceStore } from './resourceStore';
 import ImageResourceManager from './ImageResourceManager';
 import FontManager from './FontManager';
 import IconLibrary from './IconLibrary';
+import TypographyManager from './TypographyManager';
 import './ResourceWorkspace.css';
 
 export type ResourceKind = 'image' | 'text' | 'icon';
@@ -42,6 +43,10 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
   const images = useResourceStore((state) => state.images);
   const fonts = useResourceStore((state) => state.fonts);
 
+  // The Text workspace holds two things: the font files, and the named styles
+  // built on them. Mirrors the split TouchGFX draws between them.
+  const [textSection, setTextSection] = useState<'fonts' | 'typographies'>('fonts');
+
   const view = VIEWS[kind];
   // Icons come from a fixed built-in library, so a count says nothing useful.
   const count = kind === 'image'
@@ -68,11 +73,28 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
         </div>
       </div>
 
+      {kind === 'text' && (
+        <div className="resource-section-tabs">
+          <button
+            className={textSection === 'fonts' ? 'active' : ''}
+            onClick={() => setTextSection('fonts')}
+          >
+            Fonts
+          </button>
+          <button
+            className={textSection === 'typographies' ? 'active' : ''}
+            onClick={() => setTextSection('typographies')}
+          >
+            Typographies
+          </button>
+        </div>
+      )}
+
       {!ownsItsChrome && (
         <div className="resource-search">
           <input
             type="text"
-            placeholder={view.searchPlaceholder}
+            placeholder={kind === 'text' && textSection === 'typographies' ? 'Search typographies...' : view.searchPlaceholder}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -92,7 +114,7 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
         <ImageResourceManager />
       ) : (
         <div className="resource-content">
-          {kind === 'text' && <FontManager />}
+          {kind === 'text' && (textSection === 'fonts' ? <FontManager /> : <TypographyManager />)}
           {kind === 'icon' && <IconLibrary />}
         </div>
       )}

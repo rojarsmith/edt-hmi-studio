@@ -1,0 +1,103 @@
+.typography-manager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.typography-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.typography-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: white;
+  border: 1px solid #e6e6e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.typography-item:hover {
+  border-color: #4a90d9;
+  background: #f7fbff;
+}
+
+.typography-item.selected {
+  border-color: #4a90d9;
+  background: #f0f7ff;
+}
+
+.typography-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.typography-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typography-detail {
+  font-size: 11px;
+  color: #888;
+}
+
+/* A count of nothing is worth showing: it is how an unused style is spotted */
+.typography-usage {
+  font-size: 11px;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.typography-details {
+  border-top: 1px solid #e6e6e6;
+  padding: 12px 0 20px;
+}
+
+.typography-details h4 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #333;
+}
+
+.typography-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #888;
+  line-height: 1.4;
+}
+
+.typography-warning {
+  display: block;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: #fff8e6;
+  border: 1px solid #f0dca8;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #7a5b1a;
+}
+
+.typography-usage-note {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e6e6e6;
+  font-size: 11px;
+  color: #888;
+}

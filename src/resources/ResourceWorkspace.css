@@ -126,3 +126,33 @@
   color: #aaa;
   font-size: 12px;
 }
+
+/* Fonts / Typographies split inside the Text workspace */
+.resource-section-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid #e6e6e6;
+  margin-bottom: 10px;
+}
+
+.resource-section-tabs button {
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: #777;
+  transition: all 0.15s;
+}
+
+.resource-section-tabs button:hover {
+  color: #333;
+}
+
+.resource-section-tabs button.active {
+  color: #2b6cb0;
+  border-bottom-color: #4a90d9;
+  font-weight: 600;
+}
