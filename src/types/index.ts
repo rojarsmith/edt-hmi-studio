@@ -196,6 +196,36 @@ export interface ScreenGroup {
 /** Deepest group level the manager allows (1-based). */
 export const MAX_SCREEN_GROUP_DEPTH = 2;
 
+/**
+ * A named bundle of text style, shared by every widget that uses it.
+ *
+ * LVGL has no such noun, but it has the mechanism: each of these becomes one
+ * generated `static lv_style_t` applied with `lv_obj_add_style()`. Grouping the
+ * settings also collapses the two paths a widget could previously set a font
+ * through — see docs/text-typography-evaluation.md §5.
+ */
+export interface Typography {
+  id: string;
+  /** Shown in the editor, e.g. "Size24". Not the C symbol. */
+  name: string;
+  /** `montserrat_N` for a built-in, or a FontResource's cFontName. */
+  fontResource: string;
+  /** Pixel size. Fixed by the name for built-in fonts. */
+  fontSize: number;
+  letterSpace?: number;
+  lineSpace?: number;
+  align?: TypographyAlign;
+  decor?: 'none' | 'underline' | 'strikethrough';
+  /**
+   * Writing direction. Needs `LV_USE_BIDI` in lv_conf.h to have any effect —
+   * see docs/text-typography-evaluation.md §6.
+   */
+  baseDir?: 'auto' | 'ltr' | 'rtl';
+}
+
+/** `auto` resolves against the base direction, which is what RTL text needs. */
+export type TypographyAlign = 'auto' | 'left' | 'center' | 'right';
+
 export type LvglAlign = 'default' | 'center' | 'top_left' | 'top_mid' | 'top_right' | 'bottom_left' | 'bottom_mid' | 'bottom_right' | 'left_mid' | 'right_mid';
 
 export interface LvglFlags {
