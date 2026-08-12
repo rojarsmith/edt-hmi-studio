@@ -1647,6 +1647,19 @@ function fontSymbol(fontResource: string, fontSize: number): string {
   return builtin ? `lv_font_montserrat_${builtin[1]}` : `${fontResource}_${fontSize}`;
 }
 
+/** Component id → typography id, from what the components already carry. */
+function collectStoredAssignments(screens: Screen[]): Map<string, string> {
+  const assignments = new Map<string, string>();
+  const walk = (components: LvglComponent[]) => {
+    for (const comp of components) {
+      if (comp.typographyId) assignments.set(comp.id, comp.typographyId);
+      walk(comp.children ?? []);
+    }
+  };
+  for (const screen of screens) walk(screen.components);
+  return assignments;
+}
+
 /** `Noto 24` → `ui_style_noto_24`. */
 function typographySymbol(name: string): string {
   const sanitized = name
@@ -1729,7 +1742,7 @@ function generateTypographyStyles(
 /**
  * Generate ui.c source file
  */
-export function generateUiSource(screens: Screen[], options: CodeGenOptions, theme?: Theme, imageResources: ImageResource[] = [], defaultFont?: string, defaultFontSize?: number, fontResources: FontResource[] = [], useBuiltinSymbols?: boolean, symbolFont?: string): string {
+export function generateUiSource(screens: Screen[], options: CodeGenOptions, theme?: Theme, imageResources: ImageResource[] = [], defaultFont?: string, defaultFontSize?: number, fontResources: FontResource[] = [], useBuiltinSymbols?: boolean, symbolFont?: string, storedTypographies?: Typography[]): string {
   const lines: string[] = [];
   
   // Includes
@@ -1796,8 +1809,16 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   }
   lines.push('');
 
-  // Typographies: one shared lv_style_t per distinct text style in the project
-  const { typographies, assignments } = deriveTypographies(screens, defaultFont, defaultFontSize);
+  // Typographies: one shared lv_style_t per distinct text style in the project.
+  // Stored ones win — a project that has been migrated carries the author's
+  // naming, and deriving again would throw it away. Deriving is the fallback
+  // for a project file written before typographies existed.
+  const { typographies, assignments } = storedTypographies?.length
+    ? {
+        typographies: storedTypographies,
+        assignments: collectStoredAssignments(screens),
+      }
+    : deriveTypographies(screens, defaultFont, defaultFontSize);
   const typographySymbols = new Map<string, string>();
   const takenSymbols = new Set<string>();
   for (const typography of typographies) {

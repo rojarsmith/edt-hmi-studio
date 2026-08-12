@@ -1,6 +1,6 @@
 // Project Manager - Save/Load project files
 
-import type { ProjectFile, ImageResource, FontResource } from './types';
+import type { ProjectFile, ProjectScreen, ImageResource, FontResource } from './types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type { CanvasState, Screen, ScreenGroup } from '../types';
 import type { BoardId, CommunicationConfig } from '../types/hmi';
@@ -9,6 +9,7 @@ import {
   createDefaultCommunicationConfig,
 } from '../types/hmi';
 import { migrateFontResource } from './converters/fontConverter';
+import { applyTypographies } from '../codegen/typography';
 
 const PROJECT_VERSION = '1.0.0';
 
@@ -97,11 +98,25 @@ function migrateProject(project: ProjectFile): ProjectFile {
     console.warn(`Project version ${project.version} may not be fully compatible`);
   }
   
+  const screens = (project.screens ?? project.pages ?? []) as ProjectScreen[];
+
+  // Typographies are derived from the styling already present, so a project
+  // written before they existed keeps rendering exactly as it did. Projects
+  // that already have them are left alone — re-deriving would discard renaming.
+  const typographyMigration = project.typographies
+    ? { screens, typographies: project.typographies }
+    : applyTypographies(
+        screens as unknown as Screen[],
+        project.lvglConfig?.defaultFont,
+        project.lvglConfig?.defaultFontSize,
+      );
+
   // Ensure all required fields exist
   return {
     ...project,
+    typographies: typographyMigration.typographies,
     // `pages` is what this field was called before the Page → Screen rename.
-    screens: project.screens ?? project.pages ?? [],
+    screens: typographyMigration.screens as ProjectScreen[],
     screenGroups: project.screenGroups || [],
     pages: undefined,
     resources: {

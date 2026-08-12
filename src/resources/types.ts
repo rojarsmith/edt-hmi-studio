@@ -1,7 +1,7 @@
 // Resource Management Types
 
 import type { LogicGraph } from '../components/LogicEditor/types';
-import type { LvglComponent } from '../types';
+import type { LvglComponent, Typography } from '../types';
 import type {
   BoardId,
   CanBusConfig,
@@ -135,6 +135,12 @@ export interface ProjectFile {
     images: ImageResource[];
     fonts: FontResource[];
   };
+  /**
+   * Named text styles shared across widgets. Absent in files written before
+   * typographies existed; migration derives them from the styling already
+   * there, so nothing renders differently.
+   */
+  typographies?: Typography[];
   variables: ProjectVariable[];
   logicGraphs?: LogicGraph[];
   codeGenOptions: CodeGenOptions;

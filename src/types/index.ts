@@ -303,6 +303,14 @@ export interface LvglComponent {
   align?: LvglAlign;
   alignOffsetX?: number;
   alignOffsetY?: number;
+  /**
+   * The typography this widget's resting text style comes from.
+   *
+   * Absent means it inherits the screen's default font, which is what an
+   * unstyled widget has always done. Populated for existing projects by
+   * migration — see `deriveTypographies`.
+   */
+  typographyId?: string;
   // Flags
   flags?: LvglFlags;
   // Optional no-code Modbus data synchronization/write behavior

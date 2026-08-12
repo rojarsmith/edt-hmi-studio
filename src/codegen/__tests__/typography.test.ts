@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { deriveTypographies } from '../typography';
-import { createComponent, createScreen } from './helpers';
+import { deriveTypographies, applyTypographies } from '../typography';
+import { generateUiSource } from '../templates/ui.c';
+import { createComponent, createScreen, defaultOptions } from './helpers';
 import type { LvglComponent } from '../../types';
 
 const screensOf = (...components: LvglComponent[]) => [createScreen({ components })];
@@ -143,6 +144,65 @@ describe('deriveTypographies — resolution', () => {
   it('defaults a widget with no stated size to 16', () => {
     const comp = createComponent('label', { name: 'l', props: { fontResource: 'ui_font_noto' } });
     expect(deriveTypographies(screensOf(comp)).typographies[0].fontSize).toBe(16);
+  });
+});
+
+describe('applyTypographies', () => {
+  it('stamps the typography id onto the components that got one', () => {
+    const styled = createComponent('label', { name: 'a', props: { fontResource: 'ui_font_noto', fontSize: 24 } });
+    const plain = createComponent('obj', { name: 'b' });
+    const result = applyTypographies(screensOf(styled, plain));
+
+    const [outStyled, outPlain] = result.screens[0].components;
+    expect(outStyled.typographyId).toBe(result.typographies[0].id);
+    expect(outPlain.typographyId).toBeUndefined();
+  });
+
+  it('reaches nested children', () => {
+    const child = createComponent('label', { name: 'inner', props: { fontResource: 'ui_font_noto', fontSize: 16 } });
+    const parent = createComponent('obj', { name: 'outer', children: [child] });
+    const result = applyTypographies(screensOf(parent));
+    expect(result.screens[0].components[0].children[0].typographyId).toBeDefined();
+  });
+
+  it('does not mutate the screens it was given', () => {
+    const comp = createComponent('label', { name: 'a', props: { fontResource: 'ui_font_noto', fontSize: 24 } });
+    const screens = screensOf(comp);
+    applyTypographies(screens);
+    expect(screens[0].components[0].typographyId).toBeUndefined();
+  });
+
+  it('gives widgets sharing a style the same id', () => {
+    const a = createComponent('label', { name: 'a', props: { fontResource: 'ui_font_noto', fontSize: 24 } });
+    const b = createComponent('label', { name: 'b', props: { fontResource: 'ui_font_noto', fontSize: 24 } });
+    const result = applyTypographies(screensOf(a, b));
+    const [outA, outB] = result.screens[0].components;
+    expect(outA.typographyId).toBe(outB.typographyId);
+    expect(result.typographies).toHaveLength(1);
+  });
+
+  /**
+   * The migration guarantee: stamping ids onto a project must not change what
+   * ui.c emits for it. Stored assignments and derivation have to agree, or a
+   * project would render differently the first time it is opened.
+   */
+  it('generates the same ui.c before and after migration', () => {
+    const build = () => [
+      createScreen({
+        name: 'main',
+        components: [
+          createComponent('label', { id: 'l1', name: 'title', props: { text: 'A', fontResource: 'ui_font_noto', fontSize: 24 } }),
+          createComponent('label', { id: 'l2', name: 'body', styles: { default: { textFont: 'ui_font_noto', textFontSize: 16, textLetterSpace: 2 } } }),
+          createComponent('obj', { id: 'o1', name: 'box' }),
+        ],
+      }),
+    ];
+
+    const beforeMigration = generateUiSource(build(), defaultOptions());
+    const migrated = applyTypographies(build());
+    const afterMigration = generateUiSource(migrated.screens, defaultOptions(), undefined, [], undefined, undefined, [], undefined, undefined, migrated.typographies);
+
+    expect(afterMigration).toBe(beforeMigration);
   });
 });
 
