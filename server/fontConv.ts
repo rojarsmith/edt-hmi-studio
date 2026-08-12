@@ -10,6 +10,7 @@
  */
 
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 
 const requireFrom = createRequire(import.meta.url);
 
@@ -61,6 +62,56 @@ export function buildFontConvArgs(spec: FontConvSpec): string[] {
 
   args.push('--format', 'lvgl', '--output', spec.outFile, '--no-compress');
   return args;
+}
+
+export interface FontCacheKeySpec {
+  /** Digest of the font file itself, hashed once per font rather than per size. */
+  fontHash: string;
+  /**
+   * The C variable name.
+   *
+   * Part of the key because lv_font_conv names the global it emits after the
+   * output file, so the same glyphs under a different name are a different
+   * file — reusing one for the other would produce C that declares a font
+   * nothing refers to.
+   */
+  cFontName: string;
+  size: number;
+  bpp: number;
+  ranges: string;
+  symbols?: string;
+}
+
+/**
+ * Cache key for one converted font variant.
+ *
+ * The glyph set is normalised first, so a reordering that means nothing to the
+ * output does not miss the cache: symbols are deduplicated and sorted, ranges
+ * trimmed, lowercased and sorted.
+ */
+export function fontCacheKey(spec: FontCacheKeySpec): string {
+  const ranges = spec.ranges
+    .split(',')
+    .map((range) => range.trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join(',');
+  const symbols = [...new Set([...(spec.symbols ?? '')])].sort().join('');
+
+  return createHash('sha256')
+    .update(spec.fontHash).update('\0')
+    .update(spec.cFontName).update('\0')
+    .update(String(spec.size)).update('\0')
+    .update(String(spec.bpp)).update('\0')
+    .update(ranges).update('\0')
+    .update(symbols)
+    .digest('hex')
+    .slice(0, 32);
+}
+
+/** Digest of the font file bytes. Computed once per font, reused for each size. */
+export function hashFontData(bytes: Uint8Array): string {
+  return createHash('sha256').update(bytes).digest('hex');
 }
 
 /**

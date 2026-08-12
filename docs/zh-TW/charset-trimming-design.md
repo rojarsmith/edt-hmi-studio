@@ -177,8 +177,20 @@ work #1。本設計讓快取更必要 —— 字集現在會隨任何一次 labe
 它更容易，因為收集器產出的是一個正規化的值：
 
 ```
-key = sha256(fontData) + size + bpp + sorted(symbols) + sorted(ranges) + compress
+key = sha256(fontData + cFontName + size + bpp + sorted(ranges) + sorted(symbols))
 ```
+
+`cFontName` 必須在鍵裡，而且很容易漏。**`lv_font_conv` 產出的全域變數是以 output
+檔名命名的**，所以同一組 glyph 換個名字就是不同的檔案 —— 這點是實測的：同一組字集
+轉成兩個名稱再 diff，得到 `const lv_font_t nameA` 與 `const lv_font_t nameB`。
+若拿其中一份充當另一份，產出的 C 會宣告一個沒有人引用的字型。
+
+有兩項性質是實測而非假設的，因為快取的正確性依賴它們：
+
+- **輸出是決定性的。** 兩次相同的執行只差在一行記錄呼叫參數的註解。
+- **symbols 順序不影響資料。** `--symbols "中文"` 與 `--symbols "文中"` 在排除該註解
+  後位元組完全相同，所以在鍵裡正規化順序是安全的，也能避免一個毫無意義的重排造成
+  快取未命中。
 
 既有的 `tmpdir()/lvgl-lib-<hash>` 慣例可直接沿用。
 

@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
-import { buildFontConvArgs, resolveLvFontConvEntry, FALLBACK_RANGE } from '../fontConv';
+import {
+  buildFontConvArgs,
+  resolveLvFontConvEntry,
+  fontCacheKey,
+  hashFontData,
+  FALLBACK_RANGE,
+} from '../fontConv';
 
 const base = { fontFile: '/tmp/f.ttf', outFile: '/tmp/f_16.c', size: 16, bpp: 4 };
 
@@ -79,6 +85,60 @@ describe('buildFontConvArgs', () => {
     expect(valueAfter(args, '--symbols')).toHaveLength(800);
     // The same set as ranges would be ~800 arguments and too long for cmd.exe
     expect(args.length).toBeLessThan(20);
+  });
+});
+
+describe('fontCacheKey', () => {
+  const spec = { fontHash: 'abc', cFontName: 'ui_font_noto', size: 16, bpp: 4, ranges: '0x20-0x7e' };
+
+  it('is stable for the same inputs', () => {
+    expect(fontCacheKey(spec)).toBe(fontCacheKey({ ...spec }));
+  });
+
+  it('ignores the order symbols arrive in', () => {
+    const a = fontCacheKey({ ...spec, symbols: '中文溫度' });
+    const b = fontCacheKey({ ...spec, symbols: '度溫文中' });
+    expect(a).toBe(b);
+  });
+
+  it('ignores duplicated symbols', () => {
+    expect(fontCacheKey({ ...spec, symbols: '中中文' })).toBe(fontCacheKey({ ...spec, symbols: '中文' }));
+  });
+
+  it('ignores range order, spacing and case', () => {
+    const a = fontCacheKey({ ...spec, ranges: '0x20-0x7E,0x4E00-0x4EFF' });
+    const b = fontCacheKey({ ...spec, ranges: ' 0x4e00-0x4eff , 0x20-0x7e ' });
+    expect(a).toBe(b);
+  });
+
+  it.each([
+    ['a different font file', { fontHash: 'def' }],
+    ['a different size', { size: 24 }],
+    ['a different bpp', { bpp: 2 }],
+    ['different ranges', { ranges: '0x20-0x7f' }],
+    ['different symbols', { symbols: '中' }],
+  ])('changes for %s', (_label, override) => {
+    expect(fontCacheKey({ ...spec, ...override })).not.toBe(fontCacheKey(spec));
+  });
+
+  // lv_font_conv names the global it emits after the output file
+  it('changes for a different C variable name, even with identical glyphs', () => {
+    expect(fontCacheKey({ ...spec, cFontName: 'ui_font_other' })).not.toBe(fontCacheKey(spec));
+  });
+
+  it('does not confuse adjacent fields', () => {
+    // Without separators, ("ab", "c") and ("a", "bc") would hash the same
+    const a = fontCacheKey({ ...spec, fontHash: 'ab', cFontName: 'c' });
+    const b = fontCacheKey({ ...spec, fontHash: 'a', cFontName: 'bc' });
+    expect(a).not.toBe(b);
+  });
+});
+
+describe('hashFontData', () => {
+  it('is stable and content-dependent', () => {
+    const a = hashFontData(new Uint8Array([1, 2, 3]));
+    expect(a).toBe(hashFontData(new Uint8Array([1, 2, 3])));
+    expect(a).not.toBe(hashFontData(new Uint8Array([1, 2, 4])));
   });
 });
 

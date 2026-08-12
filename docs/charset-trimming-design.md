@@ -201,8 +201,24 @@ the glyph set now moves whenever anyone edits a label — and also easier, becau
 the collector emits a canonical value:
 
 ```
-key = sha256(fontData) + size + bpp + sorted(symbols) + sorted(ranges) + compress
+key = sha256(fontData + cFontName + size + bpp + sorted(ranges) + sorted(symbols))
 ```
+
+`cFontName` belongs in that key and is easy to leave out. **`lv_font_conv` names
+the global it emits after the output file**, so the same glyphs under a
+different name are a different file — verified by converting one glyph set to
+two names and diffing: `const lv_font_t nameA` against `const lv_font_t nameB`.
+Serving one for the other would produce C declaring a font nothing refers to.
+
+Two properties were checked rather than assumed, because the cache depends on
+both:
+
+- **The output is deterministic.** Two identical runs differ only in a comment
+  line recording the invocation.
+- **Symbol order does not affect the data.** `--symbols "中文"` and
+  `--symbols "文中"` produce byte-identical output once that comment is
+  excluded, so normalising the order in the key is safe and stops a
+  meaningless reordering from missing the cache.
 
 The existing `tmpdir()/lvgl-lib-<hash>` convention carries over directly.
 
