@@ -9,17 +9,12 @@
 
 import type { Plugin } from 'vite';
 import { execFile } from 'node:child_process';
-import { mkdir, writeFile, readFile, rm, rename } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import {
-  buildFontConvArgs,
-  resolveLvFontConvEntry,
-  fontCacheKey,
-  hashFontData,
-} from './server/fontConv';
+import { convertFonts } from './server/fontConv';
 
 // Font data sent from the client for server-side conversion
 interface FontRequest {
@@ -50,16 +45,6 @@ const PROJECT_DIR = '/home/xcssa/.openclaw/workspace/projects/edt-gui-studio';
 const LV_CONF_DIR = join(PROJECT_DIR, 'wasm');
 const LIBLVGL_PATH = join(PROJECT_DIR, 'wasm/build/liblvgl_emcc.a');
 const LV_CONF_TEMPLATE_PATH = join(PROJECT_DIR, 'wasm/lv_conf.h');
-
-/**
- * Converted fonts, keyed by font content plus the exact glyph set.
- *
- * Survives dev-server restarts, which matters because a CJK conversion is tens
- * of seconds. Note the key includes the glyph set, so editing one label
- * invalidates that font — expected, but it means hit rates while actively
- * editing text are lower than they look.
- */
-const FONT_CACHE_DIR = join(tmpdir(), 'edt-gui-studio-font-cache');
 
 // Build cache: buildId → directory path
 const builds = new Map<string, string>();
@@ -292,104 +277,7 @@ function runShell(cmd: string, cwd: string): Promise<{ stdout: string; stderr: s
   });
 }
 
-/**
- * Run a Node script as argv, with no shell in between.
- *
- * Used for font conversion, where the arguments contain text the user typed.
- */
-function runNode(args: string[], cwd: string): Promise<{ stdout: string; stderr: string; code: number }> {
-  return new Promise((resolve) => {
-    execFile(process.execPath, args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({
-        stdout: stdout ?? '',
-        stderr: stderr ?? '',
-        code: err ? (err as NodeJS.ErrnoException & { status?: number }).status ?? 1 : 0,
-      });
-    });
-  });
-}
 
-/**
- * Convert font files to LVGL C sources using lv_font_conv.
- * Returns a map of filename → C source content.
- */
-async function convertFonts(
-  fonts: FontRequest[],
-  workDir: string,
-): Promise<Record<string, string>> {
-  const result: Record<string, string> = {};
-  const lvFontConvEntry = resolveLvFontConvEntry();
-
-  for (const font of fonts) {
-    // Decode base64 to a temp file
-    const raw = font.data.replace(/^data:[^;]+;base64,/, '');
-    const fontBytes = Buffer.from(raw, 'base64');
-
-    // Detect extension from data URI or default to .ttf
-    const ext = font.data.includes('font/opentype') || font.data.includes('.otf') ? '.otf' : '.ttf';
-    const fontFile = join(workDir, `${font.cFontName}${ext}`);
-    await writeFile(fontFile, fontBytes);
-
-    // Hashed once per font: the file is megabytes and every size shares it
-    const fontHash = hashFontData(fontBytes);
-
-    for (const variant of font.variants ?? []) {
-      const outName = `${font.cFontName}_${variant.size}`;
-      const outFile = join(workDir, `${outName}.c`);
-
-      const cacheKey = fontCacheKey({
-        fontHash,
-        cFontName: font.cFontName,
-        size: variant.size,
-        bpp: font.bpp,
-        ranges: font.ranges,
-        symbols: variant.symbols,
-      });
-      const cachePath = join(FONT_CACHE_DIR, `${cacheKey}.c`);
-
-      if (existsSync(cachePath)) {
-        result[`${outName}.c`] = await readFile(cachePath, 'utf-8');
-        continue;
-      }
-
-      // argv, not a shell string: the symbols carry authored text, and a label
-      // holding a double quote would otherwise swallow --output
-      const args = buildFontConvArgs({
-        fontFile,
-        outFile,
-        size: variant.size,
-        bpp: font.bpp,
-        ranges: font.ranges,
-        symbols: variant.symbols,
-      });
-
-      const convResult = await runNode([lvFontConvEntry, ...args], workDir);
-      if (convResult.code !== 0) {
-        throw new Error(
-          `lv_font_conv failed for ${outName}: ${convResult.stderr || convResult.stdout}`,
-        );
-      }
-
-      const cContent = await readFile(outFile, 'utf-8');
-      result[`${outName}.c`] = cContent;
-
-      // Populate the cache last, so a failed run never leaves a usable entry.
-      // Written via a unique temp name and renamed, so a second dev server
-      // converting the same font cannot expose a half-written file.
-      try {
-        await mkdir(FONT_CACHE_DIR, { recursive: true });
-        const staging = `${cachePath}.${randomUUID()}.tmp`;
-        await writeFile(staging, cContent, 'utf-8');
-        await rename(staging, cachePath);
-      } catch (err) {
-        // A cache that cannot be written is slow, not broken
-        console.warn(`[compile] could not cache ${outName}:`, err);
-      }
-    }
-  }
-
-  return result;
-}
 
 /**
  * Resolve the LVGL library path and conf include dir for a given config.

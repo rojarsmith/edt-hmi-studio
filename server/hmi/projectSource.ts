@@ -1,8 +1,13 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import sharp from 'sharp';
 import { generateCode } from '../../src/codegen/generator';
 import { generateHmiBindings } from '../../src/codegen/hmiBindingGenerator';
+import { collectUsedCustomFonts } from '../../src/codegen/fontUsage';
+import { collectGlyphs } from '../../src/codegen/collectGlyphs';
+import { buildFontCompileRequests } from '../../src/codegen/fontRequests';
+import { convertFonts } from '../fontConv';
 import {
   DEFAULT_IMAGE_OPTIONS,
   generateImageCCode,
@@ -211,6 +216,36 @@ export async function writeGeneratedProjectSource(
   for (const plan of collectUsedImageResources(screens, imageResources)) {
     generatedFiles[`${plan.image.cArrayName}.c`] =
       await generateImageSource(plan.image, plan.targetSize);
+  }
+
+  // Fonts. ui.h declares every custom font+size combination in use and ui.c
+  // refers to them, so without these the firmware fails to link — custom fonts
+  // have never reached a board. See docs/charset-trimming-design.md §8.
+  const usedFontSizes = collectUsedCustomFonts(
+    screens,
+    fontResources,
+    lvglConfig?.defaultFont,
+    lvglConfig?.defaultFontSize,
+  );
+  const glyphs = collectGlyphs({
+    screens,
+    fontResources,
+    logicGraphs,
+    defaultFont: lvglConfig?.defaultFont,
+    defaultFontSize: lvglConfig?.defaultFontSize,
+  });
+  const fontRequests = buildFontCompileRequests(fontResources, usedFontSizes, glyphs);
+  if (fontRequests.length > 0) {
+    // Converted outside the source tree: the working directory holds the
+    // decoded .ttf and lv_font_conv's own output, and CMake globs
+    // "${HMI_PROJECT_SOURCE}/*.c" — the copies belong in generatedFiles, not
+    // next to them.
+    const fontWorkDir = await mkdtemp(join(tmpdir(), 'edt-font-'));
+    try {
+      Object.assign(generatedFiles, await convertFonts(fontRequests, fontWorkDir));
+    } finally {
+      await rm(fontWorkDir, { recursive: true, force: true });
+    }
   }
 
   await mkdir(projectSourceDirectory, { recursive: true });
