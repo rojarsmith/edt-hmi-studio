@@ -20,10 +20,14 @@ import { buildFontConvArgs, resolveLvFontConvEntry } from './server/fontConv';
 interface FontRequest {
   data: string;       // base64 data URI (data:font/ttf;base64,...)
   cFontName: string;  // e.g. "ui_font_noto"
-  sizes: number[];    // e.g. [16, 24]
   ranges: string;     // pre-computed range args, e.g. "0x20-0x7e"
-  symbols?: string;   // literal characters the project uses, e.g. "中文"
+  variants: FontVariantRequest[];  // one per size; glyphs differ between them
   bpp: number;        // 1 | 2 | 4 | 8
+}
+
+interface FontVariantRequest {
+  size: number;
+  symbols?: string;   // literal characters this size uses, e.g. "中文"
 }
 
 // Project LVGL config from client
@@ -311,8 +315,8 @@ async function convertFonts(
     const fontFile = join(workDir, `${font.cFontName}${ext}`);
     await writeFile(fontFile, fontBytes);
 
-    for (const size of font.sizes) {
-      const outName = `${font.cFontName}_${size}`;
+    for (const variant of font.variants ?? []) {
+      const outName = `${font.cFontName}_${variant.size}`;
       const outFile = join(workDir, `${outName}.c`);
 
       // argv, not a shell string: the symbols carry authored text, and a label
@@ -320,10 +324,10 @@ async function convertFonts(
       const args = buildFontConvArgs({
         fontFile,
         outFile,
-        size,
+        size: variant.size,
         bpp: font.bpp,
         ranges: font.ranges,
-        symbols: font.symbols,
+        symbols: variant.symbols,
       });
 
       const convResult = await runNode([lvFontConvEntry, ...args], workDir);

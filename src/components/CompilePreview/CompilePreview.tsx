@@ -6,7 +6,8 @@ import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
 import { generateCode } from '../../codegen';
 import { compileCode, type CompileStatus, type WasmRuntime, type FontCompileRequest } from './compilerService';
-import { getCharsetRanges } from '../../resources/converters/fontConverter';
+import { collectGlyphs } from '../../codegen/collectGlyphs';
+import { buildFontCompileRequests } from '../../codegen/fontRequests';
 import type { LvglComponent } from '../../types';
 import type { FontResource } from '../../resources/types';
 import { loadImageFromBase64, generateImageCCode, DEFAULT_IMAGE_OPTIONS } from '../../resources/converters/imageConverter';
@@ -245,24 +246,21 @@ const CompilePreview: React.FC = () => {
       }
     }
 
-    // Build font compile requests by dynamically collecting used font+size combos
+    // Which font+size combinations exist at all, from what the widgets select
     const usedFontSizes = collectUsedCustomFontSizes(screens, fontResources, projectDefaultFont, projectDefaultFontSize);
-    const fontRequests: FontCompileRequest[] = fontResources
-      .filter((font) => usedFontSizes.has(font.cFontName))
-      .map((font) => {
-        const ranges = getCharsetRanges(font.charset, font.customChars);
-        const rangeStr = ranges.length > 0
-          ? ranges.map(([start, end]) => `0x${start.toString(16)}-0x${end.toString(16)}`).join(',')
-          : '0x20-0x7E'; // fallback to basic ASCII
-        const sizes = [...usedFontSizes.get(font.cFontName)!].sort((a, b) => a - b);
-        return {
-          data: font.data,
-          cFontName: font.cFontName,
-          sizes,
-          ranges: rangeStr,
-          bpp: font.bpp,
-        };
-      });
+    // Which characters each of them has to be able to draw
+    const glyphs = collectGlyphs({
+      screens,
+      fontResources,
+      logicGraphs,
+      defaultFont: projectDefaultFont,
+      defaultFontSize: projectDefaultFontSize,
+    });
+    const fontRequests: FontCompileRequest[] = buildFontCompileRequests(
+      fontResources,
+      usedFontSizes,
+      glyphs,
+    );
 
     const result = await compileCode(
       userFiles,
@@ -301,7 +299,7 @@ const CompilePreview: React.FC = () => {
       setStatus('done');
       setStatusMessage('Build succeeded (no runtime)');
     }
-  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, screens, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
+  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, screens, logicGraphs, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
 
   // Handle stop button
   const handleStop = useCallback(() => {

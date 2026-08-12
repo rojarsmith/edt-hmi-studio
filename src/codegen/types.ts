@@ -18,18 +18,34 @@ export interface CodeGenOptions {
  * docs/charset-trimming-design.md §8.
  */
 export interface FontCompileRequest {
-  /** base64 data URI of the TTF/OTF */
+  /** base64 data URI of the TTF/OTF, sent once however many sizes are built */
   data: string;
   /** e.g. "ui_font_noto" */
   cFontName: string;
-  /** every size in use, e.g. [16, 24] */
-  sizes: number[];
-  /** comma-separated ranges, e.g. "0x20-0x7e,0x4e00-0x4eff" */
+  /**
+   * Comma-separated ranges, e.g. `"0x20-0x7e,0x4e00-0x4eff"`.
+   *
+   * Font-level: ranges come from the charset mode, which does not vary by size.
+   */
   ranges: string;
-  /** literal characters to include, on top of `ranges` */
-  symbols?: string;
+  /** One entry per size to convert. */
+  variants: FontVariantRequest[];
   /** 1 | 2 | 4 | 8 */
   bpp: number;
+}
+
+/**
+ * One size of one font.
+ *
+ * Sizes are listed separately rather than as a `number[]` because the glyphs
+ * differ between them — a 48px title and a 14px status line rarely share
+ * characters, and trimming per size is strictly smaller for no extra work.
+ * See docs/charset-trimming-design.md §2.
+ */
+export interface FontVariantRequest {
+  size: number;
+  /** Characters this size needs, on top of the font's `ranges`. */
+  symbols?: string;
 }
 
 export interface GeneratedCode {
