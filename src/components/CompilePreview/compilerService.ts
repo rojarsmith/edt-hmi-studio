@@ -4,6 +4,8 @@
  * then loads the Emscripten module in the browser.
  */
 
+import type { FontCompileRequest } from '../../codegen/types';
+
 export type CompileStatus =
   | 'idle'
   | 'compiling'
@@ -44,14 +46,13 @@ interface EmscriptenModule {
   _main?: () => number;
 }
 
-/** Font data for server-side conversion */
-export interface FontCompileRequest {
-  data: string;       // base64 data URI
-  cFontName: string;  // e.g. "ui_font_noto"
-  sizes: number[];    // e.g. [16, 24]
-  ranges: string;     // pre-computed range string, e.g. "0x20-0x7e"
-  bpp: number;        // 1 | 2 | 4 | 8
-}
+/**
+ * Font data for server-side conversion.
+ *
+ * Defined in `src/codegen/types.ts` and re-exported here so the firmware deploy
+ * path can build the same request — see docs/charset-trimming-design.md §8.
+ */
+export type { FontCompileRequest };
 
 /**
  * Compile C code on the server and return a WasmRuntime for interactive use.
