@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateUiSource } from '../templates/ui.c';
+import type { StyleProps } from '../../types';
 import {
   defaultOptions,
   createScreen,
@@ -550,66 +551,75 @@ describe('generateUiSource', () => {
       expect(result).toContain('lv_obj_set_style_transform_pivot_y(ui_box, 50, 0);');
     });
 
-    it('generates builtin montserrat font', () => {
-      const obj = createComponent('obj', {
-        name: 'box',
-        styles: { default: { textFont: 'montserrat_24' } },
-      });
-      const screens = [createScreen({ name: 'main', components: [obj] })];
-      const result = generateUiSource(screens, defaultOptions());
-      expect(result).toContain('lv_obj_set_style_text_font(ui_box, &lv_font_montserrat_24, 0);');
+    /**
+     * Text styling now travels through a shared typography style rather than
+     * per-widget calls. The widget gets one lv_obj_add_style; the properties
+     * are set once on the style. Both must not be emitted — a local style wins
+     * over an added one, so the typography would be silently masked.
+     */
+    const sourceFor = (styles: StyleProps) =>
+      generateUiSource(
+        [createScreen({ name: 'main', components: [createComponent('obj', { name: 'box', styles: { default: styles } })] })],
+        defaultOptions(),
+      );
+
+    it('puts a builtin montserrat font on the shared style', () => {
+      const result = sourceFor({ textFont: 'montserrat_24' });
+      expect(result).toContain('lv_style_set_text_font(&ui_style_montserrat_24, &lv_font_montserrat_24);');
+      expect(result).toContain('lv_obj_add_style(ui_box, &ui_style_montserrat_24, 0);');
+      expect(result).not.toContain('lv_obj_set_style_text_font(ui_box');
     });
 
-    it('generates custom font', () => {
-      const obj = createComponent('obj', {
-        name: 'box',
-        styles: { default: { textFont: 'my_custom_font', textFontSize: 20 } },
-      });
-      const screens = [createScreen({ name: 'main', components: [obj] })];
-      const result = generateUiSource(screens, defaultOptions());
-      // The C symbol is cFontName_size — one lv_font_t exists per size
-      expect(result).toContain('lv_obj_set_style_text_font(ui_box, &my_custom_font_20, 0);');
+    it('puts a custom font on the shared style, as cFontName_size', () => {
+      const result = sourceFor({ textFont: 'my_custom_font', textFontSize: 20 });
+      // One lv_font_t exists per size, so the symbol carries it
+      expect(result).toContain('lv_style_set_text_font(&ui_style_my_custom_font_20, &my_custom_font_20);');
+      expect(result).toContain('lv_obj_add_style(ui_box, &ui_style_my_custom_font_20, 0);');
+      expect(result).not.toContain('lv_obj_set_style_text_font(ui_box');
     });
 
     it('falls back to 16px when a style names a font without a size', () => {
-      const obj = createComponent('obj', {
-        name: 'box',
-        styles: { default: { textFont: 'my_custom_font' } },
-      });
-      const screens = [createScreen({ name: 'main', components: [obj] })];
-      const result = generateUiSource(screens, defaultOptions());
-      expect(result).toContain('lv_obj_set_style_text_font(ui_box, &my_custom_font_16, 0);');
+      const result = sourceFor({ textFont: 'my_custom_font' });
+      expect(result).toContain('lv_style_set_text_font(&ui_style_my_custom_font_16, &my_custom_font_16);');
     });
 
-    it('generates textLetterSpace and textLineSpace', () => {
-      const obj = createComponent('obj', {
-        name: 'box',
-        styles: { default: { textLetterSpace: 2, textLineSpace: 5 } },
-      });
-      const screens = [createScreen({ name: 'main', components: [obj] })];
-      const result = generateUiSource(screens, defaultOptions());
-      expect(result).toContain('lv_obj_set_style_text_letter_space(ui_box, 2, 0);');
-      expect(result).toContain('lv_obj_set_style_text_line_space(ui_box, 5, 0);');
+    it('puts letter and line spacing on the shared style', () => {
+      const result = sourceFor({ textLetterSpace: 2, textLineSpace: 5 });
+      expect(result).toMatch(/lv_style_set_text_letter_space\(&ui_style_\w+, 2\);/);
+      expect(result).toMatch(/lv_style_set_text_line_space\(&ui_style_\w+, 5\);/);
+      expect(result).not.toContain('lv_obj_set_style_text_letter_space(ui_box');
     });
 
-    it('generates textDecor underline', () => {
-      const obj = createComponent('obj', {
-        name: 'box',
-        styles: { default: { textDecor: 'underline' } },
-      });
-      const screens = [createScreen({ name: 'main', components: [obj] })];
-      const result = generateUiSource(screens, defaultOptions());
-      expect(result).toContain('lv_obj_set_style_text_decor(ui_box, LV_TEXT_DECOR_UNDERLINE, 0);');
+    it.each([
+      ['underline' as const, 'LV_TEXT_DECOR_UNDERLINE'],
+      ['strikethrough' as const, 'LV_TEXT_DECOR_STRIKETHROUGH'],
+    ])('puts %s decoration on the shared style', (decor, constant) => {
+      const result = sourceFor({ textDecor: decor });
+      expect(result).toMatch(new RegExp(`lv_style_set_text_decor\\(&ui_style_\\w+, ${constant}\\);`));
+      expect(result).not.toContain('lv_obj_set_style_text_decor(ui_box');
     });
 
-    it('generates textDecor strikethrough', () => {
+    it('initialises every style before any screen adds it to a widget', () => {
+      const result = sourceFor({ textFont: 'my_custom_font', textFontSize: 20 });
+      expect(result).toContain('static lv_style_t ui_style_my_custom_font_20;');
+      expect(result).toContain('lv_style_init(&ui_style_my_custom_font_20);');
+      // ui_init runs the initialiser before it loads any screen
+      expect(result.indexOf('static void ui_typography_init(void)')).toBeLessThan(result.indexOf('void ui_init(void)'));
+      expect(result).toContain('ui_typography_init();');
+    });
+
+    it('leaves non-default states emitting their own text properties', () => {
+      // A typography describes the resting appearance only
       const obj = createComponent('obj', {
         name: 'box',
-        styles: { default: { textDecor: 'strikethrough' } },
+        styles: {
+          default: { textFont: 'my_custom_font', textFontSize: 20 },
+          pressed: { textFont: 'other_font', textFontSize: 24 },
+        },
       });
-      const screens = [createScreen({ name: 'main', components: [obj] })];
-      const result = generateUiSource(screens, defaultOptions());
-      expect(result).toContain('lv_obj_set_style_text_decor(ui_box, LV_TEXT_DECOR_STRIKETHROUGH, 0);');
+      const result = generateUiSource([createScreen({ name: 'main', components: [obj] })], defaultOptions());
+      expect(result).toContain('lv_obj_add_style(ui_box, &ui_style_my_custom_font_20, 0);');
+      expect(result).toContain('lv_obj_set_style_text_font(ui_box, &other_font_24, LV_STATE_PRESSED);');
     });
 
     it('generates blendMode', () => {

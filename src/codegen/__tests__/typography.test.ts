@@ -31,6 +31,30 @@ describe('deriveTypographies — what gets one', () => {
     expect(deriveTypographies(screensOf(comp)).typographies).toHaveLength(1);
   });
 
+  it('ignores styling that only exists in a non-default state', () => {
+    // A typography describes the resting appearance. Pressed/focused/disabled
+    // text styling keeps emitting per-state, so deriving one here would invent
+    // a typography from styling the widget never set.
+    const comp = createComponent('label', {
+      name: 'l',
+      styles: { default: {}, pressed: { textFont: 'ui_font_noto', textFontSize: 24 } },
+    });
+    expect(deriveTypographies(screensOf(comp)).typographies).toEqual([]);
+  });
+
+  it('still derives from the default state when other states also style text', () => {
+    const comp = createComponent('label', {
+      name: 'l',
+      styles: {
+        default: { textFont: 'ui_font_noto', textFontSize: 24 },
+        pressed: { textFont: 'ui_font_other', textFontSize: 30 },
+      },
+    });
+    const [typo] = deriveTypographies(screensOf(comp)).typographies;
+    expect(typo.fontResource).toBe('ui_font_noto');
+    expect(typo.fontSize).toBe(24);
+  });
+
   it('walks into nested children', () => {
     const child = createComponent('label', { name: 'inner', props: { fontResource: 'ui_font_noto', fontSize: 16 } });
     const parent = createComponent('obj', { name: 'outer', children: [child] });

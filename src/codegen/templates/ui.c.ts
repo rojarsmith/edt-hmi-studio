@@ -4,6 +4,8 @@ import type { Screen, LvglComponent, StyleProps, Theme, Animation, AnimationEasi
 import type { CodeGenOptions } from '../types';
 import type { ImageResource, FontResource } from '../../resources/types';
 import { collectUsedCustomFonts } from '../fontUsage';
+import { deriveTypographies } from '../typography';
+import type { Typography } from '../../types';
 import {
   getScreenVarName,
   getComponentVarName,
@@ -135,13 +137,19 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
 /**
  * Generate style code for a component
  */
+/**
+ * @param suppressText omit text properties because a typography's shared style
+ *   already carries them. A local style would win over the added one, so the
+ *   two must not both be emitted.
+ */
 function generateStyleCode(
   varName: string,
   styles: StyleProps,
   options: CodeGenOptions,
   selector: string = '0',
   defaultFont?: string,
-  defaultFontSize?: number
+  defaultFontSize?: number,
+  suppressText: boolean = false
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -291,8 +299,11 @@ function generateStyleCode(
     lines.push(`${indent}lv_obj_set_style_transform_pivot_y(${varName}, ${styles.transformPivotY}, ${selector});`);
   }
 
-  // Text font
-  if (styles.textFont) {
+  // Text font. Skipped when a typography covers this state: the shared style
+  // sets the same properties, and a local style would silently win over it.
+  if (suppressText) {
+    // handled by lv_obj_add_style
+  } else if (styles.textFont) {
     const builtinMatch = styles.textFont.match(/^montserrat_(\d+)$/);
     if (builtinMatch) {
       // Skip if same as project default font
@@ -311,15 +322,15 @@ function generateStyleCode(
   if (styles.textFontSize !== undefined && styles.textFontSize !== 14) {
     lines.push(`${indent}// Note: LVGL font size is determined at compile time (requested: ${styles.textFontSize}px)`);
   }
-  if (styles.textLetterSpace !== undefined && styles.textLetterSpace !== 0) {
+  if (!suppressText && styles.textLetterSpace !== undefined && styles.textLetterSpace !== 0) {
     lines.push(`${indent}lv_obj_set_style_text_letter_space(${varName}, ${styles.textLetterSpace}, ${selector});`);
   }
-  if (styles.textLineSpace !== undefined && styles.textLineSpace !== 0) {
+  if (!suppressText && styles.textLineSpace !== undefined && styles.textLineSpace !== 0) {
     lines.push(`${indent}lv_obj_set_style_text_line_space(${varName}, ${styles.textLineSpace}, ${selector});`);
   }
 
   // Text decoration
-  if (styles.textDecor && styles.textDecor !== 'none') {
+  if (!suppressText && styles.textDecor && styles.textDecor !== 'none') {
     const decorMap: Record<string, string> = {
       'underline': 'LV_TEXT_DECOR_UNDERLINE',
       'strikethrough': 'LV_TEXT_DECOR_STRIKETHROUGH',
@@ -357,14 +368,17 @@ function generatePropsCode(
   options: CodeGenOptions,
   imageResources: ImageResource[] = [],
   defaultFont?: string,
-  defaultFontSize?: number
+  defaultFontSize?: number,
+  suppressText: boolean = false
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
   const isV9 = options.lvglVersion === '9';
-  
+
   // Common text properties for components with text
   const generateTextProps = (labelVar: string) => {
+    // A typography's shared style already sets font and alignment
+    if (suppressText) return;
     if (props.fontResource) {
       const fontName = props.fontResource as string;
       const builtinMatch = fontName.match(/^montserrat_(\d+)$/);
@@ -1066,7 +1080,8 @@ function generateComponentCode(
   defaultFont?: string,
   defaultFontSize?: number,
   useBuiltinSymbols?: boolean,
-  symbolFont?: string
+  symbolFont?: string,
+  componentStyles?: Map<string, string>
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -1188,8 +1203,16 @@ function generateComponentCode(
     }
   }
 
-  // Styles
-  const styleLines = generateStyleCode(varName, component.styles.default, options, '0', defaultFont, defaultFontSize);
+  // Typography, if this component's text styling was collected into one. The
+  // shared style is added before local styles so it cannot mask them.
+  const typographyStyle = componentStyles?.get(component.id);
+  if (typographyStyle) {
+    lines.push(`${indent}lv_obj_add_style(${varName}, &${typographyStyle}, 0);`);
+  }
+
+  // Styles. Only the default state defers to the typography — the other states
+  // are not covered by one and keep emitting their own text properties.
+  const styleLines = generateStyleCode(varName, component.styles.default, options, '0', defaultFont, defaultFontSize, Boolean(typographyStyle));
   lines.push(...styleLines);
 
   // Pressed state styles
@@ -1211,7 +1234,7 @@ function generateComponentCode(
   }
 
   // Component-specific properties
-  const propLines = generatePropsCode(varName, component.type, component.props, options, imageResources, defaultFont, defaultFontSize);
+  const propLines = generatePropsCode(varName, component.type, component.props, options, imageResources, defaultFont, defaultFontSize, Boolean(typographyStyle));
   lines.push(...propLines);
 
   // Event bindings
@@ -1246,7 +1269,7 @@ function generateComponentCode(
     const defaultTab = `${varName}_tab_${component.props.activeTab || 0}`;
     for (const child of component.children) {
       const tabParent = childToTab[child.id] || defaultTab;
-      lines.push(...generateComponentCode(child, tabParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+      lines.push(...generateComponentCode(child, tabParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
     }
   } else if (component.type === 'tileview' && component.props?.rows !== undefined && component.props?.cols !== undefined) {
     const tileChildMap: Record<string, string[]> = component.props.tileChildMap || {};
@@ -1263,19 +1286,19 @@ function generateComponentCode(
     const defaultTile = `${varName}_tile_0_0`;
     for (const child of component.children) {
       const tileParent = childToTile[child.id] || defaultTile;
-      lines.push(...generateComponentCode(child, tileParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+      lines.push(...generateComponentCode(child, tileParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
     }
   } else if (component.type === 'win') {
     // Win children go into the content area
     if (component.children.length > 0) {
       lines.push(`${indent}lv_obj_t * ${varName}_content = lv_win_get_content(${varName});`);
       for (const child of component.children) {
-        lines.push(...generateComponentCode(child, `${varName}_content`, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+        lines.push(...generateComponentCode(child, `${varName}_content`, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
       }
     }
   } else {
     for (const child of component.children) {
-      lines.push(...generateComponentCode(child, varName, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+      lines.push(...generateComponentCode(child, varName, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
     }
   }
 
@@ -1383,7 +1406,8 @@ function generateScreenInitFunc(
   defaultFont?: string,
   defaultFontSize?: number,
   useBuiltinSymbols?: boolean,
-  symbolFont?: string
+  symbolFont?: string,
+  componentStyles?: Map<string, string>
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -1431,7 +1455,7 @@ function generateScreenInitFunc(
   
   // Generate components
   for (const component of screen.components) {
-    lines.push(...generateComponentCode(component, screenVar, options, screen.name, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+    lines.push(...generateComponentCode(component, screenVar, options, screen.name, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
   }
 
   // Park animated widgets before the transition draws, start them after it ends
@@ -1617,6 +1641,91 @@ function generateImageButtonSupport(
 }
 
 
+/** The C symbol for a font, as `LV_FONT_DECLARE` and lv_font_conv name it. */
+function fontSymbol(fontResource: string, fontSize: number): string {
+  const builtin = fontResource.match(/^montserrat_(\d+)$/);
+  return builtin ? `lv_font_montserrat_${builtin[1]}` : `${fontResource}_${fontSize}`;
+}
+
+/** `Noto 24` → `ui_style_noto_24`. */
+function typographySymbol(name: string): string {
+  const sanitized = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return `ui_style_${sanitized || 'text'}`;
+}
+
+/**
+ * One `lv_style_t` per typography, plus the init that fills it in.
+ *
+ * Only properties that differ from LVGL's own defaults are set, so the emitted
+ * style stays the same size the per-widget calls were.
+ */
+function generateTypographyStyles(
+  typographies: Typography[],
+  symbols: Map<string, string>,
+  options: CodeGenOptions,
+): { declarations: string[]; init: string[] } {
+  const declarations: string[] = [];
+  const init: string[] = [];
+  if (typographies.length === 0) return { declarations, init };
+
+  const indent = getIndent(options);
+
+  if (options.generateComments) {
+    declarations.push(generateSectionHeader('Typographies', options));
+    declarations.push('');
+  }
+  for (const typography of typographies) {
+    declarations.push(`static lv_style_t ${symbols.get(typography.id)};`);
+  }
+  declarations.push('');
+
+  init.push('static void ui_typography_init(void) {');
+  for (const typography of typographies) {
+    const symbol = symbols.get(typography.id)!;
+    if (options.generateComments) {
+      init.push(`${indent}${generateComment(typography.name, options)}`);
+    }
+    init.push(`${indent}lv_style_init(&${symbol});`);
+    init.push(
+      `${indent}lv_style_set_text_font(&${symbol}, &${fontSymbol(typography.fontResource, typography.fontSize)});`,
+    );
+
+    if (typography.letterSpace) {
+      init.push(`${indent}lv_style_set_text_letter_space(&${symbol}, ${typography.letterSpace});`);
+    }
+    if (typography.lineSpace) {
+      init.push(`${indent}lv_style_set_text_line_space(&${symbol}, ${typography.lineSpace});`);
+    }
+    if (typography.align && typography.align !== 'auto') {
+      const alignMap: Record<string, string> = {
+        left: 'LV_TEXT_ALIGN_LEFT',
+        center: 'LV_TEXT_ALIGN_CENTER',
+        right: 'LV_TEXT_ALIGN_RIGHT',
+      };
+      init.push(`${indent}lv_style_set_text_align(&${symbol}, ${alignMap[typography.align]});`);
+    }
+    if (typography.decor && typography.decor !== 'none') {
+      const decorMap: Record<string, string> = {
+        underline: 'LV_TEXT_DECOR_UNDERLINE',
+        strikethrough: 'LV_TEXT_DECOR_STRIKETHROUGH',
+      };
+      init.push(`${indent}lv_style_set_text_decor(&${symbol}, ${decorMap[typography.decor]});`);
+    }
+    if (typography.baseDir && typography.baseDir !== 'auto') {
+      // Needs LV_USE_BIDI to have any effect — see docs/text-typography-evaluation.md §6
+      init.push(
+        `${indent}lv_style_set_base_dir(&${symbol}, ${typography.baseDir === 'rtl' ? 'LV_BASE_DIR_RTL' : 'LV_BASE_DIR_LTR'});`,
+      );
+    }
+  }
+  init.push('}');
+
+  return { declarations, init };
+}
+
 /**
  * Generate ui.c source file
  */
@@ -1686,6 +1795,30 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     }
   }
   lines.push('');
+
+  // Typographies: one shared lv_style_t per distinct text style in the project
+  const { typographies, assignments } = deriveTypographies(screens, defaultFont, defaultFontSize);
+  const typographySymbols = new Map<string, string>();
+  const takenSymbols = new Set<string>();
+  for (const typography of typographies) {
+    let symbol = typographySymbol(typography.name);
+    for (let suffix = 2; takenSymbols.has(symbol); suffix++) {
+      symbol = `${typographySymbol(typography.name)}_${suffix}`;
+    }
+    takenSymbols.add(symbol);
+    typographySymbols.set(typography.id, symbol);
+  }
+  /** Component id → the style symbol to add to it. */
+  const componentStyles = new Map<string, string>();
+  for (const [componentId, typographyId] of assignments) {
+    const symbol = typographySymbols.get(typographyId);
+    if (symbol) componentStyles.set(componentId, symbol);
+  }
+
+  const typographyCode = generateTypographyStyles(typographies, typographySymbols, options);
+  if (typographyCode.declarations.length > 0) {
+    lines.push(...typographyCode.declarations);
+  }
 
   // Animation exec-callback wrappers, emitted before any screen init uses them
   const animationHelpers = generateAnimationHelpers(screens, options);
@@ -1789,7 +1922,7 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   }
 
   for (const screen of screens) {
-    lines.push(generateScreenInitFunc(screen, options, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont));
+    lines.push(generateScreenInitFunc(screen, options, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
     lines.push('');
   }
   
@@ -1811,7 +1944,19 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   }
   
   const indent = getIndent(options);
+
+  if (typographyCode.init.length > 0) {
+    lines.push(...typographyCode.init);
+    lines.push('');
+  }
+
   lines.push('void ui_init(void) {');
+
+  // Styles must be initialised before any screen init adds them to a widget
+  if (typographyCode.init.length > 0) {
+    lines.push(`${indent}ui_typography_init();`);
+    lines.push('');
+  }
 
   // Set symbol font as fallback for custom default font
   if (useBuiltinSymbols && defaultFont && !/^montserrat_\d+$/.test(defaultFont)) {
