@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   buildFontConvArgs,
   resolveLvFontConvEntry,
   fontCacheKey,
   hashFontData,
+  convertFonts,
   FALLBACK_RANGE,
 } from '../fontConv';
 
@@ -140,6 +144,32 @@ describe('hashFontData', () => {
     expect(a).toBe(hashFontData(new Uint8Array([1, 2, 3])));
     expect(a).not.toBe(hashFontData(new Uint8Array([1, 2, 4])));
   });
+});
+
+describe('convertFonts', () => {
+  it('does nothing, and spawns nothing, for an empty list', async () => {
+    await expect(convertFonts([], join(tmpdir(), 'unused'))).resolves.toEqual({});
+  });
+
+  /**
+   * The alternative is worse than a slow build: a font that quietly produces no
+   * source still gets an LV_FONT_DECLARE in ui.h, so the failure resurfaces as
+   * an undefined symbol at link time with nothing pointing back here.
+   */
+  it('rejects when a font cannot be converted, rather than omitting it', async () => {
+    const workDir = await mkdtemp(join(tmpdir(), 'edt-fontconv-fail-'));
+    try {
+      const notAFont = `data:font/ttf;base64,${Buffer.from('definitely not a font').toString('base64')}`;
+      await expect(
+        convertFonts(
+          [{ data: notAFont, cFontName: 'ui_font_broken', ranges: '0x20-0x7e', variants: [{ size: 16 }], bpp: 4 }],
+          workDir,
+        ),
+      ).rejects.toThrow(/ui_font_broken_16/);
+    } finally {
+      await rm(workDir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
 
 describe('resolveLvFontConvEntry', () => {

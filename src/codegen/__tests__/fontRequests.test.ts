@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildFontCompileRequests } from '../fontRequests';
 import { collectGlyphs } from '../collectGlyphs';
+import { collectUsedCustomFonts } from '../fontUsage';
 import { createComponent, createScreen, createFontResource } from './helpers';
 import type { FontResource } from '../../resources/types';
 
@@ -102,5 +103,63 @@ describe('buildFontCompileRequests', () => {
   it('carries bpp through', () => {
     const [request] = buildFontCompileRequests([autoFont({ bpp: 2 })], used(16));
     expect(request.bpp).toBe(2);
+  });
+});
+
+/**
+ * ui.h declares a font for every (font, size) collectUsedCustomFonts reports,
+ * and the build converts one for every variant here. If the two ever disagree,
+ * the firmware fails to link on an undefined symbol a long way from its cause,
+ * so the agreement is pinned rather than left to both calling the same helper.
+ */
+describe('declarations and conversions cover the same (font, size) pairs', () => {
+  const pairsOf = (requests: ReturnType<typeof buildFontCompileRequests>) =>
+    requests
+      .flatMap((request) => request.variants.map((v) => `${request.cFontName}@${v.size}`))
+      .sort();
+
+  const pairsFrom = (usedSizes: Map<string, Set<number>>) =>
+    [...usedSizes]
+      .flatMap(([name, sizes]) => [...sizes].map((size) => `${name}@${size}`))
+      .sort();
+
+  it.each([
+    ['a widget naming a font and size', { fontResource: FONT, fontSize: 24 }],
+    ['a widget naming a font with no size', { fontResource: FONT }],
+  ])('agrees for %s', (_label, props) => {
+    const font = autoFont();
+    const screens = [
+      createScreen({ components: [createComponent('label', { name: 'l', props: { text: 'A', ...props } })] }),
+    ];
+    const usedSizes = collectUsedCustomFonts(screens, [font]);
+    const requests = buildFontCompileRequests([font], usedSizes, collectGlyphs({ screens, fontResources: [font] }));
+    expect(pairsOf(requests)).toEqual(pairsFrom(usedSizes));
+  });
+
+  it('agrees when the project default font pulls in a size no widget names', () => {
+    const font = autoFont();
+    const screens = [
+      createScreen({ components: [createComponent('label', { name: 'l', props: { text: 'A', fontResource: FONT, fontSize: 48 } })] }),
+    ];
+    const usedSizes = collectUsedCustomFonts(screens, [font], FONT, 16);
+    const requests = buildFontCompileRequests([font], usedSizes, collectGlyphs({ screens, fontResources: [font], defaultFont: FONT, defaultFontSize: 16 }));
+    // 48 from the widget, 16 from the project default
+    expect(pairsOf(requests)).toEqual(pairsFrom(usedSizes));
+    expect(pairsOf(requests)).toEqual([`${FONT}@16`, `${FONT}@48`]);
+  });
+
+  it('agrees across several fonts and styles', () => {
+    const fonts = [autoFont(), createFontResource({ cFontName: 'font_other', charsetMode: 'auto' })];
+    const screens = [
+      createScreen({
+        components: [
+          createComponent('label', { name: 'a', props: { text: 'A', fontResource: FONT, fontSize: 16 } }),
+          createComponent('obj', { name: 'b', styles: { default: { textFont: 'font_other', textFontSize: 20 } } }),
+        ],
+      }),
+    ];
+    const usedSizes = collectUsedCustomFonts(screens, fonts);
+    const requests = buildFontCompileRequests(fonts, usedSizes, collectGlyphs({ screens, fontResources: fonts }));
+    expect(pairsOf(requests)).toEqual(pairsFrom(usedSizes));
   });
 });
