@@ -14,6 +14,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
+import { buildFontConvArgs, resolveLvFontConvEntry } from './server/fontConv';
 
 // Font data sent from the client for server-side conversion
 interface FontRequest {
@@ -21,6 +22,7 @@ interface FontRequest {
   cFontName: string;  // e.g. "ui_font_noto"
   sizes: number[];    // e.g. [16, 24]
   ranges: string;     // pre-computed range args, e.g. "0x20-0x7e"
+  symbols?: string;   // literal characters the project uses, e.g. "中文"
   bpp: number;        // 1 | 2 | 4 | 8
 }
 
@@ -272,6 +274,23 @@ function runShell(cmd: string, cwd: string): Promise<{ stdout: string; stderr: s
 }
 
 /**
+ * Run a Node script as argv, with no shell in between.
+ *
+ * Used for font conversion, where the arguments contain text the user typed.
+ */
+function runNode(args: string[], cwd: string): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve) => {
+    execFile(process.execPath, args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      resolve({
+        stdout: stdout ?? '',
+        stderr: stderr ?? '',
+        code: err ? (err as NodeJS.ErrnoException & { status?: number }).status ?? 1 : 0,
+      });
+    });
+  });
+}
+
+/**
  * Convert font files to LVGL C sources using lv_font_conv.
  * Returns a map of filename → C source content.
  */
@@ -280,6 +299,7 @@ async function convertFonts(
   workDir: string,
 ): Promise<Record<string, string>> {
   const result: Record<string, string> = {};
+  const lvFontConvEntry = resolveLvFontConvEntry();
 
   for (const font of fonts) {
     // Decode base64 to a temp file
@@ -291,25 +311,22 @@ async function convertFonts(
     const fontFile = join(workDir, `${font.cFontName}${ext}`);
     await writeFile(fontFile, fontBytes);
 
-    // Build range args — fall back to basic ASCII if empty
-    const rangeParts = font.ranges
-      .split(',')
-      .map((r) => r.trim())
-      .filter(Boolean);
-
-    if (rangeParts.length === 0) {
-      rangeParts.push('0x20-0x7E');
-    }
-
-    const rangeArgs = rangeParts.map((r) => `--range=${r}`).join(' ');
-
     for (const size of font.sizes) {
       const outName = `${font.cFontName}_${size}`;
       const outFile = join(workDir, `${outName}.c`);
 
-      const cmd = `lv_font_conv --font "${fontFile}" --size=${size} --bpp=${font.bpp} ${rangeArgs} --format=lvgl --output="${outFile}" --no-compress`;
+      // argv, not a shell string: the symbols carry authored text, and a label
+      // holding a double quote would otherwise swallow --output
+      const args = buildFontConvArgs({
+        fontFile,
+        outFile,
+        size,
+        bpp: font.bpp,
+        ranges: font.ranges,
+        symbols: font.symbols,
+      });
 
-      const convResult = await runShell(cmd, workDir);
+      const convResult = await runNode([lvFontConvEntry, ...args], workDir);
       if (convResult.code !== 0) {
         throw new Error(
           `lv_font_conv failed for ${outName}: ${convResult.stderr || convResult.stdout}`,
