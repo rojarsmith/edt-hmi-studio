@@ -3,6 +3,7 @@
 import type { Screen, LvglComponent } from '../../types';
 import type { FontResource } from '../../resources/types';
 import type { CodeGenOptions } from '../types';
+import { collectUsedCustomFonts } from '../fontUsage';
 import {
   getScreenVarName,
   getComponentVarName,
@@ -48,59 +49,7 @@ export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fon
 
   // Font declarations — only declare custom font+size combos actually used
   if (fonts.length > 0) {
-    const isBuiltin = (name: string) => /^montserrat_\d+$/.test(name);
-    const customFontNames = new Set(fonts.map(f => f.cFontName));
-    const usedFonts = new Map<string, Set<number>>();
-
-    const addFont = (fontName: string, size: number) => {
-      if (!usedFonts.has(fontName)) {
-        usedFonts.set(fontName, new Set());
-      }
-      usedFonts.get(fontName)!.add(size);
-    };
-
-    const walkComponents = (components: LvglComponent[]) => {
-      for (const comp of components) {
-        if (comp.props.fontResource) {
-          const fontName = comp.props.fontResource as string;
-          if (!isBuiltin(fontName) && customFontNames.has(fontName)) {
-            addFont(fontName, (comp.props.fontSize as number) || 16);
-          }
-        } else if (comp.props.fontSize !== undefined && defaultFont && !isBuiltin(defaultFont) && customFontNames.has(defaultFont)) {
-          // No fontResource but has fontSize override — uses default font with different size
-          const fontSize = comp.props.fontSize as number;
-          if (fontSize !== (defaultFontSize || 16)) {
-            addFont(defaultFont, fontSize);
-          }
-        }
-        if (comp.styles.default.textFont) {
-          const fontName = comp.styles.default.textFont;
-          if (!isBuiltin(fontName) && customFontNames.has(fontName)) {
-            addFont(fontName, comp.styles.default.textFontSize || 16);
-          }
-        }
-        for (const state of ['pressed', 'focused', 'disabled'] as const) {
-          const stateStyles = comp.styles[state];
-          if (stateStyles?.textFont) {
-            const fontName = stateStyles.textFont;
-            if (!isBuiltin(fontName) && customFontNames.has(fontName)) {
-              addFont(fontName, stateStyles.textFontSize || 16);
-            }
-          }
-        }
-        walkComponents(comp.children);
-      }
-    };
-
-    for (const screen of screens) {
-      walkComponents(screen.components);
-    }
-
-    // Include project default font if custom
-    if (defaultFont && !isBuiltin(defaultFont) && customFontNames.has(defaultFont)) {
-      // Always include the default font at its default size
-      addFont(defaultFont, defaultFontSize || 16);
-    }
+    const usedFonts = collectUsedCustomFonts(screens, fonts, defaultFont, defaultFontSize);
 
     if (usedFonts.size > 0) {
       if (options.generateComments) {

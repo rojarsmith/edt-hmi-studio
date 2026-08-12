@@ -101,16 +101,47 @@ describe('generateUiHeader', () => {
     expect(result).not.toContain('Screen Declarations');
   });
 
-  it('generates font declarations', () => {
+  /** A screen whose labels use `cFontName` at each of `sizes`. */
+  const screensUsing = (cFontName: string, sizes: number[]) => [
+    createScreen({
+      components: sizes.map((size) =>
+        createComponent('label', {
+          name: `lbl_${size}`,
+          props: { text: 'x', fontResource: cFontName, fontSize: size },
+        }),
+      ),
+    }),
+  ];
+
+  it('generates font declarations for the sizes in use', () => {
     const font = createFontResource({ cFontName: 'font_roboto', sizes: [16, 24] });
-    const result = generateUiHeader([], defaultOptions(), [font]);
+    const result = generateUiHeader(screensUsing('font_roboto', [16, 24]), defaultOptions(), [font]);
     expect(result).toContain('LV_FONT_DECLARE(font_roboto_16);');
     expect(result).toContain('LV_FONT_DECLARE(font_roboto_24);');
   });
 
+  // Declarations follow usage, not the resource: an unused size is never
+  // converted, so declaring it would leave an undefined symbol at link time
+  it('declares only the sizes widgets actually use', () => {
+    const font = createFontResource({ cFontName: 'font_roboto', sizes: [16, 24] });
+    const result = generateUiHeader(screensUsing('font_roboto', [16]), defaultOptions(), [font]);
+    expect(result).toContain('LV_FONT_DECLARE(font_roboto_16);');
+    expect(result).not.toContain('LV_FONT_DECLARE(font_roboto_24);');
+  });
+
+  it('declares nothing for a font no widget uses', () => {
+    const font = createFontResource({ cFontName: 'font_roboto', sizes: [16] });
+    const result = generateUiHeader([], defaultOptions(), [font]);
+    expect(result).not.toContain('LV_FONT_DECLARE');
+  });
+
   it('generates font section header when comments enabled', () => {
-    const font = createFontResource();
-    const result = generateUiHeader([], defaultOptions({ generateComments: true }), [font]);
+    const font = createFontResource({ cFontName: 'font_roboto' });
+    const result = generateUiHeader(
+      screensUsing('font_roboto', [16]),
+      defaultOptions({ generateComments: true }),
+      [font],
+    );
     expect(result).toContain('Font Declarations');
   });
 

@@ -7,77 +7,12 @@ import { useProjectStore } from '../../store/projectStore';
 import { generateCode } from '../../codegen';
 import { compileCode, type CompileStatus, type WasmRuntime, type FontCompileRequest } from './compilerService';
 import { collectGlyphs } from '../../codegen/collectGlyphs';
+import { collectUsedCustomFonts } from '../../codegen/fontUsage';
 import { buildFontCompileRequests } from '../../codegen/fontRequests';
 import type { LvglComponent } from '../../types';
-import type { FontResource } from '../../resources/types';
 import { loadImageFromBase64, generateImageCCode, DEFAULT_IMAGE_OPTIONS } from '../../resources/converters/imageConverter';
 import './CompilePreview.css';
 
-/**
- * Collect all custom font + size combinations used by components.
- * Returns a Map of cFontName -> Set of sizes.
- */
-function collectUsedCustomFontSizes(
-  screens: { components: LvglComponent[] }[],
-  fontResources: FontResource[],
-  defaultFont?: string,
-  defaultFontSize?: number
-): Map<string, Set<number>> {
-  const usedFonts = new Map<string, Set<number>>();
-  const isBuiltin = (name: string) => /^montserrat_\d+$/.test(name);
-  const customFontNames = new Set(fontResources.map(f => f.cFontName));
-
-  const addFont = (fontName: string, size: number) => {
-    if (!usedFonts.has(fontName)) {
-      usedFonts.set(fontName, new Set());
-    }
-    usedFonts.get(fontName)!.add(size);
-  };
-
-  const walkComponents = (components: LvglComponent[]) => {
-    for (const comp of components) {
-      if (comp.props.fontResource) {
-        const fontName = comp.props.fontResource as string;
-        if (!isBuiltin(fontName) && customFontNames.has(fontName)) {
-          addFont(fontName, (comp.props.fontSize as number) || 16);
-        }
-      } else if (comp.props.fontSize !== undefined && defaultFont && !isBuiltin(defaultFont) && customFontNames.has(defaultFont)) {
-        // No fontResource but has fontSize override — uses default font with different size
-        const fontSize = comp.props.fontSize as number;
-        if (fontSize !== (defaultFontSize || 16)) {
-          addFont(defaultFont, fontSize);
-        }
-      }
-      if (comp.styles.default.textFont) {
-        const fontName = comp.styles.default.textFont;
-        if (!isBuiltin(fontName) && customFontNames.has(fontName)) {
-          addFont(fontName, comp.styles.default.textFontSize || 16);
-        }
-      }
-      for (const state of ['pressed', 'focused', 'disabled'] as const) {
-        const stateStyles = comp.styles[state];
-        if (stateStyles?.textFont) {
-          const fontName = stateStyles.textFont;
-          if (!isBuiltin(fontName) && customFontNames.has(fontName)) {
-            addFont(fontName, stateStyles.textFontSize || 16);
-          }
-        }
-      }
-      walkComponents(comp.children);
-    }
-  };
-
-  for (const screen of screens) {
-    walkComponents(screen.components);
-  }
-
-  // Include the project default font if it's a custom font (with its default size)
-  if (defaultFont && !isBuiltin(defaultFont) && customFontNames.has(defaultFont)) {
-    addFont(defaultFont, defaultFontSize || 16);
-  }
-
-  return usedFonts;
-}
 
 /** Map JS keyboard event.key to LVGL key codes */
 const LV_KEY_MAP: Record<string, number> = {
@@ -247,7 +182,7 @@ const CompilePreview: React.FC = () => {
     }
 
     // Which font+size combinations exist at all, from what the widgets select
-    const usedFontSizes = collectUsedCustomFontSizes(screens, fontResources, projectDefaultFont, projectDefaultFontSize);
+    const usedFontSizes = collectUsedCustomFonts(screens, fontResources, projectDefaultFont, projectDefaultFontSize);
     // Which characters each of them has to be able to draw
     const glyphs = collectGlyphs({
       screens,

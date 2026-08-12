@@ -563,11 +563,22 @@ describe('generateUiSource', () => {
     it('generates custom font', () => {
       const obj = createComponent('obj', {
         name: 'box',
+        styles: { default: { textFont: 'my_custom_font', textFontSize: 20 } },
+      });
+      const screens = [createScreen({ name: 'main', components: [obj] })];
+      const result = generateUiSource(screens, defaultOptions());
+      // The C symbol is cFontName_size — one lv_font_t exists per size
+      expect(result).toContain('lv_obj_set_style_text_font(ui_box, &my_custom_font_20, 0);');
+    });
+
+    it('falls back to 16px when a style names a font without a size', () => {
+      const obj = createComponent('obj', {
+        name: 'box',
         styles: { default: { textFont: 'my_custom_font' } },
       });
       const screens = [createScreen({ name: 'main', components: [obj] })];
       const result = generateUiSource(screens, defaultOptions());
-      expect(result).toContain('lv_obj_set_style_text_font(ui_box, &font_my_custom_font, 0);');
+      expect(result).toContain('lv_obj_set_style_text_font(ui_box, &my_custom_font_16, 0);');
     });
 
     it('generates textLetterSpace and textLineSpace', () => {
