@@ -1,21 +1,44 @@
 // Font Manager Component
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useResourceStore } from './resourceStore';
-import type { FontResource, CharsetType } from './types';
+import type { FontResource, CharsetType, CharsetMode } from './types';
 import { toast } from '../components/Toast';
 import { modal } from '../components/Modal';
-import { 
+import {
   FONT_PREVIEW_TEXT,
   FONT_PREVIEW_TEXT_CJK,
   generateFontConvCommand,
   generateFontSourceTemplate,
   generateFontCCodeHeader,
   extractCharsFromText,
-  getCharsetRanges,
-  countGlyphs,
+  resolveFontCharset,
+  charsetCodePoints,
 } from './converters/fontConverter';
+import { collectGlyphs, glyphSetKey } from '../codegen/collectGlyphs';
+import { useEditorStore } from '../store/editorStore';
+import { useAppStore } from '../store/appStore';
+import { useProjectStore } from '../store/projectStore';
+import { useLogicEditorStore } from '../components/LogicEditor';
 import './FontManager.css';
+
+const CHARSET_MODES: { id: CharsetMode; label: string; hint: string }[] = [
+  {
+    id: 'auto',
+    label: 'Auto',
+    hint: 'Only the characters this project\'s text actually uses, plus the ASCII baseline.',
+  },
+  {
+    id: 'preset',
+    label: 'Preset',
+    hint: 'A fixed Unicode block. Simple, but a CJK block is roughly 20,000 glyphs.',
+  },
+  {
+    id: 'manual',
+    label: 'Manual',
+    hint: 'Exactly the characters and ranges listed below, and nothing else.',
+  },
+];
 
 /** Track which @font-face rules we've already injected */
 const loadedFontFaces = new Set<string>();
@@ -51,6 +74,31 @@ const FontManager: React.FC = () => {
   } = useResourceStore();
   
   const fonts = getFilteredFonts();
+
+  // The project's text, so `auto` coverage can be shown as it is edited
+  const screens = useEditorStore((s) => s.screens);
+  const logicGraphs = useLogicEditorStore((s) => s.graphs);
+  const currentProjectId = useAppStore((s) => s.currentProjectId);
+  const getProjectConfig = useProjectStore((s) => s.getProjectConfig);
+  const [defaultFont, setDefaultFont] = useState<string | undefined>();
+  const [defaultFontSize, setDefaultFontSize] = useState<number | undefined>();
+
+  useEffect(() => {
+    if (!currentProjectId) return;
+    getProjectConfig(currentProjectId).then((cfg) => {
+      if (!cfg) return;
+      setDefaultFont(cfg.lvglConfig.defaultFont);
+      setDefaultFontSize(cfg.lvglConfig.defaultFontSize);
+    });
+  }, [currentProjectId, getProjectConfig]);
+
+  // Widgets that set no font of their own are drawn with the project default,
+  // so without it most of a project's text would look unattributed
+  const glyphs = useMemo(
+    () => collectGlyphs({ screens, fontResources: fonts, logicGraphs, defaultFont, defaultFontSize }),
+    [screens, fonts, logicGraphs, defaultFont, defaultFontSize],
+  );
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showCommandModal, setShowCommandModal] = useState(false);
@@ -59,6 +107,7 @@ const FontManager: React.FC = () => {
   const [generatedHeader, setGeneratedHeader] = useState('');
   const [generatedSource, setGeneratedSource] = useState('');
   const [customCharsInput, setCustomCharsInput] = useState('');
+  const [showCollected, setShowCollected] = useState(false);
   // Map font id → CSS font-family name
   const [fontFaceMap, setFontFaceMap] = useState<Record<string, string>>({});
   
@@ -112,42 +161,63 @@ const FontManager: React.FC = () => {
     }
   };
   
-  const buildConvOptions = useCallback((font: FontResource) => ({
-    sizes: font.sizes,
-    charset: font.charset,
-    customChars: font.charset === 'custom' ? (font.customChars || customCharsInput) : undefined,
-    bpp: font.bpp,
-    compress: false,
-  }), [customCharsInput]);
-  
+  /**
+   * Code points collected for one font, unioned across every size it is used
+   * at — the panel is per font, while the conversion is per font and size.
+   */
+  const collectedFor = useCallback((font: FontResource) => {
+    const points = new Set<number>();
+    const sources = new Set<string>();
+    for (const size of font.sizes.length > 0 ? font.sizes : [16]) {
+      const entry = glyphs.byFontSize.get(glyphSetKey(font.cFontName, size));
+      if (!entry) continue;
+      for (const cp of entry.codePoints) points.add(cp);
+      for (const source of entry.sources) sources.add(`${source.owner}:${source.field}`);
+    }
+    // Sizes the widgets actually use may differ from font.sizes; sweep the rest
+    for (const [, entry] of glyphs.byFontSize) {
+      if (entry.cFontName !== font.cFontName) continue;
+      for (const cp of entry.codePoints) points.add(cp);
+      for (const source of entry.sources) sources.add(`${source.owner}:${source.field}`);
+    }
+    return { points, textCount: sources.size };
+  }, [glyphs]);
+
+  const selectionFor = useCallback(
+    (font: FontResource) => resolveFontCharset(font, collectedFor(font).points),
+    [collectedFor],
+  );
+
   const handleGenerateCommand = (font: FontResource) => {
     const ext = font.data.startsWith('data:font/opentype') ? '.otf' : '.ttf';
     const command = generateFontConvCommand(
       font.name + ext,
       font.cFontName,
-      buildConvOptions(font),
+      font.sizes,
+      font.bpp,
+      selectionFor(font),
     );
     setGeneratedCommand(command);
     setShowCommandModal(true);
   };
 
   const handleGenerateHeader = (font: FontResource) => {
-    const opts = buildConvOptions(font);
+    const selection = selectionFor(font);
     // Generate header for the first selected size
     const primarySize = font.sizes[0] || 16;
-    const header = generateFontCCodeHeader(font.cFontName, font.family, primarySize, opts);
-    const source = generateFontSourceTemplate(font.cFontName, font.family, font.style, primarySize, opts);
+    const header = generateFontCCodeHeader(font.cFontName, font.family, primarySize, font.bpp, selection);
+    const source = generateFontSourceTemplate(font.cFontName, font.family, font.style, primarySize, font.bpp, selection);
     setGeneratedHeader(header);
     setGeneratedSource(source);
     setShowHeaderModal(true);
   };
-  
+
   const handleExtractChars = () => {
-    const input = selectedFont?.customChars ?? customCharsInput;
+    const input = selectedFont?.extraChars ?? customCharsInput;
     const chars = extractCharsFromText(input);
     setCustomCharsInput(chars);
     if (selectedFont) {
-      updateFont(selectedFont.id, { customChars: chars });
+      updateFont(selectedFont.id, { extraChars: chars });
     }
   };
   
@@ -167,10 +237,8 @@ const FontManager: React.FC = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const getGlyphCount = (font: FontResource): number => {
-    const ranges = getCharsetRanges(font.charset, font.charset === 'custom' ? (font.customChars || customCharsInput) : undefined);
-    return countGlyphs(ranges);
-  };
+  const getGlyphCount = (font: FontResource): number =>
+    charsetCodePoints(selectionFor(font)).size;
   
   const selectedFont = fonts.find(f => f.id === selectedResourceId);
   
@@ -290,34 +358,99 @@ const FontManager: React.FC = () => {
           
           <div className="detail-section">
             <label>Character Set:</label>
-            <select
-              value={selectedFont.charset}
-              onChange={(e) => updateFont(selectedFont.id, { charset: e.target.value as CharsetType })}
-            >
-              <option value="ascii">ASCII (Basic)</option>
-              <option value="latin">Latin Extended</option>
-              <option value="cjk-basic">CJK Basic</option>
-              <option value="custom">Custom</option>
-            </select>
+            <div className="charset-mode-row">
+              {CHARSET_MODES.map((mode) => (
+                <button
+                  key={mode.id}
+                  className={`charset-mode-btn ${selectedFont.charsetMode === mode.id ? 'active' : ''}`}
+                  onClick={() => updateFont(selectedFont.id, { charsetMode: mode.id })}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+            <span className="charset-hint">
+              {CHARSET_MODES.find((m) => m.id === selectedFont.charsetMode)?.hint}
+            </span>
           </div>
-          
-          {selectedFont.charset === 'custom' && (
+
+          {selectedFont.charsetMode === 'auto' && (
             <div className="detail-section">
-              <label>Custom Characters:</label>
-              <textarea
-                value={selectedFont.customChars ?? customCharsInput}
-                onChange={(e) => {
-                  setCustomCharsInput(e.target.value);
-                  updateFont(selectedFont.id, { customChars: e.target.value });
-                }}
-                placeholder="Enter the characters to include, or paste text and extract unique characters"
-                rows={3}
-              />
-              <button className="extract-btn" onClick={handleExtractChars}>
-                Extract Unique Characters
+              <div className="charset-summary">
+                <strong>{collectedFor(selectedFont).points.size.toLocaleString()}</strong> characters
+                {' '}from {collectedFor(selectedFont).textCount} text
+                {collectedFor(selectedFont).textCount === 1 ? '' : 's'}
+                {' · '}95 ASCII baseline
+                {selectedFont.extraChars ? ` · ${[...selectedFont.extraChars].length} extra` : ''}
+              </div>
+              <button className="extract-btn" onClick={() => setShowCollected((v) => !v)}>
+                {showCollected ? 'Hide collected characters' : 'Preview collected characters'}
               </button>
+              {showCollected && (
+                <div className="charset-preview-box">
+                  {String.fromCodePoint(...[...collectedFor(selectedFont).points].sort((a, b) => a - b))
+                    || '(nothing collected yet)'}
+                </div>
+              )}
+              {glyphs.opaque.length > 0 && (
+                <p className="charset-warning">
+                  {glyphs.opaque.length} place{glyphs.opaque.length === 1 ? '' : 's'} in this project
+                  {' '}use custom C, which cannot be scanned for characters. Anything they display
+                  {' '}has to be listed under Extra characters below.
+                </p>
+              )}
             </div>
           )}
+
+          {selectedFont.charsetMode === 'preset' && (
+            <div className="detail-section">
+              <label>Preset:</label>
+              <select
+                value={selectedFont.charset}
+                onChange={(e) => updateFont(selectedFont.id, { charset: e.target.value as CharsetType })}
+              >
+                <option value="ascii">ASCII (Basic)</option>
+                <option value="latin">Latin Extended</option>
+                <option value="cjk-basic">CJK Basic</option>
+              </select>
+            </div>
+          )}
+
+          <div className="detail-section">
+            <label>{selectedFont.charsetMode === 'manual' ? 'Characters:' : 'Extra Characters:'}</label>
+            <textarea
+              value={selectedFont.extraChars ?? customCharsInput}
+              onChange={(e) => {
+                setCustomCharsInput(e.target.value);
+                updateFont(selectedFont.id, { extraChars: e.target.value });
+              }}
+              placeholder={
+                selectedFont.charsetMode === 'manual'
+                  ? 'Every character this font should contain'
+                  : 'Characters no scan can see — values shown from custom C, for example'
+              }
+              rows={3}
+            />
+            <button className="extract-btn" onClick={handleExtractChars}>
+              Extract Unique Characters
+            </button>
+          </div>
+
+          <div className="detail-section">
+            <label>{selectedFont.charsetMode === 'manual' ? 'Ranges:' : 'Extra Ranges:'}</label>
+            <input
+              type="text"
+              value={selectedFont.extraRanges ?? ''}
+              onChange={(e) => updateFont(selectedFont.id, { extraRanges: e.target.value })}
+              placeholder="0x4E00-0x4EFF,0xFF00-0xFFEF"
+            />
+          </div>
+
+          <div className="detail-section">
+            <span className="charset-total">
+              Total coverage: <strong>{charsetCodePoints(selectionFor(selectedFont)).size.toLocaleString()}</strong> glyphs
+            </span>
+          </div>
 
           <div className="detail-section">
             <label>BPP (Antialiasing):</label>
