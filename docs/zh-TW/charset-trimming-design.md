@@ -84,7 +84,7 @@ preset **更早**壞掉。§5 不是優化，是前置條件。
 | --- | --- |
 | `setText` 內建動作的 `action.value`（`ui_events.c.ts`） | 可 —— 是專案裡的字面值 |
 | 邏輯圖 setText 節點（`ui_logic.c.ts`） | 可 |
-| Modbus 綁定格式化數值（`hmiBindingGenerator.ts`） | 部分 —— 需納入數字、`.`、`-` 與單位後綴 |
+| Modbus 綁定格式化數值（`hmiBindingGenerator.ts`） | 不需額外處理 —— `ModbusBinding` 不帶格式字串，數值由韌體格式化，而它需要的數字、小數點與負號都在 ASCII 基準線內 |
 | `LV_SYMBOL_*` | **必須排除** —— 來自符號字型，不是文字字型 |
 | 事件或邏輯節點中的自訂 C（`customCode`） | **不可** —— 這正是 §4 存在的理由 |
 
@@ -126,8 +126,17 @@ export interface FontResource {
 | `charset: 'ascii' \| 'latin' \| 'cjk-basic'` | `charsetMode: 'preset'`，`charset` 不變 |
 | 新加入的字型 | `charsetMode: 'auto'` |
 
-因此既有專案產出的位元組完全相同，只有新字型走新路徑。這是一條回歸測試，不是期望
-—— 見 §9。
+因此既有專案保有原本的字集，只有新字型走新路徑。這是一條回歸測試，不是期望 —— 見 §9。
+
+這條保證針對的是**最終進入字型的 glyph，而不是產生它的那條指令**。遷移為 `manual`
+的字型改用 `--symbols` 轉換，而非每個字一個 `--range`：字集相同，但指令不會在幾百
+個字之後就崩掉。原本已經撞到 `cmd.exe` 上限的人，是被這次遷移**修好**，而不是被
+原樣保留。
+
+先寫這條回歸測試是值得的。它第一次跑就失敗，失敗在「custom 但字元為空」這個案例上，
+而原因很有啟發性：`getCharsetRanges()` 在該情況回傳的是**空清單**，大家以為在它裡面
+的 ASCII fallback 其實在呼叫端 —— `CompilePreview` 與 `convertFonts` 各自帶了一份。
+任何替代實作要重現的是呼叫端的行為，不是那個函式的行為。
 
 ## 5. 傳輸層：`--symbols` 與 argv spawn
 

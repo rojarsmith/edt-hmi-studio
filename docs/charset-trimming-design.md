@@ -93,7 +93,7 @@ Text that is set at runtime needs separate treatment:
 | --- | --- |
 | `setText` builtin action's `action.value` (`ui_events.c.ts`) | Yes — a literal in the project |
 | Logic-graph setText node (`ui_logic.c.ts`) | Yes |
-| Modbus bindings formatting a value (`hmiBindingGenerator.ts`) | Partly — must add digits, `.`, `-`, and any unit suffix |
+| Modbus bindings formatting a value (`hmiBindingGenerator.ts`) | Nothing needed — `ModbusBinding` carries no format string, the firmware formats the value, and the digits, point and minus sign it needs are inside the ASCII baseline |
 | `LV_SYMBOL_*` | **Must be excluded** — those come from the symbol font, not the text font |
 | Custom C in events or logic nodes (`customCode`) | **No** — this is why §4 exists |
 
@@ -138,8 +138,21 @@ Migration, which must not change any existing project's output:
 | `charset: 'ascii' \| 'latin' \| 'cjk-basic'` | `charsetMode: 'preset'`, `charset` unchanged |
 | Newly added font | `charsetMode: 'auto'` |
 
-So existing projects produce byte-identical output and only new fonts take the
-new path. That is a regression test, not a hope — see §9.
+So existing projects keep the glyph set they already had, and only new fonts
+take the new path. That is a regression test, not a hope — see §9.
+
+The guarantee is about **the glyphs that reach the font, not the command that
+produces them**. Migrated `manual` fonts are converted with `--symbols` rather
+than one `--range` per character: the same glyph set, by a command that no
+longer breaks past a few hundred characters. Anyone who had hit the `cmd.exe`
+ceiling is fixed by the migration rather than preserved in it.
+
+Writing that regression first was worth it. It failed on the first run, on the
+empty-custom-charset case, and the reason was instructive: `getCharsetRanges()`
+returns an *empty* list there, and the ASCII fallback everyone assumes is in it
+actually lives in the callers — `CompilePreview` and `convertFonts` each carry
+their own copy. Any replacement has to reproduce the caller's behaviour, not
+the function's.
 
 ## 5. Transport: `--symbols` and an argv spawn
 
