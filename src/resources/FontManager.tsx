@@ -14,6 +14,7 @@ import {
   extractCharsFromText,
   resolveFontCharset,
   charsetCodePoints,
+  parseFontCoverage,
 } from './converters/fontConverter';
 import { collectGlyphs, glyphSetKey } from '../codegen/collectGlyphs';
 import { useEditorStore } from '../store/editorStore';
@@ -241,6 +242,41 @@ const FontManager: React.FC = () => {
     charsetCodePoints(selectionFor(font)).size;
   
   const selectedFont = fonts.find(f => f.id === selectedResourceId);
+
+  /**
+   * Which code points each font file can actually draw, parsed on demand.
+   *
+   * Kept in a ref because a CJK cmap is ~45,000 entries and parsing costs
+   * around 100ms — worth doing once per font, not once per render.
+   * `null` means the font carries no cmap we understand, which is different
+   * from "covers nothing" and must not produce warnings.
+   */
+  const coverageCache = useRef(new Map<string, Set<number> | null>());
+  const [coverageVersion, setCoverageVersion] = useState(0);
+
+  useEffect(() => {
+    const font = selectedFont;
+    if (!font || coverageCache.current.has(font.id)) return;
+    let cancelled = false;
+    parseFontCoverage(font.data).then((covered) => {
+      if (cancelled) return;
+      coverageCache.current.set(font.id, covered);
+      setCoverageVersion((v) => v + 1);
+    });
+    return () => { cancelled = true; };
+  }, [selectedFont]);
+
+  /** Characters the project uses that this font file does not contain. */
+  const missingGlyphs = useMemo(() => {
+    if (!selectedFont) return [];
+    const covered = coverageCache.current.get(selectedFont.id);
+    if (!covered) return []; // still parsing, or no readable cmap
+    return [...collectedFor(selectedFont).points]
+      .filter((cp) => !covered.has(cp))
+      .sort((a, b) => a - b);
+    // coverageVersion re-runs this once the parse lands
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFont, collectedFor, coverageVersion]);
   
   return (
     <div className="font-manager">
@@ -391,6 +427,18 @@ const FontManager: React.FC = () => {
                   {String.fromCodePoint(...[...collectedFor(selectedFont).points].sort((a, b) => a - b))
                     || '(nothing collected yet)'}
                 </div>
+              )}
+              {missingGlyphs.length > 0 && (
+                <p className="charset-error">
+                  This font file has no glyph for {missingGlyphs.length} character
+                  {missingGlyphs.length === 1 ? '' : 's'} the project uses:
+                  {' '}<span className="charset-missing-list">
+                    {String.fromCodePoint(...missingGlyphs.slice(0, 40))}
+                  </span>
+                  {missingGlyphs.length > 40 ? ' …' : ''}
+                  . They will be dropped silently during conversion and show as
+                  {' '}blanks on the panel — use a font that covers them, or a fallback font.
+                </p>
               )}
               {glyphs.opaque.length > 0 && (
                 <p className="charset-warning">

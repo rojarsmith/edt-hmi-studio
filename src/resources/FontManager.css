@@ -381,6 +381,22 @@
   color: #7a5b1a;
 }
 
+.charset-error {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  background: #fdeeee;
+  border: 1px solid #f0b8b8;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #8a2c2c;
+}
+
+.charset-missing-list {
+  font-size: 14px;
+  word-break: break-all;
+}
+
 .charset-total {
   font-size: 12px;
   color: #666;

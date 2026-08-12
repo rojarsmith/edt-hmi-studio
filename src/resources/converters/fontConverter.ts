@@ -315,6 +315,121 @@ function readUint32BE(bytes: Uint8Array, offset: number): number {
 }
 
 /**
+ * Code points covered by a format 4 cmap subtable (segment mapping, BMP only).
+ *
+ * Glyph ids are resolved rather than the segment bounds being taken at face
+ * value: a segment can legitimately contain code points that map to glyph 0,
+ * and treating those as present would suppress exactly the warning this is for.
+ */
+export function parseCmapFormat4(bytes: Uint8Array, offset: number): Set<number> {
+  const covered = new Set<number>();
+  const segCount = readUint16BE(bytes, offset + 6) / 2;
+
+  const endBase = offset + 14;
+  const startBase = endBase + segCount * 2 + 2; // +2 for reservedPad
+  const deltaBase = startBase + segCount * 2;
+  const rangeOffsetBase = deltaBase + segCount * 2;
+
+  for (let seg = 0; seg < segCount; seg++) {
+    const end = readUint16BE(bytes, endBase + seg * 2);
+    const start = readUint16BE(bytes, startBase + seg * 2);
+    if (start > end || start === 0xffff) continue;
+
+    const idDelta = readUint16BE(bytes, deltaBase + seg * 2);
+    const idRangeOffset = readUint16BE(bytes, rangeOffsetBase + seg * 2);
+
+    for (let cp = start; cp <= end && cp !== 0xffff; cp++) {
+      let glyphId: number;
+      if (idRangeOffset === 0) {
+        glyphId = (cp + idDelta) & 0xffff;
+      } else {
+        const glyphIndexAddr = rangeOffsetBase + seg * 2 + idRangeOffset + (cp - start) * 2;
+        if (glyphIndexAddr + 1 >= bytes.length) continue;
+        glyphId = readUint16BE(bytes, glyphIndexAddr);
+        if (glyphId !== 0) glyphId = (glyphId + idDelta) & 0xffff;
+      }
+      if (glyphId !== 0) covered.add(cp);
+    }
+  }
+
+  return covered;
+}
+
+/** Code points covered by a format 12 cmap subtable (segmented, full Unicode). */
+export function parseCmapFormat12(bytes: Uint8Array, offset: number): Set<number> {
+  const covered = new Set<number>();
+  const numGroups = readUint32BE(bytes, offset + 12);
+
+  for (let group = 0; group < numGroups; group++) {
+    const base = offset + 16 + group * 12;
+    if (base + 12 > bytes.length) break;
+    const start = readUint32BE(bytes, base);
+    const end = readUint32BE(bytes, base + 4);
+    const startGlyph = readUint32BE(bytes, base + 8);
+    if (start > end) continue;
+    for (let cp = start; cp <= end; cp++) {
+      if (startGlyph + (cp - start) !== 0) covered.add(cp);
+    }
+  }
+
+  return covered;
+}
+
+/**
+ * Which code points a font file can actually draw.
+ *
+ * Used to warn in the editor rather than discovering a blank on the panel:
+ * lv_font_conv drops a glyph the font does not have without failing the build.
+ * Returns null when the font carries no cmap subtable we understand, so callers
+ * can tell "nothing covered" apart from "cannot tell".
+ */
+export async function parseFontCoverage(base64Data: string): Promise<Set<number> | null> {
+  try {
+    const bytes = decodeBase64ToBytes(base64Data);
+    const numTables = readUint16BE(bytes, 4);
+
+    let cmapOffset = 0;
+    for (let i = 0; i < numTables; i++) {
+      const entry = 12 + i * 16;
+      const tag = String.fromCharCode(bytes[entry], bytes[entry + 1], bytes[entry + 2], bytes[entry + 3]);
+      if (tag === 'cmap') cmapOffset = readUint32BE(bytes, entry + 8);
+    }
+    if (cmapOffset === 0) return null;
+
+    // Prefer a full-Unicode subtable, then a BMP one. (3,10) and (0,4)/(0,6)
+    // are format 12; (3,1) and (0,3) are format 4.
+    const subtableCount = readUint16BE(bytes, cmapOffset + 2);
+    let best: { offset: number; score: number } | null = null;
+
+    for (let i = 0; i < subtableCount; i++) {
+      const rec = cmapOffset + 4 + i * 8;
+      const platformId = readUint16BE(bytes, rec);
+      const encodingId = readUint16BE(bytes, rec + 2);
+      const subtableOffset = cmapOffset + readUint32BE(bytes, rec + 4);
+      if (subtableOffset + 4 > bytes.length) continue;
+
+      let score = 0;
+      if (platformId === 3 && encodingId === 10) score = 4;
+      else if (platformId === 0 && (encodingId === 4 || encodingId === 6)) score = 3;
+      else if (platformId === 3 && encodingId === 1) score = 2;
+      else if (platformId === 0) score = 1;
+      else continue;
+
+      if (!best || score > best.score) best = { offset: subtableOffset, score };
+    }
+    if (!best) return null;
+
+    const format = readUint16BE(bytes, best.offset);
+    if (format === 12) return parseCmapFormat12(bytes, best.offset);
+    if (format === 4) return parseCmapFormat4(bytes, best.offset);
+    return null;
+  } catch (error) {
+    console.error('Failed to read font coverage:', error);
+    return null;
+  }
+}
+
+/**
  * Parse font file and extract metadata by reading the TTF/OTF name table.
  * Extracts nameID 1 (Font Family) and nameID 2 (Font Subfamily / Style).
  */
