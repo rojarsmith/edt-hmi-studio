@@ -1431,3 +1431,22 @@
 .toggle-switch.on .toggle-switch-knob {
   left: 18px;
 }
+
+/* "New typography from this widget" — an action, not a value, so it does not
+   get the input styling the rest of the property rows share */
+.typography-create-btn {
+  flex: 1;
+  padding: 6px 8px;
+  background: #f0f7ff;
+  border: 1px dashed #9dc2e8;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #2b6cb0;
+  text-align: left;
+}
+
+.typography-create-btn:hover {
+  background: #e3f0fc;
+  border-color: #4a90d9;
+}

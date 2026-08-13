@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '../resources/types';
 import type { Screen, ScreenGroup, Typography } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
+import { applyTypographies } from '../codegen/typography';
+import { migrateFontResource } from '../resources/converters/fontConverter';
 import type {
   BoardId,
   CanBusConfig,
@@ -382,6 +384,7 @@ interface ProjectStoreState {
 
   // Load / save project data (screens, logic, resources)
   loadProjectData: (id: string) => Promise<{ data: ProjectData; images: ImageResource[]; fonts: FontResource[] }>;
+  /** Omit  to leave the stored list untouched. */
   saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[], typographies?: Typography[]) => Promise<void>;
 
   // Import / export
@@ -483,12 +486,17 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     return { data, images, fonts };
   },
 
-  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = [], typographies = []) => {
+  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = [], typographies) => {
+    // Omitting typographies means "leave them alone", not "delete them". They
+    // are written once by migration and then only by the editor, so defaulting
+    // to an empty array let every autosave quietly wipe the list while the
+    // widgets kept pointing at ids that no longer resolved.
+    const nextTypographies = typographies ?? (await dbGetProjectData(id))?.typographies ?? [];
     const config = await dbGetProjectConfig(id);
     if (config) {
       await dbUpdateProjectConfig({ ...config, updatedAt: Date.now() });
     }
-    await dbUpdateProjectData({ projectId: id, screens, screenGroups, typographies, logicGraphs, variables: [] });
+    await dbUpdateProjectData({ projectId: id, screens, screenGroups, typographies: nextTypographies, logicGraphs, variables: [] });
     await get().syncResources(id, images, fonts);
   },
 
@@ -587,17 +595,26 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     await dbUpdateProjectConfig(config);
 
     // `pages` is the pre-rename spelling, still present in older project files.
-    const screens: Screen[] = (file.screens || file.pages || []).map(s => ({
+    const rawScreens: Screen[] = (file.screens || file.pages || []).map(s => ({
       id: s.id,
       name: s.name,
       components: s.components,
       backgroundColor: s.backgroundColor ?? '#F5F5F5',
       groupId: s.groupId ?? null,
     }));
+
+    // Import is its own path into the app, so it has to run the same migrations
+    // as opening a file. Without this an imported project would arrive with no
+    // typographies at all, however much styling it carries.
+    const migrated = file.typographies
+      ? { screens: rawScreens, typographies: file.typographies }
+      : applyTypographies(rawScreens, lvglConfig.defaultFont, lvglConfig.defaultFontSize);
+
     await dbUpdateProjectData({
       projectId: id,
-      screens,
+      screens: migrated.screens,
       screenGroups: (file.screenGroups || []).map(g => ({ ...g })),
+      typographies: migrated.typographies,
       logicGraphs: file.logicGraphs || [],
       variables: (file.variables || []).map(v => ({ ...v, type: v.type as string })),
     });
@@ -608,7 +625,10 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     for (const img of images) {
       await dbPutResource({ id: `${id}-img-${img.id}`, projectId: id, type: 'image', data: img });
     }
-    for (const font of fonts) {
+    for (const rawFont of fonts) {
+      // Same reason as the typographies above: a font imported from an older
+      // file carries no charsetMode, and the panel reads that field directly
+      const font = migrateFontResource(rawFont);
       await dbPutResource({ id: `${id}-font-${font.id}`, projectId: id, type: 'font', data: font });
     }
 

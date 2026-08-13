@@ -1311,6 +1311,82 @@ function FontSelector({
 // Built-in font sizes (matching montserrat available sizes)
 const BUILTIN_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48];
 
+/**
+ * How a widget's text is styled: a named typography, or nothing.
+ *
+ * The font selector below only appears when no typography is assigned. With one
+ * assigned it would be misleading — codegen puts the font on the shared style
+ * and skips the per-widget call, so anything set here would have no effect.
+ */
+function TextStyleSelector({
+  component,
+  onChange,
+  onBatchChange,
+}: {
+  component: LvglComponent;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onBatchChange?: (updates: Record<string, any>) => void;
+}): React.ReactNode {
+  const typographies = useEditorStore((s) => s.typographies);
+  const addTypography = useEditorStore((s) => s.addTypography);
+  const updateComponent = useEditorStore((s) => s.updateComponent);
+
+  const assigned = component.typographyId;
+
+  const select = (typographyId: string | undefined) => {
+    // The widget's own font props are left alone rather than cleared: choosing
+    // "None" again should give back what it looked like before, not nothing.
+    updateComponent(component.id, { typographyId });
+  };
+
+  const createFromWidget = () => {
+    const id = addTypography({
+      name: `${component.name} text`,
+      fontResource: (component.props.fontResource as string) ?? 'montserrat_14',
+      fontSize: (component.props.fontSize as number) ?? 14,
+      align: (component.props.textAlign as 'auto' | 'left' | 'center' | 'right') ?? 'auto',
+    });
+    select(id);
+  };
+
+  return (
+    <>
+      <div className="property-row">
+        <label>Typography</label>
+        <select
+          value={assigned ?? ''}
+          onChange={(e) => select(e.target.value || undefined)}
+        >
+          <option value="">None (inherit)</option>
+          {typographies.map((typography) => (
+            <option key={typography.id} value={typography.id}>
+              {typography.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {!assigned && (
+        <div className="property-row">
+          <label />
+          <button className="typography-create-btn" onClick={createFromWidget}>
+            ＋ New typography from this widget
+          </button>
+        </div>
+      )}
+      {!assigned && (
+        <ComponentFontSelector
+          fontResource={component.props.fontResource}
+          fontSize={component.props.fontSize}
+          onChange={onChange}
+          onBatchChange={onBatchChange}
+        />
+      )}
+    </>
+  );
+}
+
 // Font selector for component props (fontResource + fontSize)
 function ComponentFontSelector({
   fontResource,
@@ -1649,9 +1725,8 @@ function renderComponentProps(
                 onChange={(e) => onChange('text', e.target.value)}
               />
             </div>
-            <ComponentFontSelector
-              fontResource={props.fontResource}
-              fontSize={props.fontSize}
+            <TextStyleSelector
+              component={component}
               onChange={onChange}
               onBatchChange={onBatchChange}
             />
@@ -1683,9 +1758,8 @@ function renderComponentProps(
               onChange={(e) => onChange('text', e.target.value)}
             />
           </div>
-          <ComponentFontSelector
-            fontResource={props.fontResource}
-            fontSize={props.fontSize}
+          <TextStyleSelector
+            component={component}
             onChange={onChange}
             onBatchChange={onBatchChange}
           />
@@ -1736,9 +1810,8 @@ function renderComponentProps(
               onChange={(e) => onChange('placeholder', e.target.value)}
             />
           </div>
-          <ComponentFontSelector
-            fontResource={props.fontResource}
-            fontSize={props.fontSize}
+          <TextStyleSelector
+            component={component}
             onChange={onChange}
             onBatchChange={onBatchChange}
           />
@@ -1784,9 +1857,8 @@ function renderComponentProps(
               onChange={(e) => onChange('text', e.target.value)}
             />
           </div>
-          <ComponentFontSelector
-            fontResource={props.fontResource}
-            fontSize={props.fontSize}
+          <TextStyleSelector
+            component={component}
             onChange={onChange}
             onBatchChange={onBatchChange}
           />
@@ -2006,9 +2078,8 @@ function renderComponentProps(
               ))}
             </select>
           </div>
-          <ComponentFontSelector
-            fontResource={props.fontResource}
-            fontSize={props.fontSize}
+          <TextStyleSelector
+            component={component}
             onChange={onChange}
             onBatchChange={onBatchChange}
           />

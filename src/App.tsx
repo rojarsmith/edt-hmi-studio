@@ -129,7 +129,7 @@ interface EditorViewProps {
   goToProjectList: () => void;
   setLastSaveTime: (t: number) => void;
   setDefaultFontSize: (size: number) => void;
-  saveProjectData: (id: string, screens: Screen[], logicGraphs: import('./components/LogicEditor/types').LogicGraph[], images: import('./resources/types').ImageResource[], fonts: import('./resources/types').FontResource[], screenGroups?: import('./types').ScreenGroup[]) => Promise<void>;
+  saveProjectData: (id: string, screens: Screen[], logicGraphs: import('./components/LogicEditor/types').LogicGraph[], images: import('./resources/types').ImageResource[], fonts: import('./resources/types').FontResource[], screenGroups?: import('./types').ScreenGroup[], typographies?: import('./types').Typography[]) => Promise<void>;
   exportProject: (id: string) => Promise<import('./resources/types').ProjectFile>;
   importProject: (file: import('./resources/types').ProjectFile, name?: string) => Promise<string>;
   loadProjectData: (id: string) => Promise<{ data: { screens: Screen[]; screenGroups?: import('./types').ScreenGroup[]; logicGraphs: import('./components/LogicEditor/types').LogicGraph[] }; images: import('./resources/types').ImageResource[]; fonts: import('./resources/types').FontResource[] }>;
@@ -154,7 +154,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   // Enable keyboard shortcuts
   useKeyboardShortcuts();
 
-  const { addComponent, screens, screenGroups, setScreens, setCanvasSize } = useEditorStore();
+  const { addComponent, screens, screenGroups, typographies, setScreens, setCanvasSize } = useEditorStore();
   const { images, fonts, importResources } = useResourceStore();
   const { messages, removeToast, success, error } = useToast();
 
@@ -201,7 +201,7 @@ const EditorView: React.FC<EditorViewProps> = ({
     const doSave = async () => {
       try {
         const logicGraphs = useLogicEditorStore.getState().graphs;
-        await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
+        await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups, typographies);
         setLastSaveTime(Date.now());
       } catch (err) {
         console.error('Auto-save failed:', err);
@@ -224,34 +224,34 @@ const EditorView: React.FC<EditorViewProps> = ({
       clearInterval(saveInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, setLastSaveTime]);
+  }, [currentProjectId, screens, screenGroups, typographies, images, fonts, saveProjectData, setLastSaveTime]);
 
   // Project management handlers
   const handleSaveProject = useCallback(async () => {
     if (!currentProjectId) return;
     try {
       const logicGraphs = useLogicEditorStore.getState().graphs;
-      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
+      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups, typographies);
       setLastSaveTime(Date.now());
       success('Project saved');
     } catch (err) {
       error('Save failed: ' + String(err));
     }
-  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, setLastSaveTime, success, error]);
+  }, [currentProjectId, screens, screenGroups, typographies, images, fonts, saveProjectData, setLastSaveTime, success, error]);
 
   const handleExportProject = useCallback(async () => {
     if (!currentProjectId) return;
     try {
       // Save first
       const logicGraphs = useLogicEditorStore.getState().graphs;
-      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
+      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups, typographies);
       const project = await exportProject(currentProjectId);
       downloadProject(project);
       success('Project exported');
     } catch (err) {
       error('Export failed: ' + String(err));
     }
-  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, exportProject, success, error]);
+  }, [currentProjectId, screens, screenGroups, typographies, images, fonts, saveProjectData, exportProject, success, error]);
 
   const handleImportProject = () => {
     fileInputRef.current?.click();
@@ -289,24 +289,24 @@ const EditorView: React.FC<EditorViewProps> = ({
       // Save current project first
       if (currentProjectId) {
         const logicGraphs = useLogicEditorStore.getState().graphs;
-        await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
+        await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups, typographies);
       }
       goToProjectList();
     }
-  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, goToProjectList]);
+  }, [currentProjectId, screens, screenGroups, typographies, images, fonts, saveProjectData, goToProjectList]);
 
   const handleBackToList = useCallback(async () => {
     // Save current project first
     if (currentProjectId) {
       try {
         const logicGraphs = useLogicEditorStore.getState().graphs;
-        await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups);
+        await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, screenGroups, typographies);
       } catch {
         // ignore
       }
     }
     goToProjectList();
-  }, [currentProjectId, screens, screenGroups, images, fonts, saveProjectData, goToProjectList]);
+  }, [currentProjectId, screens, screenGroups, typographies, images, fonts, saveProjectData, goToProjectList]);
 
   // Listen for keyboard shortcut events
   useEffect(() => {
