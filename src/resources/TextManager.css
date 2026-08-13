@@ -1,0 +1,165 @@
+.text-manager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* The table scrolls in both directions: a project can have many rows, and each
+   language adds a column. */
+.text-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #e6e6e6;
+  border-radius: 4px;
+  background: white;
+}
+
+.text-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.text-table th,
+.text-table td {
+  border-bottom: 1px solid #eee;
+  border-right: 1px solid #f2f2f2;
+  padding: 0;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.text-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fafafa;
+  padding: 8px 10px;
+  font-weight: 600;
+  color: #444;
+  white-space: nowrap;
+}
+
+.lang-head {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.lang-code {
+  font-weight: 400;
+  font-size: 11px;
+  color: #999;
+}
+
+.lang-default {
+  font-weight: 400;
+  font-size: 10px;
+  color: #2b6cb0;
+  background: #eaf3fb;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.lang-remove {
+  margin-left: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.lang-remove:hover {
+  color: #c0392b;
+}
+
+.text-table .col-key {
+  min-width: 160px;
+}
+
+.text-table .col-used,
+.text-table .col-actions {
+  width: 1%;
+  text-align: center;
+  padding: 0 10px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.key-input,
+.value-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.key-input {
+  font-family: 'Consolas', 'Courier New', monospace;
+  color: #2b6cb0;
+}
+
+.key-input:focus,
+.value-input:focus {
+  outline: 2px solid #4a90d9;
+  outline-offset: -2px;
+  background: #f7fbff;
+}
+
+/* Placeholder shows the default language's words, so an untranslated cell reads
+   as "this is what will appear" rather than as empty. */
+.value-input.untranslated::placeholder {
+  color: #c4c4c4;
+  font-style: italic;
+}
+
+.text-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #999;
+}
+
+.language-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.language-add input {
+  width: 130px;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.language-add button {
+  padding: 6px 12px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.language-add button:hover {
+  background: #e0e0e0;
+}
+
+.language-add.inline {
+  margin-left: auto;
+}
+
+.text-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #888;
+}

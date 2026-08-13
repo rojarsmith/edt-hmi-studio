@@ -61,7 +61,16 @@ const ProjectListPage: React.FC = () => {
       if (!config) { toast.error('Project not found'); return; }
 
       const { data, images, fonts } = await loadProjectData(id);
-      setScreens(data.screens as Screen[]);
+      // Everything setScreens is given, or it clears it: this is the path most
+      // projects are opened by, and passing only the screens dropped the screen
+      // groups, typographies, languages and texts on the way in.
+      setScreens(
+        data.screens as Screen[],
+        data.screenGroups,
+        data.typographies,
+        data.languages,
+        data.texts,
+      );
       setCanvasSize(config.display.width, config.display.height);
       importResources({ images, fonts });
       if (data.logicGraphs) {

@@ -103,7 +103,9 @@ function migrateProject(project: ProjectFile): ProjectFile {
   // Typographies are derived from the styling already present, so a project
   // written before they existed keeps rendering exactly as it did. Projects
   // that already have them are left alone — re-deriving would discard renaming.
-  const typographyMigration = project.typographies
+  // Length rather than existence: an empty array is truthy, and a saved project
+  // carries [] rather than omitting the field
+  const typographyMigration = project.typographies?.length
     ? { screens, typographies: project.typographies }
     : applyTypographies(
         screens as unknown as Screen[],

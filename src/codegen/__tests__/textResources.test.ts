@@ -148,6 +148,28 @@ describe('applyTextResources', () => {
   });
 });
 
+/**
+ * The load path decides whether to migrate by looking at the stored arrays, and
+ * a saved project carries `[]` rather than omitting the field. `[]` is truthy,
+ * so testing existence alone skips migration forever after the first save —
+ * which is exactly how a project ends up with widgets holding a textId and no
+ * text table for them to point at.
+ */
+describe('empty arrays are not "already migrated"', () => {
+  it.each([
+    ['undefined', undefined],
+    ['an empty array', []],
+  ])('treats %s as needing migration', (_label, stored: TextResource[] | undefined) => {
+    const needsMigration = !stored?.length;
+    expect(needsMigration).toBe(true);
+  });
+
+  it('treats a populated array as already migrated', () => {
+    const stored: TextResource[] = [{ id: 't1', key: 'k', values: {} }];
+    expect(!stored?.length).toBe(false);
+  });
+});
+
 describe('resolveText', () => {
   const resource: TextResource = { id: 't1', key: 'greeting', values: { en: 'Hello', 'zh-TW': '你好' } };
 

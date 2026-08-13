@@ -500,7 +500,10 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     // existed carries none, so without this every existing project shows an
     // empty Typographies panel however much styling it has.
     const config = await dbGetProjectConfig(id);
-    let data: ProjectData = stored.typographies
+    // Length, not existence. An empty array is truthy, so testing the field
+    // alone would skip migration for every project that has once been saved —
+    // and saving writes [] rather than leaving the field out.
+    let data: ProjectData = stored.typographies?.length
       ? stored
       : {
           ...stored,
@@ -514,7 +517,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     // A project written before text resources existed has its words inside the
     // widgets. Derive them into a table under one default language, so the
     // Texts panel has something to show and nothing renders differently.
-    if (!data.texts) {
+    if (!data.texts?.length) {
       const languages: ProjectLanguage[] = data.languages?.length
         ? data.languages
         : [{ code: DEFAULT_LANGUAGE_CODE, name: DEFAULT_LANGUAGE_NAME }];
@@ -648,7 +651,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     // Import is its own path into the app, so it has to run the same migrations
     // as opening a file. Without this an imported project would arrive with no
     // typographies at all, however much styling it carries.
-    const migrated = file.typographies
+    const migrated = file.typographies?.length
       ? { screens: rawScreens, typographies: file.typographies }
       : applyTypographies(rawScreens, lvglConfig.defaultFont, lvglConfig.defaultFontSize);
 

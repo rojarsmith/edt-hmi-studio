@@ -7,9 +7,23 @@ import ImageResourceManager from './ImageResourceManager';
 import FontManager from './FontManager';
 import IconLibrary from './IconLibrary';
 import TypographyManager from './TypographyManager';
+import TextManager from './TextManager';
 import './ResourceWorkspace.css';
 
 export type ResourceKind = 'image' | 'text' | 'icon';
+
+/** Sections of the Text workspace, in the order TouchGFX presents them. */
+const TEXT_SECTIONS = [
+  { id: 'texts' as const, label: 'Texts' },
+  { id: 'typographies' as const, label: 'Typographies' },
+  { id: 'fonts' as const, label: 'Fonts' },
+];
+
+const TEXT_SEARCH_PLACEHOLDER: Record<'texts' | 'typographies' | 'fonts', string> = {
+  texts: 'Search texts...',
+  typographies: 'Search typographies...',
+  fonts: 'Search fonts...',
+};
 
 interface ResourceWorkspaceProps {
   kind: ResourceKind;
@@ -43,9 +57,9 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
   const images = useResourceStore((state) => state.images);
   const fonts = useResourceStore((state) => state.fonts);
 
-  // The Text workspace holds two things: the font files, and the named styles
-  // built on them. Mirrors the split TouchGFX draws between them.
-  const [textSection, setTextSection] = useState<'fonts' | 'typographies'>('fonts');
+  // Words, the named styles they are drawn in, and the font files underneath.
+  // Mirrors the split TouchGFX draws between Texts and Typographies.
+  const [textSection, setTextSection] = useState<'texts' | 'typographies' | 'fonts'>('texts');
 
   const view = VIEWS[kind];
   // Icons come from a fixed built-in library, so a count says nothing useful.
@@ -75,18 +89,15 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
 
       {kind === 'text' && (
         <div className="resource-section-tabs">
-          <button
-            className={textSection === 'fonts' ? 'active' : ''}
-            onClick={() => setTextSection('fonts')}
-          >
-            Fonts
-          </button>
-          <button
-            className={textSection === 'typographies' ? 'active' : ''}
-            onClick={() => setTextSection('typographies')}
-          >
-            Typographies
-          </button>
+          {TEXT_SECTIONS.map((section) => (
+            <button
+              key={section.id}
+              className={textSection === section.id ? 'active' : ''}
+              onClick={() => setTextSection(section.id)}
+            >
+              {section.label}
+            </button>
+          ))}
         </div>
       )}
 
@@ -94,7 +105,7 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
         <div className="resource-search">
           <input
             type="text"
-            placeholder={kind === 'text' && textSection === 'typographies' ? 'Search typographies...' : view.searchPlaceholder}
+            placeholder={kind === 'text' ? TEXT_SEARCH_PLACEHOLDER[textSection] : view.searchPlaceholder}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -114,7 +125,9 @@ const ResourceWorkspace: React.FC<ResourceWorkspaceProps> = ({ kind }) => {
         <ImageResourceManager />
       ) : (
         <div className="resource-content">
-          {kind === 'text' && (textSection === 'fonts' ? <FontManager /> : <TypographyManager />)}
+          {kind === 'text' && textSection === 'texts' && <TextManager />}
+          {kind === 'text' && textSection === 'typographies' && <TypographyManager />}
+          {kind === 'text' && textSection === 'fonts' && <FontManager />}
           {kind === 'icon' && <IconLibrary />}
         </div>
       )}

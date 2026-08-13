@@ -150,6 +150,10 @@ interface EditorState {
   deleteLanguage: (code: string) => void;
   updateText: (id: string, language: string, value: string) => void;
   renameTextKey: (id: string, key: string) => void;
+  /** Create an empty text resource and return its id. */
+  addText: () => string;
+  /** Removing one leaves its widgets showing their own literal again. */
+  deleteText: (id: string) => void;
 
   /** Create a typography and return its id. Seeded from the project default. */
   addTypography: (seed?: Partial<Typography>) => string;
@@ -1096,6 +1100,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (get().texts.some((text) => text.id !== id && text.key === trimmed)) return;
     set({
       texts: get().texts.map((text) => (text.id === id ? { ...text, key: trimmed } : text)),
+    });
+  },
+
+  addText: () => {
+    const id = `text_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const taken = new Set(get().texts.map((text) => text.key));
+    let key = 'newText';
+    for (let suffix = 2; taken.has(key); suffix++) key = `newText${suffix}`;
+
+    set({ texts: [...get().texts, { id, key, values: {} }] });
+    return id;
+  },
+
+  deleteText: (id) => {
+    get().saveToHistory();
+    // Widgets pointing at it fall back to their own props.text, which is what
+    // they showed before text resources existed
+    const clearReferences = (components: LvglComponent[]): LvglComponent[] =>
+      components.map((comp) => ({
+        ...comp,
+        ...(comp.textId === id ? { textId: undefined } : {}),
+        children: clearReferences(comp.children ?? []),
+      }));
+
+    set({
+      texts: get().texts.filter((text) => text.id !== id),
+      screens: get().screens.map((screen) => ({
+        ...screen,
+        components: clearReferences(screen.components),
+      })),
     });
   },
 
