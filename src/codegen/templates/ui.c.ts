@@ -501,7 +501,12 @@ function generatePropsCode(
       break;
       
     case 'checkbox':
-      if (props.text) {
+      if (translationTag) {
+        // A checkbox's caption is not a label, so LVGL will not re-apply it on
+        // a language change — the callback below is ours to add
+        lines.push(`${indent}lv_checkbox_set_text(${varName}, lv_tr("${escapeCString(translationTag)}"));`);
+        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_checkbox_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translationTag)}");`);
+      } else if (props.text) {
         lines.push(`${indent}lv_checkbox_set_text(${varName}, "${escapeCString(props.text)}");`);
       }
       if (props.checked) {
@@ -517,10 +522,18 @@ function generatePropsCode(
       break;
       
     case 'textarea':
-      if (props.placeholder) {
+      // The tag stands for whichever of the two the text resource came from —
+      // a textarea's own text is user input, so a placeholder is the usual one
+      if (translationTag && !props.text) {
+        lines.push(`${indent}lv_textarea_set_placeholder_text(${varName}, lv_tr("${escapeCString(translationTag)}"));`);
+        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_textarea_placeholder_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translationTag)}");`);
+      } else if (props.placeholder) {
         lines.push(`${indent}lv_textarea_set_placeholder_text(${varName}, "${escapeCString(props.placeholder)}");`);
       }
-      if (props.text) {
+      if (translationTag && props.text) {
+        lines.push(`${indent}lv_textarea_set_text(${varName}, lv_tr("${escapeCString(translationTag)}"));`);
+        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_textarea_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translationTag)}");`);
+      } else if (props.text) {
         lines.push(`${indent}lv_textarea_set_text(${varName}, "${escapeCString(props.text)}");`);
       }
       if (props.maxLength && props.maxLength > 0) {
@@ -762,7 +775,12 @@ function generatePropsCode(
       break;
       
     case 'win':
-      if (props.title) {
+      if (translationTag) {
+        // lv_win_add_title creates and returns a real label, so keeping the
+        // pointer is enough — no callback needed, LVGL re-applies it itself
+        lines.push(`${indent}lv_obj_t *${varName}_title = lv_win_add_title(${varName}, "");`);
+        lines.push(`${indent}lv_label_set_translation_tag(${varName}_title, "${escapeCString(translationTag)}");`);
+      } else if (props.title) {
         lines.push(`${indent}lv_win_add_title(${varName}, "${escapeCString(props.title)}");`);
       }
       if (props.headerHeight && props.headerHeight !== 40) {
@@ -1720,6 +1738,59 @@ function generateTranslations(
   return { declarations, init };
 }
 
+/**
+ * Callbacks that re-apply a tag when the language changes.
+ *
+ * `lv_label` is the only widget in LVGL that handles
+ * `LV_EVENT_TRANSLATION_LANGUAGE_CHANGED` itself, so anything whose text is not
+ * a label needs one of these or it would stay frozen in the language it was
+ * built with. The event reaches every object —
+ * `lv_translation_set_language` walks the whole tree from NULL — so a callback
+ * attached to the widget is all it takes.
+ *
+ * The tag travels as user data, which is safe because it is a string literal in
+ * the generated file and outlives every widget.
+ */
+function generateTranslationCallbacks(kinds: Set<string>, options: CodeGenOptions): string[] {
+  if (kinds.size === 0) return [];
+
+  const lines: string[] = [];
+  const indent = getIndent(options);
+
+  if (options.generateComments) {
+    lines.push(generateSectionHeader('Translation Callbacks', options));
+    lines.push('');
+  }
+
+  const emit = (name: string, setter: string) => {
+    lines.push(`static void ${name}(lv_event_t * e) {`);
+    lines.push(`${indent}${setter}`);
+    lines.push('}');
+    lines.push('');
+  };
+
+  if (kinds.has('checkbox')) {
+    emit(
+      'ui_tr_checkbox_cb',
+      'lv_checkbox_set_text(lv_event_get_target_obj(e), lv_tr((const char *)lv_event_get_user_data(e)));',
+    );
+  }
+  if (kinds.has('textarea-placeholder')) {
+    emit(
+      'ui_tr_textarea_placeholder_cb',
+      'lv_textarea_set_placeholder_text(lv_event_get_target_obj(e), lv_tr((const char *)lv_event_get_user_data(e)));',
+    );
+  }
+  if (kinds.has('textarea')) {
+    emit(
+      'ui_tr_textarea_cb',
+      'lv_textarea_set_text(lv_event_get_target_obj(e), lv_tr((const char *)lv_event_get_user_data(e)));',
+    );
+  }
+
+  return lines;
+}
+
 /** Component id → typography id, from what the components already carry. */
 function collectStoredAssignments(screens: Screen[]): Map<string, string> {
   const assignments = new Map<string, string>();
@@ -1922,16 +1993,29 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   }
   /** Component id → the tag to give it, for the widgets that can carry one. */
   const componentTags = new Map<string, string>();
+  /** Which callbacks are actually needed, so unused ones are not emitted. */
+  const translationCallbackKinds = new Set<string>();
   if (texts.length > 0) {
     const keyById = new Map(texts.map((text) => [text.id, text.key]));
     const walkTags = (components: LvglComponent[]) => {
       for (const comp of components) {
         const key = comp.textId ? keyById.get(comp.textId) : undefined;
-        if (key) componentTags.set(comp.id, key);
+        if (key) {
+          componentTags.set(comp.id, key);
+          if (comp.type === 'checkbox') translationCallbackKinds.add('checkbox');
+          if (comp.type === 'textarea') {
+            translationCallbackKinds.add(comp.props?.text ? 'textarea' : 'textarea-placeholder');
+          }
+        }
         walkTags(comp.children ?? []);
       }
     };
     for (const screen of screens) walkTags(screen.components);
+  }
+
+  const translationCallbacks = generateTranslationCallbacks(translationCallbackKinds, options);
+  if (translationCallbacks.length > 0) {
+    lines.push(...translationCallbacks);
   }
 
   // Animation exec-callback wrappers, emitted before any screen init uses them

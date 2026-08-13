@@ -108,6 +108,50 @@ describe('widgets carrying a tag', () => {
     expect(result).toContain('lv_label_set_text(ui_plain, "Untranslated");');
   });
 
+  /**
+   * lv_label is the only widget LVGL re-applies a tag for. Anything whose text
+   * is not a label needs a callback, or it stays frozen in the language it was
+   * built with — visibly wrong only after a switch, which is easy to miss.
+   */
+  it('gives a checkbox a callback, since its caption is not a label', () => {
+    const result = generate([createComponent('checkbox', { name: 'agree', props: { text: 'I agree' }, textId: 't1' })]);
+    expect(result).toContain('lv_checkbox_set_text(ui_agree, lv_tr("greeting"));');
+    expect(result).toContain('lv_obj_add_event_cb(ui_agree, ui_tr_checkbox_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"greeting");');
+    expect(result).toContain('static void ui_tr_checkbox_cb(lv_event_t * e) {');
+  });
+
+  it('gives a textarea placeholder a callback', () => {
+    const result = generate([createComponent('textarea', { name: 'notes', props: { placeholder: 'Notes' }, textId: 't1' })]);
+    expect(result).toContain('lv_textarea_set_placeholder_text(ui_notes, lv_tr("greeting"));');
+    expect(result).toContain('ui_tr_textarea_placeholder_cb');
+  });
+
+  it('emits only the callbacks something actually uses', () => {
+    const result = generate([createComponent('checkbox', { name: 'agree', props: { text: 'I agree' }, textId: 't1' })]);
+    expect(result).toContain('ui_tr_checkbox_cb');
+    expect(result).not.toContain('ui_tr_textarea_cb');
+    expect(result).not.toContain('ui_tr_textarea_placeholder_cb');
+  });
+
+  it('emits no callbacks at all when only labels carry tags', () => {
+    const result = generate([createComponent('label', { name: 'l', props: { text: 'Hello' }, textId: 't1' })]);
+    expect(result).not.toContain('ui_tr_');
+  });
+
+  /** lv_win_add_title returns a real label, so the native path works. */
+  it('keeps a window title\'s label and tags it rather than adding a callback', () => {
+    const result = generate([createComponent('win', { name: 'dlg', props: { title: 'Settings' }, textId: 't1' })]);
+    expect(result).toContain('lv_obj_t *ui_dlg_title = lv_win_add_title(ui_dlg, "");');
+    expect(result).toContain('lv_label_set_translation_tag(ui_dlg_title, "greeting");');
+    expect(result).not.toContain('ui_tr_');
+  });
+
+  /** void* converts implicitly in C but not in C++, and generated UI is sometimes built as C++. */
+  it('casts the tag out of user data explicitly', () => {
+    const result = generate([createComponent('checkbox', { name: 'agree', props: { text: 'x' }, textId: 't1' })]);
+    expect(result).toContain('lv_tr((const char *)lv_event_get_user_data(e))');
+  });
+
   it('ignores a textId pointing at a resource that no longer exists', () => {
     const result = generate([createComponent('label', { name: 'l', props: { text: 'Hello' }, textId: 'gone' })]);
     expect(result).not.toContain('lv_label_set_translation_tag(ui_l');
