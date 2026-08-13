@@ -1,0 +1,158 @@
+// Deriving text resources from the literals a project already contains.
+//
+// A widget currently stores the words it shows. Translation needs the opposite:
+// the widget stores an id, and the words live in one table with a column per
+// language. This turns the former into the latter without changing what any
+// widget displays.
+//
+// See docs/text-typography-evaluation.md §3.
+
+import type { LvglComponent, Screen, TextResource } from '../types';
+
+/**
+ * Props holding a single translatable string.
+ *
+ * Deliberately not the array-valued ones — dropdown options, table cells and
+ * tab names are each several strings, so one widget maps to several resources
+ * and the widget can no longer carry a single `textId`. That needs a different
+ * shape and is left until this one is wired up.
+ */
+const TRANSLATABLE_PROPS = ['text', 'placeholder', 'title'] as const;
+
+export interface TextDerivation {
+  /** Deduplicated, in the order first encountered so keys stay stable. */
+  texts: TextResource[];
+  /** Component id → text resource id. Only components with a literal appear. */
+  assignments: Map<string, string>;
+}
+
+/** `Save changes` → `saveChanges`, so generated tags read like identifiers. */
+function keyFromText(text: string): string {
+  const words = text
+    .trim()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 4);
+
+  if (words.length === 0) return 'text';
+
+  const [first, ...rest] = words;
+  const camel = first.toLowerCase() + rest.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+
+  // Keys become string literals in the generated tag table, not identifiers, so
+  // any script is valid and 溫度設定 is a better key than text溫度設定. A leading
+  // digit is the one awkward case: it reads as a number rather than a name.
+  return /^\p{N}/u.test(camel) ? `text${camel}` : camel;
+}
+
+/** The translatable string a component shows, if it has one. */
+function literalOf(comp: LvglComponent): string | undefined {
+  const props = comp.props ?? {};
+  for (const prop of TRANSLATABLE_PROPS) {
+    const value = props[prop];
+    if (typeof value === 'string' && value.trim().length > 0) return value;
+  }
+  return undefined;
+}
+
+/**
+ * Collect the distinct strings a project displays, keyed and deduplicated.
+ *
+ * `defaultLanguage` is the code the existing literals are recorded under —
+ * they were written in some language, and this says which.
+ *
+ * Identical strings collapse onto one resource, which is the point: translating
+ * "OK" once should translate every OK. It also means editing one afterwards
+ * edits them all, so the deduplication is visible in the editor rather than
+ * silent.
+ */
+export function deriveTextResources(
+  screens: Screen[],
+  defaultLanguage: string,
+): TextDerivation {
+  const texts: TextResource[] = [];
+  const assignments = new Map<string, string>();
+  const byLiteral = new Map<string, TextResource>();
+  const usedKeys = new Set<string>();
+
+  const walk = (components: LvglComponent[]) => {
+    for (const comp of components) {
+      const literal = literalOf(comp);
+      if (literal !== undefined) {
+        let resource = byLiteral.get(literal);
+        if (!resource) {
+          let key = keyFromText(literal);
+          for (let suffix = 2; usedKeys.has(key); suffix++) {
+            key = `${keyFromText(literal)}${suffix}`;
+          }
+          usedKeys.add(key);
+
+          resource = {
+            id: `text_${texts.length + 1}`,
+            key,
+            values: { [defaultLanguage]: literal },
+          };
+          byLiteral.set(literal, resource);
+          texts.push(resource);
+        }
+        assignments.set(comp.id, resource.id);
+      }
+
+      walk(comp.children ?? []);
+    }
+  };
+
+  for (const screen of screens) walk(screen.components);
+
+  return { texts, assignments };
+}
+
+/**
+ * Give a project's screens their text ids, in place of deriving them again.
+ *
+ * Returns new screens rather than mutating, since this runs inside the load
+ * path while the caller still holds the parsed data.
+ */
+export function applyTextResources(
+  screens: Screen[],
+  defaultLanguage: string,
+): { screens: Screen[]; texts: TextResource[] } {
+  const { texts, assignments } = deriveTextResources(screens, defaultLanguage);
+
+  const assign = (components: LvglComponent[]): LvglComponent[] =>
+    components.map((comp) => {
+      const textId = assignments.get(comp.id);
+      return {
+        ...comp,
+        ...(textId ? { textId } : {}),
+        children: assign(comp.children ?? []),
+      };
+    });
+
+  return {
+    screens: screens.map((screen) => ({ ...screen, components: assign(screen.components) })),
+    texts,
+  };
+}
+
+/**
+ * The string a text resource shows in a given language.
+ *
+ * Falls back to the first language that has one, matching what
+ * `lv_translation_get` does at runtime: an untranslated tag shows the language
+ * it was written in rather than disappearing.
+ */
+export function resolveText(
+  resource: TextResource,
+  language: string,
+  languages: string[],
+): string {
+  const direct = resource.values[language];
+  if (direct !== undefined) return direct;
+  for (const code of languages) {
+    const value = resource.values[code];
+    if (value !== undefined) return value;
+  }
+  return resource.key;
+}

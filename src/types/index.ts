@@ -226,6 +226,37 @@ export interface Typography {
 /** `auto` resolves against the base direction, which is what RTL text needs. */
 export type TypographyAlign = 'auto' | 'left' | 'center' | 'right';
 
+/**
+ * One language a project's text is written in.
+ *
+ * `code` is what reaches `lv_translation_set_language()` at runtime, so it has
+ * to be stable once anything ships; `name` is only ever shown in the editor.
+ */
+export interface ProjectLanguage {
+  code: string;
+  name: string;
+}
+
+/**
+ * A piece of user-visible text, held once and referred to by widgets.
+ *
+ * This is the indirection that makes a language switch possible: a widget
+ * stores the id, not the words. Generated code registers these with LVGL's
+ * translation module and tags each label with its key.
+ *
+ * See docs/text-typography-evaluation.md §3.
+ */
+export interface TextResource {
+  id: string;
+  /**
+   * The tag generated code uses, e.g. `boxEnglish`. Unique within a project,
+   * and stable — renaming it changes the generated C.
+   */
+  key: string;
+  /** Translation per language code. A missing entry falls back to the first language. */
+  values: Record<string, string>;
+}
+
 export type LvglAlign = 'default' | 'center' | 'top_left' | 'top_mid' | 'top_right' | 'bottom_left' | 'bottom_mid' | 'bottom_right' | 'left_mid' | 'right_mid';
 
 export interface LvglFlags {
@@ -311,6 +342,13 @@ export interface LvglComponent {
    * migration — see `deriveTypographies`.
    */
   typographyId?: string;
+  /**
+   * The text resource this widget displays, when its text is translatable.
+   *
+   * Absent means the literal in `props.text` is used directly, which is what
+   * every widget did before text resources existed. Populated by migration.
+   */
+  textId?: string;
   // Flags
   flags?: LvglFlags;
   // Optional no-code Modbus data synchronization/write behavior
