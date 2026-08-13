@@ -73,7 +73,7 @@ const App: React.FC = () => {
         if (cfg) {
           // Load project data into stores
           loadProjectData(lastId).then(({ data, images, fonts }) => {
-            useEditorStore.getState().setScreens(data.screens as Screen[], data.screenGroups);
+            useEditorStore.getState().setScreens(data.screens as Screen[], data.screenGroups, data.typographies);
             useEditorStore.getState().setCanvasSize(cfg.display.width, cfg.display.height);
             useResourceStore.getState().importResources({ images, fonts });
             if (data.logicGraphs) {
@@ -132,7 +132,7 @@ interface EditorViewProps {
   saveProjectData: (id: string, screens: Screen[], logicGraphs: import('./components/LogicEditor/types').LogicGraph[], images: import('./resources/types').ImageResource[], fonts: import('./resources/types').FontResource[], screenGroups?: import('./types').ScreenGroup[], typographies?: import('./types').Typography[]) => Promise<void>;
   exportProject: (id: string) => Promise<import('./resources/types').ProjectFile>;
   importProject: (file: import('./resources/types').ProjectFile, name?: string) => Promise<string>;
-  loadProjectData: (id: string) => Promise<{ data: { screens: Screen[]; screenGroups?: import('./types').ScreenGroup[]; logicGraphs: import('./components/LogicEditor/types').LogicGraph[] }; images: import('./resources/types').ImageResource[]; fonts: import('./resources/types').FontResource[] }>;
+  loadProjectData: (id: string) => Promise<{ data: { screens: Screen[]; screenGroups?: import('./types').ScreenGroup[]; typographies?: import('./types').Typography[]; logicGraphs: import('./components/LogicEditor/types').LogicGraph[] }; images: import('./resources/types').ImageResource[]; fonts: import('./resources/types').FontResource[] }>;
   getProjectConfig: (id: string) => Promise<import('./store/projectStore').ProjectConfig | undefined>;
   openProject: (id: string) => void;
 }
@@ -266,7 +266,7 @@ const EditorView: React.FC<EditorViewProps> = ({
       const cfg = await getProjectConfig(id);
       if (cfg) {
         const { data, images: imgs, fonts: fnts } = await loadProjectData(id);
-        setScreens(data.screens as Screen[], data.screenGroups);
+        setScreens(data.screens as Screen[], data.screenGroups, data.typographies);
         setCanvasSize(cfg.display.width, cfg.display.height);
         importResources({ images: imgs, fonts: fnts });
         if (data.logicGraphs) {

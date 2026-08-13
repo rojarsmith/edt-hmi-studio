@@ -472,8 +472,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   },
 
   loadProjectData: async (id) => {
-    const data = await dbGetProjectData(id);
-    if (!data) {
+    const stored = await dbGetProjectData(id);
+    if (!stored) {
       throw new Error('Project data not found');
     }
     const resources = await dbGetProjectResources(id);
@@ -481,8 +481,27 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     const fonts: FontResource[] = [];
     for (const r of resources) {
       if (r.type === 'image') images.push(r.data as ImageResource);
-      else if (r.type === 'font') fonts.push(r.data as FontResource);
+      // A font stored before charsetMode existed has none, and the panel reads
+      // that field directly
+      else if (r.type === 'font') fonts.push(migrateFontResource(r.data as FontResource));
     }
+
+    // Opening a stored project is the common path, and it has to migrate for
+    // the same reason opening a file does: a project saved before typographies
+    // existed carries none, so without this every existing project shows an
+    // empty Typographies panel however much styling it has.
+    const config = await dbGetProjectConfig(id);
+    const data: ProjectData = stored.typographies
+      ? stored
+      : {
+          ...stored,
+          ...applyTypographies(
+            stored.screens,
+            config?.lvglConfig?.defaultFont,
+            config?.lvglConfig?.defaultFontSize,
+          ),
+        };
+
     return { data, images, fonts };
   },
 
