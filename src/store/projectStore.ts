@@ -4,9 +4,10 @@ import { create } from 'zustand';
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 import { v4 as uuidv4 } from 'uuid';
 import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '../resources/types';
-import type { Screen, ScreenGroup, Typography } from '../types';
+import type { Screen, ScreenGroup, Typography, ProjectLanguage, TextResource } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import { applyTypographies } from '../codegen/typography';
+import { applyTextResources } from '../codegen/textResources';
 import { migrateFontResource } from '../resources/converters/fontConverter';
 import type {
   BoardId,
@@ -71,6 +72,10 @@ export interface ProjectData {
   screenGroups?: ScreenGroup[];
   /** Named text styles shared across widgets. */
   typographies?: Typography[];
+  /** Languages the project is translated into. The first is the default. */
+  languages?: ProjectLanguage[];
+  /** Shared text, referenced by widgets through textId. */
+  texts?: TextResource[];
   logicGraphs: LogicGraph[];
   variables: { id: string; name: string; type: string; defaultValue: string }[];
 }
@@ -90,6 +95,10 @@ export interface ProjectListItem {
 // ---------------------------------------------------------------------------
 // Default values
 // ---------------------------------------------------------------------------
+
+/** Language existing literals are recorded under when a project first gains a text table. */
+export const DEFAULT_LANGUAGE_CODE = 'en';
+export const DEFAULT_LANGUAGE_NAME = 'English';
 
 const DEFAULT_BOARD = getBoardDefinition(DEFAULT_BOARD_ID);
 
@@ -385,7 +394,7 @@ interface ProjectStoreState {
   // Load / save project data (screens, logic, resources)
   loadProjectData: (id: string) => Promise<{ data: ProjectData; images: ImageResource[]; fonts: FontResource[] }>;
   /** Omit  to leave the stored list untouched. */
-  saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[], typographies?: Typography[]) => Promise<void>;
+  saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[], typographies?: Typography[], languages?: ProjectLanguage[], texts?: TextResource[]) => Promise<void>;
 
   // Import / export
   exportProject: (id: string) => Promise<ProjectFile>;
@@ -491,7 +500,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     // existed carries none, so without this every existing project shows an
     // empty Typographies panel however much styling it has.
     const config = await dbGetProjectConfig(id);
-    const data: ProjectData = stored.typographies
+    let data: ProjectData = stored.typographies
       ? stored
       : {
           ...stored,
@@ -502,20 +511,34 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           ),
         };
 
+    // A project written before text resources existed has its words inside the
+    // widgets. Derive them into a table under one default language, so the
+    // Texts panel has something to show and nothing renders differently.
+    if (!data.texts) {
+      const languages: ProjectLanguage[] = data.languages?.length
+        ? data.languages
+        : [{ code: DEFAULT_LANGUAGE_CODE, name: DEFAULT_LANGUAGE_NAME }];
+      const derived = applyTextResources(data.screens, languages[0].code);
+      data = { ...data, screens: derived.screens, texts: derived.texts, languages };
+    }
+
     return { data, images, fonts };
   },
 
-  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = [], typographies) => {
+  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = [], typographies, languages, texts) => {
     // Omitting typographies means "leave them alone", not "delete them". They
     // are written once by migration and then only by the editor, so defaulting
     // to an empty array let every autosave quietly wipe the list while the
     // widgets kept pointing at ids that no longer resolved.
-    const nextTypographies = typographies ?? (await dbGetProjectData(id))?.typographies ?? [];
+    const previous = (typographies && languages && texts) ? undefined : await dbGetProjectData(id);
+    const nextTypographies = typographies ?? previous?.typographies ?? [];
+    const nextLanguages = languages ?? previous?.languages ?? [];
+    const nextTexts = texts ?? previous?.texts ?? [];
     const config = await dbGetProjectConfig(id);
     if (config) {
       await dbUpdateProjectConfig({ ...config, updatedAt: Date.now() });
     }
-    await dbUpdateProjectData({ projectId: id, screens, screenGroups, typographies: nextTypographies, logicGraphs, variables: [] });
+    await dbUpdateProjectData({ projectId: id, screens, screenGroups, typographies: nextTypographies, languages: nextLanguages, texts: nextTexts, logicGraphs, variables: [] });
     await get().syncResources(id, images, fonts);
   },
 

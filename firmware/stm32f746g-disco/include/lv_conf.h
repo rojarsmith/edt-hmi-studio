@@ -181,6 +181,8 @@
 #define LV_USE_MONKEY 0
 #define LV_USE_GRIDNAV 0
 #define LV_USE_FRAGMENT 0
+/* Translation table used by generated UI code; lv_label follows it natively */
+#define LV_USE_TRANSLATION 1
 #define LV_USE_IMGFONT 0
 #define LV_USE_IME_PINYIN 0
 #define LV_USE_FILE_EXPLORER 0

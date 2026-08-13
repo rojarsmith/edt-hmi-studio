@@ -1,6 +1,6 @@
 // Main code generator
 
-import type { Screen, Theme } from '../types';
+import type { Screen, Theme, Typography, TextResource, ProjectLanguage } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type { ImageResource, FontResource } from '../resources/types';
 import type { CodeGenOptions, GeneratedCode } from './types';
@@ -30,13 +30,16 @@ export function generateCode(
   defaultFont?: string,
   defaultFontSize?: number,
   useBuiltinSymbols?: boolean,
-  symbolFont?: string
+  symbolFont?: string,
+  typographies?: Typography[],
+  texts: TextResource[] = [],
+  languages: ProjectLanguage[] = []
 ): GeneratedCode {
   const opts: CodeGenOptions = { ...DEFAULT_CODEGEN_OPTIONS, ...options };
   
   return {
     'ui.h': generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols),
-    'ui.c': generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont),
+    'ui.c': generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont, typographies, texts, languages),
     'ui_events.h': generateEventsHeader(screens, opts),
     'ui_events.c': generateEventsSource(screens, opts),
     'ui_logic.h': generateLogicHeader(opts, logicGraphs),
@@ -58,7 +61,10 @@ export function generateSingleFile(
   defaultFont?: string,
   defaultFontSize?: number,
   useBuiltinSymbols?: boolean,
-  symbolFont?: string
+  symbolFont?: string,
+  typographies?: Typography[],
+  texts: TextResource[] = [],
+  languages: ProjectLanguage[] = []
 ): string {
   const opts: CodeGenOptions = { ...DEFAULT_CODEGEN_OPTIONS, ...options };
   
@@ -66,7 +72,7 @@ export function generateSingleFile(
     case 'ui.h':
       return generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols);
     case 'ui.c':
-      return generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont);
+      return generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont, typographies, texts, languages);
     case 'ui_events.h':
       return generateEventsHeader(screens, opts);
     case 'ui_events.c':

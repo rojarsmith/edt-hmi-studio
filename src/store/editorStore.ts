@@ -10,6 +10,8 @@ import type {
   Screen,
   ScreenGroup,
   Typography,
+  ProjectLanguage,
+  TextResource,
 } from '../types';
 import { MAX_SCREEN_GROUP_DEPTH } from '../types';
 import type { ModbusRegisterTag } from '../types/hmi';
@@ -61,6 +63,12 @@ interface EditorState {
    * inherits the screen's default font, as an unstyled widget always has.
    */
   typographies: Typography[];
+
+  /** Languages the project is translated into. The first is the default. */
+  languages: ProjectLanguage[];
+
+  /** Shared text, referenced by widgets through textId. */
+  texts: TextResource[];
 
   /**
    * Screens with a tab open along the bottom of the canvas, in tab order.
@@ -128,7 +136,20 @@ interface EditorState {
   ) => void;
   clearComponents: () => void;
   setComponents: (components: LvglComponent[]) => void;
-  setScreens: (screens: Screen[], screenGroups?: ScreenGroup[], typographies?: Typography[]) => void;
+  setScreens: (
+    screens: Screen[],
+    screenGroups?: ScreenGroup[],
+    typographies?: Typography[],
+    languages?: ProjectLanguage[],
+    texts?: TextResource[],
+  ) => void;
+
+  /** Add a language column. The first language added becomes the default. */
+  addLanguage: (code: string, name: string) => void;
+  /** Removing a language drops its column from every text resource. */
+  deleteLanguage: (code: string) => void;
+  updateText: (id: string, language: string, value: string) => void;
+  renameTextKey: (id: string, key: string) => void;
 
   /** Create a typography and return its id. Seeded from the project default. */
   addTypography: (seed?: Partial<Typography>) => string;
@@ -514,6 +535,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   screens: [initialScreen],
   currentScreenId: initialScreen.id,
   typographies: [],
+  languages: [],
+  texts: [],
   screenGroups: [],
   openScreenIds: [initialScreen.id],
 
@@ -1034,6 +1057,48 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
+  addLanguage: (code, name) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    if (get().languages.some((language) => language.code === trimmed)) return;
+    set({ languages: [...get().languages, { code: trimmed, name: name.trim() || trimmed }] });
+  },
+
+  deleteLanguage: (code) => {
+    const remaining = get().languages.filter((language) => language.code !== code);
+    // Dropping the column means dropping its words: leaving them would keep
+    // translations for a language the project no longer has, and the next
+    // export would silently disagree with the table
+    set({
+      languages: remaining,
+      texts: get().texts.map((text) => {
+        if (!(code in text.values)) return text;
+        const values = { ...text.values };
+        delete values[code];
+        return { ...text, values };
+      }),
+    });
+  },
+
+  updateText: (id, language, value) => {
+    set({
+      texts: get().texts.map((text) =>
+        text.id === id ? { ...text, values: { ...text.values, [language]: value } } : text,
+      ),
+    });
+  },
+
+  renameTextKey: (id, key) => {
+    const trimmed = key.trim();
+    if (!trimmed) return;
+    // The key is the generated tag, so a duplicate would make two texts
+    // indistinguishable to lv_translation_get
+    if (get().texts.some((text) => text.id !== id && text.key === trimmed)) return;
+    set({
+      texts: get().texts.map((text) => (text.id === id ? { ...text, key: trimmed } : text)),
+    });
+  },
+
   addTypography: (seed = {}) => {
     const existing = get().typographies;
     const id = `typo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1091,13 +1156,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  setScreens: (screens, screenGroups, typographies) => {
+  setScreens: (screens, screenGroups, typographies, languages, texts) => {
     get().saveToHistory();
     const firstId = screens.length > 0 ? screens[0].id : get().currentScreenId;
     set({
       screens: cloneScreens(screens),
       screenGroups: screenGroups ? screenGroups.map(g => ({ ...g })) : [],
       typographies: typographies ? typographies.map(t => ({ ...t })) : [],
+      languages: languages ? languages.map(l => ({ ...l })) : [],
+      texts: texts ? texts.map(t => ({ ...t, values: { ...t.values } })) : [],
       // A freshly loaded project starts with just its first screen open.
       openScreenIds: screens.length > 0 ? [firstId] : [],
       currentScreenId: firstId,

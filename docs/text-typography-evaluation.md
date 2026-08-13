@@ -253,6 +253,46 @@ the firmware's `lv_conf.h` and the board definitions in `src/types/hmi.ts` are
 **not generated from one another and must be kept in step by hand**. Any macro
 added above lands in both places.
 
+## 9a. SquareLine Studio, for comparison
+
+SquareLine Studio is a commercial LVGL editor, so where it differs is worth
+knowing — and it differs in both directions.
+
+**Where it is ahead of us**
+
+- **A font is an explicit instance.** Font asset + size + bpp + character set,
+  named, created once and reused. Closer to TouchGFX's Typography than our
+  `FontResource`, which is a file whose sizes are inferred from usage. Inferred
+  sizes are less to maintain; explicit instances are easier to reason about, and
+  the author can see exactly what will be built.
+- **Letters, Range and Symbols are additive**, three inputs on one form rather
+  than exclusive modes. Our `auto` / `preset` / `manual` forces a choice that
+  need not be exclusive — wanting the used characters *and* a declared range is
+  reasonable, and today that means picking `auto` and using Extra Ranges.
+- **Compression is offered with its cost stated**: "about 30% slower to render",
+  recommended only for larger, rarely-used fonts. We hardcode `--no-compress`
+  and never offer it, which is the safe default but not an informed one.
+- **A Custom field passes raw `lv_font_conv` flags** (e.g.
+  `--no-compress --no-prefilter`), an escape hatch for anything the UI does not
+  model. We have no equivalent.
+
+**Where we are ahead**
+
+- **No usage-derived character set at all.** Letters/Range/Symbols are all
+  declarations; nothing reads the project's own text. A CJK font is still
+  specified by hand, which is the problem §4 exists to remove.
+- **Multilanguage is markup, not management.** A text marked "To be translated"
+  exports as `_("text")`, and the documentation says you "need to manually add
+  and use the `lv_i18n` library in your project". There is no translation table
+  in the editor and no per-language column — the words live outside the tool.
+- **It targets `lv_i18n`**, the older community library, rather than LVGL 9's
+  built-in `lv_translation` (§3). Ours generates for the module that ships with
+  LVGL and that `lv_label` already follows on its own.
+
+**Worth taking from it:** the compression toggle with its cost written down, and
+the raw-flags escape hatch. Both are small, and both are the kind of thing an
+author reaches for once and cannot work around when it is missing.
+
 ## 10. Suggested order
 
 **First — native support, generator-only changes**
