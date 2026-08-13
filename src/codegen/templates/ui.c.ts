@@ -5,7 +5,8 @@ import type { CodeGenOptions } from '../types';
 import type { ImageResource, FontResource } from '../../resources/types';
 import { collectUsedCustomFonts } from '../fontUsage';
 import { deriveTypographies } from '../typography';
-import type { Typography } from '../../types';
+import { resolveText } from '../textResources';
+import type { Typography, TextResource, ProjectLanguage } from '../../types';
 import {
   getScreenVarName,
   getComponentVarName,
@@ -369,7 +370,9 @@ function generatePropsCode(
   imageResources: ImageResource[] = [],
   defaultFont?: string,
   defaultFontSize?: number,
-  suppressText: boolean = false
+  suppressText: boolean = false,
+  /** Translation tag for this widget, when its text is a shared resource. */
+  translationTag?: string
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -415,7 +418,11 @@ function generatePropsCode(
   
   switch (type) {
     case 'label':
-      if (props.text) {
+      if (translationTag) {
+        // Applies the text as well as storing the tag, and re-applies it
+        // whenever the language changes — no handler of ours needed
+        lines.push(`${indent}lv_label_set_translation_tag(${varName}, "${escapeCString(translationTag)}");`);
+      } else if (props.text) {
         lines.push(`${indent}lv_label_set_text(${varName}, "${escapeCString(props.text)}");`);
       }
       if (props.longMode) {
@@ -431,10 +438,15 @@ function generatePropsCode(
       break;
       
     case 'btn':
-      if (props.text) {
+      if (translationTag || props.text) {
         // Create a label inside the button
         lines.push(`${indent}lv_obj_t *${varName}_label = lv_label_create(${varName});`);
-        lines.push(`${indent}lv_label_set_text(${varName}_label, "${escapeCString(props.text)}");`);
+        if (translationTag) {
+          // A button's caption is a real label, so it follows the language too
+          lines.push(`${indent}lv_label_set_translation_tag(${varName}_label, "${escapeCString(translationTag)}");`);
+        } else {
+          lines.push(`${indent}lv_label_set_text(${varName}_label, "${escapeCString(props.text)}");`);
+        }
         lines.push(`${indent}lv_obj_center(${varName}_label);`);
         generateTextProps(`${varName}_label`);
       }
@@ -1081,7 +1093,8 @@ function generateComponentCode(
   defaultFontSize?: number,
   useBuiltinSymbols?: boolean,
   symbolFont?: string,
-  componentStyles?: Map<string, string>
+  componentStyles?: Map<string, string>,
+  componentTags?: Map<string, string>
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -1234,7 +1247,7 @@ function generateComponentCode(
   }
 
   // Component-specific properties
-  const propLines = generatePropsCode(varName, component.type, component.props, options, imageResources, defaultFont, defaultFontSize, Boolean(typographyStyle));
+  const propLines = generatePropsCode(varName, component.type, component.props, options, imageResources, defaultFont, defaultFontSize, Boolean(typographyStyle), componentTags?.get(component.id));
   lines.push(...propLines);
 
   // Event bindings
@@ -1269,7 +1282,7 @@ function generateComponentCode(
     const defaultTab = `${varName}_tab_${component.props.activeTab || 0}`;
     for (const child of component.children) {
       const tabParent = childToTab[child.id] || defaultTab;
-      lines.push(...generateComponentCode(child, tabParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
+      lines.push(...generateComponentCode(child, tabParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles, componentTags));
     }
   } else if (component.type === 'tileview' && component.props?.rows !== undefined && component.props?.cols !== undefined) {
     const tileChildMap: Record<string, string[]> = component.props.tileChildMap || {};
@@ -1286,19 +1299,19 @@ function generateComponentCode(
     const defaultTile = `${varName}_tile_0_0`;
     for (const child of component.children) {
       const tileParent = childToTile[child.id] || defaultTile;
-      lines.push(...generateComponentCode(child, tileParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
+      lines.push(...generateComponentCode(child, tileParent, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles, componentTags));
     }
   } else if (component.type === 'win') {
     // Win children go into the content area
     if (component.children.length > 0) {
       lines.push(`${indent}lv_obj_t * ${varName}_content = lv_win_get_content(${varName});`);
       for (const child of component.children) {
-        lines.push(...generateComponentCode(child, `${varName}_content`, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
+        lines.push(...generateComponentCode(child, `${varName}_content`, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles, componentTags));
       }
     }
   } else {
     for (const child of component.children) {
-      lines.push(...generateComponentCode(child, varName, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
+      lines.push(...generateComponentCode(child, varName, options, screenName, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles, componentTags));
     }
   }
 
@@ -1407,7 +1420,8 @@ function generateScreenInitFunc(
   defaultFontSize?: number,
   useBuiltinSymbols?: boolean,
   symbolFont?: string,
-  componentStyles?: Map<string, string>
+  componentStyles?: Map<string, string>,
+  componentTags?: Map<string, string>
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -1455,7 +1469,7 @@ function generateScreenInitFunc(
   
   // Generate components
   for (const component of screen.components) {
-    lines.push(...generateComponentCode(component, screenVar, options, screen.name, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
+    lines.push(...generateComponentCode(component, screenVar, options, screen.name, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles, componentTags));
   }
 
   // Park animated widgets before the transition draws, start them after it ends
@@ -1647,6 +1661,65 @@ function fontSymbol(fontResource: string, fontSize: number): string {
   return builtin ? `lv_font_montserrat_${builtin[1]}` : `${fontResource}_${fontSize}`;
 }
 
+/**
+ * The translation table, as three static arrays plus the call that registers
+ * them.
+ *
+ * The layout of `translations` is the trap here. lv_translation.h documents it
+ * as `{"Dog", "Cat", "Hund", "Katze"}` — language-major — but the
+ * implementation indexes it `translation_p[language_cnt * tag + language]`, and
+ * LVGL's own example writes one row per tag holding every language. The header
+ * comment is wrong, and following it would mistranslate everything past the
+ * first language while still producing plausible-looking strings.
+ */
+function generateTranslations(
+  texts: TextResource[],
+  languages: ProjectLanguage[],
+  options: CodeGenOptions,
+): { declarations: string[]; init: string[] } {
+  const declarations: string[] = [];
+  const init: string[] = [];
+  if (texts.length === 0 || languages.length === 0) return { declarations, init };
+
+  const indent = getIndent(options);
+  const codes = languages.map((language) => language.code);
+
+  if (options.generateComments) {
+    declarations.push(generateSectionHeader('Translations', options));
+    declarations.push('');
+  }
+
+  declarations.push(
+    `static const char * const ui_languages[] = {${codes.map((c) => `"${escapeCString(c)}"`).join(', ')}, NULL};`,
+  );
+  declarations.push(
+    `static const char * const ui_text_tags[] = {${texts.map((t) => `"${escapeCString(t.key)}"`).join(', ')}, NULL};`,
+  );
+
+  if (options.generateComments) {
+    declarations.push(`${generateComment('One row per tag, each holding every language in ui_languages order', options)}`);
+  }
+  declarations.push('static const char * const ui_translations[] = {');
+  for (const text of texts) {
+    const row = codes
+      .map((code) => `"${escapeCString(resolveText(text, code, codes))}"`)
+      .join(', ');
+    declarations.push(`${indent}${row},${options.generateComments ? ` ${generateComment(text.key, options)}` : ''}`);
+  }
+  declarations.push('};');
+  declarations.push('');
+
+  init.push('static void ui_translation_init(void) {');
+  init.push(`${indent}lv_translation_add_static(ui_languages, ui_text_tags, ui_translations);`);
+  if (options.generateComments) {
+    init.push(`${indent}${generateComment('A tag resolves to itself until a language is selected', options)}`);
+  }
+  init.push(`${indent}lv_translation_set_language("${escapeCString(codes[0])}");`);
+  init.push('}');
+
+  return { declarations, init };
+}
+
 /** Component id → typography id, from what the components already carry. */
 function collectStoredAssignments(screens: Screen[]): Map<string, string> {
   const assignments = new Map<string, string>();
@@ -1742,7 +1815,7 @@ function generateTypographyStyles(
 /**
  * Generate ui.c source file
  */
-export function generateUiSource(screens: Screen[], options: CodeGenOptions, theme?: Theme, imageResources: ImageResource[] = [], defaultFont?: string, defaultFontSize?: number, fontResources: FontResource[] = [], useBuiltinSymbols?: boolean, symbolFont?: string, storedTypographies?: Typography[]): string {
+export function generateUiSource(screens: Screen[], options: CodeGenOptions, theme?: Theme, imageResources: ImageResource[] = [], defaultFont?: string, defaultFontSize?: number, fontResources: FontResource[] = [], useBuiltinSymbols?: boolean, symbolFont?: string, storedTypographies?: Typography[], texts: TextResource[] = [], languages: ProjectLanguage[] = []): string {
   const lines: string[] = [];
   
   // Includes
@@ -1839,6 +1912,26 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   const typographyCode = generateTypographyStyles(typographies, typographySymbols, options);
   if (typographyCode.declarations.length > 0) {
     lines.push(...typographyCode.declarations);
+  }
+
+  // Translations. Only emitted when the project has text resources: without
+  // them every widget keeps its literal, which is what it did before.
+  const translationCode = generateTranslations(texts, languages, options);
+  if (translationCode.declarations.length > 0) {
+    lines.push(...translationCode.declarations);
+  }
+  /** Component id → the tag to give it, for the widgets that can carry one. */
+  const componentTags = new Map<string, string>();
+  if (texts.length > 0) {
+    const keyById = new Map(texts.map((text) => [text.id, text.key]));
+    const walkTags = (components: LvglComponent[]) => {
+      for (const comp of components) {
+        const key = comp.textId ? keyById.get(comp.textId) : undefined;
+        if (key) componentTags.set(comp.id, key);
+        walkTags(comp.children ?? []);
+      }
+    };
+    for (const screen of screens) walkTags(screen.components);
   }
 
   // Animation exec-callback wrappers, emitted before any screen init uses them
@@ -1943,7 +2036,7 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   }
 
   for (const screen of screens) {
-    lines.push(generateScreenInitFunc(screen, options, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles));
+    lines.push(generateScreenInitFunc(screen, options, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles, componentTags));
     lines.push('');
   }
   
@@ -1971,7 +2064,19 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     lines.push('');
   }
 
+  if (translationCode.init.length > 0) {
+    lines.push(...translationCode.init);
+    lines.push('');
+  }
+
   lines.push('void ui_init(void) {');
+
+  // Registered before anything else: lv_label_set_translation_tag resolves the
+  // tag immediately, so a label created first would show its tag as its text
+  if (translationCode.init.length > 0) {
+    lines.push(`${indent}ui_translation_init();`);
+    lines.push('');
+  }
 
   // Styles must be initialised before any screen init adds them to a widget
   if (typographyCode.init.length > 0) {
