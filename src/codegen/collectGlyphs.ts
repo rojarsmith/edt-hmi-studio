@@ -231,13 +231,14 @@ export function collectGlyphs(input: CollectGlyphsInput): GlyphCollection {
   };
   for (const screen of screens) indexTree(screen.components);
 
-  const record = (comp: LvglComponent | undefined, source: GlyphSource) => {
+  const record = (comp: LvglComponent | undefined, source: GlyphSource, targetsOverride?: { cFontName: string; size: number }[]) => {
     const points = codePointsOf(source.text);
     if (points.length === 0) return;
 
-    const targets = comp
-      ? resolveFonts(comp, customFontNames, defaultFont, defaultFontSize, typographyById)
-      : [];
+    const targets = targetsOverride
+      ?? (comp
+        ? resolveFonts(comp, customFontNames, defaultFont, defaultFontSize, typographyById)
+        : []);
     if (targets.length === 0) {
       unattributed.push(source);
       return;
@@ -272,13 +273,22 @@ export function collectGlyphs(input: CollectGlyphsInput): GlyphCollection {
       if (comp.textId) {
         const resource = textById.get(comp.textId);
         if (resource) {
+          const typography = comp.typographyId ? typographyById.get(comp.typographyId) : undefined;
           for (const [language, value] of Object.entries(resource.values)) {
+            // A language with a font override renders through that font and
+            // only that font — sending its characters to the base font too
+            // would put the CJK back into the Latin face, which is exactly the
+            // bloat per-language fonts exist to avoid
+            const override = typography?.languageFonts?.[language];
+            const targets = override && !isBuiltinFont(override.fontResource) && customFontNames.has(override.fontResource)
+              ? [{ cFontName: override.fontResource, size: override.fontSize || 16 }]
+              : undefined;
             record(comp, {
               kind: 'widget',
               owner: comp.name,
               field: `${resource.key} [${language}]`,
               text: value,
-            });
+            }, targets);
           }
         }
       }

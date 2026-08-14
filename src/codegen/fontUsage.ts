@@ -81,6 +81,11 @@ export function collectUsedCustomFonts(
   // a compile error pointing at the style, a long way from the missing font.
   for (const typography of typographies) {
     addFont(typography.fontResource, typography.fontSize || IMPLIED_FONT_SIZE);
+    // Language overrides are swapped in at runtime by generated code, so each
+    // one's font must exist whether or not that language is ever selected
+    for (const override of Object.values(typography.languageFonts ?? {})) {
+      addFont(override.fontResource, override.fontSize || IMPLIED_FONT_SIZE);
+    }
   }
 
   return usedFonts;

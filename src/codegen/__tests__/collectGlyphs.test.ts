@@ -299,6 +299,50 @@ describe('collectGlyphs — translations and typographies', () => {
   });
 });
 
+describe('collectGlyphs — per-language typography fonts', () => {
+  /**
+   * A language with a font override renders through that font and only that
+   * font. Sending its characters to the base face too would put the CJK back
+   * into the Latin font — the exact bloat per-language fonts exist to avoid.
+   */
+  it('routes an overridden language\'s characters to the override font only', () => {
+    const label = createComponent('label', {
+      name: 'title', props: { text: 'Hello' }, textId: 't1', typographyId: 'typo1',
+    });
+    const result = collectGlyphs({
+      screens: [createScreen({ components: [label] })],
+      fontResources: [
+        createFontResource({ cFontName: 'font_rajdhani' }),
+        createFontResource({ cFontName: 'font_noto' }),
+      ],
+      texts: [{ id: 't1', key: 'greeting', values: { en: 'Hello', 'zh-TW': '你好' } }],
+      typographies: [{
+        id: 'typo1', name: 'Heading', fontResource: 'font_rajdhani', fontSize: 32,
+        languageFonts: { 'zh-TW': { fontResource: 'font_noto', fontSize: 32 } },
+      }],
+    });
+    const noto = result.byFontSize.get(glyphSetKey('font_noto', 32));
+    const rajdhani = result.byFontSize.get(glyphSetKey('font_rajdhani', 32));
+    expect(noto && String.fromCodePoint(...[...noto.codePoints].sort((a, b) => a - b))).toBe('你好');
+    expect(rajdhani?.codePoints.has(0x4f60)).toBe(false); // 你 stays out of the Latin face
+    expect(rajdhani?.codePoints.has('H'.codePointAt(0)!)).toBe(true);
+  });
+
+  it('keeps a language without an override on the base font', () => {
+    const label = createComponent('label', {
+      name: 'title', props: { text: 'Hello' }, textId: 't1', typographyId: 'typo1',
+    });
+    const result = collectGlyphs({
+      screens: [createScreen({ components: [label] })],
+      fontResources: [createFontResource({ cFontName: 'font_rajdhani' })],
+      texts: [{ id: 't1', key: 'greeting', values: { en: 'Hello', ja: 'こんにちは' } }],
+      typographies: [{ id: 'typo1', name: 'Heading', fontResource: 'font_rajdhani', fontSize: 32 }],
+    });
+    const base = result.byFontSize.get(glyphSetKey('font_rajdhani', 32));
+    expect(base?.codePoints.has('こ'.codePointAt(0)!)).toBe(true);
+  });
+});
+
 describe('collectGlyphs — symbol exclusion', () => {
   // U+F00C is LV_SYMBOL_OK: drawn by the symbol font, absent from any real TTF
   const SYMBOL_OK = '';

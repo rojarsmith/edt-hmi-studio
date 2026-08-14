@@ -196,6 +196,50 @@ describe('widgets carrying a tag', () => {
     expect(result).not.toContain('ui_tr_dropdown_cb');
   });
 
+  describe('per-language typography fonts', () => {
+    const typography = {
+      id: 'typo1', name: 'Heading', fontResource: 'ui_font_rajdhani', fontSize: 32,
+      languageFonts: { 'zh-TW': { fontResource: 'ui_font_noto', fontSize: 32 } },
+    };
+
+    const generateWithTypography = () =>
+      generateUiSource(
+        [createScreen({ name: 'main', components: [
+          createComponent('label', { name: 'title', props: { text: 'Hello' }, textId: 't1', typographyId: 'typo1' }),
+        ] })],
+        defaultOptions({ generateComments: false }),
+        undefined, [], undefined, undefined, [], undefined, undefined,
+        [typography], TEXTS, LANGUAGES,
+      );
+
+    it('swaps the style font by language and reports the change', () => {
+      const result = generateWithTypography();
+      expect(result).toContain('if(lv_streq(lang, "zh-TW")) lv_style_set_text_font(&ui_style_heading, &ui_font_noto_32);');
+      expect(result).toContain('else lv_style_set_text_font(&ui_style_heading, &ui_font_rajdhani_32);');
+      // Without the report, objects using the style keep drawing the old font
+      expect(result).toContain('lv_obj_report_style_change(&ui_style_heading);');
+    });
+
+    it('applies the boot language\'s override from init, not from the first switch', () => {
+      const result = generateWithTypography();
+      const initBody = result.slice(result.indexOf('static void ui_typography_init'));
+      expect(initBody.slice(0, initBody.indexOf('}'))).toContain('ui_typography_apply_language_fonts();');
+    });
+
+    it('listens on one screen, which the full-tree walk guarantees is enough', () => {
+      const result = generateWithTypography();
+      expect(result).toContain('lv_obj_add_event_cb(ui_screen_main, ui_typography_language_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, NULL);');
+    });
+
+    it('emits none of it for typographies without overrides', () => {
+      const result = generate([
+        createComponent('label', { name: 'title', props: { text: 'Hello' }, textId: 't1' }),
+      ]);
+      expect(result).not.toContain('apply_language_fonts');
+      expect(result).not.toContain('ui_typography_language_cb');
+    });
+  });
+
   /** void* converts implicitly in C but not in C++, and generated UI is sometimes built as C++. */
   it('casts the tag out of user data explicitly', () => {
     const result = generate([createComponent('checkbox', { name: 'agree', props: { text: 'x' }, textId: 't1' })]);

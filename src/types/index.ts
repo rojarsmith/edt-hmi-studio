@@ -221,6 +221,20 @@ export interface Typography {
    * see docs/text-typography-evaluation.md §6.
    */
   baseDir?: 'auto' | 'ltr' | 'rtl';
+  /**
+   * Per-language font override, keyed by language code — TouchGFX's
+   * "Language Settings". A language without an entry renders with the base
+   * font above. Generated code swaps the style's font when the language
+   * changes, so 中文 can render in Noto while everything else stays Rajdhani.
+   */
+  languageFonts?: Record<string, TypographyLanguageFont>;
+}
+
+/** One language's font choice inside a typography. */
+export interface TypographyLanguageFont {
+  /** `montserrat_N` for a built-in, or a FontResource's cFontName. */
+  fontResource: string;
+  fontSize: number;
 }
 
 /** `auto` resolves against the base direction, which is what RTL text needs. */

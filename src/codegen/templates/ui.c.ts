@@ -1850,10 +1850,14 @@ function generateTypographyStyles(
   typographies: Typography[],
   symbols: Map<string, string>,
   options: CodeGenOptions,
-): { declarations: string[]; init: string[] } {
+): { declarations: string[]; init: string[]; hasLanguageFonts: boolean } {
   const declarations: string[] = [];
   const init: string[] = [];
-  if (typographies.length === 0) return { declarations, init };
+  const withOverrides = typographies.filter(
+    (typography) => Object.keys(typography.languageFonts ?? {}).length > 0,
+  );
+  const hasLanguageFonts = withOverrides.length > 0;
+  if (typographies.length === 0) return { declarations, init, hasLanguageFonts };
 
   const indent = getIndent(options);
 
@@ -1865,6 +1869,42 @@ function generateTypographyStyles(
     declarations.push(`static lv_style_t ${symbols.get(typography.id)};`);
   }
   declarations.push('');
+
+  if (hasLanguageFonts) {
+    // Defined before ui_typography_init, which calls it so the boot language's
+    // override applies from the first frame rather than the first switch
+    if (options.generateComments) {
+      init.push(generateComment('Swap each typography onto the font its language names', options));
+    }
+    init.push('static void ui_typography_apply_language_fonts(void) {');
+    init.push(`${indent}const char * lang = lv_translation_get_language();`);
+    init.push(`${indent}if(lang == NULL) return;`);
+    for (const typography of withOverrides) {
+      const symbol = symbols.get(typography.id)!;
+      if (options.generateComments) {
+        init.push(`${indent}${generateComment(typography.name, options)}`);
+      }
+      const entries = Object.entries(typography.languageFonts!);
+      entries.forEach(([code, override], index) => {
+        const keyword = index === 0 ? 'if' : 'else if';
+        init.push(
+          `${indent}${keyword}(lv_streq(lang, "${escapeCString(code)}")) lv_style_set_text_font(&${symbol}, &${fontSymbol(override.fontResource, override.fontSize)});`,
+        );
+      });
+      init.push(
+        `${indent}else lv_style_set_text_font(&${symbol}, &${fontSymbol(typography.fontResource, typography.fontSize)});`,
+      );
+      // No object uses the style yet at boot, in which case this is a no-op
+      init.push(`${indent}lv_obj_report_style_change(&${symbol});`);
+    }
+    init.push('}');
+    init.push('');
+    init.push('static void ui_typography_language_cb(lv_event_t * e) {');
+    init.push(`${indent}LV_UNUSED(e);`);
+    init.push(`${indent}ui_typography_apply_language_fonts();`);
+    init.push('}');
+    init.push('');
+  }
 
   init.push('static void ui_typography_init(void) {');
   for (const typography of typographies) {
@@ -1905,9 +1945,12 @@ function generateTypographyStyles(
       );
     }
   }
+  if (hasLanguageFonts) {
+    init.push(`${indent}ui_typography_apply_language_fonts();`);
+  }
   init.push('}');
 
-  return { declarations, init };
+  return { declarations, init, hasLanguageFonts };
 }
 
 /**
@@ -2230,6 +2273,19 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     lines.push(`${indent}${initFunc}();`);
   }
   lines.push('');
+
+  // Per-language typography fonts follow the language through this callback.
+  // One screen is enough: lv_translation_set_language walks every screen of
+  // every display, active or not, so the first screen always hears the event.
+  if (typographyCode.hasLanguageFonts && screens.length > 0) {
+    if (options.generateComments) {
+      lines.push(`${indent}${generateComment('Re-apply per-language typography fonts on language change', options)}`);
+    }
+    lines.push(
+      `${indent}lv_obj_add_event_cb(${getScreenVarName(screens[0].name, options)}, ui_typography_language_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, NULL);`,
+    );
+    lines.push('');
+  }
   
   // Load first screen
   if (screens.length > 0) {

@@ -27,6 +27,7 @@ function isBuiltinFont(name: string): boolean {
 
 const TypographyManager: React.FC = () => {
   const typographies = useEditorStore((s) => s.typographies);
+  const languages = useEditorStore((s) => s.languages);
   const screens = useEditorStore((s) => s.screens);
   const addTypography = useEditorStore((s) => s.addTypography);
   const updateTypography = useEditorStore((s) => s.updateTypography);
@@ -257,6 +258,72 @@ const TypographyManager: React.FC = () => {
               </span>
             )}
           </div>
+
+          {languages.length > 0 && (
+            <div className="detail-section">
+              <label>Language fonts:</label>
+              <span className="typography-hint">
+                A language without an override uses the base font above. Overridden languages get
+                their own font on the device the moment the language switches.
+              </span>
+              {languages.map((language) => {
+                const override = selected.languageFonts?.[language.code];
+                const setOverride = (value?: { fontResource: string; fontSize: number }) => {
+                  const next = { ...(selected.languageFonts ?? {}) };
+                  if (value) next[language.code] = value;
+                  else delete next[language.code];
+                  updateTypography(selected.id, {
+                    languageFonts: Object.keys(next).length > 0 ? next : undefined,
+                  });
+                };
+                return (
+                  <div key={language.code} className="language-font-row">
+                    <span className="language-font-name">{language.name}</span>
+                    <select
+                      value={override?.fontResource ?? ''}
+                      onChange={(event) => {
+                        const fontResource = event.target.value;
+                        if (!fontResource) { setOverride(undefined); return; }
+                        // A built-in font's size is fixed by its name; a custom
+                        // one starts at the base size, the likeliest intent
+                        const builtin = fontResource.match(/^montserrat_(\d+)$/);
+                        setOverride({
+                          fontResource,
+                          fontSize: builtin ? Number(builtin[1]) : selected.fontSize,
+                        });
+                      }}
+                    >
+                      <option value="">Base font</option>
+                      <optgroup label="Built-in">
+                        {BUILTIN_SIZES.map((size) => (
+                          <option key={size} value={`montserrat_${size}`}>Montserrat {size}</option>
+                        ))}
+                      </optgroup>
+                      {fonts.length > 0 && (
+                        <optgroup label="Custom">
+                          {fonts.map((font) => (
+                            <option key={font.id} value={font.cFontName}>{font.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                    {override && !isBuiltinFont(override.fontResource) && (
+                      <select
+                        className="language-font-size"
+                        value={override.fontSize}
+                        onChange={(event) =>
+                          setOverride({ ...override, fontSize: Number(event.target.value) })}
+                      >
+                        {CUSTOM_SIZES.map((size) => (
+                          <option key={size} value={size}>{size}px</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className="typography-usage-note">
             Used by {usageCounts.get(selected.id) ?? 0} widget
