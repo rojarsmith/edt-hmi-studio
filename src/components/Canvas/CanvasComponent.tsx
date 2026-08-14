@@ -3,6 +3,7 @@ import type { LvglComponent, ResizeHandle } from '../../types';
 import { useEditorStore } from '../../store/editorStore';
 import { useAppStore } from '../../store/appStore';
 import { displayTextFor } from '../../utils/componentText';
+import { resolveCanvasFont } from './canvasFont';
 import { useResourceStore } from '../../resources/resourceStore';
 import {
   getImageButtonState,
@@ -64,6 +65,14 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   const shownPlaceholder = displayTextFor(component, 'placeholder', texts, languages, previewLanguage);
   const shownTitle = displayTextFor(component, 'title', texts, languages, previewLanguage);
   const shownOptions = displayTextFor(component, 'options', texts, languages, previewLanguage).split('\n');
+  const typographies = useEditorStore(state => state.typographies);
+  const fontResources = useResourceStore(state => state.fonts);
+  // The face and size the device would use, per the same precedence ui.c emits
+  const canvasFont = resolveCanvasFont(component, typographies, fontResources, languages, previewLanguage);
+  const textFontStyle = {
+    fontFamily: canvasFont.fontFamily,
+    fontSize: canvasFont.fontSize ?? defaultFontSize,
+  };
 
   // Helper: apply shadow opacity to shadow color
   const buildShadowColor = (color?: string, opacity?: number): string => {
@@ -344,7 +353,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             width: '100%',
             height: '100%',
             color: defaultStyle.textColor || '#ffffff',
-            fontSize: props.fontSize || defaultFontSize,
+            ...textFontStyle,
           }}>
             {children}
             {(!children || React.Children.count(children) === 0) && (shownText || 'Button')}
@@ -355,7 +364,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
         return (
           <span className="lvgl-label" style={{
             color: defaultStyle.textColor || '#333333',
-            fontSize: props.fontSize || defaultFontSize,
+            ...textFontStyle,
           }}>{shownText || 'Label'}</span>
         );
       
@@ -451,7 +460,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             }}>
               {props.checked && <span style={{ color: '#fff', fontSize: '12px', lineHeight: 1 }}>✓</span>}
             </div>
-            <span style={{ fontSize: defaultFontSize }}>{shownText || 'Checkbox'}</span>
+            <span style={textFontStyle}>{shownText || 'Checkbox'}</span>
           </div>
         );
       

@@ -17,6 +17,7 @@ import {
   parseFontCoverage,
 } from './converters/fontConverter';
 import { collectGlyphs, glyphSetKey } from '../codegen/collectGlyphs';
+import { ensureFontFaceLoaded } from './fontFaces';
 import { useEditorStore } from '../store/editorStore';
 import { useAppStore } from '../store/appStore';
 import { useProjectStore } from '../store/projectStore';
@@ -41,26 +42,6 @@ const CHARSET_MODES: { id: CharsetMode; label: string; hint: string }[] = [
   },
 ];
 
-/** Track which @font-face rules we've already injected */
-const loadedFontFaces = new Set<string>();
-
-/**
- * Dynamically inject a @font-face rule so the browser can render the uploaded font.
- */
-function ensureFontFaceLoaded(font: FontResource): string {
-  const faceName = `ui-font-${font.id}`;
-  if (loadedFontFaces.has(faceName)) return faceName;
-
-  const format = font.data.startsWith('data:font/opentype') || font.name.toLowerCase().endsWith('.otf')
-    ? 'opentype' : 'truetype';
-
-  const rule = `@font-face { font-family: "${faceName}"; src: url("${font.data}") format("${format}"); font-display: swap; }`;
-  const style = document.createElement('style');
-  style.textContent = rule;
-  document.head.appendChild(style);
-  loadedFontFaces.add(faceName);
-  return faceName;
-}
 
 const BPP_OPTIONS: (1 | 2 | 4 | 8)[] = [1, 2, 4, 8];
 
