@@ -76,6 +76,25 @@ SECTIONS
         __ext_flash_images_end = .;
     } > EXTFLASH
 
+    /* Converted font glyph bitmaps, placed by LV_ATTRIBUTE_LARGE_CONST in the
+       generated font sources. A CJK subset is the largest thing this firmware
+       links, and 1 MB of internal flash cannot hold it beside the code.
+
+       Its own section rather than sharing .ext_flash_images: the two are
+       programmed together but they are different assets, and the placement
+       read back from this map is only useful if a font can be told from an
+       image by the section it landed in. Follows the images with no gap, so
+       objcopy cuts one contiguous binary for the QSPI. */
+    .ext_flash_fonts :
+    {
+        . = ALIGN(4);
+        __ext_flash_fonts_start = .;
+        *(.ext_flash_fonts)
+        *(.ext_flash_fonts.*)
+        . = ALIGN(4);
+        __ext_flash_fonts_end = .;
+    } > EXTFLASH
+
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)

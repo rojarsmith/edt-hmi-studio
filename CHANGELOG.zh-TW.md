@@ -11,6 +11,7 @@
 ## [Unreleased]
 
 ### 變更
+- **Deploy 分頁的配置面板改以位址區間呈現** —— 從 *Image Placement* 更名為 *Asset Placement*，把轉換後的字型與圖片並列，每一項給出起始與結束位址，而不是位址加大小。這個面板要回答的問題是「這個資產是不是從頭到尾都在 QSPI 視窗裡」，兩端直接回答了它；起點與終點落在不同區域的區間現在會明講，而不是只報起點。字型那一列還會帶上字數與平均每字位元組，從實際編譯的那個檔案的 `glyph_dsc[]` 數出來 —— 光看大小無法分辨一個字型大是因為收的字多，還是因為每個字都很貴
 - **Typographies 分頁的字型與大小拆成兩個欄位，不再是一個下拉選單** —— 綁在一起等於一份清單同時承載兩個選擇，想選 24px 得先捲過所有字型，同一個字型的兩個尺寸看起來像兩個字型。Font 現在只列字型家族（Montserrat 出現一次，不是 21 次），Size 改成直接輸入。內建字型只有特定尺寸，所以會吸附到最近的一個並明講
 - **內建的隨附字型可以直接在 Typographies 的字型清單選** —— 不管專案有沒有加過，Noto Sans JP 與 KR 都會出現在「Bundled — added on selection」群組，選下去就會自動加入。以前要 CJK 字型得先繞去 Fonts 分頁再繞回來
 - **元件層級不再有字型設定** —— 屬性編輯器只設定 Typography。在單一元件上設定的字體與大小，對其他應該一致的元件是看不見的，而且只有 Typography 能帶各語系字型。「＋ New typography from this widget」仍然會用元件目前的設定當種子，那就是舊專案搬過來的路徑；既有的元件層級設定也照舊會產生程式碼
@@ -19,6 +20,7 @@
 - **Modbus 的時間設定在 USB 上仍然有意義** —— USB 傳輸沒有 baud rate，所以 Protocol 分頁的那個值改用來推導 RTU 幀間靜默時間，而不是被忽略。Parity 與 stop bits 依 CDC 規定記錄並回報給主機，除此之外不作用
 
 ### 新增
+- **STM32H747I-DISCO 上字型字圖改連結到外部 flash** —— 轉出來的 CJK 子集是這份韌體連結的東西裡最大的一個，1 MB 內部 flash 在放完程式碼之後沒有位置容納它。每個轉換後的字型會把 `LV_ATTRIBUTE_LARGE_CONST`（LVGL 自己掛在那個陣列上的鉤子）重新定義成 `.ext_flash_fonts` section，由 linker script 放進 QSPI NOR；描述元、cmap 與 `lv_font_t` 留在內部 flash，因為它們很小、而且每次查字都會讀到。以 `HMI_FONTS_IN_EXTERNAL_FLASH` 包住，只有真的有地方放的板子才定義，所以同一份轉換結果仍可供 WASM 預覽與沒有外部 flash 的板子使用。已用 ARM 工具鏈驗證：一份 14px Noto Sans TC 子集切成 `.ext_flash_fonts` 0x148 / `.rodata` 0xcc，同一個檔不加定義則是 `.rodata` 0x214
 - **Noto Sans SC 也隨編輯器出貨**，且四款 Noto 字型現在都列在 Typographies 字型下拉選單的 *Built-in* 之下 —— 同一個標題、不管專案加過沒有都在同一個位置，*Project fonts* 則留給作者自己上傳的字型。先前的分法會讓同一個字型因為「用過了沒」而出現在不同標題下，那是編輯器的內部記帳，不是作者做過的選擇。Montserrat 雖與它們並列，本質仍不同：編進 LVGL、不需轉檔、只有 `lv_conf.h` 打開的那幾個尺寸
 - **Noto Sans TC 隨編輯器出貨** —— 繁體中文是這些板子的主要市場，卻是唯一沒有隨附字型的語系，於是專案切到繁體就是一整排缺字方塊，而且字型下拉選單裡沒有任何能解決它的選項。`NotoSansTC-Regular.otf`，OFL-1.1，來源與已隨附的 JP、KR 完全相同（`notofonts/noto-cjk` 的 `Sans/SubsetOTF`）。它走同一套 auto 字元集裁剪進 Flash，所以一套 UI 的中文只佔數十 KB，而不是整套字型的 5.4 MB
 - **元件改用 key 從下拉選單挑選要顯示的文字** —— 屬性編輯器新增 Key 欄位，列出文字表的每一列，綁定元件變成「選一個」而不是「反覆改字面文字直到剛好對上既有的列」。選定 key 後元件的字面文字會更新成它現在顯示的字，那正是解除連結與刪除時的退路

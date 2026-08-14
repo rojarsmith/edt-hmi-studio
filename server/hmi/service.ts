@@ -2,6 +2,7 @@ import process from 'node:process';
 import { existsSync } from 'node:fs';
 import {
   mkdir,
+  readdir,
   readFile,
   realpath,
   stat,
@@ -18,7 +19,8 @@ import {
   type StLinkProbe,
 } from './programmerParser';
 import { writeGeneratedProjectSource } from './projectSource';
-import { parseImageLayout, type ImagePlacement } from './imageLayout';
+import { countFontGlyphs } from '../fontConv';
+import { parseImageLayout, type AssetKind, type ImagePlacement } from './imageLayout';
 import {
   assertBuildId,
   assertSupportedProject,
@@ -598,25 +600,54 @@ export class HmiService {
 
     // project.json is written next to the generated sources and carries the
     // resource list the build was made from, which is what names the arrays.
-    const projectPath = join(buildDirectory, 'project-source', 'project.json');
-    const cArrayNames: string[] = [];
-    const imageNames = new Map<string, string>();
+    const sourceDirectory = join(buildDirectory, 'project-source');
+    const projectPath = join(sourceDirectory, 'project.json');
+    const wanted = new Map<string, AssetKind>();
+    const displayNames = new Map<string, string>();
+    const glyphCounts = new Map<string, number>();
     if (existsSync(projectPath)) {
       const parsed = JSON.parse(await readFile(projectPath, 'utf-8')) as {
-        resources?: { images?: { cArrayName?: string; name?: string }[] };
+        resources?: {
+          images?: { cArrayName?: string; name?: string }[];
+          fonts?: { cFontName?: string; name?: string }[];
+        };
       };
       for (const image of parsed.resources?.images ?? []) {
         if (typeof image.cArrayName === 'string') {
-          cArrayNames.push(image.cArrayName);
-          imageNames.set(image.cArrayName, image.name ?? image.cArrayName);
+          wanted.set(image.cArrayName, 'image');
+          displayNames.set(image.cArrayName, image.name ?? image.cArrayName);
+        }
+      }
+
+      // A font becomes one generated file per size, named `<cFontName>_<size>`,
+      // and which sizes were converted is decided during the build rather than
+      // recorded in the project. Reading the directory back is the only answer
+      // that cannot disagree with what was compiled.
+      const fonts = (parsed.resources?.fonts ?? []).filter(
+        (font): font is { cFontName: string; name?: string } => typeof font.cFontName === 'string',
+      );
+      if (fonts.length > 0 && existsSync(sourceDirectory)) {
+        for (const file of await readdir(sourceDirectory)) {
+          // `ui_font_noto_sans_tc_14.c` splits at the last underscore. Matched
+          // by string rather than a built regex: a cFontName reaches this from
+          // a project file, and regex metacharacters in one would either throw
+          // or match the wrong file
+          const stem = /^(.+)\.c$/.exec(file)?.[1];
+          const split = stem ? /^(.+)_(\d+)$/.exec(stem) : null;
+          if (!stem || !split) continue;
+          const font = fonts.find((candidate) => candidate.cFontName === split[1]);
+          if (!font) continue;
+          wanted.set(stem, 'font');
+          displayNames.set(stem, `${font.name ?? font.cFontName} ${split[2]}px`);
+          // From the file that was compiled, so the count cannot disagree with
+          // the bytes the map reports beside it
+          const glyphs = countFontGlyphs(await readFile(join(sourceDirectory, file), 'utf-8'));
+          if (glyphs !== undefined) glyphCounts.set(stem, glyphs);
         }
       }
     }
 
-    const placements = parseImageLayout(
-      await readFile(mapPath, 'utf-8'),
-      cArrayNames,
-    );
+    const placements = parseImageLayout(await readFile(mapPath, 'utf-8'), wanted);
     const externalImagePath = join(buildDirectory, EXTERNAL_FLASH_ARTIFACT_NAME);
     const board = getBoardDefinition(metadata.boardId as BoardId);
     return {
@@ -629,7 +660,10 @@ export class HmiService {
         : 0,
       images: placements.map((placement) => ({
         ...placement,
-        name: imageNames.get(placement.cArrayName) ?? placement.cArrayName,
+        name: displayNames.get(placement.cArrayName) ?? placement.cArrayName,
+        ...(glyphCounts.has(placement.cArrayName)
+          ? { glyphCount: glyphCounts.get(placement.cArrayName) }
+          : {}),
       })),
     };
   }

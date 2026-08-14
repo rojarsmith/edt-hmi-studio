@@ -11,14 +11,37 @@ export const EXTERNAL_FLASH_END = 0x98000000;
 
 export type MemoryRegion = 'external-flash' | 'internal-flash' | 'other';
 
+/** What a placed asset is, so a font can be told from an image at a glance. */
+export type AssetKind = 'image' | 'font';
+
 export interface ImagePlacement {
-  /** The image's C array name, which is also its generated file's stem. */
+  /** The asset's C array name, which is also its generated file's stem. */
   cArrayName: string;
+  kind: AssetKind;
+  /** First byte. */
   address: number;
+  /**
+   * Last byte, inclusive — `address + size - 1`.
+   *
+   * Reported rather than left to the reader because the question this panel
+   * answers is "does this asset start and end inside the QSPI window", and
+   * two ends of one range answer it directly. A zero-size allocation would
+   * make an inclusive end sit before its start, so it never reaches here:
+   * `consider` drops those.
+   */
+  endAddress: number;
   size: number;
   region: MemoryRegion;
+  /** Region the last byte lands in — the two differ only if a range straddles. */
+  endRegion: MemoryRegion;
   /** Output section the linker placed it in, for the curious. */
   section: string;
+  /**
+   * Glyphs a font carries. Absent for an image, and for a font whose generated
+   * source could not be read back — the count comes from that file, not from
+   * the map.
+   */
+  glyphCount?: number;
 }
 
 export function regionOf(address: number): MemoryRegion {
@@ -49,31 +72,44 @@ function cArrayNameFromObject(objectPath: string): string | null {
 }
 
 /**
- * Every input section contributed by a generated image file, keyed by image.
+ * Every input section contributed by a generated asset file, keyed by asset.
  *
- * An image file contributes more than one section — the pixel array and the
- * small `lv_image_dsc_t` descriptor, plus empty `.text`/`.data`/`.bss` stubs.
- * The pixel data is by far the largest, and it is the part that has to be
- * programmed, so the largest allocation wins.
+ * A generated file contributes more than one section — for an image the pixel
+ * array and the small `lv_image_dsc_t` descriptor, for a font the glyph
+ * bitmaps plus descriptors, cmaps and the `lv_font_t` — along with empty
+ * `.text`/`.data`/`.bss` stubs. The bulk array is by far the largest and is
+ * the part that has to be programmed, so the largest allocation wins.
+ *
+ * `knownCArrayNames` maps each name to what it is. A name absent from it is
+ * ignored, which is what keeps the firmware's own objects out of the table.
  */
 export function parseImageLayout(
   mapText: string,
-  knownCArrayNames: readonly string[],
+  knownCArrayNames: ReadonlyMap<string, AssetKind> | readonly string[],
 ): ImagePlacement[] {
-  const wanted = new Set(knownCArrayNames);
+  // Callers that only have images pass a plain list, as they always did
+  const wanted: ReadonlyMap<string, AssetKind> = Array.isArray(knownCArrayNames)
+    ? new Map(knownCArrayNames.map((name) => [name, 'image' as const]))
+    : (knownCArrayNames as ReadonlyMap<string, AssetKind>);
   const best = new Map<string, ImagePlacement>();
 
   const consider = (section: string, address: number, size: number, object: string) => {
     if (size <= 0) return;
     const cArrayName = cArrayNameFromObject(object);
-    if (!cArrayName || !wanted.has(cArrayName)) return;
+    if (!cArrayName) return;
+    const kind = wanted.get(cArrayName);
+    if (!kind) return;
     const existing = best.get(cArrayName);
     if (existing && existing.size >= size) return;
+    const endAddress = address + size - 1;
     best.set(cArrayName, {
       cArrayName,
+      kind,
       address,
+      endAddress,
       size,
       region: regionOf(address),
+      endRegion: regionOf(endAddress),
       section,
     });
   };

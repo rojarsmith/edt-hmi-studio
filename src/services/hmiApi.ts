@@ -203,13 +203,23 @@ export async function flashHmiBuild(
   return normalizeOperationResult(data);
 }
 
+type MemoryRegion = 'external-flash' | 'internal-flash' | 'other';
+
 export interface HmiImageLayoutEntry {
   cArrayName: string;
   name: string;
+  /** An image's pixel data, or one size of a converted font's glyph bitmaps. */
+  kind: 'image' | 'font';
   address: number;
+  /** Last byte, inclusive. */
+  endAddress: number;
   size: number;
-  region: 'external-flash' | 'internal-flash' | 'other';
+  region: MemoryRegion;
+  /** Region of the last byte; differs from `region` only if a range straddles. */
+  endRegion: MemoryRegion;
   section: string;
+  /** Glyphs a font carries; absent for an image. */
+  glyphCount?: number;
 }
 
 export interface HmiImageLayout {

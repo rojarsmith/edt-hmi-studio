@@ -62,6 +62,11 @@ add_compile_definitions(
     # script places in the QSPI NOR rather than the 1 MB internal flash.
     # See docs/images-external-flash.md.
     HMI_IMAGES_IN_EXTERNAL_FLASH
+    # The same for converted font glyph bitmaps, into .ext_flash_fonts. A CJK
+    # subset is the largest thing this firmware links; 1 MB of internal flash
+    # cannot hold it beside the code. Board-specific on purpose — a board with
+    # no external flash must not define this.
+    HMI_FONTS_IN_EXTERNAL_FLASH
 )
 
 # LVGL reads lv_conf.h through this directory-level include path.  Directory
@@ -184,22 +189,27 @@ set_property(TARGET firmware APPEND PROPERTY
     LINK_DEPENDS "${BOARD_ROOT}/STM32H747XIHx_FLASH.ld"
 )
 
-# .ext_flash_images sits at 0x90000000, four gigabytes past the internal flash.
-# A plain `objcopy -O binary` pads the gap, so the two images have to be cut
-# apart: firmware.bin is the internal image with that section removed, and
-# firmware_extflash.bin is the section on its own, programmed through the
-# MT25TL01G external loader. The .hex drops it too — CubeProgrammer would
-# otherwise try to write those records without a loader loaded.
+# The external-flash sections sit at 0x90000000, four gigabytes past the
+# internal flash. A plain `objcopy -O binary` pads the gap, so the two images
+# have to be cut apart: firmware.bin is the internal image with those sections
+# removed, and firmware_extflash.bin is the sections on their own, programmed
+# through the MT25TL01G external loader. The .hex drops them too —
+# CubeProgrammer would otherwise try to write those records without a loader
+# loaded. Both sections are named on every command: one missed here is either
+# megabytes of padding in the internal image or a font that is never written.
 add_custom_command(TARGET firmware POST_BUILD
     COMMAND "${CMAKE_SIZE}" "$<TARGET_FILE:firmware>"
     COMMAND "${CMAKE_OBJCOPY}" -O ihex
         --remove-section .ext_flash_images
+        --remove-section .ext_flash_fonts
         "$<TARGET_FILE:firmware>" "${HMI_ARTIFACT_DIR}/firmware.hex"
     COMMAND "${CMAKE_OBJCOPY}" -O binary
         --remove-section .ext_flash_images
+        --remove-section .ext_flash_fonts
         "$<TARGET_FILE:firmware>" "${HMI_ARTIFACT_DIR}/firmware.bin"
     COMMAND "${CMAKE_OBJCOPY}" -O binary
         -j .ext_flash_images
+        -j .ext_flash_fonts
         "$<TARGET_FILE:firmware>" "${HMI_ARTIFACT_DIR}/firmware_extflash.bin"
     VERBATIM
 )

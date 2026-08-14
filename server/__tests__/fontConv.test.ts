@@ -10,6 +10,8 @@ import {
   hashFontData,
   convertFonts,
   FALLBACK_RANGE,
+  placeGlyphBitmapInExternalFlash,
+  countFontGlyphs,
 } from '../fontConv';
 
 const base = { fontFile: '/tmp/f.ttf', outFile: '/tmp/f_16.c', size: 16, bpp: 4 };
@@ -177,5 +179,74 @@ describe('resolveLvFontConvEntry', () => {
     const entry = resolveLvFontConvEntry();
     expect(entry).toMatch(/lv_font_conv\.js$/);
     expect(existsSync(entry)).toBe(true);
+  });
+});
+
+describe('placeGlyphBitmapInExternalFlash', () => {
+  const DECL = 'static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {';
+
+  it('redefines the hook LVGL already puts on the bitmaps', () => {
+    const out = placeGlyphBitmapInExternalFlash(`#include "lvgl.h"\n\n${DECL}\n0x00\n};\n`);
+    expect(out).toContain('#  define LV_ATTRIBUTE_LARGE_CONST __attribute__((section(".ext_flash_fonts")))');
+    expect(out).toContain(DECL);
+  });
+
+  it('guards it, so the same file still serves a board with no external flash', () => {
+    const out = placeGlyphBitmapInExternalFlash(`${DECL}\n};\n`);
+    expect(out).toContain('#ifdef HMI_FONTS_IN_EXTERNAL_FLASH');
+    // The WASM preview and the F746 compile this too and define nothing
+    expect(out.indexOf('#ifdef HMI_FONTS_IN_EXTERNAL_FLASH')).toBeLessThan(out.indexOf(DECL));
+  });
+
+  it('touches only the bitmaps, leaving the descriptors in internal flash', () => {
+    // They are read on every glyph lookup; a memory-mapped QSPI read is the
+    // wrong place for them, and they are small
+    const source = `${DECL}\n};\nstatic const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {\n};\n`;
+    const out = placeGlyphBitmapInExternalFlash(source);
+    expect(out).toContain('static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {');
+    expect(out.match(/#ifdef HMI_FONTS_IN_EXTERNAL_FLASH/g)).toHaveLength(1);
+  });
+
+  it('leaves a file it does not recognise exactly as it was', () => {
+    const source = 'static const uint8_t something_else[] = {};\n';
+    expect(placeGlyphBitmapInExternalFlash(source)).toBe(source);
+  });
+});
+
+describe('countFontGlyphs', () => {
+  const font = (...entries: string[]) => `
+static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
+    {.bitmap_index = 0, .adv_w = 0, .box_w = 0, .box_h = 0, .ofs_x = 0, .ofs_y = 0} /* id = 0 reserved */,
+${entries.join(',\n')}
+};
+`;
+
+  it('does not count the reserved id 0, which draws the missing-glyph box', () => {
+    const source = font(
+      '    {.bitmap_index = 0, .adv_w = 163, .box_w = 8, .box_h = 11, .ofs_x = 1, .ofs_y = 0}',
+      '    {.bitmap_index = 44, .adv_w = 124, .box_w = 8, .box_h = 8, .ofs_x = 0, .ofs_y = 0}',
+    );
+    expect(countFontGlyphs(source)).toBe(2);
+  });
+
+  it('reads a font carrying nothing but the reserved entry as none', () => {
+    expect(countFontGlyphs(`
+static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
+    {.bitmap_index = 0, .adv_w = 0, .box_w = 0, .box_h = 0, .ofs_x = 0, .ofs_y = 0} /* id = 0 reserved */
+};
+`)).toBe(0);
+  });
+
+  it('says nothing rather than guessing when the array is not there', () => {
+    expect(countFontGlyphs('static const uint8_t glyph_bitmap[] = {};')).toBeUndefined();
+  });
+
+  it('stops at the end of the array, ignoring anything after it', () => {
+    const source = `${font('    {.bitmap_index = 0, .adv_w = 1, .box_w = 1, .box_h = 1, .ofs_x = 0, .ofs_y = 0}')}
+static const lv_font_fmt_txt_glyph_dsc_t other[] = {
+    {.bitmap_index = 9, .adv_w = 9, .box_w = 9, .box_h = 9, .ofs_x = 0, .ofs_y = 0}
+};
+`;
+    expect(countFontGlyphs(source)).toBe(1);
   });
 });

@@ -85,3 +85,58 @@ describe('parseImageLayout', () => {
     expect(parseImageLayout('Linker script and memory map\n', names)).toEqual([]);
   });
 });
+
+/**
+ * A converted font contributes its glyph bitmaps to .ext_flash_fonts and its
+ * small descriptors to internal flash, so both appear against the same object.
+ */
+const FONT_MAP = String.raw`
+Linker script and memory map
+
+ .rodata.glyph_dsc
+                0x08041000       0x40 CMakeFiles/firmware.dir/C_/tmp/src/ui_font_noto_sans_tc_14.c.obj
+ .ext_flash_fonts
+                0x90010000    0x30000 CMakeFiles/firmware.dir/C_/tmp/src/ui_font_noto_sans_tc_14.c.obj
+ .ext_flash_images
+                0x90000000     0x4000 CMakeFiles/firmware.dir/C_/tmp/src/ui_img_probe.c.obj
+`;
+
+describe('font glyph bitmaps', () => {
+  const known = new Map<string, 'image' | 'font'>([
+    ['ui_font_noto_sans_tc_14', 'font'],
+    ['ui_img_probe', 'image'],
+  ]);
+
+  it('are reported as their own asset, not folded into the images', () => {
+    const layout = parseImageLayout(FONT_MAP, known);
+    const font = layout.find((entry) => entry.cArrayName === 'ui_font_noto_sans_tc_14');
+    expect(font?.kind).toBe('font');
+    expect(layout.find((entry) => entry.cArrayName === 'ui_img_probe')?.kind).toBe('image');
+  });
+
+  it('report the bitmaps, not the descriptors that share the object', () => {
+    // Largest allocation wins: the descriptors are in internal flash and
+    // picking them would say the font is not in the QSPI at all
+    const font = parseImageLayout(FONT_MAP, known)[1];
+    expect(font.section).toBe('.ext_flash_fonts');
+    expect(font.address).toBe(0x90010000);
+  });
+
+  it('carry an inclusive end, so a range can be read off directly', () => {
+    const font = parseImageLayout(FONT_MAP, known)[1];
+    expect(font.endAddress).toBe(0x9003ffff);
+    expect(font.endRegion).toBe('external-flash');
+  });
+
+  it('flag a range whose end leaves the region its start is in', () => {
+    const straddling = String.raw`
+Linker script and memory map
+
+ .ext_flash_fonts
+                0x97fff000     0x4000 CMakeFiles/firmware.dir/C_/tmp/src/ui_font_big_14.c.obj
+`;
+    const [entry] = parseImageLayout(straddling, new Map([['ui_font_big_14', 'font' as const]]));
+    expect(entry.region).toBe('external-flash');
+    expect(entry.endRegion).toBe('other');
+  });
+});

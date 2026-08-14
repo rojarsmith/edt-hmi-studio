@@ -42,6 +42,7 @@ an `lv_image_dsc_t.data` pointer into `0x9xxxxxxx` reads like any other pointer.
 | `board.c` | An MPU region typing the window as Normal, cacheable, read-only, and `board_external_flash_init()` which brings up the QSPI and enables memory mapped mode |
 | `CMakeLists.txt` post-build | Splits the ELF into `firmware.bin`/`.hex` (external section removed) and `firmware_extflash.bin` (that section alone) |
 | `service.ts` | Programs `firmware_extflash.bin` through the external loader, then the internal image. The address and the loader name both come from the board definition's `externalFlash`, so a board with none skips the step |
+| `fontConv.ts` | Redefines `LV_ATTRIBUTE_LARGE_CONST` in each converted font to `section(".ext_flash_fonts")` under `HMI_FONTS_IN_EXTERNAL_FLASH`, moving the glyph bitmaps the same way |
 
 Only images the project actually uses are emitted at all —
 `collectUsedImageResources` in `projectSource.ts` already walked the screens for
@@ -50,6 +51,34 @@ that, and it predates this change.
 `--gc-sections` still applies. An image whose data nothing references is
 dropped by the linker rather than occupying external flash, which is why the
 descriptor has to be reachable from live code for its pixels to survive.
+
+### 2.1 Fonts travel the same road, in their own section
+
+A converted CJK font is the largest thing this firmware links — larger than any
+image, and far larger than 1 MB of internal flash has to spare beside the code.
+The glyph bitmaps go to external flash by the same mechanism, with two
+differences worth stating.
+
+**The hook is LVGL's own.** `lv_font_conv` already marks the one large array
+`LV_ATTRIBUTE_LARGE_CONST`, and `lv_conf.h` defines that empty. The converted
+file redefines it just above the array, so the change is confined to that
+translation unit — LVGL's built-in Montserrat faces compile in the library
+target where the macro is still empty and stay in internal flash, which is
+where a font that is a few kilobytes belongs.
+
+**Only the bitmaps move.** `glyph_dsc`, the cmaps and the `lv_font_t` are small
+and are read on every glyph lookup; leaving them in internal flash keeps that
+lookup off the memory-mapped QSPI. Compiling one 14px Noto Sans TC subset for
+Cortex-M7 splits it `.ext_flash_fonts` 0x148 / `.rodata` 0xcc, and the same
+file built without the define is `.rodata` 0x214 — the two add up, which is the
+check that nothing else moved.
+
+`.ext_flash_fonts` is its own output section rather than more of
+`.ext_flash_images`. They are programmed together as one contiguous binary, but
+the placement read back from the map is only useful if a font can be told from
+an image by where it landed. Every `objcopy` command names both sections; one
+missed there is either megabytes of padding in the internal image or a font
+that is never written.
 
 ## 3. Two things that are easy to get wrong
 

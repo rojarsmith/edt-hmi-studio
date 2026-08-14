@@ -104,6 +104,17 @@ export interface FontCacheKeySpec {
  * output does not miss the cache: symbols are deduplicated and sorted, ranges
  * trimmed, lowercased and sorted.
  */
+/**
+ * Bumped whenever the post-processing below changes what a converted font
+ * looks like.
+ *
+ * Without it the cache is keyed only on the font and its glyphs, so an entry
+ * written before a change would be served afterwards — and a font that quietly
+ * lost its section attribute would link into internal flash with nothing to
+ * say so.
+ */
+const POST_PROCESS_VERSION = 'ext-flash-fonts-1';
+
 export function fontCacheKey(spec: FontCacheKeySpec): string {
   const ranges = spec.ranges
     .split(',')
@@ -119,9 +130,80 @@ export function fontCacheKey(spec: FontCacheKeySpec): string {
     .update(String(spec.size)).update('\0')
     .update(String(spec.bpp)).update('\0')
     .update(ranges).update('\0')
-    .update(symbols)
+    .update(symbols).update('\0')
+    .update(POST_PROCESS_VERSION)
     .digest('hex')
     .slice(0, 32);
+}
+
+/**
+ * Section the glyph bitmaps are linked into when the firmware asks for it.
+ *
+ * Matched by an output section in the board's linker script and cut out of the
+ * internal-flash image by objcopy — the same arrangement image pixel data
+ * already uses, under its own name so the two can be told apart in a map.
+ */
+export const EXTERNAL_FLASH_FONT_SECTION = '.ext_flash_fonts';
+
+/** lv_font_conv's one large array, and the only line worth moving. */
+const GLYPH_BITMAP_DECL = 'static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[]';
+
+/**
+ * Let the firmware link a converted font's glyph bitmaps into external flash.
+ *
+ * `LV_ATTRIBUTE_LARGE_CONST` is LVGL's own hook for exactly this, and lv_conf.h
+ * defines it empty, so redefining it here changes this translation unit and
+ * nothing else — LVGL's built-in Montserrat faces compile in the library target
+ * where it stays empty.
+ *
+ * The redefinition is `#ifdef`-guarded on a symbol only a board that has
+ * somewhere to put them defines, so the same converted file still serves the
+ * WASM preview and any board without external flash.
+ *
+ * Only the bitmaps move. The descriptors, cmaps and the `lv_font_t` are small
+ * and are read on every glyph lookup, so they stay in internal flash where the
+ * access is not a memory-mapped QSPI read.
+ */
+/**
+ * How many glyphs a converted font actually carries.
+ *
+ * Counted from `glyph_dsc[]` rather than from the `U+` comments in the bitmap,
+ * because the comments are a formatting detail of an uncompressed conversion
+ * while the descriptor array is the structure LVGL indexes at runtime. Its
+ * first entry is the reserved id 0 — the box drawn for a character the font
+ * does not have — and is not a glyph.
+ *
+ * The count is what makes the placement panel's byte figure mean something: a
+ * size alone cannot say whether a font is large because it covers a lot or
+ * because each glyph is expensive.
+ */
+export function countFontGlyphs(cSource: string): number | undefined {
+  const start = cSource.indexOf('glyph_dsc[] = {');
+  if (start === -1) return undefined;
+  const end = cSource.indexOf('};', start);
+  if (end === -1) return undefined;
+
+  const entries = cSource.slice(start, end).match(/\{\s*\.bitmap_index\s*=/g)?.length ?? 0;
+  return entries > 0 ? entries - 1 : undefined;
+}
+
+export function placeGlyphBitmapInExternalFlash(cSource: string): string {
+  if (!cSource.includes(GLYPH_BITMAP_DECL)) return cSource;
+
+  const preamble = [
+    '/* Glyph bitmaps are the bulk of a converted font — a CJK subset dwarfs',
+    ' * everything else the firmware links. A board that defines',
+    ' * HMI_FONTS_IN_EXTERNAL_FLASH has a QSPI NOR to put them in; every other',
+    ' * build, the WASM preview included, leaves the attribute empty and keeps',
+    ' * them alongside the code. See docs/images-external-flash.md. */',
+    '#ifdef HMI_FONTS_IN_EXTERNAL_FLASH',
+    '#  undef LV_ATTRIBUTE_LARGE_CONST',
+    `#  define LV_ATTRIBUTE_LARGE_CONST __attribute__((section("${EXTERNAL_FLASH_FONT_SECTION}")))`,
+    '#endif',
+    '',
+  ].join('\n');
+
+  return cSource.replace(GLYPH_BITMAP_DECL, `${preamble}${GLYPH_BITMAP_DECL}`);
 }
 
 /** Digest of the font file bytes. Computed once per font, reused for each size. */
@@ -230,7 +312,9 @@ export async function convertFonts(
         );
       }
 
-      const cContent = await readFile(outFile, 'utf-8');
+      // Annotated before caching, so every consumer of the cache gets the same
+      // file. The annotation is inert unless the firmware asks for it.
+      const cContent = placeGlyphBitmapInExternalFlash(await readFile(outFile, 'utf-8'));
       result[`${outName}.c`] = cContent;
 
       // Populate the cache last, so a failed run never leaves a usable entry.

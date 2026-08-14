@@ -397,12 +397,15 @@ const DeployPanel: React.FC = () => {
               <div className="hmi-panel-card-title">
                 <div>
                   <h3>
-                    Image Placement
+                    Asset Placement
                     <span className="hwinfo-dev-badge">Factory Dev Mode</span>
                   </h3>
                   <p>
-                    Where each flashed image sits in memory, read from the
-                    linker map of the build above rather than predicted.
+                    Where each flashed image and font glyph bitmap sits in
+                    memory, as the range it occupies, read from the linker map
+                    of the build above rather than predicted. A row whose start
+                    and end are both in external flash is entirely in the QSPI
+                    NOR.
                   </p>
                 </div>
               </div>
@@ -413,7 +416,7 @@ const DeployPanel: React.FC = () => {
                 </p>
               ) : layout.images.length === 0 ? (
                 <p className="deploy-placement-empty">
-                  This project flashes no images.
+                  This project flashes no images or custom fonts.
                 </p>
               ) : (
                 <>
@@ -424,15 +427,28 @@ const DeployPanel: React.FC = () => {
                     <span>
                       External flash image: {formatSize(layout.externalImageBytes)}
                     </span>
-                    <span>{layout.images.length} images</span>
+                    <span>
+                      {layout.images.filter((entry) => entry.kind === 'image').length} images,{' '}
+                      {layout.images.filter((entry) => entry.kind === 'font').length} fonts
+                    </span>
+                    {layout.images.some(
+                      (entry) => entry.region !== 'external-flash'
+                        || entry.endRegion !== 'external-flash',
+                    ) && (
+                      <span className="deploy-region-int">
+                        not all of it is in external flash
+                      </span>
+                    )}
                   </div>
                   <div className="tag-table-wrap">
                     <table className="deploy-placement-table">
                       <thead>
                         <tr>
-                          <th>Image</th>
-                          <th>Address</th>
+                          <th>Asset</th>
+                          <th>Start</th>
+                          <th>End</th>
                           <th>Size</th>
+                          <th>Glyphs</th>
                           <th>Memory</th>
                           <th>Section</th>
                         </tr>
@@ -442,18 +458,43 @@ const DeployPanel: React.FC = () => {
                           <tr key={entry.cArrayName}>
                             <td>
                               {entry.name}
-                              <span className="deploy-carray">{entry.cArrayName}</span>
+                              <span className="deploy-carray">
+                                {entry.kind === 'font' ? 'font · ' : 'image · '}
+                                {entry.cArrayName}
+                              </span>
                             </td>
                             <td className="deploy-mono">{formatAddress(entry.address)}</td>
+                            <td className="deploy-mono">{formatAddress(entry.endAddress)}</td>
                             <td>{formatSize(entry.size)}</td>
+                            <td>
+                              {entry.glyphCount === undefined ? (
+                                <span className="deploy-carray">—</span>
+                              ) : (
+                                <>
+                                  {entry.glyphCount}
+                                  {/* The average is what a size alone cannot say:
+                                      whether a font is large because it covers a
+                                      lot or because each glyph is expensive */}
+                                  <span className="deploy-carray">
+                                    ~{formatSize(Math.round(entry.size / entry.glyphCount))} each
+                                  </span>
+                                </>
+                              )}
+                            </td>
                             <td
                               className={
                                 entry.region === 'external-flash'
+                                  && entry.endRegion === 'external-flash'
                                   ? 'deploy-region-ext'
                                   : 'deploy-region-int'
                               }
                             >
-                              {REGION_LABEL[entry.region] ?? entry.region}
+                              {/* Both ends, because a range that starts in one
+                                  region and ends in another is the failure this
+                                  panel exists to make visible */}
+                              {entry.region === entry.endRegion
+                                ? REGION_LABEL[entry.region] ?? entry.region
+                                : `${REGION_LABEL[entry.region] ?? entry.region} → ${REGION_LABEL[entry.endRegion] ?? entry.endRegion}`}
                             </td>
                             <td className="deploy-mono">{entry.section}</td>
                           </tr>
