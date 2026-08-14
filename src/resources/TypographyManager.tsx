@@ -51,9 +51,16 @@ function fontResourceFor(family: string, size: number): string {
 /**
  * Font family picker.
  *
- * Bundled fonts are listed whether or not the project has added them, and
- * choosing one adds it: needing CJK coverage should be one selection here, not
- * a detour through the Fonts tab and back.
+ * Everything that ships with the studio sits under one heading whether or not
+ * the project has added it, and choosing an unadded one adds it. The earlier
+ * split — a "bundled" group that emptied into a "project fonts" group as fonts
+ * were used — showed the same font under two headings depending on internal
+ * state, which is the editor's bookkeeping rather than anything the author
+ * chose. *Project fonts* now means only what the author uploaded.
+ *
+ * Montserrat is grouped with them but is not the same kind of thing: it is
+ * compiled into LVGL, so it needs no conversion and exists only at the sizes
+ * lv_conf.h switches on. The others are converted per size, charset-trimmed.
  */
 function FontFamilySelect({
   value,
@@ -72,11 +79,19 @@ function FontFamilySelect({
 }): React.ReactNode {
   const [adding, setAdding] = useState(false);
 
-  // Only the ones still missing: an added bundled font is an ordinary
-  // FontResource and already appears under Project fonts
-  const missing = BUNDLED_FONTS.filter(
-    (spec) => !fonts.some((font) => font.bundled === spec.id),
-  );
+  // Only what the author uploaded. A bundled font already has its entry above,
+  // in the same place whether or not it has been added yet
+  const uploaded = fonts.filter((font) => !font.bundled);
+
+  /**
+   * A bundled font's entry carries its catalogue id until it exists as a
+   * resource, and its C name afterwards — so the option keeps its place in the
+   * list while what selecting it has to do changes.
+   */
+  const bundledValue = (spec: BundledFontSpec): string => {
+    const added = fonts.find((font) => font.bundled === spec.id);
+    return added ? added.cFontName : `${BUNDLED_PREFIX}${spec.id}`;
+  };
 
   const handleChange = async (raw: string) => {
     if (!raw.startsWith(BUNDLED_PREFIX)) {
@@ -101,18 +116,14 @@ function FontFamilySelect({
       {baseLabel !== undefined && <option value="">{baseLabel}</option>}
       <optgroup label="Built-in">
         <option value={MONTSERRAT}>Montserrat</option>
+        {BUNDLED_FONTS.map((spec) => (
+          <option key={spec.id} value={bundledValue(spec)}>{spec.label}</option>
+        ))}
       </optgroup>
-      {fonts.length > 0 && (
+      {uploaded.length > 0 && (
         <optgroup label="Project fonts">
-          {fonts.map((font) => (
+          {uploaded.map((font) => (
             <option key={font.id} value={font.cFontName}>{font.name}</option>
-          ))}
-        </optgroup>
-      )}
-      {missing.length > 0 && (
-        <optgroup label="Bundled — added on selection">
-          {missing.map((spec) => (
-            <option key={spec.id} value={`${BUNDLED_PREFIX}${spec.id}`}>{spec.label}</option>
           ))}
         </optgroup>
       )}

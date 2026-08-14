@@ -32,7 +32,37 @@ export interface BundledFontSpec {
 /** Subdirectory of public/ (and of the served root) holding the font files. */
 export const BUNDLED_FONT_DIR = 'fonts';
 
+/**
+ * Listed in the order the font dropdowns show them, most relevant to these
+ * boards first. `languages` is catalogue metadata in standard spellings — a
+ * project's own language code reaches `lv_translation_set_language()` verbatim
+ * and need not appear here for the font to be usable with it.
+ */
 export const BUNDLED_FONTS: BundledFontSpec[] = [
+  {
+    id: 'noto-sans-tc',
+    label: 'Noto Sans TC',
+    file: 'NotoSansTC-Regular.otf',
+    family: 'Noto Sans TC',
+    style: 'Regular',
+    cFontName: 'ui_font_noto_sans_tc',
+    languages: ['zh-TW', 'zh-Hant'],
+    license: 'OFL-1.1',
+    description:
+      'Traditional Chinese — the safe, complete choice. Google Noto CJK, Traditional Chinese build. Japanese kanji is not a substitute: the forms are Japanese variants and some Traditional-only characters are missing.',
+  },
+  {
+    id: 'noto-sans-sc',
+    label: 'Noto Sans SC',
+    file: 'NotoSansSC-Regular.otf',
+    family: 'Noto Sans SC',
+    style: 'Regular',
+    cFontName: 'ui_font_noto_sans_sc',
+    languages: ['zh-CN', 'zh-Hans'],
+    license: 'OFL-1.1',
+    description:
+      'Simplified Chinese — Google Noto CJK, Simplified Chinese build. Shares its design with the TC build, so a project carrying both scripts stays visually consistent.',
+  },
   {
     id: 'noto-sans-jp',
     label: 'Noto Sans JP',
@@ -54,21 +84,6 @@ export const BUNDLED_FONTS: BundledFontSpec[] = [
     languages: ['ko'],
     license: 'OFL-1.1',
     description: 'Korean — all modern Hangul syllables. Google Noto CJK, Korean build.',
-  },
-  {
-    id: 'noto-sans-tc',
-    label: 'Noto Sans TC',
-    file: 'NotoSansTC-Regular.otf',
-    family: 'Noto Sans TC',
-    style: 'Regular',
-    cFontName: 'ui_font_noto_sans_tc',
-    // Standard spellings. The field is catalogue metadata — a project's own
-    // language code reaches lv_translation_set_language() verbatim and need
-    // not appear here for the font to be usable with it.
-    languages: ['zh-TW', 'zh-Hant'],
-    license: 'OFL-1.1',
-    description:
-      'Traditional Chinese — the safe, complete choice. Google Noto CJK, Traditional Chinese build. Japanese kanji is not a substitute: the forms are Japanese variants and some Traditional-only characters are missing.',
   },
 ];
 

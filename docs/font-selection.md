@@ -59,14 +59,20 @@ what makes a large font affordable in the first place.
   **BIZ UDPGothic** (OFL, universal-design, drawn for high legibility)
 - Korean: **Noto Sans KR**; **Pretendard** (OFL, close in feel to Inter)
 
-**Noto Sans TC, JP and KR ship with EDT GUI Studio** — the Fonts panel lists
-them under *Bundled fonts*, and so does the Typographies font dropdown, one
-selection from becoming a project resource. They go through the same auto
-charset trimming as an uploaded font, so a UI's worth of Chinese, Japanese or
-Korean text costs tens of kilobytes of Flash, not the megabytes of the full
-face. The files live in `public/fonts/` next to their OFL licence; project
-saves store only a reference and re-read the payload from the app, so autosaves
-stay small.
+**Noto Sans TC, SC, JP and KR ship with EDT GUI Studio** — the Typographies
+font dropdown lists them under *Built-in*, alongside Montserrat and in the same
+place whether or not the project has added one; selecting an unadded one adds
+it. The Fonts panel lists them too, under *Bundled fonts*. They go through the
+same auto charset trimming as an uploaded font, so a UI's worth of Chinese,
+Japanese or Korean text costs tens of kilobytes of Flash, not the megabytes of
+the full face. The files live in `public/fonts/` next to their OFL licence;
+project saves store only a reference and re-read the payload from the app, so
+autosaves stay small.
+
+Montserrat is grouped with them but is not the same kind of thing: it is
+compiled into LVGL, needs no conversion, and exists only at the sizes
+`lv_conf.h` switches on. The Noto faces are converted per size and trimmed to
+the characters the project uses.
 
 Reaching for Noto Sans JP to render Traditional Chinese is a mistake worth
 naming: it carries kanji, so common characters appear and it looks as though it

@@ -49,6 +49,12 @@ describe('bundled font catalog', () => {
     // was why switching to 繁體 rendered a row of tofu with nothing in the
     // dropdown to fix it
     expect(languages).toContain('zh-TW');
+    expect(languages).toContain('zh-CN');
+  });
+
+  it('lists Traditional Chinese first, the primary market for these boards', () => {
+    // Array order is display order in both font dropdowns
+    expect(BUNDLED_FONTS[0].id).toBe('noto-sans-tc');
   });
 
   it('ships every file it lists, as a real font, next to its license', () => {
