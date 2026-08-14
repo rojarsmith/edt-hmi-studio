@@ -54,7 +54,7 @@ const DOWNLOADABLE_ARTIFACT_NAMES = [
   'firmware.bin',
 ] as const;
 
-type BuildStatus = 'building' | 'succeeded' | 'failed';
+export type BuildStatus = 'building' | 'succeeded' | 'failed';
 
 interface BuildMetadata {
   buildId: string;
@@ -104,6 +104,17 @@ export interface HmiImageLayoutResult {
   externalFlashBase: string;
   externalImageBytes: number;
   images: HmiImageLayoutEntry[];
+}
+
+export interface HmiBuildStatusResult {
+  success: boolean;
+  buildId: string;
+  boardId: string;
+  status: BuildStatus;
+  createdAt: string;
+  updatedAt: string;
+  error?: string;
+  artifacts?: HmiArtifact[];
 }
 
 export interface HmiFlashResult {
@@ -532,6 +543,40 @@ export class HmiService {
         error: message,
       };
     }
+  }
+
+  /**
+   * Metadata for one build, as recorded by `buildProject`.
+   *
+   * The poll path for long builds: `buildProject` runs the compile and writes
+   * the outcome whether or not the response socket survives it, so a client
+   * that will not hold a connection open for the whole build can POST, let the
+   * connection go, and follow the status here until it leaves 'building'.
+   */
+  async getBuildStatus(buildIdValue: unknown): Promise<HmiBuildStatusResult> {
+    assertBuildId(buildIdValue);
+    const buildDirectory = resolveBuildDirectory(
+      this.paths.buildRoot,
+      buildIdValue,
+    );
+    const metadata = await readBuildMetadata(buildDirectory);
+    return {
+      success: true,
+      buildId: metadata.buildId,
+      boardId: metadata.boardId,
+      status: metadata.status,
+      createdAt: metadata.createdAt,
+      updatedAt: metadata.updatedAt,
+      ...(metadata.error === undefined ? {} : { error: metadata.error }),
+      ...(metadata.status === 'succeeded'
+        ? {
+            artifacts: await collectArtifacts(
+              buildDirectory,
+              metadata.buildId,
+            ),
+          }
+        : {}),
+    };
   }
 
   /**

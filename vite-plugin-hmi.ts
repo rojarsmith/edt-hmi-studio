@@ -30,6 +30,11 @@ function sendJson(
   statusCode: number,
   body: unknown,
 ): void {
+  // A build outlives most sockets; when the client has already given up,
+  // writing would only raise 'error' on a destroyed stream.
+  if (response.destroyed || response.writableEnded) {
+    return;
+  }
   response.statusCode = statusCode;
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.setHeader('Cache-Control', 'no-store');
@@ -107,15 +112,27 @@ function createHmiMiddleware(
   service: HmiService,
 ): Connect.NextHandleFunction {
   return async (request, response, next) => {
-    const requestUrl = new URL(
-      request.url || '/',
-      'http://127.0.0.1',
-    );
-    const path = requestUrl.pathname;
+    let path: string;
+    try {
+      path = new URL(request.url || '/', 'http://127.0.0.1').pathname;
+    } catch {
+      sendJson(response, 400, {
+        success: false,
+        error: 'Invalid request URL',
+      });
+      return;
+    }
     if (!path.startsWith('/api/hmi/')) {
       next();
       return;
     }
+
+    // A client that gives up mid-build tears the socket down while the
+    // handler is still awaiting; the next write then emits 'error' on these
+    // streams, and without a listener that is an uncaught exception that
+    // takes the whole dev server with it.
+    request.on('error', () => {});
+    response.on('error', () => {});
 
     try {
       assertLocalOrigin(request);
@@ -175,6 +192,16 @@ function createHmiMiddleware(
           body.probeSerial,
         );
         sendJson(response, 200, result);
+        return;
+      }
+
+      const statusMatch = path.match(/^\/api\/hmi\/builds\/([^/]+)$/);
+      if (statusMatch) {
+        if (request.method !== 'GET') {
+          methodNotAllowed(response, 'GET');
+          return;
+        }
+        sendJson(response, 200, await service.getBuildStatus(statusMatch[1]));
         return;
       }
 
@@ -245,6 +272,19 @@ function installHmiMiddleware(
 export default function hmiPlugin(): Plugin {
   return {
     name: 'lvgl-hmi-local-bridge',
+    config() {
+      return {
+        server: {
+          watch: {
+            // Firmware builds churn thousands of short-lived toolchain files
+            // in these trees. Watched, every build backs the watcher up for
+            // minutes, and chokidar racing the archiver for a temp file dies
+            // on EBUSY — an unhandled 'error' that kills the dev server.
+            ignored: ['**/.hmi-builds/**', '**/.hmi-cache/**'],
+          },
+        },
+      };
+    },
     configureServer(server) {
       installHmiMiddleware(server);
     },
