@@ -590,6 +590,11 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         groupId: s.groupId ?? null,
       })),
       screenGroups: (data.screenGroups || []).map(g => ({ ...g })),
+      // Without these an exported project loses every translation and named
+      // style on the way out, and import re-derives a single-language table
+      typographies: (data.typographies || []).map(t => ({ ...t })),
+      languages: (data.languages || []).map(l => ({ ...l })),
+      texts: (data.texts || []).map(t => ({ ...t, values: { ...t.values } })),
       resources: { images, fonts },
       variables: data.variables.map(v => ({
         id: v.id,
@@ -660,6 +665,10 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       screens: migrated.screens,
       screenGroups: (file.screenGroups || []).map(g => ({ ...g })),
       typographies: migrated.typographies,
+      // A file that carries its own translations keeps them; one that does not
+      // gets a table derived on first load, as the read-side migration does
+      languages: file.languages || [],
+      texts: file.texts || [],
       logicGraphs: file.logicGraphs || [],
       variables: (file.variables || []).map(v => ({ ...v, type: v.type as string })),
     });

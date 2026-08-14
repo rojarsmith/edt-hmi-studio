@@ -6,6 +6,7 @@ import type { ImageResource, FontResource } from '../resources/types';
 import type { CodeGenOptions, GeneratedCode } from './types';
 import { DEFAULT_CODEGEN_OPTIONS } from './types';
 import { generateUiHeader } from './templates/ui.h';
+import { deriveTypographies } from './typography';
 import { generateUiSource } from './templates/ui.c';
 import { generateEventsHeader } from './templates/ui_events.h';
 import { generateEventsSource } from './templates/ui_events.c';
@@ -35,10 +36,16 @@ export function generateCode(
   texts: TextResource[] = [],
   languages: ProjectLanguage[] = []
 ): GeneratedCode {
+  // The same stored-or-derived rule ui.c applies internally: ui.h must declare
+  // fonts for exactly the typography set ui.c initialises.
+  const effectiveTypographies = typographies?.length
+    ? typographies
+    : deriveTypographies(screens, defaultFont, defaultFontSize).typographies;
+
   const opts: CodeGenOptions = { ...DEFAULT_CODEGEN_OPTIONS, ...options };
   
   return {
-    'ui.h': generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols),
+    'ui.h': generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols, effectiveTypographies),
     'ui.c': generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont, typographies, texts, languages),
     'ui_events.h': generateEventsHeader(screens, opts),
     'ui_events.c': generateEventsSource(screens, opts),
@@ -67,10 +74,14 @@ export function generateSingleFile(
   languages: ProjectLanguage[] = []
 ): string {
   const opts: CodeGenOptions = { ...DEFAULT_CODEGEN_OPTIONS, ...options };
-  
+  // Same stored-or-derived rule as generateCode, for the same reason
+  const effectiveTypographies = typographies?.length
+    ? typographies
+    : deriveTypographies(screens, defaultFont, defaultFontSize).typographies;
+
   switch (fileName) {
     case 'ui.h':
-      return generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols);
+      return generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols, effectiveTypographies);
     case 'ui.c':
       return generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont, typographies, texts, languages);
     case 'ui_events.h':

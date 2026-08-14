@@ -45,6 +45,9 @@ const CompilePreview: React.FC = () => {
   const screens = useEditorStore((s) => s.screens);
   const canvas = useEditorStore((s) => s.canvas);
   const logicGraphs = useLogicEditorStore((s) => s.graphs);
+  const typographies = useEditorStore((s) => s.typographies);
+  const projectLanguages = useEditorStore((s) => s.languages);
+  const projectTexts = useEditorStore((s) => s.texts);
   const { images: imageResources, fonts: fontResources } = useResourceStore();
   const currentProjectId = useAppStore((s) => s.currentProjectId);
   const getProjectConfig = useProjectStore((s) => s.getProjectConfig);
@@ -69,8 +72,8 @@ const CompilePreview: React.FC = () => {
 
   // Generate C code from current editor state
   const generateCCode = useCallback(() => {
-    return generateCode(screens, {}, logicGraphs, undefined, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont);
-  }, [screens, logicGraphs, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont]);
+    return generateCode(screens, {}, logicGraphs, undefined, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, typographies, projectTexts, projectLanguages);
+  }, [screens, logicGraphs, typographies, projectTexts, projectLanguages, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont]);
 
   // Render framebuffer to canvas
   const renderFramebuffer = useCallback((fbData: Uint8Array, width: number, height: number) => {
@@ -182,12 +185,14 @@ const CompilePreview: React.FC = () => {
     }
 
     // Which font+size combinations exist at all, from what the widgets select
-    const usedFontSizes = collectUsedCustomFonts(screens, fontResources, projectDefaultFont, projectDefaultFontSize);
+    const usedFontSizes = collectUsedCustomFonts(screens, fontResources, projectDefaultFont, projectDefaultFontSize, typographies);
     // Which characters each of them has to be able to draw
     const glyphs = collectGlyphs({
       screens,
       fontResources,
       logicGraphs,
+      texts: projectTexts,
+      typographies,
       defaultFont: projectDefaultFont,
       defaultFontSize: projectDefaultFontSize,
     });
@@ -234,7 +239,7 @@ const CompilePreview: React.FC = () => {
       setStatus('done');
       setStatusMessage('Build succeeded (no runtime)');
     }
-  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, screens, logicGraphs, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
+  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
 
   // Handle stop button
   const handleStop = useCallback(() => {

@@ -148,6 +148,37 @@ describe('declarations and conversions cover the same (font, size) pairs', () =>
     expect(pairsOf(requests)).toEqual([`${FONT}@16`, `${FONT}@48`]);
   });
 
+  it('agrees when a typography names a font no widget prop mentions', () => {
+    // ui_typography_init takes the font's address regardless of use, so the
+    // declaration set and the conversion set must both include it
+    const fonts = [autoFont(), createFontResource({ cFontName: 'font_heading', charsetMode: 'auto' })];
+    const typographies = [
+      { id: 'typo1', name: 'Heading', fontResource: 'font_heading', fontSize: 32 },
+    ];
+    const screens = [
+      createScreen({ components: [createComponent('label', { name: 'l', props: { text: 'A', fontResource: FONT, fontSize: 16 } })] }),
+    ];
+    const usedSizes = collectUsedCustomFonts(screens, fonts, undefined, undefined, typographies);
+    const requests = buildFontCompileRequests(fonts, usedSizes, collectGlyphs({ screens, fontResources: fonts, typographies }));
+    expect(pairsOf(requests)).toEqual(pairsFrom(usedSizes));
+    expect(pairsOf(requests)).toContain('font_heading@32');
+  });
+
+  it('carries translation characters into the conversion request', () => {
+    const font = autoFont();
+    const screens = [
+      createScreen({
+        components: [createComponent('label', { name: 'l', props: { text: 'Hello', fontResource: FONT, fontSize: 16 }, textId: 't1' })],
+      }),
+    ];
+    const texts = [{ id: 't1', key: 'greeting', values: { en: 'Hello', 'zh-TW': '你好' } }];
+    const usedSizes = collectUsedCustomFonts(screens, [font]);
+    const requests = buildFontCompileRequests([font], usedSizes, collectGlyphs({ screens, fontResources: [font], texts }));
+    const symbols = requests[0].variants.find((v) => v.size === 16)?.symbols ?? '';
+    expect(symbols).toContain('你');
+    expect(symbols).toContain('好');
+  });
+
   it('agrees across several fonts and styles', () => {
     const fonts = [autoFont(), createFontResource({ cFontName: 'font_other', charsetMode: 'auto' })];
     const screens = [

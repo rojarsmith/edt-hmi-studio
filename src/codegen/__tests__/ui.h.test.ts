@@ -135,6 +135,19 @@ describe('generateUiHeader', () => {
     expect(result).not.toContain('LV_FONT_DECLARE');
   });
 
+  /**
+   * Every stored typography is initialised by ui_typography_init and its style
+   * takes the font's address, whether or not a widget uses it yet — so a font
+   * only a typography names still needs its declaration.
+   */
+  it('declares a font referenced only by a typography', () => {
+    const font = createFontResource({ cFontName: 'font_roboto', sizes: [16] });
+    const result = generateUiHeader([], defaultOptions(), [font], undefined, undefined, undefined, [
+      { id: 'typo1', name: 'Heading', fontResource: 'font_roboto', fontSize: 32 },
+    ]);
+    expect(result).toContain('LV_FONT_DECLARE(font_roboto_32);');
+  });
+
   it('generates font section header when comments enabled', () => {
     const font = createFontResource({ cFontName: 'font_roboto' });
     const result = generateUiHeader(

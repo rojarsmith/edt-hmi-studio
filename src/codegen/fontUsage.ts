@@ -7,7 +7,7 @@
 // Shared so ui.h's declarations, the WASM preview's conversion requests and the
 // firmware build all agree — see docs/charset-trimming-design.md §8.
 
-import type { LvglComponent, Screen } from '../types';
+import type { LvglComponent, Screen, Typography } from '../types';
 import type { FontResource } from '../resources/types';
 
 /** Size assumed when a widget selects a font without stating a size. */
@@ -28,6 +28,7 @@ export function collectUsedCustomFonts(
   fontResources: FontResource[],
   defaultFont?: string,
   defaultFontSize?: number,
+  typographies: Typography[] = [],
 ): Map<string, Set<number>> {
   const usedFonts = new Map<string, Set<number>>();
   const customFontNames = new Set(fontResources.map((f) => f.cFontName));
@@ -73,6 +74,14 @@ export function collectUsedCustomFonts(
   // The project default is always converted: every screen sets it, whether or
   // not any widget names it explicitly
   if (defaultFont) addFont(defaultFont, defaultFontSize || IMPLIED_FONT_SIZE);
+
+  // Every stored typography is initialised by ui_typography_init and its style
+  // takes the font's address, whether or not any widget uses it yet. A font
+  // referenced only here would otherwise be neither declared nor converted —
+  // a compile error pointing at the style, a long way from the missing font.
+  for (const typography of typographies) {
+    addFont(typography.fontResource, typography.fontSize || IMPLIED_FONT_SIZE);
+  }
 
   return usedFonts;
 }

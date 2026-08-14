@@ -7,7 +7,7 @@
 // Nothing here decides the final glyph set on its own: the conversion adds an
 // unconditional ASCII baseline and the author's declared extras on top (§4).
 
-import type { LvglComponent, Screen } from '../types';
+import type { LvglComponent, Screen, TextResource, Typography } from '../types';
 import type { FontResource } from '../resources/types';
 import type { LogicGraph, LogicNode } from '../components/LogicEditor/types';
 
@@ -48,6 +48,11 @@ export interface CollectGlyphsInput {
   screens: Screen[];
   fontResources: FontResource[];
   logicGraphs?: LogicGraph[];
+  /** Shared text. A linked widget must cover every language's words, since the
+   * device can switch at any moment. */
+  texts?: TextResource[];
+  /** Widgets assigned a typography render with its font, not their own. */
+  typographies?: Typography[];
   /** Project default font — `montserrat_N` for a built-in, or a cFontName. */
   defaultFont?: string;
   defaultFontSize?: number;
@@ -163,12 +168,19 @@ function resolveFonts(
   customFontNames: Set<string>,
   defaultFont?: string,
   defaultFontSize?: number,
+  typographyById?: Map<string, Typography>,
 ): { cFontName: string; size: number }[] {
   const out: { cFontName: string; size: number }[] = [];
   const add = (name: string | undefined, size: number | undefined) => {
     if (!name || isBuiltinFont(name) || !customFontNames.has(name)) return;
     out.push({ cFontName: name, size: size || IMPLIED_FONT_SIZE });
   };
+
+  // An assigned typography's shared style is what actually renders the text,
+  // and it may name a font no widget prop mentions. Over-inclusive as ever:
+  // the props paths stay attributed too.
+  const typography = comp.typographyId ? typographyById?.get(comp.typographyId) : undefined;
+  if (typography) add(typography.fontResource, typography.fontSize);
 
   const props = comp.props ?? {};
   if (props.fontResource) {
@@ -202,7 +214,7 @@ function literalTextOf(node: LogicNode): string | undefined {
  * Collect the glyphs every custom font in a project has to be able to draw.
  */
 export function collectGlyphs(input: CollectGlyphsInput): GlyphCollection {
-  const { screens, fontResources, logicGraphs = [], defaultFont, defaultFontSize } = input;
+  const { screens, fontResources, logicGraphs = [], texts = [], typographies = [], defaultFont, defaultFontSize } = input;
   const customFontNames = new Set(fontResources.map((f) => f.cFontName));
 
   const byFontSize = new Map<string, FontGlyphSet>();
@@ -224,7 +236,7 @@ export function collectGlyphs(input: CollectGlyphsInput): GlyphCollection {
     if (points.length === 0) return;
 
     const targets = comp
-      ? resolveFonts(comp, customFontNames, defaultFont, defaultFontSize)
+      ? resolveFonts(comp, customFontNames, defaultFont, defaultFontSize, typographyById)
       : [];
     if (targets.length === 0) {
       unattributed.push(source);
@@ -243,11 +255,32 @@ export function collectGlyphs(input: CollectGlyphsInput): GlyphCollection {
     }
   };
 
+  const typographyById = new Map(typographies.map((typography) => [typography.id, typography]));
+  const textById = new Map(texts.map((text) => [text.id, text]));
+
   // 1. Static text on widgets
   const walk = (components: LvglComponent[]) => {
     for (const comp of components) {
       for (const { field, text } of textsOfComponent(comp)) {
         record(comp, { kind: 'widget', owner: comp.name, field, text });
+      }
+
+      // A linked widget renders its text resource, and the device can switch
+      // language at any moment — so every language's words belong to this
+      // widget's fonts, not only the literal it was drawn with. This is what
+      // puts 你好 into the font when the label was authored as "Hello".
+      if (comp.textId) {
+        const resource = textById.get(comp.textId);
+        if (resource) {
+          for (const [language, value] of Object.entries(resource.values)) {
+            record(comp, {
+              kind: 'widget',
+              owner: comp.name,
+              field: `${resource.key} [${language}]`,
+              text: value,
+            });
+          }
+        }
       }
 
       // 2. Text set at runtime by a built-in event action

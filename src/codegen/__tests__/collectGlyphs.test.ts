@@ -241,6 +241,64 @@ describe('collectGlyphs — font attribution', () => {
   });
 });
 
+describe('collectGlyphs — translations and typographies', () => {
+  /**
+   * The device can switch language at any moment, so a linked widget's fonts
+   * must cover every language's words — not only the literal it was drawn
+   * with. This is what puts 你好 into the font when the label says "Hello".
+   */
+  it('collects every language of a linked widget\'s text resource', () => {
+    const label = createComponent('label', {
+      name: 'greet',
+      props: { text: 'Hello', fontResource: FONT, fontSize: 16 },
+      textId: 't1',
+    });
+    const result = collectGlyphs({
+      screens: [createScreen({ components: [label] })],
+      fontResources: [createFontResource({ cFontName: FONT })],
+      texts: [{ id: 't1', key: 'greeting', values: { en: 'Hello', 'zh-TW': '你好' } }],
+    });
+    const chars = charsOf(result);
+    expect(chars).toContain('你');
+    expect(chars).toContain('好');
+    expect(chars).toContain('H');
+  });
+
+  it('ignores a textId whose resource no longer exists', () => {
+    const label = createComponent('label', {
+      name: 'greet',
+      props: { text: 'Hello', fontResource: FONT, fontSize: 16 },
+      textId: 'gone',
+    });
+    const result = collectGlyphs({
+      screens: [createScreen({ components: [label] })],
+      fontResources: [createFontResource({ cFontName: FONT })],
+      texts: [],
+    });
+    expect(charsOf(result)).toBe('Helo');
+  });
+
+  /**
+   * An assigned typography's shared style is what actually renders the text,
+   * and it may name a font no widget prop mentions — the words must follow it.
+   */
+  it('attributes a widget\'s text to its assigned typography\'s font', () => {
+    const label = createComponent('label', {
+      name: 'title',
+      props: { text: '溫度' },
+      typographyId: 'typo1',
+    });
+    const result = collectGlyphs({
+      screens: [createScreen({ components: [label] })],
+      fontResources: [createFontResource({ cFontName: 'font_noto' })],
+      typographies: [{ id: 'typo1', name: 'Heading', fontResource: 'font_noto', fontSize: 32 }],
+    });
+    const set = result.byFontSize.get(glyphSetKey('font_noto', 32));
+    expect(set).toBeDefined();
+    expect(String.fromCodePoint(...[...set!.codePoints].sort((a, b) => a - b))).toBe('度溫');
+  });
+});
+
 describe('collectGlyphs — symbol exclusion', () => {
   // U+F00C is LV_SYMBOL_OK: drawn by the symbol font, absent from any real TTF
   const SYMBOL_OK = '';

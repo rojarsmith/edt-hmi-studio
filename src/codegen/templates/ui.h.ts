@@ -1,6 +1,6 @@
 // ui.h template generator
 
-import type { Screen, LvglComponent } from '../../types';
+import type { Screen, LvglComponent, Typography } from '../../types';
 import type { FontResource } from '../../resources/types';
 import type { CodeGenOptions } from '../types';
 import { collectUsedCustomFonts } from '../fontUsage';
@@ -40,7 +40,7 @@ function getAllComponents(screens: Screen[]): { component: LvglComponent; screen
 /**
  * Generate ui.h header file
  */
-export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fonts: FontResource[] = [], defaultFont?: string, defaultFontSize?: number, useBuiltinSymbols?: boolean): string {
+export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fonts: FontResource[] = [], defaultFont?: string, defaultFontSize?: number, useBuiltinSymbols?: boolean, typographies: Typography[] = []): string {
   const lines: string[] = [];
   
   // Includes
@@ -49,7 +49,7 @@ export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fon
 
   // Font declarations — only declare custom font+size combos actually used
   if (fonts.length > 0) {
-    const usedFonts = collectUsedCustomFonts(screens, fonts, defaultFont, defaultFontSize);
+    const usedFonts = collectUsedCustomFonts(screens, fonts, defaultFont, defaultFontSize, typographies);
 
     if (usedFonts.size > 0) {
       if (options.generateComments) {

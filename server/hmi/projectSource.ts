@@ -188,6 +188,9 @@ export async function writeGeneratedProjectSource(
   const fontResources = projectFile.resources.fonts ?? [];
   const lvglConfig = projectFile.lvglConfig;
   const logicGraphs = projectFile.logicGraphs ?? [];
+  const typographies = projectFile.typographies ?? [];
+  const projectLanguages = projectFile.languages ?? [];
+  const projectTexts = projectFile.texts ?? [];
   const codeOptions = { lvglVersion: '9' as const };
 
   const generatedCode = generateCode(
@@ -201,6 +204,9 @@ export async function writeGeneratedProjectSource(
     lvglConfig?.defaultFontSize,
     lvglConfig?.useBuiltinSymbols,
     lvglConfig?.symbolFont,
+    typographies,
+    projectTexts,
+    projectLanguages,
   );
   const generatedBindings = generateHmiBindings(
     screens,
@@ -226,11 +232,14 @@ export async function writeGeneratedProjectSource(
     fontResources,
     lvglConfig?.defaultFont,
     lvglConfig?.defaultFontSize,
+    typographies,
   );
   const glyphs = collectGlyphs({
     screens,
     fontResources,
     logicGraphs,
+    texts: projectTexts,
+    typographies,
     defaultFont: lvglConfig?.defaultFont,
     defaultFontSize: lvglConfig?.defaultFontSize,
   });

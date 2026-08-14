@@ -78,6 +78,8 @@ const FontManager: React.FC = () => {
 
   // The project's text, so `auto` coverage can be shown as it is edited
   const screens = useEditorStore((s) => s.screens);
+  const projectTexts = useEditorStore((s) => s.texts);
+  const projectTypographies = useEditorStore((s) => s.typographies);
   const logicGraphs = useLogicEditorStore((s) => s.graphs);
   const currentProjectId = useAppStore((s) => s.currentProjectId);
   const getProjectConfig = useProjectStore((s) => s.getProjectConfig);
@@ -96,8 +98,8 @@ const FontManager: React.FC = () => {
   // Widgets that set no font of their own are drawn with the project default,
   // so without it most of a project's text would look unattributed
   const glyphs = useMemo(
-    () => collectGlyphs({ screens, fontResources: fonts, logicGraphs, defaultFont, defaultFontSize }),
-    [screens, fonts, logicGraphs, defaultFont, defaultFontSize],
+    () => collectGlyphs({ screens, fontResources: fonts, logicGraphs, texts: projectTexts, typographies: projectTypographies, defaultFont, defaultFontSize }),
+    [screens, fonts, logicGraphs, projectTexts, projectTypographies, defaultFont, defaultFontSize],
   );
 
   const fileInputRef = useRef<HTMLInputElement>(null);

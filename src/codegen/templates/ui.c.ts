@@ -1965,7 +1965,20 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   }
 
   // Collect used custom font + size combinations and add LV_FONT_DECLARE
-  const usedCustomFonts = collectUsedCustomFonts(screens, fontResources, defaultFont, defaultFontSize);
+  // Resolved before the font declarations, which must cover typography fonts:
+  // every stored typography is initialised whether or not a widget uses it, so
+  // a font it names has to be declared even if no widget prop mentions it.
+  // Stored ones win — a migrated project carries the author's naming, and
+  // deriving again would throw it away. Deriving is the fallback for a project
+  // file written before typographies existed.
+  const { typographies, assignments } = storedTypographies?.length
+    ? {
+        typographies: storedTypographies,
+        assignments: collectStoredAssignments(screens),
+      }
+    : deriveTypographies(screens, defaultFont, defaultFontSize);
+
+  const usedCustomFonts = collectUsedCustomFonts(screens, fontResources, defaultFont, defaultFontSize, typographies);
   if (usedCustomFonts.size > 0) {
     lines.push('');
     if (options.generateComments) {
@@ -1980,16 +1993,8 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   }
   lines.push('');
 
-  // Typographies: one shared lv_style_t per distinct text style in the project.
-  // Stored ones win — a project that has been migrated carries the author's
-  // naming, and deriving again would throw it away. Deriving is the fallback
-  // for a project file written before typographies existed.
-  const { typographies, assignments } = storedTypographies?.length
-    ? {
-        typographies: storedTypographies,
-        assignments: collectStoredAssignments(screens),
-      }
-    : deriveTypographies(screens, defaultFont, defaultFontSize);
+  // Typographies: one shared lv_style_t per distinct text style in the project
+  // (resolved above, before the font declarations they feed).
   const typographySymbols = new Map<string, string>();
   const takenSymbols = new Set<string>();
   for (const typography of typographies) {
