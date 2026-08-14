@@ -19,6 +19,8 @@ import {
   parseFontMetadata,
   migrateFontResource,
 } from './converters/fontConverter';
+import type { BundledFontSpec } from './bundledFonts';
+import { loadBundledFontData } from './bundledFontLoader';
 
 // Generate unique ID
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -95,6 +97,8 @@ interface ResourceState {
   
   // Actions - Fonts
   addFont: (file: File) => Promise<FontResource>;
+  /** Add a font that ships with the app. Returns the existing resource if already added. */
+  addBundledFont: (spec: BundledFontSpec) => Promise<FontResource>;
   updateFont: (id: string, updates: Partial<FontResource>) => void;
   deleteFont: (id: string) => void;
   getFontById: (id: string) => FontResource | undefined;
@@ -227,10 +231,39 @@ export const useResourceStore = create<ResourceState>((set, get) => ({
     set(state => ({
       fonts: [...state.fonts, newFont],
     }));
-    
+
     return newFont;
   },
-  
+
+  addBundledFont: async (spec: BundledFontSpec) => {
+    const existing = get().fonts.find((font) => font.bundled === spec.id);
+    if (existing) return existing;
+
+    const { data, size } = await loadBundledFontData(spec.file);
+
+    const newFont: FontResource = {
+      id: generateId(),
+      name: spec.label,
+      family: spec.family,
+      style: spec.style,
+      sizes: [16],
+      charsetMode: 'auto',
+      charset: 'ascii',
+      bpp: 4,
+      data,
+      bundled: spec.id,
+      cFontName: spec.cFontName,
+      size,
+      createdAt: Date.now(),
+    };
+
+    set(state => ({
+      fonts: [...state.fonts, newFont],
+    }));
+
+    return newFont;
+  },
+
   updateFont: (id, updates) => {
     set(state => ({
       fonts: state.fonts.map(font =>

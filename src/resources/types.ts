@@ -49,6 +49,11 @@ export interface FontResource {
   customChars?: string;
   bpp: 1 | 2 | 4 | 8;
   data: string; // Base64 encoded TTF/OTF
+  /**
+   * Catalog id when this font ships with the app (see `bundledFonts.ts`).
+   * Persisted copies of such fonts drop `data` and rehydrate it on load.
+   */
+  bundled?: string;
   cFontName: string;
   size: number; // File size in bytes
   createdAt: number;

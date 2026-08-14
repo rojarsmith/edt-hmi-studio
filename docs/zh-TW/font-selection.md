@@ -54,6 +54,12 @@
   **BIZ UDPGothic**（OFL，通用設計，為高辨識度而繪）
 - 韓文：**Noto Sans KR**；**Pretendard**（OFL，風格接近 Inter）
 
+**Noto Sans JP 與 Noto Sans KR 已隨附於 EDT GUI Studio** —— Fonts 面板的
+*Bundled fonts* 區塊列出兩者，一鍵即成為專案資源。它們走與上傳字型相同的
+auto 字元集裁剪，一套 UI 的日文或韓文字只佔數十 KB Flash，而非整套字型的
+數 MB。檔案位於 `public/fonts/`，OFL 授權文件在旁；專案存檔只存參照、
+載入時由應用程式補回 payload，因此自動存檔保持輕量。
+
 ## 6. 阿拉伯文 —— 以及一個 LVGL 陷阱
 
 對照 `lv_text_ap.c` 的映射表確認過：LVGL 的 `LV_USE_ARABIC_PERSIAN_CHARS` 會把基本

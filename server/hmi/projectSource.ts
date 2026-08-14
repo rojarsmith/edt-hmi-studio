@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import sharp from 'sharp';
@@ -14,6 +14,7 @@ import {
 } from '../../src/resources/converters/imageConverter';
 import type { ProjectFile } from '../../src/resources/types';
 import type { ImageResource } from '../../src/resources/types';
+import { BUNDLED_FONT_DIR, hydrateBundledFonts } from '../../src/resources/bundledFonts';
 import type { LvglComponent, Screen } from '../../src/types';
 import type { CommunicationConfig } from '../../src/types/hmi';
 import { isRecord } from './validation';
@@ -185,7 +186,17 @@ export async function writeGeneratedProjectSource(
   const screens = projectFile.screens as Screen[];
   const communication = projectFile.communication as CommunicationConfig;
   const imageResources = projectFile.resources.images ?? [];
-  const fontResources = projectFile.resources.fonts ?? [];
+  // A client that persists bundled fonts without their payload may post them
+  // that way too; the server owns the same files, so read them from disk. A
+  // used font that stays dataless would only fail later inside lv_font_conv
+  // with a far worse message.
+  const fontResources = await hydrateBundledFonts(
+    projectFile.resources.fonts ?? [],
+    async (file) => {
+      const bytes = await readFile(join(process.cwd(), 'public', BUNDLED_FONT_DIR, file));
+      return `data:font/opentype;base64,${bytes.toString('base64')}`;
+    },
+  );
   const lvglConfig = projectFile.lvglConfig;
   const logicGraphs = projectFile.logicGraphs ?? [];
   const typographies = projectFile.typographies ?? [];

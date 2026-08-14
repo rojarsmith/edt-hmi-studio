@@ -9,6 +9,8 @@ import type { LogicGraph } from '../components/LogicEditor/types';
 import { applyTypographies } from '../codegen/typography';
 import { applyTextResources } from '../codegen/textResources';
 import { migrateFontResource } from '../resources/converters/fontConverter';
+import { hydrateBundledFonts, stripBundledFontData } from '../resources/bundledFonts';
+import { loadBundledFontData } from '../resources/bundledFontLoader';
 import type {
   BoardId,
   CanBusConfig,
@@ -487,13 +489,26 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     }
     const resources = await dbGetProjectResources(id);
     const images: ImageResource[] = [];
-    const fonts: FontResource[] = [];
+    const storedFonts: FontResource[] = [];
     for (const r of resources) {
       if (r.type === 'image') images.push(r.data as ImageResource);
       // A font stored before charsetMode existed has none, and the panel reads
       // that field directly
-      else if (r.type === 'font') fonts.push(migrateFontResource(r.data as FontResource));
+      else if (r.type === 'font') storedFonts.push(migrateFontResource(r.data as FontResource));
     }
+
+    // Bundled fonts are stored without their payload; read it back from the
+    // app's own files. A failed read leaves the font dataless rather than
+    // failing the whole open — the canvas falls back and the panel still lists
+    // the resource.
+    const fonts = await hydrateBundledFonts(storedFonts, async (file) => {
+      try {
+        return (await loadBundledFontData(file)).data;
+      } catch (error) {
+        console.error('Failed to load bundled font:', error);
+        return '';
+      }
+    });
 
     // Opening a stored project is the common path, and it has to migrate for
     // the same reason opening a file does: a project saved before typographies
@@ -557,11 +572,12 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       newIds.add(resId);
       await dbPutResource({ id: resId, projectId, type: 'image', data: img });
     }
-    // Upsert fonts
+    // Upsert fonts. Bundled ones are stored without their payload — loading
+    // reads it back from the app's own files, so autosaves stay small.
     for (const font of fonts) {
       const resId = `${projectId}-font-${font.id}`;
       newIds.add(resId);
-      await dbPutResource({ id: resId, projectId, type: 'font', data: font });
+      await dbPutResource({ id: resId, projectId, type: 'font', data: stripBundledFontData(font) });
     }
     // Delete removed resources
     for (const id of existingIds) {
@@ -683,7 +699,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       // Same reason as the typographies above: a font imported from an older
       // file carries no charsetMode, and the panel reads that field directly
       const font = migrateFontResource(rawFont);
-      await dbPutResource({ id: `${id}-font-${font.id}`, projectId: id, type: 'font', data: font });
+      // Same shape syncResources writes: a bundled font's payload comes from
+      // the app, not the database
+      await dbPutResource({ id: `${id}-font-${font.id}`, projectId: id, type: 'font', data: stripBundledFontData(font) });
     }
 
     await get().refreshList();

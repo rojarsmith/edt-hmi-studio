@@ -7,6 +7,80 @@
   gap: 12px;
 }
 
+/* Bundled fonts — the catalog of fonts that ship with the app */
+.bundled-fonts {
+  background: #f8f9fb;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bundled-fonts-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bundled-font-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: white;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.bundled-font-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bundled-font-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.bundled-font-desc {
+  font-size: 11px;
+  color: #777;
+}
+
+.bundled-font-add {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border: 1px solid #4a90d9;
+  border-radius: 4px;
+  background: white;
+  color: #4a90d9;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.bundled-font-add:hover:not(:disabled) {
+  background: #4a90d9;
+  color: white;
+}
+
+.bundled-font-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bundled-fonts-license {
+  font-size: 10px;
+  color: #999;
+}
+
 /* Font List */
 .font-list {
   display: grid;

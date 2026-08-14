@@ -18,6 +18,7 @@ import {
 } from './converters/fontConverter';
 import { collectGlyphs, glyphSetKey } from '../codegen/collectGlyphs';
 import { ensureFontFaceLoaded } from './fontFaces';
+import { BUNDLED_FONTS, type BundledFontSpec } from './bundledFonts';
 import { useEditorStore } from '../store/editorStore';
 import { useAppStore } from '../store/appStore';
 import { useProjectStore } from '../store/projectStore';
@@ -49,6 +50,7 @@ const FontManager: React.FC = () => {
   const {
     getFilteredFonts,
     addFont,
+    addBundledFont,
     deleteFont,
     updateFont,
     selectedResourceId,
@@ -110,6 +112,25 @@ const FontManager: React.FC = () => {
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const [addingBundled, setAddingBundled] = useState<string | null>(null);
+  const bundledAvailable = BUNDLED_FONTS.filter(
+    (spec) => !fonts.some((font) => font.bundled === spec.id),
+  );
+
+  const handleAddBundled = async (spec: BundledFontSpec) => {
+    setAddingBundled(spec.id);
+    try {
+      const font = await addBundledFont(spec);
+      setSelectedResource(font.id);
+      toast.success(`Added ${spec.label}`);
+    } catch (error) {
+      console.error('Failed to add bundled font:', error);
+      toast.error(`Failed to add ${spec.label}`);
+    } finally {
+      setAddingBundled(null);
+    }
   };
   
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -281,7 +302,33 @@ const FontManager: React.FC = () => {
           style={{ display: 'none' }}
         />
       </div>
-      
+
+      {/* Fonts that ship with the app, one click away from being a resource */}
+      {bundledAvailable.length > 0 && (
+        <div className="bundled-fonts">
+          <div className="bundled-fonts-title">Bundled fonts</div>
+          {bundledAvailable.map((spec) => (
+            <div key={spec.id} className="bundled-font-item">
+              <div className="bundled-font-info">
+                <span className="bundled-font-name">{spec.label}</span>
+                <span className="bundled-font-desc">{spec.description}</span>
+              </div>
+              <button
+                className="bundled-font-add"
+                onClick={() => handleAddBundled(spec)}
+                disabled={addingBundled !== null}
+              >
+                {addingBundled === spec.id ? 'Adding…' : '+ Add'}
+              </button>
+            </div>
+          ))}
+          <div className="bundled-fonts-license">
+            SIL Open Font License 1.1 — free for commercial use.
+          </div>
+        </div>
+      )}
+
+
       {/* Font List */}
       <div className="font-list">
         {fonts.length === 0 ? (
