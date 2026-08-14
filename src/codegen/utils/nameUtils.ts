@@ -109,6 +109,43 @@ export function getScreenLoadFuncName(screenName: string, options: CodeGenOption
   return `ui_load_screen_${converted}`;
 }
 
+/** snake_case exactly as the logic templates have always produced it. */
+function toLogicSnakeCase(name: string): string {
+  return name
+    .replace(/[^a-zA-Z0-9]/g, '_')
+    .replace(/([A-Z])/g, '_$1')
+    .toLowerCase()
+    .replace(/__+/g, '_')
+    .replace(/^_/, '');
+}
+
+/**
+ * Graph id → the C function name it generates, unique across the project.
+ *
+ * Nothing stops two logic graphs sharing a name — adding one twice gives two
+ * called "New Logic Graph" — but two C functions cannot share one, and the
+ * duplicate definition surfaces only when the firmware compiles. The first
+ * graph keeps the plain name, so existing projects generate what they always
+ * did; a later collision takes a numeric suffix, in graph order.
+ *
+ * `ui_logic.h` and `ui_logic.c` both call this over the same array, which is
+ * what keeps a declaration and its definition agreeing.
+ */
+export function getLogicFuncNames(graphs: { id: string; name: string }[]): Map<string, string> {
+  const names = new Map<string, string>();
+  const taken = new Set<string>();
+
+  for (const graph of graphs) {
+    const base = toLogicSnakeCase(`logic_${graph.name}`);
+    let name = base;
+    for (let suffix = 2; taken.has(name); suffix++) name = `${base}_${suffix}`;
+    taken.add(name);
+    names.set(graph.id, name);
+  }
+
+  return names;
+}
+
 /**
  * Convert hex color string to LVGL color format
  */

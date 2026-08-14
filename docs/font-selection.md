@@ -59,13 +59,19 @@ what makes a large font affordable in the first place.
   **BIZ UDPGothic** (OFL, universal-design, drawn for high legibility)
 - Korean: **Noto Sans KR**; **Pretendard** (OFL, close in feel to Inter)
 
-**Noto Sans JP and Noto Sans KR ship with EDT GUI Studio** — the Fonts panel
-lists them under *Bundled fonts*, one click from becoming a project resource.
-They go through the same auto charset trimming as an uploaded font, so a UI's
-worth of Japanese or Korean text costs tens of kilobytes of Flash, not the
-megabytes of the full face. The files live in `public/fonts/` next to their
-OFL licence; project saves store only a reference and re-read the payload from
-the app, so autosaves stay small.
+**Noto Sans TC, JP and KR ship with EDT GUI Studio** — the Fonts panel lists
+them under *Bundled fonts*, and so does the Typographies font dropdown, one
+selection from becoming a project resource. They go through the same auto
+charset trimming as an uploaded font, so a UI's worth of Chinese, Japanese or
+Korean text costs tens of kilobytes of Flash, not the megabytes of the full
+face. The files live in `public/fonts/` next to their OFL licence; project
+saves store only a reference and re-read the payload from the app, so autosaves
+stay small.
+
+Reaching for Noto Sans JP to render Traditional Chinese is a mistake worth
+naming: it carries kanji, so common characters appear and it looks as though it
+worked, but the forms are Japanese variants and Traditional-only characters are
+missing outright. Use the TC build.
 
 ## 6. Arabic — and an LVGL trap
 

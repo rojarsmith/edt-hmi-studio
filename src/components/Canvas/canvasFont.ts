@@ -3,9 +3,10 @@
 // The precedence mirrors what generated code actually does, so the canvas is a
 // truthful preview rather than an approximation with its own rules:
 //
-//   1. An assigned typography — its per-language override for the previewed
-//      language when one exists, its base font otherwise. The shared style is
-//      what renders on the device.
+//   1. The effective typography — the bound text resource's when it names one,
+//      the widget's own otherwise — using its per-language override for the
+//      previewed language when one exists and its base font otherwise. The
+//      shared style is what renders on the device.
 //   2. The widget's own style font, which ui.c emits after the props font and
 //      therefore wins.
 //   3. The widget's props font.
@@ -13,9 +14,10 @@
 // Custom fonts render through their real @font-face; built-ins approximate
 // Montserrat with the closest system sans, since the TTF is LVGL's, not ours.
 
-import type { LvglComponent, ProjectLanguage, Typography } from '../../types';
+import type { LvglComponent, ProjectLanguage, TextResource, Typography } from '../../types';
 import type { FontResource } from '../../resources/types';
 import { ensureFontFaceLoaded } from '../../resources/fontFaces';
+import { effectiveTypographyId } from '../../utils/componentText';
 
 export interface CanvasFont {
   /** CSS font-family, or undefined to leave the browser default. */
@@ -40,9 +42,11 @@ export function resolveCanvasFont(
   fontResources: FontResource[],
   languages: ProjectLanguage[],
   previewLanguage: string | null,
+  texts: TextResource[] = [],
 ): CanvasFont {
-  const typography = comp.typographyId
-    ? typographies.find((t) => t.id === comp.typographyId)
+  const typographyId = effectiveTypographyId(comp, texts);
+  const typography = typographyId
+    ? typographies.find((t) => t.id === typographyId)
     : undefined;
 
   if (typography) {

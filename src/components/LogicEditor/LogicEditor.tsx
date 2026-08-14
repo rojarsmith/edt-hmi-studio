@@ -214,12 +214,19 @@ const LogicEditorInner: React.FC = () => {
 
   // Create new graph
   const handleCreateGraph = useCallback(async () => {
-    const name = await modal.prompt('Enter a logic graph name:', 'New Logic Graph');
+    // Accepting the default twice used to leave two graphs called the same
+    // thing, indistinguishable in the list. Generated code deduplicates the
+    // function names either way; this only stops the editor suggesting it.
+    const taken = new Set(graphs.map(graph => graph.name));
+    let suggestion = 'New Logic Graph';
+    for (let index = 2; taken.has(suggestion); index++) suggestion = `New Logic Graph ${index}`;
+
+    const name = await modal.prompt('Enter a logic graph name:', suggestion);
     if (name) {
       createGraph(name);
       setShowGraphList(false);
     }
-  }, [createGraph]);
+  }, [createGraph, graphs]);
 
   // Delete current graph
   const handleDeleteGraph = useCallback(async () => {

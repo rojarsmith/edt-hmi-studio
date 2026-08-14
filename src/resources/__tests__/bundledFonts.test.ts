@@ -41,10 +41,14 @@ describe('bundled font catalog', () => {
     expect(new Set(cNames).size).toBe(BUNDLED_FONTS.length);
   });
 
-  it('covers Japanese and Korean', () => {
+  it('covers the scripts a Latin font cannot render at all', () => {
     const languages = BUNDLED_FONTS.flatMap((spec) => spec.languages);
     expect(languages).toContain('ja');
     expect(languages).toContain('ko');
+    // Traditional Chinese, the primary market for these boards. Its absence
+    // was why switching to 繁體 rendered a row of tofu with nothing in the
+    // dropdown to fix it
+    expect(languages).toContain('zh-TW');
   });
 
   it('ships every file it lists, as a real font, next to its license', () => {

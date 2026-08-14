@@ -137,7 +137,7 @@ export type LvglEventType =
   | 'LV_EVENT_CANCEL';
 
 // Built-in Action Types
-export type BuiltinActionType = 
+export type BuiltinActionType =
   | 'navigate'
   | 'setProperty'
   | 'show'
@@ -145,7 +145,18 @@ export type BuiltinActionType =
   | 'enable'
   | 'disable'
   | 'setText'
-  | 'setValue';
+  | 'setValue'
+  | 'setLanguage';
+
+/**
+ * `BuiltinAction.language` value meaning "advance to the next project language,
+ * wrapping at the end" — the one-button toggle a demo or a settings screen wants
+ * without naming every language.
+ *
+ * Deliberately not a valid language code: a real one reaches
+ * `lv_translation_set_language()` verbatim.
+ */
+export const NEXT_LANGUAGE = '__next__';
 
 // Built-in Action Configuration
 export interface BuiltinAction {
@@ -156,6 +167,8 @@ export interface BuiltinAction {
   targetComponent?: string; // For setProperty, show, hide, enable, disable, setText, setValue
   property?: string;        // For setProperty
   value?: string | number | boolean;  // For setProperty, setText, setValue
+  /** For setLanguage: a ProjectLanguage code, or `NEXT_LANGUAGE` to cycle. */
+  language?: string;
 }
 
 // Event Binding (Phase 3 - Enhanced)
@@ -266,12 +279,31 @@ export type TranslatableProp = 'text' | 'placeholder' | 'title' | 'options';
 export interface TextResource {
   id: string;
   /**
-   * The tag generated code uses, e.g. `boxEnglish`. Unique within a project,
-   * and stable — renaming it changes the generated C.
+   * The tag generated code uses, e.g. `boxEnglish`. Unique within a project
+   * **case-insensitively** — `newText` and `newtext` are one key, not two —
+   * and stable, since renaming it changes the generated C.
    */
   key: string;
   /** Translation per language code. A missing entry falls back to the first language. */
   values: Record<string, string>;
+  /**
+   * Typography every widget bound to this text renders with, TouchGFX's
+   * TypedText → Typography pairing. Set here it wins over the widget's own,
+   * so the words and the style that suits them travel together.
+   */
+  typographyId?: string;
+}
+
+/**
+ * Two text keys are the same key when they differ only in case.
+ *
+ * `lv_translation_get` matches with `lv_streq` and would treat them as
+ * distinct, but nothing else would: the two are indistinguishable in the table,
+ * and `keyFromText` lowercases, so linking a widget showing "newText" derives
+ * `newtext` and quietly sits next to a hand-written `newText`.
+ */
+export function sameTextKey(a: string, b: string): boolean {
+  return a.toLocaleUpperCase() === b.toLocaleUpperCase();
 }
 
 export type LvglAlign = 'default' | 'center' | 'top_left' | 'top_mid' | 'top_right' | 'bottom_left' | 'bottom_mid' | 'bottom_right' | 'left_mid' | 'right_mid';

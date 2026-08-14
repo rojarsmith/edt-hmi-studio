@@ -48,7 +48,7 @@ export function generateCode(
     'ui.h': generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols, effectiveTypographies),
     'ui.c': generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont, typographies, texts, languages),
     'ui_events.h': generateEventsHeader(screens, opts),
-    'ui_events.c': generateEventsSource(screens, opts),
+    'ui_events.c': generateEventsSource(screens, opts, languages),
     'ui_logic.h': generateLogicHeader(opts, logicGraphs),
     'ui_logic.c': generateLogicSource(opts, logicGraphs, screens),
   };
@@ -87,7 +87,7 @@ export function generateSingleFile(
     case 'ui_events.h':
       return generateEventsHeader(screens, opts);
     case 'ui_events.c':
-      return generateEventsSource(screens, opts);
+      return generateEventsSource(screens, opts, languages);
     case 'ui_logic.h':
       return generateLogicHeader(opts, logicGraphs);
     case 'ui_logic.c':

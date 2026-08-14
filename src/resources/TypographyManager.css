@@ -124,6 +124,16 @@
   font-size: 12px;
 }
 
-.language-font-row select.language-font-size {
+/* Size sits beside the family rather than inside it, so a font and a size are
+   two choices instead of one long combined list. */
+.size-input {
+  width: 84px;
+  padding: 5px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.language-font-row .size-input {
   flex: 0 0 84px;
 }

@@ -55,6 +55,21 @@ export const BUNDLED_FONTS: BundledFontSpec[] = [
     license: 'OFL-1.1',
     description: 'Korean — all modern Hangul syllables. Google Noto CJK, Korean build.',
   },
+  {
+    id: 'noto-sans-tc',
+    label: 'Noto Sans TC',
+    file: 'NotoSansTC-Regular.otf',
+    family: 'Noto Sans TC',
+    style: 'Regular',
+    cFontName: 'ui_font_noto_sans_tc',
+    // Standard spellings. The field is catalogue metadata — a project's own
+    // language code reaches lv_translation_set_language() verbatim and need
+    // not appear here for the font to be usable with it.
+    languages: ['zh-TW', 'zh-Hant'],
+    license: 'OFL-1.1',
+    description:
+      'Traditional Chinese — the safe, complete choice. Google Noto CJK, Traditional Chinese build. Japanese kanji is not a substitute: the forms are Japanese variants and some Traditional-only characters are missing.',
+  },
 ];
 
 export function bundledFontById(id: string | undefined): BundledFontSpec | undefined {

@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import type { EventBinding, LvglEventType } from '../../types';
+import { NEXT_LANGUAGE } from '../../types';
 import EventEditDialog from './EventEditDialog';
 import './EventPanel.css';
 
@@ -82,7 +83,11 @@ const EventPanel: React.FC = () => {
     if (event.action) {
       switch (event.action.type) {
         case 'navigate':
-          return `Navigate to: ${event.action.targetPage || 'Not set'}`;
+          // `targetPage` is the pre-rename spelling, still present in older
+          // projects — the same fallback the generator applies. `||` rather
+          // than `??` because the dialog writes an empty string for a navigate
+          // whose screen was never chosen, and that is "Not set", not blank.
+          return `Navigate to: ${event.action.targetScreen || event.action.targetPage || 'Not set'}`;
         case 'setProperty':
           return `Set property: ${event.action.property || 'Not set'}`;
         case 'show':
@@ -97,6 +102,10 @@ const EventPanel: React.FC = () => {
           return `Set text: "${event.action.value || ''}"`;
         case 'setValue':
           return `Set value: ${event.action.value ?? 'Not set'}`;
+        case 'setLanguage':
+          return event.action.language === NEXT_LANGUAGE
+            ? 'Switch language: next'
+            : `Switch language: ${event.action.language || 'Not set'}`;
         default:
           return 'Built-in action';
       }

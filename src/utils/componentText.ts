@@ -9,6 +9,26 @@ import type { LvglComponent, ProjectLanguage, TextResource, TranslatableProp } f
 import { resolveText } from '../codegen/textResources';
 
 /**
+ * The typography a widget actually renders with.
+ *
+ * A text resource may name one, and when it does it wins: the words and the
+ * style that suits them are chosen together, which is what makes a language
+ * whose script needs its own face render correctly everywhere it appears
+ * rather than everywhere someone remembered. The widget's own assignment is
+ * what applies when the resource names none, or the widget carries a literal.
+ *
+ * The canvas, the property editor and `ui.c` all resolve through here, so what
+ * is previewed is what is generated.
+ */
+export function effectiveTypographyId(
+  comp: LvglComponent,
+  texts: TextResource[],
+): string | undefined {
+  const resource = comp.textId ? texts.find((text) => text.id === comp.textId) : undefined;
+  return resource?.typographyId ?? comp.typographyId;
+}
+
+/**
  * Which prop a widget's text resource stands in for.
  *
  * The recorded `textProp` wins. The inference below only serves data written

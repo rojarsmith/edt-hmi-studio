@@ -8,11 +8,22 @@ import { useEditorStore } from '../store/editorStore';
 import { useResourceStore } from './resourceStore';
 import type { Typography, TypographyAlign, LvglComponent } from '../types';
 import { modal } from '../components/Modal';
+import { BUNDLED_FONTS, type BundledFontSpec } from './bundledFonts';
+import { BUILTIN_FONT_SIZES, builtinFontFor, isBuiltinFont, nearestBuiltinSize } from './builtinFonts';
+import type { FontResource } from './types';
 import './TypographyManager.css';
 
-/** Sizes LVGL ships a built-in Montserrat for. */
-const BUILTIN_SIZES = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48];
-const CUSTOM_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 56, 64, 72];
+/**
+ * The one built-in family, as a family rather than 21 font-and-size entries.
+ *
+ * Size is a separate field: pairing them made one dropdown carry both choices,
+ * so picking 24px meant scrolling a list of fonts, and the same font at two
+ * sizes looked like two fonts.
+ */
+const MONTSERRAT = 'montserrat';
+
+/** Prefix marking a dropdown entry that has to be added to the project first. */
+const BUNDLED_PREFIX = 'bundled:';
 
 const ALIGNMENTS: { value: TypographyAlign; label: string }[] = [
   { value: 'auto', label: 'Auto' },
@@ -21,8 +32,130 @@ const ALIGNMENTS: { value: TypographyAlign; label: string }[] = [
   { value: 'right', label: 'Right' },
 ];
 
-function isBuiltinFont(name: string): boolean {
-  return /^montserrat_\d+$/.test(name);
+/** `montserrat_24` → `montserrat`; a custom font's C name is its own family. */
+function familyOf(fontResource: string): string {
+  return isBuiltinFont(fontResource) ? MONTSERRAT : fontResource;
+}
+
+/**
+ * Turn a family and a size into the stored `fontResource`.
+ *
+ * Only the built-in carries its size in its name, which is why the two fields
+ * cannot be stored as typed for it — and why the size snaps to one the build
+ * actually has.
+ */
+function fontResourceFor(family: string, size: number): string {
+  return family === MONTSERRAT ? builtinFontFor(size) : family;
+}
+
+/**
+ * Font family picker.
+ *
+ * Bundled fonts are listed whether or not the project has added them, and
+ * choosing one adds it: needing CJK coverage should be one selection here, not
+ * a detour through the Fonts tab and back.
+ */
+function FontFamilySelect({
+  value,
+  onChange,
+  fonts,
+  addBundledFont,
+  baseLabel,
+}: {
+  /** Family, `''` for "inherit the base", or undefined when nothing is set. */
+  value: string;
+  onChange: (family: string) => void;
+  fonts: FontResource[];
+  addBundledFont: (spec: BundledFontSpec) => Promise<FontResource>;
+  /** Label for the empty option. Omitted when the field cannot be empty. */
+  baseLabel?: string;
+}): React.ReactNode {
+  const [adding, setAdding] = useState(false);
+
+  // Only the ones still missing: an added bundled font is an ordinary
+  // FontResource and already appears under Project fonts
+  const missing = BUNDLED_FONTS.filter(
+    (spec) => !fonts.some((font) => font.bundled === spec.id),
+  );
+
+  const handleChange = async (raw: string) => {
+    if (!raw.startsWith(BUNDLED_PREFIX)) {
+      onChange(raw);
+      return;
+    }
+    const spec = BUNDLED_FONTS.find((candidate) => candidate.id === raw.slice(BUNDLED_PREFIX.length));
+    if (!spec) return;
+    setAdding(true);
+    try {
+      const font = await addBundledFont(spec);
+      onChange(font.cFontName);
+    } catch (error) {
+      modal.alert(`Could not add ${spec.label}: ${String(error)}`);
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <select value={value} disabled={adding} onChange={(event) => handleChange(event.target.value)}>
+      {baseLabel !== undefined && <option value="">{baseLabel}</option>}
+      <optgroup label="Built-in">
+        <option value={MONTSERRAT}>Montserrat</option>
+      </optgroup>
+      {fonts.length > 0 && (
+        <optgroup label="Project fonts">
+          {fonts.map((font) => (
+            <option key={font.id} value={font.cFontName}>{font.name}</option>
+          ))}
+        </optgroup>
+      )}
+      {missing.length > 0 && (
+        <optgroup label="Bundled — added on selection">
+          {missing.map((spec) => (
+            <option key={spec.id} value={`${BUNDLED_PREFIX}${spec.id}`}>{spec.label}</option>
+          ))}
+        </optgroup>
+      )}
+    </select>
+  );
+}
+
+/**
+ * Pixel size, typed rather than chosen from a list.
+ *
+ * The draft is local so a half-typed "2" on its way to "24" is not committed
+ * as 2 — and, for the built-in font, not snapped to 8 mid-keystroke.
+ */
+function SizeInput({
+  value,
+  onCommit,
+}: {
+  value: number;
+  onCommit: (size: number) => void;
+}): React.ReactNode {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    if (draft === null) return;
+    const parsed = Number(draft);
+    if (Number.isFinite(parsed) && parsed > 0) onCommit(Math.round(parsed));
+    setDraft(null);
+  };
+
+  return (
+    <input
+      type="number"
+      min={1}
+      className="size-input"
+      value={draft ?? value}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+        if (event.key === 'Escape') setDraft(null);
+      }}
+    />
+  );
 }
 
 const TypographyManager: React.FC = () => {
@@ -33,6 +166,7 @@ const TypographyManager: React.FC = () => {
   const updateTypography = useEditorStore((s) => s.updateTypography);
   const deleteTypography = useEditorStore((s) => s.deleteTypography);
   const fonts = useResourceStore((s) => s.fonts);
+  const addBundledFont = useResourceStore((s) => s.addBundledFont);
   const searchQuery = useResourceStore((s) => s.searchQuery);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -76,9 +210,6 @@ const TypographyManager: React.FC = () => {
 
   const describe = (typography: Typography) =>
     `${typography.fontResource.replace(/^ui_font_/, '')} ${typography.fontSize}px`;
-
-  const sizesFor = (fontResource: string) =>
-    isBuiltinFont(fontResource) ? BUILTIN_SIZES : CUSTOM_SIZES;
 
   return (
     <div className="typography-manager">
@@ -139,53 +270,44 @@ const TypographyManager: React.FC = () => {
             />
           </div>
 
-          <div className="detail-section">
+          <div className="detail-row">
             <label>Font:</label>
-            <select
-              value={selected.fontResource}
-              onChange={(event) => {
-                const fontResource = event.target.value;
-                // A built-in font's size is fixed by its name
-                const builtin = fontResource.match(/^montserrat_(\d+)$/);
+            <FontFamilySelect
+              value={familyOf(selected.fontResource)}
+              fonts={fonts}
+              addBundledFont={addBundledFont}
+              onChange={(family) => {
+                // Keeping the size across a font change is the likelier intent;
+                // the built-in only ships certain sizes, so it snaps
+                const fontSize = family === MONTSERRAT
+                  ? nearestBuiltinSize(selected.fontSize)
+                  : selected.fontSize;
                 updateTypography(selected.id, {
-                  fontResource,
-                  ...(builtin ? { fontSize: Number(builtin[1]) } : {}),
+                  fontResource: fontResourceFor(family, fontSize),
+                  fontSize,
                 });
               }}
-            >
-              <optgroup label="Built-in">
-                {BUILTIN_SIZES.map((size) => (
-                  <option key={size} value={`montserrat_${size}`}>Montserrat {size}</option>
-                ))}
-              </optgroup>
-              {fonts.length > 0 && (
-                <optgroup label="Custom">
-                  {fonts.map((font) => (
-                    <option key={font.id} value={font.cFontName}>{font.name}</option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
+            />
           </div>
 
-          <div className="detail-section">
+          <div className="detail-row">
             <label>Size:</label>
-            {isBuiltinFont(selected.fontResource) ? (
+            <SizeInput
+              value={selected.fontSize}
+              onCommit={(size) => {
+                const family = familyOf(selected.fontResource);
+                const fontSize = family === MONTSERRAT ? nearestBuiltinSize(size) : size;
+                updateTypography(selected.id, {
+                  fontResource: fontResourceFor(family, fontSize),
+                  fontSize,
+                });
+              }}
+            />
+            {isBuiltinFont(selected.fontResource) && (
               <span className="typography-hint">
-                Fixed at {selected.fontSize}px — a built-in font carries its size in its name.
+                Montserrat is compiled in at {BUILTIN_FONT_SIZES.join(', ')}px only; any other size
+                snaps to the nearest. A size that is not compiled in has no symbol to link against.
               </span>
-            ) : (
-              <div className="size-grid">
-                {sizesFor(selected.fontResource).map((size) => (
-                  <button
-                    key={size}
-                    className={`size-btn ${selected.fontSize === size ? 'active' : ''}`}
-                    onClick={() => updateTypography(selected.id, { fontSize: size })}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
             )}
           </div>
 
@@ -279,45 +401,29 @@ const TypographyManager: React.FC = () => {
                 return (
                   <div key={language.code} className="language-font-row">
                     <span className="language-font-name">{language.name}</span>
-                    <select
-                      value={override?.fontResource ?? ''}
-                      onChange={(event) => {
-                        const fontResource = event.target.value;
-                        if (!fontResource) { setOverride(undefined); return; }
-                        // A built-in font's size is fixed by its name; a custom
-                        // one starts at the base size, the likeliest intent
-                        const builtin = fontResource.match(/^montserrat_(\d+)$/);
-                        setOverride({
-                          fontResource,
-                          fontSize: builtin ? Number(builtin[1]) : selected.fontSize,
-                        });
+                    <FontFamilySelect
+                      value={override ? familyOf(override.fontResource) : ''}
+                      baseLabel="Base font"
+                      fonts={fonts}
+                      addBundledFont={addBundledFont}
+                      onChange={(family) => {
+                        if (!family) { setOverride(undefined); return; }
+                        // Starts at the base size, the likeliest intent
+                        const fontSize = family === MONTSERRAT
+                          ? nearestBuiltinSize(override?.fontSize ?? selected.fontSize)
+                          : override?.fontSize ?? selected.fontSize;
+                        setOverride({ fontResource: fontResourceFor(family, fontSize), fontSize });
                       }}
-                    >
-                      <option value="">Base font</option>
-                      <optgroup label="Built-in">
-                        {BUILTIN_SIZES.map((size) => (
-                          <option key={size} value={`montserrat_${size}`}>Montserrat {size}</option>
-                        ))}
-                      </optgroup>
-                      {fonts.length > 0 && (
-                        <optgroup label="Custom">
-                          {fonts.map((font) => (
-                            <option key={font.id} value={font.cFontName}>{font.name}</option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-                    {override && !isBuiltinFont(override.fontResource) && (
-                      <select
-                        className="language-font-size"
+                    />
+                    {override && (
+                      <SizeInput
                         value={override.fontSize}
-                        onChange={(event) =>
-                          setOverride({ ...override, fontSize: Number(event.target.value) })}
-                      >
-                        {CUSTOM_SIZES.map((size) => (
-                          <option key={size} value={size}>{size}px</option>
-                        ))}
-                      </select>
+                        onCommit={(size) => {
+                          const family = familyOf(override.fontResource);
+                          const fontSize = family === MONTSERRAT ? nearestBuiltinSize(size) : size;
+                          setOverride({ fontResource: fontResourceFor(family, fontSize), fontSize });
+                        }}
+                      />
                     )}
                   </div>
                 );

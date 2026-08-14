@@ -11,10 +11,18 @@
 ## [Unreleased]
 
 ### 變更
+- **Typographies 分頁的字型與大小拆成兩個欄位，不再是一個下拉選單** —— 綁在一起等於一份清單同時承載兩個選擇，想選 24px 得先捲過所有字型，同一個字型的兩個尺寸看起來像兩個字型。Font 現在只列字型家族（Montserrat 出現一次，不是 21 次），Size 改成直接輸入。內建字型只有特定尺寸，所以會吸附到最近的一個並明講
+- **內建的隨附字型可以直接在 Typographies 的字型清單選** —— 不管專案有沒有加過，Noto Sans JP 與 KR 都會出現在「Bundled — added on selection」群組，選下去就會自動加入。以前要 CJK 字型得先繞去 Fonts 分頁再繞回來
+- **元件層級不再有字型設定** —— 屬性編輯器只設定 Typography。在單一元件上設定的字體與大小，對其他應該一致的元件是看不見的，而且只有 Typography 能帶各語系字型。「＋ New typography from this widget」仍然會用元件目前的設定當種子，那就是舊專案搬過來的路徑；既有的元件層級設定也照舊會產生程式碼
+- **文字 key 改為不分大小寫唯一** —— `newText` 和 `newtext` 以前是兩列，而自動推導的 key 是小寫的，所以把顯示 "newText" 的元件連結起來，就會在手寫的那一列旁邊生出第二列。一筆有翻譯一筆沒有，在表格裡完全分不出來。現在改名會被拒絕並告訴你和哪個 key 撞到，自動推導也會跳過只差大小寫的那個
 - **EVK043027B 的 Modbus RTU 改走 Type-C USB 虛擬 COM port**，不再走 RS-485。這塊板子沒有 ST-LINK VCP（它是用外掛探針燒錄的），但它自己有 USB device 周邊，所以 Type-C 埠會以 VID 0x0483 / PID 0x5740 列舉成 `USB Serial Device (COMxx)`，Windows 直接綁內建的 `usbser.sys`。不需轉換器也不需驅動：插上、在 Communication 分頁選那個 port、跑測試伺服器。ST 的 USB Device Library 由 `bootstrap-deps.ps1` 抓取；描述符、低層黏合與帶 ring buffer 的 CDC 傳輸層則在 `src/`。RS-485 收發器還在板上，`board_uart1_apply` 也還會正確設定它，只是沒人呼叫 —— 見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md) §5
 - **Modbus 的時間設定在 USB 上仍然有意義** —— USB 傳輸沒有 baud rate，所以 Protocol 分頁的那個值改用來推導 RTU 幀間靜默時間，而不是被忽略。Parity 與 stop bits 依 CDC 規定記錄並回報給主機，除此之外不作用
 
 ### 新增
+- **Noto Sans TC 隨編輯器出貨** —— 繁體中文是這些板子的主要市場，卻是唯一沒有隨附字型的語系，於是專案切到繁體就是一整排缺字方塊，而且字型下拉選單裡沒有任何能解決它的選項。`NotoSansTC-Regular.otf`，OFL-1.1，來源與已隨附的 JP、KR 完全相同（`notofonts/noto-cjk` 的 `Sans/SubsetOTF`）。它走同一套 auto 字元集裁剪進 Flash，所以一套 UI 的中文只佔數十 KB，而不是整套字型的 5.4 MB
+- **元件改用 key 從下拉選單挑選要顯示的文字** —— 屬性編輯器新增 Key 欄位，列出文字表的每一列，綁定元件變成「選一個」而不是「反覆改字面文字直到剛好對上既有的列」。選定 key 後元件的字面文字會更新成它現在顯示的字，那正是解除連結與刪除時的退路
+- **文字資源可以指定它的 Typography** —— Texts 分頁新增 Typography 欄，即 TouchGFX 的 TypedText → Typography 配對。在這裡設定會蓋過元件自己的指定，於是需要特定字體的文字會把字體帶到它出現的每個地方，而不是只帶到有人記得設定的地方。畫布、屬性編輯器與 `ui.c` 都走同一條解析規則，所以預覽就是產生的程式碼
+- **「切換語系」成為內建事件動作** —— 執行中的 UI 上的按鈕現在可以直接切換語系，在此之前這需要在自訂處理常式裡手寫 C。可以指定語系（`lv_translation_set_language("zh-TW")`），也可以選「next language」在專案語系之間循環並繞回第一個；循環用的輔助函式在 `ui_events.c` 只產生一份，不管有幾個按鈕用到它。除此之外不產生任何東西，因為不需要 —— label 會自己重讀文字，而 `ui.c` 早已為不會自己重讀的元件註冊了 callback。有兩種情況刻意不產生程式碼，而不是產生半殘的東西：專案已經沒有的語系代碼，以及只有一個語系時的循環切換。詳見 [docs/zh-TW/language-switching.md](docs/zh-TW/language-switching.md)，其中也說明畫布 🌐 預覽、Build & Run 與硬體各自涵蓋與涵蓋不到什麼
 - **支援 EDT EVK043027B** — STM32U599NJH6Q、由 LTDC 直接驅動的 480×272 面板（ARGB8888 32-bit）、maXTouch MXT336U 觸控，圖片資源留在 2 MB 的內部 flash。完整韌體樣板位於 `firmware/edt-evk043027b/`，含 vendor 進來的 EDT 面板與觸控驅動。詳見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md)
 - **以獨立探針燒錄的板子改用目標晶片辨識** — 獨立的 ST-LINK/V2 不會回報板名，因此 `probeBoardPattern` 現在可以是 `null`；燒錄器改為先連線（不寫入）並比對回報的 device ID 與板子定義是否相符
 - **外部 flash 設定改為逐板配置** — 外部載入器名稱與基底位址從 `server/hmi/service.ts` 的常數搬到板子定義上，每塊板子指名自己的顆粒。定義中 `externalFlash: null` 的板子會跳過外部燒錄步驟
@@ -28,6 +36,9 @@
 - **EVK043027B 狀態 LED** — 主迴圈固定 1 Hz 心跳；進入 `board_error_handler` 時則重複閃 `board_init_stage` + 1 下。它是唯一不依賴面板、背光與切換式供電軌的輸出，因此不需要除錯器就能區分「韌體沒在跑」與「韌體在跑但顯示設定錯了」。見 [docs/zh-TW/edt-evk043027b.md](docs/zh-TW/edt-evk043027b.md) §7
 
 ### 修正
+- **選到韌體沒有編進去的 Montserrat 尺寸會讓編譯失敗** —— Typographies 分頁提供 LVGL 出貨的全部 21 種尺寸，但每個目標的 `lv_conf.h` 只打開 12、14、16、20、24、28、32。選其他尺寸會產生一個根本不存在的符號參照，在整包 LVGL 編到第 540 個檔案左右才以 `'lv_font_montserrat_22' undeclared` 失敗。可選集合現在來自單一常數，尺寸會吸附到它（平手時往上），已經存有無法編譯尺寸的專案在開啟時會被吸附。另有測試會讀取四個 `lv_conf.h` 檔案，只要它們和常數不一致就失敗 —— 如 [docs/lvgl-configuration.md](docs/lvgl-configuration.md) 所述，它們並非由彼此產生。`wasm/lv_conf.h` 補上 Montserrat 12，讓 WASM 預覽與板子提供相同集合
+- **兩個同名的邏輯圖會讓韌體編譯失敗** —— 兩者產生同名的函式，而重複定義要等到整包 LVGL 編完才會以 `error: redefinition of 'logic_new_logic_graph'` 現形。新增時連按兩次接受「New Logic Graph」預設名稱就會踩到。產生器現在會給每個邏輯圖一個唯一的 C 名稱 —— 第一個維持原本的名字，之後撞名的加數字後綴 —— 且 `ui_logic.h` 與 `ui_logic.c` 都由同一支共用函式推導，宣告不可能和定義對不上。編輯器也不再建議一個已經有人用的名字
+- **所有導覽事件都被列成「Navigate to: Not set」** — 事件面板讀的是改名前的 `targetPage`，而編輯器自改名之後寫的是 `targetScreen`。產生的程式碼一直都是對的，錯的只有清單裡那一行摘要。現在兩種寫法都能顯示，改名之前存的專案也讀得出來
 - **EVK043027B 根本沒跑過 `board_init` 的第一行** — STM32U5 的 PWR 周邊是被時脈閘控的（`RCC_AHB3ENR_PWREN`），時脈沒開時 `HAL_PWREx_ConfigSupply` 輪詢到的暫存器永遠讀成 0，於是回傳 `HAL_TIMEOUT`。開那個時脈是 `HAL_Init` 呼叫 `HAL_MspInit` 的工作，而 HAL 自己的版本是 weak 且空的；原廠套件把它放在 `stm32u5xx_hal_msp.c`，而本樣板漏了沒移植。結果時脈樹、OctoSPI、LTDC 與顯示流程全都沒跑到，唯一的徵兆就是面板全黑
 - **EVK043027B 主迴圈會一次卡住好幾秒** — vendor 進來的 maXTouch 驅動在 I²C 收發兩邊都用 1000 ms timeout，而 LVGL 每約 30 ms 就輪詢一次輸入裝置，所以觸控控制器不在或沒回應時，卡住的不只是觸控，而是整個 HMI 迴圈。`board_display_init` 現在會先用 50 ms 的 `HAL_I2C_IsDeviceReady` 探測一次，沒回應就完全不向 LVGL 註冊輸入裝置，並把結果記在 `board_touch_ready`
 - **EVK043027B 觸控控制器從來沒有真的被 reset 過** — `CTP_RST`（PH6）只是一直被拉高，所以熱開機時那顆 IC 根本沒經歷過 reset。現在改為先拉低再放開，並等待 datasheet 要求的啟動時間

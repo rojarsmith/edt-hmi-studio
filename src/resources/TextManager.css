@@ -90,6 +90,28 @@
   white-space: nowrap;
 }
 
+.text-table .col-typography {
+  width: 1%;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.typography-select {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 5px 4px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #555;
+  max-width: 160px;
+}
+
+.typography-select:hover,
+.typography-select:focus {
+  border-color: #ddd;
+  background: #fff;
+}
+
 .key-input,
 .value-input {
   width: 100%;

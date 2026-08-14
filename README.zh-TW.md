@@ -43,6 +43,7 @@
   - 設定屬性
   - 顯示／隱藏元件
   - 設定文字或數值
+  - 切換語系 —— 指定某個語系，或在專案語系之間循環。詳見 [docs/zh-TW/language-switching.md](docs/zh-TW/language-switching.md)
 - **自訂 C 程式碼**：以 Monaco 編輯
 
 ### 🔗 邏輯編排器

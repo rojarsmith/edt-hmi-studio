@@ -11,6 +11,7 @@ import React, { useMemo, useState } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { useResourceStore } from './resourceStore';
 import type { LvglComponent, TextResource } from '../types';
+import { sameTextKey } from '../types';
 import { modal } from '../components/Modal';
 import './TextManager.css';
 
@@ -18,6 +19,8 @@ const TextManager: React.FC = () => {
   const languages = useEditorStore((s) => s.languages);
   const texts = useEditorStore((s) => s.texts);
   const screens = useEditorStore((s) => s.screens);
+  const typographies = useEditorStore((s) => s.typographies);
+  const setTextTypography = useEditorStore((s) => s.setTextTypography);
   const addLanguage = useEditorStore((s) => s.addLanguage);
   const deleteLanguage = useEditorStore((s) => s.deleteLanguage);
   const updateText = useEditorStore((s) => s.updateText);
@@ -86,11 +89,16 @@ const TextManager: React.FC = () => {
   const commitKey = () => {
     if (!keyDraft) return;
     const trimmed = keyDraft.value.trim();
-    const clash = texts.some((text) => text.id !== keyDraft.id && text.key === trimmed);
+    const clash = texts.find((text) => text.id !== keyDraft.id && sameTextKey(text.key, trimmed));
     if (trimmed && clash) {
       // The key is the tag generated code matches on, so duplicates are not
-      // merely untidy — two rows would be indistinguishable at runtime
-      modal.alert(`"${trimmed}" is already used by another text.`);
+      // merely untidy. Case is not enough to tell two apart either: `newText`
+      // and `newtext` read as the same row and bind the wrong widget
+      modal.alert(
+        clash.key === trimmed
+          ? `"${trimmed}" is already used by another text.`
+          : `"${trimmed}" differs from "${clash.key}" only in case. Keys must differ by more than that.`,
+      );
     } else {
       renameTextKey(keyDraft.id, trimmed);
     }
@@ -171,6 +179,7 @@ const TextManager: React.FC = () => {
                   )}
                 </th>
               ))}
+              <th className="col-typography">Typography</th>
               <th className="col-used">Used</th>
               <th className="col-actions" />
             </tr>
@@ -178,7 +187,7 @@ const TextManager: React.FC = () => {
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={languages.length + 3} className="text-empty">
+                <td colSpan={languages.length + 4} className="text-empty">
                   {texts.length === 0
                     ? 'No texts yet. Opening a project derives these from the words already in it.'
                     : 'Nothing matches that search.'}
@@ -227,6 +236,21 @@ const TextManager: React.FC = () => {
                       </td>
                     );
                   })}
+                  <td className="col-typography">
+                    <select
+                      className="typography-select"
+                      value={text.typographyId ?? ''}
+                      onChange={(e) => setTextTypography(text.id, e.target.value || undefined)}
+                      title="Every widget bound to this text renders with it"
+                    >
+                      <option value="">Widget's own</option>
+                      {typographies.map((typography) => (
+                        <option key={typography.id} value={typography.id}>
+                          {typography.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="col-used">{usageCounts.get(text.id) ?? 0}</td>
                   <td className="col-actions">
                     <button className="delete-btn" onClick={() => handleDeleteText(text)} title="Delete">
@@ -243,7 +267,8 @@ const TextManager: React.FC = () => {
       <p className="text-note">
         A row is shared by every widget that shows it, so editing one changes them all — the Used
         column says how many. Untranslated cells fall back to {languages[0].name}, which is what
-        LVGL does at runtime too.
+        LVGL does at runtime too. A row that names a Typography imposes it on every widget bound to
+        it, so words that need a particular face carry it with them.
       </p>
     </div>
   );

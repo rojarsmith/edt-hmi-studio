@@ -94,11 +94,13 @@ export function deriveTextResources(
         const literal = found.value;
         let resource = byLiteral.get(literal);
         if (!resource) {
+          // Case-folded, because two keys differing only in case are one key —
+          // see `sameTextKey`
           let key = keyFromText(literal);
-          for (let suffix = 2; usedKeys.has(key); suffix++) {
+          for (let suffix = 2; usedKeys.has(key.toLocaleUpperCase()); suffix++) {
             key = `${keyFromText(literal)}${suffix}`;
           }
-          usedKeys.add(key);
+          usedKeys.add(key.toLocaleUpperCase());
 
           resource = {
             id: `text_${texts.length + 1}`,

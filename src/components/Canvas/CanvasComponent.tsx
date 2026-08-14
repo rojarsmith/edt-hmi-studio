@@ -68,7 +68,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   const typographies = useEditorStore(state => state.typographies);
   const fontResources = useResourceStore(state => state.fonts);
   // The face and size the device would use, per the same precedence ui.c emits
-  const canvasFont = resolveCanvasFont(component, typographies, fontResources, languages, previewLanguage);
+  const canvasFont = resolveCanvasFont(component, typographies, fontResources, languages, previewLanguage, texts);
   const textFontStyle = {
     fontFamily: canvasFont.fontFamily,
     fontSize: canvasFont.fontSize ?? defaultFontSize,

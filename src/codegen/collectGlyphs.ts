@@ -10,6 +10,7 @@
 import type { LvglComponent, Screen, TextResource, Typography } from '../types';
 import type { FontResource } from '../resources/types';
 import type { LogicGraph, LogicNode } from '../components/LogicEditor/types';
+import { effectiveTypographyId } from '../utils/componentText';
 
 /** ASCII baseline, always included by the conversion regardless of usage. */
 export const ASCII_BASELINE_START = 0x20;
@@ -169,6 +170,7 @@ function resolveFonts(
   defaultFont?: string,
   defaultFontSize?: number,
   typographyById?: Map<string, Typography>,
+  texts: TextResource[] = [],
 ): { cFontName: string; size: number }[] {
   const out: { cFontName: string; size: number }[] = [];
   const add = (name: string | undefined, size: number | undefined) => {
@@ -176,10 +178,13 @@ function resolveFonts(
     out.push({ cFontName: name, size: size || IMPLIED_FONT_SIZE });
   };
 
-  // An assigned typography's shared style is what actually renders the text,
-  // and it may name a font no widget prop mentions. Over-inclusive as ever:
-  // the props paths stay attributed too.
-  const typography = comp.typographyId ? typographyById?.get(comp.typographyId) : undefined;
+  // The effective typography's shared style is what actually renders the text,
+  // and it may name a font no widget prop mentions. Effective, not the widget's
+  // own: a text resource naming a typography wins, and reading only the widget
+  // would subset the wrong font. Over-inclusive as ever — the props paths stay
+  // attributed too.
+  const typographyId = effectiveTypographyId(comp, texts);
+  const typography = typographyId ? typographyById?.get(typographyId) : undefined;
   if (typography) add(typography.fontResource, typography.fontSize);
 
   const props = comp.props ?? {};
@@ -237,7 +242,7 @@ export function collectGlyphs(input: CollectGlyphsInput): GlyphCollection {
 
     const targets = targetsOverride
       ?? (comp
-        ? resolveFonts(comp, customFontNames, defaultFont, defaultFontSize, typographyById)
+        ? resolveFonts(comp, customFontNames, defaultFont, defaultFontSize, typographyById, texts)
         : []);
     if (targets.length === 0) {
       unattributed.push(source);
@@ -273,7 +278,11 @@ export function collectGlyphs(input: CollectGlyphsInput): GlyphCollection {
       if (comp.textId) {
         const resource = textById.get(comp.textId);
         if (resource) {
-          const typography = comp.typographyId ? typographyById.get(comp.typographyId) : undefined;
+          // Effective, so a typography named by the resource brings its
+          // per-language overrides with it — otherwise this language's
+          // characters would be subset into the base Latin font instead
+          const typographyId = effectiveTypographyId(comp, texts);
+          const typography = typographyId ? typographyById.get(typographyId) : undefined;
           for (const [language, value] of Object.entries(resource.values)) {
             // A language with a font override renders through that font and
             // only that font — sending its characters to the base font too

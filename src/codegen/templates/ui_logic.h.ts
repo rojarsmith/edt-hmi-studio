@@ -8,18 +8,7 @@ import {
   generateInclude,
   generateSectionHeader,
 } from '../formatters/cFormatter';
-
-/**
- * Convert string to snake_case
- */
-function toSnakeCase(str: string): string {
-  return str
-    .replace(/[^a-zA-Z0-9]/g, '_')
-    .replace(/([A-Z])/g, '_$1')
-    .toLowerCase()
-    .replace(/__+/g, '_')
-    .replace(/^_/, '');
-}
+import { getLogicFuncNames } from '../utils/nameUtils';
 
 /**
  * Generate ui_logic.h header file
@@ -42,10 +31,13 @@ export function generateLogicHeader(
   }
   
   if (graphs.length > 0) {
+    const funcNames = getLogicFuncNames(graphs);
+
     // Generate function declarations for each graph
     for (const graph of graphs) {
-      const functionName = toSnakeCase(`logic_${graph.name}`);
-      
+      const functionName = funcNames.get(graph.id)!;
+
+
       if (options.generateComments && graph.description) {
         lines.push(`// ${graph.description}`);
       }

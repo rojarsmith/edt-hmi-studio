@@ -13,7 +13,7 @@ import type {
   ProjectLanguage,
   TextResource,
 } from '../types';
-import { MAX_SCREEN_GROUP_DEPTH } from '../types';
+import { MAX_SCREEN_GROUP_DEPTH, sameTextKey } from '../types';
 import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
@@ -159,6 +159,11 @@ interface EditorState {
   linkComponentToText: (componentId: string) => string | null;
   /** Back to the plain literal, keeping the words currently displayed. */
   unlinkComponentText: (componentId: string) => void;
+  /**
+   * Point a widget at an existing text resource, chosen by key. Passing no id
+   * unlinks. The widget's literal is refreshed to the words it now shows.
+   */
+  bindComponentToText: (componentId: string, textId: string | undefined) => void;
   /** Add a language column. The first language added becomes the default. */
   addLanguage: (code: string, name: string) => void;
   /** Removing a language drops its column from every text resource. */
@@ -167,6 +172,8 @@ interface EditorState {
   renameTextKey: (id: string, key: string) => void;
   /** Create an empty text resource and return its id. */
   addText: () => string;
+  /** Bind a typography to a text resource, or clear it. Widgets follow it. */
+  setTextTypography: (id: string, typographyId: string | undefined) => void;
   /** Removing one leaves its widgets showing their own literal again. */
   deleteText: (id: string) => void;
 
@@ -1099,9 +1106,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     const id = `text_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const taken = new Set(get().texts.map((text) => text.key));
+    const taken = get().texts.map((text) => text.key);
     let key = keyFromText(literal);
-    for (let suffix = 2; taken.has(key); suffix++) key = `${keyFromText(literal)}${suffix}`;
+    for (let suffix = 2; taken.some((existing) => sameTextKey(existing, key)); suffix++) {
+      key = `${keyFromText(literal)}${suffix}`;
+    }
 
     set({
       texts: [...get().texts, { id, key, values: { [defaultCode]: literal } }],
@@ -1179,8 +1188,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const trimmed = key.trim();
     if (!trimmed) return;
     // The key is the generated tag, so a duplicate would make two texts
-    // indistinguishable to lv_translation_get
-    if (get().texts.some((text) => text.id !== id && text.key === trimmed)) return;
+    // indistinguishable to lv_translation_get. Case-insensitively, because two
+    // keys differing only in case are indistinguishable to a person
+    if (get().texts.some((text) => text.id !== id && sameTextKey(text.key, trimmed))) return;
     set({
       texts: get().texts.map((text) => (text.id === id ? { ...text, key: trimmed } : text)),
     });
@@ -1188,12 +1198,50 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   addText: () => {
     const id = `text_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const taken = new Set(get().texts.map((text) => text.key));
+    const taken = get().texts.map((text) => text.key);
     let key = 'newText';
-    for (let suffix = 2; taken.has(key); suffix++) key = `newText${suffix}`;
+    for (let suffix = 2; taken.some((existing) => sameTextKey(existing, key)); suffix++) {
+      key = `newText${suffix}`;
+    }
 
     set({ texts: [...get().texts, { id, key, values: {} }] });
     return id;
+  },
+
+  setTextTypography: (id, typographyId) => {
+    set({
+      texts: get().texts.map((text) => (text.id === id ? { ...text, typographyId } : text)),
+    });
+  },
+
+  bindComponentToText: (componentId, textId) => {
+    const comp = get().getComponentById(componentId);
+    if (!comp) return;
+
+    if (!textId) {
+      get().unlinkComponentText(componentId);
+      return;
+    }
+
+    const resource = get().texts.find((text) => text.id === textId);
+    if (!resource) return;
+
+    // Which prop the resource stands in for. An existing binding keeps its
+    // prop; a fresh one takes the prop the widget's own words live in, so a
+    // textarea's placeholder does not capture its content.
+    const prop = comp.textProp ?? literalOf(comp)?.prop ?? 'text';
+    const codes = get().languages.map((language) => language.code);
+    const words = resolveText(resource, get().previewLanguage ?? codes[0] ?? '', codes);
+
+    // The literal follows the words it now stands for, so unlinking later — and
+    // the canvas fallback if the resource is deleted — shows today's text
+    const literal = prop === 'options' ? words.split('\n') : words;
+
+    get().updateComponent(componentId, {
+      textId,
+      textProp: prop,
+      props: { ...comp.props, [prop]: literal },
+    });
   },
 
   deleteText: (id) => {
@@ -1266,6 +1314,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       typographies: get().typographies.filter((typography) => typography.id !== id),
+      // A text resource naming it would otherwise keep pointing at nothing,
+      // and widgets bound to that text would resolve to no typography at all
+      texts: get().texts.map((text) =>
+        text.typographyId === id ? { ...text, typographyId: undefined } : text,
+      ),
       screens: get().screens.map((screen) => ({
         ...screen,
         components: clearReferences(screen.components),

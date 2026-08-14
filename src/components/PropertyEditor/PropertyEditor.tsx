@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
+import { BUILTIN_FONTS } from '../../resources/builtinFonts';
 import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
 import type {
@@ -54,15 +55,6 @@ const ALIGN_OPTIONS: { value: LvglAlign; label: string; row: number; col: number
   { value: 'bottom_right', label: '↘', row: 2, col: 2 },
 ];
 
-// Built-in LVGL fonts
-const BUILTIN_FONTS = [
-  'montserrat_14',
-  'montserrat_16',
-  'montserrat_20',
-  'montserrat_24',
-  'montserrat_28',
-  'montserrat_32',
-];
 
 // Grid template visualization: parse "1fr 2fr 1fr" into proportional bars
 function GridTemplatePreview({ value }: { value: string }) {
@@ -1339,9 +1331,6 @@ function FontSelector({
   );
 }
 
-// Built-in font sizes (matching montserrat available sizes)
-const BUILTIN_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48];
-
 /**
  * The dropdown options editor, aware of shared text.
  *
@@ -1474,7 +1463,7 @@ function TranslatableTextRow({
   const screens = useEditorStore((s) => s.screens);
   const updateText = useEditorStore((s) => s.updateText);
   const linkComponentToText = useEditorStore((s) => s.linkComponentToText);
-  const unlinkComponentText = useEditorStore((s) => s.unlinkComponentText);
+  const bindComponentToText = useEditorStore((s) => s.bindComponentToText);
 
   const literal = typeof component.props?.[prop] === 'string' ? (component.props[prop] as string) : '';
 
@@ -1485,30 +1474,58 @@ function TranslatableTextRow({
     ? texts.find((text) => text.id === component.textId)
     : undefined;
 
+  /**
+   * Which row of the text table the widget shows, chosen by key.
+   *
+   * The alternative — retyping the literal until it happens to match an
+   * existing row — is how a widget ends up on a near-identical duplicate.
+   * Only rendered for the prop a resource can stand in for.
+   */
+  const keyRow = prop !== standIn ? null : (
+    <div className="property-row">
+      <label>Key</label>
+      <select
+        value={resource?.id ?? ''}
+        onChange={(e) => bindComponentToText(component.id, e.target.value || undefined)}
+        title="The text resource this widget shows"
+      >
+        <option value="">(none — the widget's own text)</option>
+        {texts.map((text) => (
+          <option key={text.id} value={text.id}>
+            {text.key}
+          </option>
+        ))}
+      </select>
+      {!resource && literal.trim().length > 0 && (
+        <button
+          className="text-link-btn"
+          title="Create a new text resource from these words"
+          onClick={() => linkComponentToText(component.id)}
+        >
+          🌐
+        </button>
+      )}
+    </div>
+  );
+
   if (!resource) {
     return (
-      <div className="property-row">
-        <label>{label}</label>
-        {multiline ? (
-          <textarea
-            value={literal}
-            onChange={(e) => onChange(prop, e.target.value)}
-            rows={3}
-            style={{ width: '100%', resize: 'vertical' }}
-          />
-        ) : (
-          <input type="text" value={literal} onChange={(e) => onChange(prop, e.target.value)} />
-        )}
-        {prop === standIn && literal.trim().length > 0 && (
-          <button
-            className="text-link-btn"
-            title="Share as a translatable text resource"
-            onClick={() => linkComponentToText(component.id)}
-          >
-            🌐
-          </button>
-        )}
-      </div>
+      <>
+        <div className="property-row">
+          <label>{label}</label>
+          {multiline ? (
+            <textarea
+              value={literal}
+              onChange={(e) => onChange(prop, e.target.value)}
+              rows={3}
+              style={{ width: '100%', resize: 'vertical' }}
+            />
+          ) : (
+            <input type="text" value={literal} onChange={(e) => onChange(prop, e.target.value)} />
+          )}
+        </div>
+        {keyRow}
+      </>
     );
   }
 
@@ -1548,17 +1565,12 @@ function TranslatableTextRow({
           <input type="text" value={shown} onChange={(e) => handleEdit(e.target.value)} />
         )}
       </div>
+      {keyRow}
       <div className="property-row text-resource-note">
         <label />
         <span>
-          🌐 <code>{resource.key}</code> · {activeName} · used by {usedBy}
-          <button
-            className="text-unlink-btn"
-            title="Stop sharing; keep the words currently shown"
-            onClick={() => unlinkComponentText(component.id)}
-          >
-            unlink
-          </button>
+          🌐 {activeName} · used by {usedBy}
+          {resource.typographyId && ' · typography from this text'}
         </span>
       </div>
     </>
@@ -1566,27 +1578,31 @@ function TranslatableTextRow({
 }
 
 /**
- * How a widget's text is styled: a named typography, or nothing.
+ * How a widget's text is styled: a named typography, and nothing else.
  *
- * The font selector below only appears when no typography is assigned. With one
- * assigned it would be misleading — codegen puts the font on the shared style
- * and skips the per-widget call, so anything set here would have no effect.
+ * There is deliberately no font control here. A face and a size set on one
+ * widget are invisible to every other widget that ought to match it, and they
+ * are the settings most likely to need changing across a whole screen at once
+ * — which is what a typography is. It is also the only path that can carry a
+ * per-language font, so a project that switches to 中文 changes face with it.
+ *
+ * A bound text resource may name the typography itself, in which case it wins
+ * and the control shows what it imposed rather than pretending to be free.
  */
 function TextStyleSelector({
   component,
-  onChange,
-  onBatchChange,
 }: {
   component: LvglComponent;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onChange: (key: string, value: any) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onBatchChange?: (updates: Record<string, any>) => void;
 }): React.ReactNode {
   const typographies = useEditorStore((s) => s.typographies);
+  const texts = useEditorStore((s) => s.texts);
   const addTypography = useEditorStore((s) => s.addTypography);
   const updateComponent = useEditorStore((s) => s.updateComponent);
 
+  const resource = component.textId ? texts.find((text) => text.id === component.textId) : undefined;
+  const fromText = resource?.typographyId
+    ? typographies.find((typography) => typography.id === resource.typographyId)
+    : undefined;
   const assigned = component.typographyId;
 
   const select = (typographyId: string | undefined) => {
@@ -1598,12 +1614,26 @@ function TextStyleSelector({
   const createFromWidget = () => {
     const id = addTypography({
       name: `${component.name} text`,
+      // Seeded from whatever the widget carries today, which is how a project
+      // written before typographies existed moves onto one
       fontResource: (component.props.fontResource as string) ?? 'montserrat_14',
       fontSize: (component.props.fontSize as number) ?? 14,
       align: (component.props.textAlign as 'auto' | 'left' | 'center' | 'right') ?? 'auto',
     });
     select(id);
   };
+
+  if (fromText) {
+    return (
+      <div className="property-row">
+        <label>Typography</label>
+        <select value={fromText.id} disabled title="Set on the text resource, in the Texts panel">
+          <option value={fromText.id}>{fromText.name}</option>
+        </select>
+        <span className="property-hint">from “{resource?.key}”</span>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1627,168 +1657,6 @@ function TextStyleSelector({
           <button className="typography-create-btn" onClick={createFromWidget}>
             ＋ New typography from this widget
           </button>
-        </div>
-      )}
-      {!assigned && (
-        <ComponentFontSelector
-          fontResource={component.props.fontResource}
-          fontSize={component.props.fontSize}
-          onChange={onChange}
-          onBatchChange={onBatchChange}
-        />
-      )}
-    </>
-  );
-}
-
-// Font selector for component props (fontResource + fontSize)
-function ComponentFontSelector({
-  fontResource,
-  fontSize,
-  onChange,
-  onBatchChange,
-}: {
-  fontResource?: string;
-  fontSize?: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onChange: (key: string, value: any) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onBatchChange?: (updates: Record<string, any>) => void;
-}): React.ReactNode {
-  const fonts = useResourceStore((s) => s.fonts);
-  const currentProjectId = useAppStore((s) => s.currentProjectId);
-  const getProjectConfig = useProjectStore((s) => s.getProjectConfig);
-  const [projectDefaultFont, setProjectDefaultFont] = useState<string | undefined>();
-  const [projectDefaultFontSize, setProjectDefaultFontSize] = useState<number | undefined>();
-
-  useEffect(() => {
-    if (!currentProjectId) return;
-    getProjectConfig(currentProjectId).then(cfg => {
-      if (cfg) {
-        setProjectDefaultFont(cfg.lvglConfig.defaultFont);
-        setProjectDefaultFontSize(cfg.lvglConfig.defaultFontSize);
-      }
-    });
-  }, [currentProjectId, getProjectConfig]);
-
-  // Determine current selection value
-  const currentValue = fontResource || '';
-
-  // Determine if the effective font is a builtin font (size selector should be hidden)
-  const isBuiltinFont = (name: string) => /^montserrat_\d+$/.test(name);
-
-  // Resolve the effective font: explicit selection or project default
-  const effectiveFont = fontResource || projectDefaultFont || '';
-  const effectiveIsBuiltin = isBuiltinFont(effectiveFont);
-
-  // For custom fonts, show the full BUILTIN_FONT_SIZES list instead of FontResource.sizes
-  const selectedCustomFont = fontResource
-    ? fonts.find((f) => f.cFontName === fontResource)
-    : undefined;
-  const defaultCustomFont = !fontResource && projectDefaultFont
-    ? fonts.find((f) => f.cFontName === projectDefaultFont)
-    : undefined;
-  const activeCustomFont = selectedCustomFont || defaultCustomFont;
-  const availableSizes = activeCustomFont ? BUILTIN_FONT_SIZES : [];
-
-  // When font changes, adjust fontSize if needed
-  const handleFontChange = (value: string) => {
-    if (!value) {
-      // "Default" selected - clear fontResource; keep fontSize only if default is custom and size differs.
-      const defaultIsCustom = projectDefaultFont && !isBuiltinFont(projectDefaultFont);
-      if (defaultIsCustom && fontSize !== undefined && fontSize !== (projectDefaultFontSize || 16)) {
-        // Keep fontSize to indicate this component uses default font but at a different size
-        if (onBatchChange) {
-          onBatchChange({ fontResource: undefined, fontSize });
-        } else {
-          onChange('fontResource', undefined);
-        }
-      } else {
-        // Clear both
-        if (onBatchChange) {
-          onBatchChange({ fontResource: undefined, fontSize: undefined });
-        } else {
-          onChange('fontResource', undefined);
-          onChange('fontSize', undefined);
-        }
-      }
-    } else {
-      const customFont = fonts.find((f) => f.cFontName === value);
-      if (customFont) {
-        // Custom font: keep current fontSize if it's in BUILTIN_FONT_SIZES, otherwise pick closest
-        const curSize = fontSize || 16;
-        let newSize = curSize;
-        if (!BUILTIN_FONT_SIZES.includes(curSize)) {
-          newSize = BUILTIN_FONT_SIZES.reduce((a, b) =>
-            Math.abs(b - curSize) < Math.abs(a - curSize) ? b : a
-          );
-        }
-        if (onBatchChange) {
-          onBatchChange({ fontResource: value, fontSize: newSize });
-        } else {
-          onChange('fontResource', value);
-          onChange('fontSize', newSize);
-        }
-      } else {
-        // Built-in font selected - set fontResource to builtin name, extract size
-        const match = value.match(/^montserrat_(\d+)$/);
-        if (match) {
-          if (onBatchChange) {
-            onBatchChange({ fontResource: value, fontSize: parseInt(match[1]) });
-          } else {
-            onChange('fontResource', value);
-            onChange('fontSize', parseInt(match[1]));
-          }
-        }
-      }
-    }
-  };
-
-  // Show size selector only when the effective font is a custom font
-  const showSizeSelector = !effectiveIsBuiltin && availableSizes.length > 0;
-
-  return (
-    <>
-      <div className="property-row">
-        <label>Font</label>
-        <select
-          value={currentValue}
-          onChange={(e) => handleFontChange(e.target.value)}
-          style={{ flex: 1, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
-        >
-          <option value="">Default</option>
-          <optgroup label="Built-in Fonts">
-            {BUILTIN_FONTS.map((f) => (
-              <option key={f} value={f}>{f}</option>
-            ))}
-          </optgroup>
-          {fonts.length > 0 && (
-            <optgroup label="Uploaded Fonts">
-              {fonts.map((f) => (
-                <option key={f.id} value={f.cFontName}>{f.name} ({f.family})</option>
-              ))}
-            </optgroup>
-          )}
-        </select>
-      </div>
-      {showSizeSelector && (
-        <div className="property-row">
-          <label>Font Size</label>
-          <select
-            value={availableSizes.includes(fontSize || 14) ? (fontSize || 14) : 'custom'}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v !== 'custom') onChange('fontSize', parseInt(v));
-            }}
-            style={{ flex: 1, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
-          >
-            {availableSizes.map((s) => (
-              <option key={s} value={s}>{s}px</option>
-            ))}
-            {!availableSizes.includes(fontSize || 14) && (
-              <option value="custom">{fontSize || 14}px (Custom)</option>
-            )}
-          </select>
         </div>
       )}
     </>
@@ -1972,11 +1840,7 @@ function renderComponentProps(
           <div className="property-section">
             <div className="section-header">Button</div>
             <TranslatableTextRow component={component} prop="text" label="Text" onChange={onChange} />
-            <TextStyleSelector
-              component={component}
-              onChange={onChange}
-              onBatchChange={onBatchChange}
-            />
+            <TextStyleSelector component={component} />
             <div className="property-row">
               <label>Text Alignment</label>
               <select
@@ -1998,11 +1862,7 @@ function renderComponentProps(
         <div className="property-section">
           <div className="section-header">Label</div>
           <TranslatableTextRow component={component} prop="text" label="Text" onChange={onChange} />
-          <TextStyleSelector
-            component={component}
-            onChange={onChange}
-            onBatchChange={onBatchChange}
-          />
+          <TextStyleSelector component={component} />
           <div className="property-row">
             <label>Text Alignment</label>
             <select
@@ -2035,11 +1895,7 @@ function renderComponentProps(
           <div className="section-header">Text Area</div>
           <TranslatableTextRow component={component} prop="text" label="Content" multiline onChange={onChange} />
           <TranslatableTextRow component={component} prop="placeholder" label="Placeholder" onChange={onChange} />
-          <TextStyleSelector
-            component={component}
-            onChange={onChange}
-            onBatchChange={onBatchChange}
-          />
+          <TextStyleSelector component={component} />
           <div className="property-row">
             <label>Maximum Length</label>
             <input
@@ -2075,11 +1931,7 @@ function renderComponentProps(
         <div className="property-section">
           <div className="section-header">Checkbox</div>
           <TranslatableTextRow component={component} prop="text" label="Text" onChange={onChange} />
-          <TextStyleSelector
-            component={component}
-            onChange={onChange}
-            onBatchChange={onBatchChange}
-          />
+          <TextStyleSelector component={component} />
           <div className="property-row">
             <label>Checked</label>
             <input
@@ -2293,11 +2145,7 @@ function renderComponentProps(
               ))}
             </select>
           </div>
-          <TextStyleSelector
-            component={component}
-            onChange={onChange}
-            onBatchChange={onBatchChange}
-          />
+          <TextStyleSelector component={component} />
           <div className="property-row">
             <label>Opening Direction</label>
             <select

@@ -7,6 +7,7 @@ import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '.
 import type { Screen, ScreenGroup, Typography, ProjectLanguage, TextResource } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import { applyTypographies } from '../codegen/typography';
+import { normalizeBuiltinSizes } from '../resources/builtinFonts';
 import { applyTextResources } from '../codegen/textResources';
 import { migrateFontResource } from '../resources/converters/fontConverter';
 import { hydrateBundledFonts, stripBundledFontData } from '../resources/bundledFonts';
@@ -529,6 +530,12 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           ),
         };
 
+    // A built-in size the build does not compile in has no symbol to link
+    // against, so a project carrying one cannot build at all until it is
+    // changed. Snapping on open makes it buildable and shows the truth on the
+    // canvas, rather than failing thousands of lines into an LVGL compile.
+    data = { ...data, typographies: normalizeBuiltinSizes(data.typographies ?? []) };
+
     // A project written before text resources existed has its words inside the
     // widgets. Derive them into a table under one default language, so the
     // Texts panel has something to show and nothing renders differently.
@@ -680,7 +687,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       projectId: id,
       screens: migrated.screens,
       screenGroups: (file.screenGroups || []).map(g => ({ ...g })),
-      typographies: migrated.typographies,
+      // Same reason as the read path: a built-in size the build does not
+      // compile in has no symbol, and the project could not build at all
+      typographies: normalizeBuiltinSizes(migrated.typographies),
       // A file that carries its own translations keeps them; one that does not
       // gets a table derived on first load, as the read-side migration does
       languages: file.languages || [],

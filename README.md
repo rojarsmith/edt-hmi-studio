@@ -43,6 +43,7 @@ A full-featured **visual editor for LVGL user interfaces**, with drag-and-drop d
   - Set a property
   - Show / hide a widget
   - Set text or value
+  - Switch language — a named one, or cycle through the project's languages. See [docs/language-switching.md](docs/language-switching.md)
 - **Custom C code**: edited in Monaco
 
 ### 🔗 Logic editor

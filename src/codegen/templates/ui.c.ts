@@ -6,7 +6,7 @@ import type { ImageResource, FontResource } from '../../resources/types';
 import { collectUsedCustomFonts } from '../fontUsage';
 import { deriveTypographies } from '../typography';
 import { resolveText } from '../textResources';
-import { standInProp } from '../../utils/componentText';
+import { effectiveTypographyId, standInProp } from '../../utils/componentText';
 import type { Typography, TextResource, ProjectLanguage, TranslatableProp } from '../../types';
 
 /** A typography style symbol and whether its font is custom. */
@@ -1850,11 +1850,17 @@ function generateTranslationCallbacks(kinds: Set<string>, options: CodeGenOption
 }
 
 /** Component id → typography id, from what the components already carry. */
-function collectStoredAssignments(screens: Screen[]): Map<string, string> {
+function collectStoredAssignments(
+  screens: Screen[],
+  texts: TextResource[],
+): Map<string, string> {
   const assignments = new Map<string, string>();
   const walk = (components: LvglComponent[]) => {
     for (const comp of components) {
-      if (comp.typographyId) assignments.set(comp.id, comp.typographyId);
+      // A text resource's typography wins over the widget's — one rule, shared
+      // with the canvas and the property editor
+      const typographyId = effectiveTypographyId(comp, texts);
+      if (typographyId) assignments.set(comp.id, typographyId);
       walk(comp.children ?? []);
     }
   };
@@ -2048,7 +2054,7 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   const { typographies, assignments } = storedTypographies?.length
     ? {
         typographies: storedTypographies,
-        assignments: collectStoredAssignments(screens),
+        assignments: collectStoredAssignments(screens, texts),
       }
     : deriveTypographies(screens, defaultFont, defaultFontSize);
 

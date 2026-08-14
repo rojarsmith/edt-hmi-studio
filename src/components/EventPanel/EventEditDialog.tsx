@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useEditorStore } from '../../store/editorStore';
 import type { EventBinding, LvglEventType, BuiltinActionType, BuiltinAction } from '../../types';
+import { NEXT_LANGUAGE } from '../../types';
 import { LVGL_EVENTS } from './EventPanel';
 import CodeEditor from './CodeEditor';
 import './EventEditDialog.css';
@@ -22,6 +23,7 @@ const BUILTIN_ACTIONS: { type: BuiltinActionType; label: string; description: st
   { type: 'disable', label: 'Disable Component', description: 'Disable the specified component' },
   { type: 'setText', label: 'Set Text', description: 'Set the component text' },
   { type: 'setValue', label: 'Set Value', description: 'Set the component value' },
+  { type: 'setLanguage', label: 'Switch Language', description: 'Change the language every translated widget shows' },
 ];
 
 const CODE_TEMPLATE = `// Event handler code
@@ -41,7 +43,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   onSave,
   onClose,
 }) => {
-  const { screens, currentScreenId, getAllComponents } = useEditorStore();
+  const { screens, currentScreenId, getAllComponents, languages } = useEditorStore();
   
   // Suppress unused variable warning - currentScreenId is used for reactivity
   void currentScreenId;
@@ -65,6 +67,8 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [value, setValue] = useState<string>(
     event?.action?.value !== undefined ? String(event.action.value) : ''
   );
+  // Cycling is the default because a language switcher is usually one button
+  const [languageCode, setLanguageCode] = useState(event?.action?.language || NEXT_LANGUAGE);
   const [customCode, setCustomCode] = useState(event?.customCode || CODE_TEMPLATE);
   const [showCodePreview, setShowCodePreview] = useState(false);
 
@@ -79,6 +83,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       setTargetComponent('');
       setProperty('');
       setValue('');
+      setLanguageCode(NEXT_LANGUAGE);
     }
   }, [actionType, event]);
 
@@ -115,8 +120,11 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
           action.targetComponent = targetComponent;
           action.value = parseFloat(value) || 0;
           break;
+        case 'setLanguage':
+          action.language = languageCode;
+          break;
       }
-      
+
       newEvent.action = action;
     } else {
       newEvent.customCode = customCode;
@@ -125,7 +133,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     onSave(newEvent);
   }, [
     event, eventType, handlerType, actionType,
-    targetScreen, targetComponent, property, value, customCode, onSave
+    targetScreen, targetComponent, property, value, languageCode, customCode, onSave
   ]);
 
   const generateCodePreview = (): string => {
@@ -170,6 +178,16 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       case 'setValue':
         code += `        // Set value\n`;
         code += `        lv_slider_set_value(${targetComponent || 'target'}, ${value || '0'}, LV_ANIM_ON);\n`;
+        break;
+      case 'setLanguage':
+        if (languageCode === NEXT_LANGUAGE) {
+          code += `        // Switch to the next language\n`;
+          code += `        ui_events_next_language();\n`;
+        } else {
+          const target = languages.find((language) => language.code === languageCode);
+          code += `        // Switch language to: ${target?.name || languageCode}\n`;
+          code += `        lv_translation_set_language("${languageCode}");\n`;
+        }
         break;
     }
 
@@ -319,13 +337,41 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
             </div>
             <div className="config-row">
               <label>Value</label>
-              <input 
-                type="number" 
-                value={value} 
+              <input
+                type="number"
+                value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="Enter a value"
               />
             </div>
+          </div>
+        );
+
+      case 'setLanguage':
+        return (
+          <div className="action-config">
+            <div className="config-row">
+              <label>Language</label>
+              <select
+                value={languageCode}
+                onChange={(e) => setLanguageCode(e.target.value)}
+                disabled={languages.length === 0}
+              >
+                <option value={NEXT_LANGUAGE}>Next language (cycle)</option>
+                {languages.map(language => (
+                  <option key={language.code} value={language.code}>
+                    {language.name} ({language.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="field-hint">
+              {languages.length === 0
+                ? 'This project has no languages yet — add them in the Texts panel, then link each widget to a text resource.'
+                : languages.length === 1 && languageCode === NEXT_LANGUAGE
+                  ? 'Only one language, so cycling has nowhere to go. Add a second in the Texts panel.'
+                  : 'Every widget linked to a text resource follows the switch on its own.'}
+            </p>
           </div>
         );
 

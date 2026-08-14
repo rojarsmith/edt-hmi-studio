@@ -1,6 +1,7 @@
 // ui_events.c template generator
 
-import type { Screen, LvglComponent, EventBinding, BuiltinAction } from '../../types';
+import type { Screen, LvglComponent, EventBinding, BuiltinAction, ProjectLanguage } from '../../types';
+import { NEXT_LANGUAGE } from '../../types';
 import type { CodeGenOptions } from '../types';
 import {
   getEventHandlerName,
@@ -59,13 +60,75 @@ function findComponentByName(screens: Screen[], name: string): LvglComponent | n
   return null;
 }
 
+/** Name of the file-local helper that walks the project's languages in order. */
+const NEXT_LANGUAGE_FUNC = 'ui_events_next_language';
+
+/** Does any event cycle the language, and so need the helper defined? */
+function usesNextLanguage(screens: Screen[]): boolean {
+  return getAllEvents(screens).some(
+    ({ event }) =>
+      event.handlerType === 'builtin' &&
+      event.action?.type === 'setLanguage' &&
+      event.action.language === NEXT_LANGUAGE,
+  );
+}
+
+/**
+ * The helper behind "next language".
+ *
+ * The codes are held here rather than read back from `ui.c`'s `ui_languages`,
+ * which is static to that translation unit — and the list is short enough that
+ * duplicating it costs less than the export would.
+ *
+ * A current language outside the list (nothing has called
+ * `lv_translation_set_language` yet) starts from the first, which is also the
+ * language `ui_init` selects.
+ */
+function generateNextLanguageHelper(
+  languages: ProjectLanguage[],
+  options: CodeGenOptions,
+): string[] {
+  const lines: string[] = [];
+  const indent = getIndent(options);
+  const indent2 = getIndent(options, 2);
+  const indent3 = getIndent(options, 3);
+
+  if (options.generateComments) {
+    lines.push(generateSectionHeader('Language Switching', options));
+    lines.push('');
+    lines.push(generateComment('Advance to the next project language, wrapping at the end', options));
+  }
+  lines.push(`static void ${NEXT_LANGUAGE_FUNC}(void) {`);
+  lines.push(
+    `${indent}static const char * const codes[] = {${languages
+      .map((language) => `"${escapeCString(language.code)}"`)
+      .join(', ')}};`,
+  );
+  lines.push(`${indent}const uint32_t count = (uint32_t)(sizeof(codes) / sizeof(codes[0]));`);
+  lines.push(`${indent}const char * current = lv_translation_get_language();`);
+  lines.push(`${indent}uint32_t index;`);
+  lines.push('');
+  lines.push(`${indent}for (index = 0U; index < count; ++index) {`);
+  lines.push(`${indent2}if (current != NULL && lv_streq(current, codes[index])) {`);
+  lines.push(`${indent3}lv_translation_set_language(codes[(index + 1U) % count]);`);
+  lines.push(`${indent3}return;`);
+  lines.push(`${indent2}}`);
+  lines.push(`${indent}}`);
+  lines.push(`${indent}lv_translation_set_language(codes[0]);`);
+  lines.push('}');
+  lines.push('');
+
+  return lines;
+}
+
 /**
  * Generate code for a builtin action
  */
 function generateBuiltinActionCode(
   action: BuiltinAction,
   options: CodeGenOptions,
-  screens: Screen[]
+  screens: Screen[],
+  languages: ProjectLanguage[]
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options, 2);
@@ -220,8 +283,36 @@ function generateBuiltinActionCode(
         }
       }
       break;
+
+    // Every widget carrying a text resource follows on its own: labels handle
+    // LV_EVENT_TRANSLATION_LANGUAGE_CHANGED themselves and ui.c registers a
+    // callback for the ones that do not, so switching the language is the whole
+    // action.
+    case 'setLanguage': {
+      if (action.language === NEXT_LANGUAGE) {
+        // A single language has no next; emitting the call would still compile
+        // but the button would do nothing, which reads as a defect
+        if (languages.length < 2) break;
+        if (options.generateComments) {
+          lines.push(`${indent}${generateComment('Switch to the next language', options)}`);
+        }
+        lines.push(`${indent}${NEXT_LANGUAGE_FUNC}();`);
+        break;
+      }
+
+      // A language deleted after the event was bound leaves a code the project
+      // no longer has. Generating it would compile and then silently resolve
+      // every tag to its fallback at runtime.
+      const target = languages.find((language) => language.code === action.language);
+      if (!target) break;
+      if (options.generateComments) {
+        lines.push(`${indent}${generateComment(`Switch language to: ${target.name}`, options)}`);
+      }
+      lines.push(`${indent}lv_translation_set_language("${escapeCString(target.code)}");`);
+      break;
+    }
   }
-  
+
   return lines;
 }
 
@@ -232,7 +323,8 @@ function generateEventHandler(
   component: LvglComponent,
   event: EventBinding,
   options: CodeGenOptions,
-  screens: Screen[]
+  screens: Screen[],
+  languages: ProjectLanguage[]
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -251,7 +343,7 @@ function generateEventHandler(
   
   if (event.handlerType === 'builtin' && event.action) {
     // Generate builtin action code
-    const actionLines = generateBuiltinActionCode(event.action, options, screens);
+    const actionLines = generateBuiltinActionCode(event.action, options, screens, languages);
     lines.push(...actionLines);
   } else if (event.handlerType === 'custom' && event.customCode) {
     // Insert custom code
@@ -275,25 +367,36 @@ function generateEventHandler(
 /**
  * Generate ui_events.c source file
  */
-export function generateEventsSource(screens: Screen[], options: CodeGenOptions): string {
+export function generateEventsSource(
+  screens: Screen[],
+  options: CodeGenOptions,
+  languages: ProjectLanguage[] = [],
+): string {
   const lines: string[] = [];
-  
+
   // Includes
   lines.push(generateInclude('ui.h'));
   lines.push(generateInclude('ui_events.h'));
   lines.push('');
-  
+
+  // Emitted before the handlers that call it, and only when one does. The
+  // length check matches the one the action itself applies: with a single
+  // language there is no next, and nothing calls this.
+  if (languages.length > 1 && usesNextLanguage(screens)) {
+    lines.push(...generateNextLanguageHelper(languages, options));
+  }
+
   // Event handlers
   const allEvents = getAllEvents(screens);
-  
+
   if (allEvents.length > 0) {
     if (options.generateComments) {
       lines.push(generateSectionHeader('Event Handlers', options));
       lines.push('');
     }
-    
+
     for (const { component, event } of allEvents) {
-      lines.push(generateEventHandler(component, event, options, screens));
+      lines.push(generateEventHandler(component, event, options, screens, languages));
       lines.push('');
     }
   } else {

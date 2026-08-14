@@ -17,6 +17,7 @@ import {
 } from '../formatters/cFormatter';
 import {
   getComponentVarName,
+  getLogicFuncNames,
   getScreenLoadFuncName,
   getScreenVarName,
 } from '../utils/nameUtils';
@@ -40,6 +41,8 @@ interface LogicCodegenContext {
   componentsByName: Map<string, ComponentReference>;
   pagesById: Map<string, PageReference>;
   pagesByName: Map<string, PageReference>;
+  /** Graph id → C function name, deduplicated. Shared with ui_logic.h. */
+  logicFuncNames: Map<string, string>;
 }
 
 /**
@@ -50,7 +53,7 @@ export function generateLogicSource(
   graphs: LogicGraph[] = [],
   screens: Screen[] = [],
 ): string {
-  const context = createLogicCodegenContext(screens, options);
+  const context = createLogicCodegenContext(screens, options, graphs);
   const lines: string[] = [];
   const hasHoldingRegisterNodes = graphs.some(graph =>
     graph.nodes.some(node => node.subType === 'modbus_holding_register')
@@ -115,11 +118,11 @@ export function generateLogicSource(
       lines.push('');
     }
     for (const graph of eventGraphs) {
-      const funcName = toSnakeCase(`logic_${graph.name}`);
+      const funcName = context.logicFuncNames.get(graph.id)!;
       lines.push(`static void ${funcName}_event_cb(lv_event_t *e);`);
     }
     for (const graph of timerGraphs) {
-      const funcName = toSnakeCase(`logic_${graph.name}`);
+      const funcName = context.logicFuncNames.get(graph.id)!;
       lines.push(`static void ${funcName}_timer_cb(lv_timer_t *timer);`);
     }
     lines.push('');
@@ -140,7 +143,7 @@ export function generateLogicSource(
 
     // Generate timer callbacks
     for (const graph of timerGraphs) {
-      lines.push(generateTimerCallback(graph, options));
+      lines.push(generateTimerCallback(graph, options, context));
       lines.push('');
     }
     
@@ -199,6 +202,7 @@ function generateButtonSetTextHelper(options: CodeGenOptions): string {
 function createLogicCodegenContext(
   screens: Screen[],
   options: CodeGenOptions,
+  graphs: LogicGraph[] = [],
 ): LogicCodegenContext {
   const componentEntries: Array<{ component: LvglComponent; screenName: string }> = [];
 
@@ -279,6 +283,7 @@ function createLogicCodegenContext(
     componentsByName,
     pagesById,
     pagesByName,
+    logicFuncNames: getLogicFuncNames(graphs),
   };
 }
 
@@ -348,8 +353,12 @@ function resolveVariableName(graph: LogicGraph, node: LogicNode): string {
 /**
  * Generate timer callback wrapper
  */
-function generateTimerCallback(graph: LogicGraph, options: CodeGenOptions): string {
-  const funcName = toSnakeCase(`logic_${graph.name}`);
+function generateTimerCallback(
+  graph: LogicGraph,
+  options: CodeGenOptions,
+  context: LogicCodegenContext,
+): string {
+  const funcName = context.logicFuncNames.get(graph.id)!;
   const indent = getIndent(options);
   const lines: string[] = [];
 
@@ -394,7 +403,7 @@ function generateInitFunction(
   let hasContent = false;
 
   for (const graph of graphs) {
-    const functionName = toSnakeCase(`logic_${graph.name}`);
+    const functionName = context.logicFuncNames.get(graph.id)!;
 
     // Register event triggers
     const eventTriggers = graph.nodes.filter(n => n.subType === 'event_trigger');
@@ -439,7 +448,7 @@ function generateInitFunction(
   if (eventGraphs.length > 0) {
     lines.push('');
     for (const graph of eventGraphs) {
-      const functionName = toSnakeCase(`logic_${graph.name}`);
+      const functionName = context.logicFuncNames.get(graph.id)!;
       if (options.generateComments) {
         lines.push(`/** Event callback wrapper for ${graph.name} */`);
       }
@@ -529,8 +538,8 @@ function generateLogicFunction(
   context: LogicCodegenContext,
 ): string {
   const lines: string[] = [];
-  const functionName = toSnakeCase(`logic_${graph.name}`);
-  
+  const functionName = context.logicFuncNames.get(graph.id)!;
+
   if (options.generateComments) {
     lines.push(`/**`);
     lines.push(` * Logic: ${graph.name}`);

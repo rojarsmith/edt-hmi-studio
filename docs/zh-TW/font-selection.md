@@ -54,11 +54,14 @@
   **BIZ UDPGothic**（OFL，通用設計，為高辨識度而繪）
 - 韓文：**Noto Sans KR**；**Pretendard**（OFL，風格接近 Inter）
 
-**Noto Sans JP 與 Noto Sans KR 已隨附於 EDT GUI Studio** —— Fonts 面板的
-*Bundled fonts* 區塊列出兩者，一鍵即成為專案資源。它們走與上傳字型相同的
-auto 字元集裁剪，一套 UI 的日文或韓文字只佔數十 KB Flash，而非整套字型的
-數 MB。檔案位於 `public/fonts/`，OFL 授權文件在旁；專案存檔只存參照、
-載入時由應用程式補回 payload，因此自動存檔保持輕量。
+**Noto Sans TC、JP 與 KR 已隨附於 EDT GUI Studio** —— Fonts 面板的
+*Bundled fonts* 區塊列出它們，Typographies 的字型下拉選單也是，選一下即成為
+專案資源。它們走與上傳字型相同的 auto 字元集裁剪，一套 UI 的中日韓文字只佔
+數十 KB Flash，而非整套字型的數 MB。檔案位於 `public/fonts/`，OFL 授權文件
+在旁；專案存檔只存參照、載入時由應用程式補回 payload，因此自動存檔保持輕量。
+
+有個值得點名的錯誤：拿 Noto Sans JP 來顯示繁體中文。它有漢字，所以常用字會出現、
+看起來像成功了，但字形是日文變體，繁中專用字則整個缺漏。請用 TC 版。
 
 ## 6. 阿拉伯文 —— 以及一個 LVGL 陷阱
 
