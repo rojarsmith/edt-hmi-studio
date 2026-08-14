@@ -189,6 +189,58 @@ describe('widgets carrying a tag', () => {
     expect(result).toContain('lv_dropdown_set_selected(obj, selected);');
   });
 
+  /**
+   * Found on the EVK043027B's panel, not in a test: the open list is a
+   * separate object parented to the screen, so a font set on the dropdown
+   * never reaches it. The closed button rendered 高 while the open rows fell
+   * back to the default font and drew placeholder boxes.
+   */
+  it('styles the dropdown\'s list with the same custom font', () => {
+    const dropdown = createComponent('dropdown', {
+      name: 'mode',
+      props: { options: ['Low', 'High'], fontResource: 'ui_font_noto', fontSize: 16 },
+    });
+    const result = generate([dropdown], [], []);
+    expect(result).toContain('lv_obj_set_style_text_font(lv_dropdown_get_list(ui_mode), &ui_font_noto_16, 0);');
+  });
+
+  it('pins the dropdown\'s ▼ chrome to the default font', () => {
+    // Text fonts carry no symbol glyphs by design; the indicator is chrome
+    const dropdown = createComponent('dropdown', {
+      name: 'mode',
+      props: { options: ['Low', 'High'], fontResource: 'ui_font_noto', fontSize: 16 },
+    });
+    const result = generate([dropdown], [], []);
+    expect(result).toContain('lv_obj_set_style_text_font(ui_mode, LV_FONT_DEFAULT, LV_PART_INDICATOR);');
+  });
+
+  it('reaches the list through the typography path too', () => {
+    const dropdown = createComponent('dropdown', {
+      name: 'mode',
+      props: { options: ['Low', 'High'] },
+      typographyId: 'typo1',
+    });
+    const result = generateUiSource(
+      [createScreen({ name: 'main', components: [dropdown] })],
+      defaultOptions({ generateComments: false }),
+      undefined, [], undefined, undefined, [], undefined, undefined,
+      [{ id: 'typo1', name: 'Heading', fontResource: 'ui_font_noto', fontSize: 16 }],
+    );
+    expect(result).toContain('lv_obj_add_style(lv_dropdown_get_list(ui_mode), &ui_style_heading, 0);');
+    expect(result).toContain('lv_obj_set_style_text_font(ui_mode, LV_FONT_DEFAULT, LV_PART_INDICATOR);');
+  });
+
+  it('does not pin the chrome for a builtin-font dropdown, which has the symbols', () => {
+    // The derived typography still styles the list — rows must match the
+    // button — but Montserrat carries the symbol glyphs, so no indicator pin
+    const dropdown = createComponent('dropdown', {
+      name: 'mode',
+      props: { options: ['Low', 'High'], fontResource: 'montserrat_16' },
+    });
+    const result = generate([dropdown], [], []);
+    expect(result).not.toContain('LV_PART_INDICATOR');
+  });
+
   it('keeps a dropdown without a tag on its literal options', () => {
     const dropdown = createComponent('dropdown', { name: 'mode', props: { options: ['Low', 'High'] } });
     const result = generate([dropdown]);

@@ -9,6 +9,12 @@ import { resolveText } from '../textResources';
 import { standInProp } from '../../utils/componentText';
 import type { Typography, TextResource, ProjectLanguage, TranslatableProp } from '../../types';
 
+/** A typography style symbol and whether its font is custom. */
+interface TypographyBinding {
+  symbol: string;
+  customFont: boolean;
+}
+
 /** A translation tag and the widget prop it stands in for. */
 interface TranslationBinding {
   tag: string;
@@ -579,6 +585,20 @@ function generatePropsCode(
         lines.push(`${indent}lv_dropdown_set_dir(${varName}, ${dirMap[props.direction] || 'LV_DIR_BOTTOM'});`);
       }
       generateTextProps(varName);
+      // The open list is a separate object parented to the screen, so a font
+      // set on the dropdown never reaches it — the closed button renders 高
+      // while the open rows fall back to the default font and draw placeholder
+      // boxes. Found on the panel, not in a test. The list exists from the
+      // dropdown's constructor, so styling it here is safe.
+      if (props.fontResource && !/^montserrat_\d+$/.test(props.fontResource)) {
+        const listFontSize = (props.fontSize as number) || 16;
+        lines.push(`${indent}lv_obj_set_style_text_font(lv_dropdown_get_list(${varName}), &${props.fontResource}_${listFontSize}, 0);`);
+        // The ▼ indicator is widget chrome drawn with LV_PART_INDICATOR's
+        // font, which resolves to the custom font — and no text font carries
+        // the symbol glyphs, by design. Pin the chrome to the default font,
+        // which always does.
+        lines.push(`${indent}lv_obj_set_style_text_font(${varName}, LV_FONT_DEFAULT, LV_PART_INDICATOR);`);
+      }
       break;
       
     case 'img':
@@ -1124,7 +1144,7 @@ function generateComponentCode(
   defaultFontSize?: number,
   useBuiltinSymbols?: boolean,
   symbolFont?: string,
-  componentStyles?: Map<string, string>,
+  componentStyles?: Map<string, TypographyBinding>,
   componentTags?: Map<string, TranslationBinding>
 ): string[] {
   const lines: string[] = [];
@@ -1251,7 +1271,18 @@ function generateComponentCode(
   // shared style is added before local styles so it cannot mask them.
   const typographyStyle = componentStyles?.get(component.id);
   if (typographyStyle) {
-    lines.push(`${indent}lv_obj_add_style(${varName}, &${typographyStyle}, 0);`);
+    lines.push(`${indent}lv_obj_add_style(${varName}, &${typographyStyle.symbol}, 0);`);
+    if (component.type === 'dropdown') {
+      // The open list is a separate object parented to the screen, so the
+      // shared style must reach it too — its rows must match the button
+      lines.push(`${indent}lv_obj_add_style(lv_dropdown_get_list(${varName}), &${typographyStyle.symbol}, 0);`);
+      if (typographyStyle.customFont) {
+        // Text fonts carry no symbol glyphs by design; the ▼ chrome falls back
+        // to the default font, which always does. Built-in Montserrat already
+        // has them, so it needs no pin.
+        lines.push(`${indent}lv_obj_set_style_text_font(${varName}, LV_FONT_DEFAULT, LV_PART_INDICATOR);`);
+      }
+    }
   }
 
   // Styles. Only the default state defers to the typography — the other states
@@ -1451,7 +1482,7 @@ function generateScreenInitFunc(
   defaultFontSize?: number,
   useBuiltinSymbols?: boolean,
   symbolFont?: string,
-  componentStyles?: Map<string, string>,
+  componentStyles?: Map<string, TypographyBinding>,
   componentTags?: Map<string, TranslationBinding>
 ): string {
   const lines: string[] = [];
@@ -2048,11 +2079,20 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     takenSymbols.add(symbol);
     typographySymbols.set(typography.id, symbol);
   }
-  /** Component id → the style symbol to add to it. */
-  const componentStyles = new Map<string, string>();
+  /** Component id → the style symbol to add, and whether its font is custom. */
+  const componentStyles = new Map<string, TypographyBinding>();
+  const typographyFontById = new Map(
+    typographies.map((typography) => [typography.id, typography.fontResource]),
+  );
   for (const [componentId, typographyId] of assignments) {
     const symbol = typographySymbols.get(typographyId);
-    if (symbol) componentStyles.set(componentId, symbol);
+    if (symbol) {
+      const fontResource = typographyFontById.get(typographyId) ?? '';
+      componentStyles.set(componentId, {
+        symbol,
+        customFont: !/^montserrat_\d+$/.test(fontResource),
+      });
+    }
   }
 
   const typographyCode = generateTypographyStyles(typographies, typographySymbols, options);
