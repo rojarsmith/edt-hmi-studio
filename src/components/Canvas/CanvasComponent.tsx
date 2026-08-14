@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import type { LvglComponent, ResizeHandle } from '../../types';
 import { useEditorStore } from '../../store/editorStore';
 import { useAppStore } from '../../store/appStore';
+import { displayTextFor } from '../../utils/componentText';
 import { useResourceStore } from '../../resources/resourceStore';
 import {
   getImageButtonState,
@@ -52,8 +53,16 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   const setHoveredComponent = useEditorStore(state => state.setHoveredComponent);
   const updateComponent = useEditorStore(state => state.updateComponent);
   const defaultFontSize = useAppStore(state => state.defaultFontSize);
+  // The canvas previews the selected language, so a linked widget renders its
+  // text resource rather than the literal it was drawn with
+  const texts = useEditorStore(state => state.texts);
+  const languages = useEditorStore(state => state.languages);
+  const previewLanguage = useEditorStore(state => state.previewLanguage);
   const { styles, props, type } = component;
   const defaultStyle = styles.default;
+  const shownText = displayTextFor(component, 'text', texts, languages, previewLanguage);
+  const shownPlaceholder = displayTextFor(component, 'placeholder', texts, languages, previewLanguage);
+  const shownTitle = displayTextFor(component, 'title', texts, languages, previewLanguage);
 
   // Helper: apply shadow opacity to shadow color
   const buildShadowColor = (color?: string, opacity?: number): string => {
@@ -337,7 +346,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             fontSize: props.fontSize || defaultFontSize,
           }}>
             {children}
-            {(!children || React.Children.count(children) === 0) && (props.text || 'Button')}
+            {(!children || React.Children.count(children) === 0) && (shownText || 'Button')}
           </div>
         );
       
@@ -346,7 +355,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
           <span className="lvgl-label" style={{
             color: defaultStyle.textColor || '#333333',
             fontSize: props.fontSize || defaultFontSize,
-          }}>{props.text || 'Label'}</span>
+          }}>{shownText || 'Label'}</span>
         );
       
       case 'img':
@@ -396,7 +405,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             padding: '6px 8px',
             boxSizing: 'border-box',
           }}>
-            {props.text || props.placeholder || 'Enter text...'}
+            {shownText || shownPlaceholder || 'Enter text...'}
           </div>
         );
       
@@ -441,7 +450,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             }}>
               {props.checked && <span style={{ color: '#fff', fontSize: '12px', lineHeight: 1 }}>✓</span>}
             </div>
-            <span style={{ fontSize: defaultFontSize }}>{props.text || 'Checkbox'}</span>
+            <span style={{ fontSize: defaultFontSize }}>{shownText || 'Checkbox'}</span>
           </div>
         );
       
@@ -589,7 +598,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
               justifyContent: 'space-between',
               flexShrink: 0,
             }}>
-              <span>{props.title || 'Window'}</span>
+              <span>{shownTitle || 'Window'}</span>
               {props.showCloseBtn !== false && <span style={{ color: '#999', cursor: 'pointer' }}>✕</span>}
             </div>
             <div className="lvgl-win-content" style={{ flex: 1, padding: '8px' }}>{children}</div>

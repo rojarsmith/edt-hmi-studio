@@ -99,6 +99,9 @@ const Canvas: React.FC = () => {
   // === Fine-grained store subscriptions ===
   // State that affects rendering
   const canvas = useEditorStore(s => s.canvas);
+  const languages = useEditorStore(s => s.languages);
+  const previewLanguage = useEditorStore(s => s.previewLanguage);
+  const setPreviewLanguage = useEditorStore(s => s.setPreviewLanguage);
   useEditorStore(s => s.selection.selectedIds);
   useEditorStore(s => s.selection.hoveredId);
   const alignmentGuides = useEditorStore(s => s.alignmentGuides);
@@ -968,6 +971,25 @@ const Canvas: React.FC = () => {
         </div>
       </div>
       
+      {/* Language preview: which column of the text table the canvas renders.
+          One language means nothing to switch, so the control stays hidden. */}
+      {languages.length > 1 && (
+        <div className="language-controls">
+          <span className="language-icon" title="Preview language">🌐</span>
+          <select
+            value={previewLanguage ?? languages[0].code}
+            onChange={(e) => setPreviewLanguage(e.target.value)}
+            title="Preview language"
+          >
+            {languages.map((language) => (
+              <option key={language.code} value={language.code}>
+                {language.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Zoom controls */}
       <div className="zoom-controls">
         <button onClick={handleZoomOut} title="Zoom Out">−</button>

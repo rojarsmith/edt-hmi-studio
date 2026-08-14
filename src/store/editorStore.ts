@@ -17,6 +17,7 @@ import { MAX_SCREEN_GROUP_DEPTH } from '../types';
 import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
+import { keyFromText, literalOf, resolveText } from '../codegen/textResources';
 
 // Maximum history entries for undo/redo
 const MAX_HISTORY = 50;
@@ -144,6 +145,20 @@ interface EditorState {
     texts?: TextResource[],
   ) => void;
 
+  /**
+   * Language the canvas renders. A view preference, not project data — it is
+   * never saved, and resets to the default language when a project loads.
+   */
+  previewLanguage: string | null;
+  setPreviewLanguage: (code: string | null) => void;
+  /**
+   * Share a widget's literal as a text resource, reusing an existing resource
+   * when one already holds the same words. Returns the resource id, or null if
+   * the widget has no text to share.
+   */
+  linkComponentToText: (componentId: string) => string | null;
+  /** Back to the plain literal, keeping the words currently displayed. */
+  unlinkComponentText: (componentId: string) => void;
   /** Add a language column. The first language added becomes the default. */
   addLanguage: (code: string, name: string) => void;
   /** Removing a language drops its column from every text resource. */
@@ -540,6 +555,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   currentScreenId: initialScreen.id,
   typographies: [],
   languages: [],
+  previewLanguage: null,
   texts: [],
   screenGroups: [],
   openScreenIds: [initialScreen.id],
@@ -1061,11 +1077,69 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
+  setPreviewLanguage: (code) => {
+    set({ previewLanguage: code });
+  },
+
+  linkComponentToText: (componentId) => {
+    const comp = get().getComponentById(componentId);
+    if (!comp) return null;
+    const found = literalOf(comp);
+    if (!found) return null;
+    const literal = found.value;
+
+    const defaultCode = get().languages[0]?.code ?? 'en';
+
+    // Reuse before creating: two widgets saying "OK" should share a row, which
+    // is the same rule the migration applies
+    const existing = get().texts.find((text) => text.values[defaultCode] === literal);
+    if (existing) {
+      get().updateComponent(componentId, { textId: existing.id, textProp: found.prop });
+      return existing.id;
+    }
+
+    const id = `text_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const taken = new Set(get().texts.map((text) => text.key));
+    let key = keyFromText(literal);
+    for (let suffix = 2; taken.has(key); suffix++) key = `${keyFromText(literal)}${suffix}`;
+
+    set({
+      texts: [...get().texts, { id, key, values: { [defaultCode]: literal } }],
+      // Ensure the table has a column to hold the words
+      languages: get().languages.length > 0
+        ? get().languages
+        : [{ code: defaultCode, name: 'English' }],
+    });
+    get().updateComponent(componentId, { textId: id, textProp: found.prop });
+    return id;
+  },
+
+  unlinkComponentText: (componentId) => {
+    const comp = get().getComponentById(componentId);
+    if (!comp?.textId) return;
+    const resource = get().texts.find((text) => text.id === comp.textId);
+    const codes = get().languages.map((language) => language.code);
+    // Freeze what is on screen right now, so unlinking is invisible until the
+    // words are next edited
+    const literal = resource
+      ? resolveText(resource, get().previewLanguage ?? codes[0] ?? '', codes)
+      : undefined;
+    const frozenProp = comp.textProp ?? 'text';
+    get().updateComponent(componentId, {
+      textId: undefined,
+      textProp: undefined,
+      ...(literal !== undefined ? { props: { ...comp.props, [frozenProp]: literal } } : {}),
+    });
+  },
+
   addLanguage: (code, name) => {
     const trimmed = code.trim();
     if (!trimmed) return;
     if (get().languages.some((language) => language.code === trimmed)) return;
+    const wasEmpty = get().languages.length === 0;
     set({ languages: [...get().languages, { code: trimmed, name: name.trim() || trimmed }] });
+    // The first language becomes what the canvas shows
+    if (wasEmpty && !get().previewLanguage) set({ previewLanguage: trimmed });
   },
 
   deleteLanguage: (code) => {
@@ -1081,6 +1155,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         delete values[code];
         return { ...text, values };
       }),
+      // The canvas cannot keep previewing a language that no longer exists
+      ...(get().previewLanguage === code
+        ? { previewLanguage: remaining[0]?.code ?? null }
+        : {}),
     });
   },
 
@@ -1198,6 +1276,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       screenGroups: screenGroups ? screenGroups.map(g => ({ ...g })) : [],
       typographies: typographies ? typographies.map(t => ({ ...t })) : [],
       languages: languages ? languages.map(l => ({ ...l })) : [],
+      previewLanguage: languages?.[0]?.code ?? null,
       texts: texts ? texts.map(t => ({ ...t, values: { ...t.values } })) : [],
       // A freshly loaded project starts with just its first screen open.
       openScreenIds: screens.length > 0 ? [firstId] : [],

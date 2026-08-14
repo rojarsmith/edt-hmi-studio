@@ -6,7 +6,14 @@ import type { ImageResource, FontResource } from '../../resources/types';
 import { collectUsedCustomFonts } from '../fontUsage';
 import { deriveTypographies } from '../typography';
 import { resolveText } from '../textResources';
+import { standInProp } from '../../utils/componentText';
 import type { Typography, TextResource, ProjectLanguage } from '../../types';
+
+/** A translation tag and the widget prop it stands in for. */
+interface TranslationBinding {
+  tag: string;
+  prop: 'text' | 'placeholder' | 'title';
+}
 import {
   getScreenVarName,
   getComponentVarName,
@@ -371,8 +378,8 @@ function generatePropsCode(
   defaultFont?: string,
   defaultFontSize?: number,
   suppressText: boolean = false,
-  /** Translation tag for this widget, when its text is a shared resource. */
-  translationTag?: string
+  /** Translation tag for this widget, and which prop it stands in for. */
+  translation?: { tag: string; prop: 'text' | 'placeholder' | 'title' }
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -418,10 +425,10 @@ function generatePropsCode(
   
   switch (type) {
     case 'label':
-      if (translationTag) {
+      if (translation?.prop === 'text') {
         // Applies the text as well as storing the tag, and re-applies it
         // whenever the language changes — no handler of ours needed
-        lines.push(`${indent}lv_label_set_translation_tag(${varName}, "${escapeCString(translationTag)}");`);
+        lines.push(`${indent}lv_label_set_translation_tag(${varName}, "${escapeCString(translation.tag)}");`);
       } else if (props.text) {
         lines.push(`${indent}lv_label_set_text(${varName}, "${escapeCString(props.text)}");`);
       }
@@ -438,12 +445,12 @@ function generatePropsCode(
       break;
       
     case 'btn':
-      if (translationTag || props.text) {
+      if (translation?.prop === 'text' || props.text) {
         // Create a label inside the button
         lines.push(`${indent}lv_obj_t *${varName}_label = lv_label_create(${varName});`);
-        if (translationTag) {
+        if (translation?.prop === 'text') {
           // A button's caption is a real label, so it follows the language too
-          lines.push(`${indent}lv_label_set_translation_tag(${varName}_label, "${escapeCString(translationTag)}");`);
+          lines.push(`${indent}lv_label_set_translation_tag(${varName}_label, "${escapeCString(translation.tag)}");`);
         } else {
           lines.push(`${indent}lv_label_set_text(${varName}_label, "${escapeCString(props.text)}");`);
         }
@@ -501,11 +508,11 @@ function generatePropsCode(
       break;
       
     case 'checkbox':
-      if (translationTag) {
+      if (translation?.prop === 'text') {
         // A checkbox's caption is not a label, so LVGL will not re-apply it on
         // a language change — the callback below is ours to add
-        lines.push(`${indent}lv_checkbox_set_text(${varName}, lv_tr("${escapeCString(translationTag)}"));`);
-        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_checkbox_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translationTag)}");`);
+        lines.push(`${indent}lv_checkbox_set_text(${varName}, lv_tr("${escapeCString(translation.tag)}"));`);
+        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_checkbox_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translation.tag)}");`);
       } else if (props.text) {
         lines.push(`${indent}lv_checkbox_set_text(${varName}, "${escapeCString(props.text)}");`);
       }
@@ -522,17 +529,17 @@ function generatePropsCode(
       break;
       
     case 'textarea':
-      // The tag stands for whichever of the two the text resource came from —
-      // a textarea's own text is user input, so a placeholder is the usual one
-      if (translationTag && !props.text) {
-        lines.push(`${indent}lv_textarea_set_placeholder_text(${varName}, lv_tr("${escapeCString(translationTag)}"));`);
-        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_textarea_placeholder_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translationTag)}");`);
+      // The recorded prop decides which setter the tag drives: a shared
+      // placeholder stays a placeholder even after the textarea gains content
+      if (translation?.prop === 'placeholder') {
+        lines.push(`${indent}lv_textarea_set_placeholder_text(${varName}, lv_tr("${escapeCString(translation.tag)}"));`);
+        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_textarea_placeholder_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translation.tag)}");`);
       } else if (props.placeholder) {
         lines.push(`${indent}lv_textarea_set_placeholder_text(${varName}, "${escapeCString(props.placeholder)}");`);
       }
-      if (translationTag && props.text) {
-        lines.push(`${indent}lv_textarea_set_text(${varName}, lv_tr("${escapeCString(translationTag)}"));`);
-        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_textarea_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translationTag)}");`);
+      if (translation?.prop === 'text') {
+        lines.push(`${indent}lv_textarea_set_text(${varName}, lv_tr("${escapeCString(translation.tag)}"));`);
+        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_textarea_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translation.tag)}");`);
       } else if (props.text) {
         lines.push(`${indent}lv_textarea_set_text(${varName}, "${escapeCString(props.text)}");`);
       }
@@ -775,11 +782,11 @@ function generatePropsCode(
       break;
       
     case 'win':
-      if (translationTag) {
+      if (translation?.prop === 'title') {
         // lv_win_add_title creates and returns a real label, so keeping the
         // pointer is enough — no callback needed, LVGL re-applies it itself
         lines.push(`${indent}lv_obj_t *${varName}_title = lv_win_add_title(${varName}, "");`);
-        lines.push(`${indent}lv_label_set_translation_tag(${varName}_title, "${escapeCString(translationTag)}");`);
+        lines.push(`${indent}lv_label_set_translation_tag(${varName}_title, "${escapeCString(translation.tag)}");`);
       } else if (props.title) {
         lines.push(`${indent}lv_win_add_title(${varName}, "${escapeCString(props.title)}");`);
       }
@@ -1112,7 +1119,7 @@ function generateComponentCode(
   useBuiltinSymbols?: boolean,
   symbolFont?: string,
   componentStyles?: Map<string, string>,
-  componentTags?: Map<string, string>
+  componentTags?: Map<string, TranslationBinding>
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -1439,7 +1446,7 @@ function generateScreenInitFunc(
   useBuiltinSymbols?: boolean,
   symbolFont?: string,
   componentStyles?: Map<string, string>,
-  componentTags?: Map<string, string>
+  componentTags?: Map<string, TranslationBinding>
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -1991,8 +1998,8 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   if (translationCode.declarations.length > 0) {
     lines.push(...translationCode.declarations);
   }
-  /** Component id → the tag to give it, for the widgets that can carry one. */
-  const componentTags = new Map<string, string>();
+  /** Component id → its tag and the prop the tag stands in for. */
+  const componentTags = new Map<string, TranslationBinding>();
   /** Which callbacks are actually needed, so unused ones are not emitted. */
   const translationCallbackKinds = new Set<string>();
   if (texts.length > 0) {
@@ -2001,10 +2008,12 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
       for (const comp of components) {
         const key = comp.textId ? keyById.get(comp.textId) : undefined;
         if (key) {
-          componentTags.set(comp.id, key);
-          if (comp.type === 'checkbox') translationCallbackKinds.add('checkbox');
+          const prop = standInProp(comp);
+          componentTags.set(comp.id, { tag: key, prop });
+          if (comp.type === 'checkbox' && prop === 'text') translationCallbackKinds.add('checkbox');
           if (comp.type === 'textarea') {
-            translationCallbackKinds.add(comp.props?.text ? 'textarea' : 'textarea-placeholder');
+            if (prop === 'text') translationCallbackKinds.add('textarea');
+            if (prop === 'placeholder') translationCallbackKinds.add('textarea-placeholder');
           }
         }
         walkTags(comp.children ?? []);

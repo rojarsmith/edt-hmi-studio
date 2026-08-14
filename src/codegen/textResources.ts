@@ -24,10 +24,12 @@ export interface TextDerivation {
   texts: TextResource[];
   /** Component id → text resource id. Only components with a literal appear. */
   assignments: Map<string, string>;
+  /** Component id → the prop the resource stands in for. */
+  sourceProps: Map<string, 'text' | 'placeholder' | 'title'>;
 }
 
 /** `Save changes` → `saveChanges`, so generated tags read like identifiers. */
-function keyFromText(text: string): string {
+export function keyFromText(text: string): string {
   const words = text
     .trim()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
@@ -46,12 +48,14 @@ function keyFromText(text: string): string {
   return /^\p{N}/u.test(camel) ? `text${camel}` : camel;
 }
 
-/** The translatable string a component shows, if it has one. */
-function literalOf(comp: LvglComponent): string | undefined {
+/** The translatable string a component shows, and which prop holds it. */
+export function literalOf(
+  comp: LvglComponent,
+): { prop: (typeof TRANSLATABLE_PROPS)[number]; value: string } | undefined {
   const props = comp.props ?? {};
   for (const prop of TRANSLATABLE_PROPS) {
     const value = props[prop];
-    if (typeof value === 'string' && value.trim().length > 0) return value;
+    if (typeof value === 'string' && value.trim().length > 0) return { prop, value };
   }
   return undefined;
 }
@@ -73,13 +77,15 @@ export function deriveTextResources(
 ): TextDerivation {
   const texts: TextResource[] = [];
   const assignments = new Map<string, string>();
+  const sourceProps = new Map<string, 'text' | 'placeholder' | 'title'>();
   const byLiteral = new Map<string, TextResource>();
   const usedKeys = new Set<string>();
 
   const walk = (components: LvglComponent[]) => {
     for (const comp of components) {
-      const literal = literalOf(comp);
-      if (literal !== undefined) {
+      const found = literalOf(comp);
+      if (found !== undefined) {
+        const literal = found.value;
         let resource = byLiteral.get(literal);
         if (!resource) {
           let key = keyFromText(literal);
@@ -97,6 +103,7 @@ export function deriveTextResources(
           texts.push(resource);
         }
         assignments.set(comp.id, resource.id);
+        sourceProps.set(comp.id, found.prop);
       }
 
       walk(comp.children ?? []);
@@ -105,7 +112,7 @@ export function deriveTextResources(
 
   for (const screen of screens) walk(screen.components);
 
-  return { texts, assignments };
+  return { texts, assignments, sourceProps };
 }
 
 /**
@@ -118,14 +125,15 @@ export function applyTextResources(
   screens: Screen[],
   defaultLanguage: string,
 ): { screens: Screen[]; texts: TextResource[] } {
-  const { texts, assignments } = deriveTextResources(screens, defaultLanguage);
+  const { texts, assignments, sourceProps } = deriveTextResources(screens, defaultLanguage);
 
   const assign = (components: LvglComponent[]): LvglComponent[] =>
     components.map((comp) => {
       const textId = assignments.get(comp.id);
+      const textProp = sourceProps.get(comp.id);
       return {
         ...comp,
-        ...(textId ? { textId } : {}),
+        ...(textId ? { textId, textProp } : {}),
         children: assign(comp.children ?? []),
       };
     });

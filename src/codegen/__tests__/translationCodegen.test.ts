@@ -146,6 +146,33 @@ describe('widgets carrying a tag', () => {
     expect(result).not.toContain('ui_tr_');
   });
 
+  /**
+   * The recorded prop, not the current props, decides which setter the tag
+   * drives. Without it, a shared-placeholder textarea that gains typed content
+   * would silently rebind its translation onto the content.
+   */
+  it('keeps a shared placeholder on the placeholder even when content exists', () => {
+    const textarea = createComponent('textarea', {
+      name: 'notes',
+      props: { text: 'typed by the user', placeholder: 'Notes' },
+      textId: 't1',
+      textProp: 'placeholder',
+    });
+    const result = generate([textarea]);
+    expect(result).toContain('lv_textarea_set_placeholder_text(ui_notes, lv_tr("greeting"));');
+    // The typed content stays a literal
+    expect(result).toContain('lv_textarea_set_text(ui_notes, "typed by the user");');
+    expect(result).not.toContain('lv_textarea_set_text(ui_notes, lv_tr');
+  });
+
+  it('infers the prop for data written before textProp existed', () => {
+    // No textProp on the widget — the legacy inference must still tag the
+    // placeholder, matching what the derivation saw when it linked it
+    const textarea = createComponent('textarea', { name: 'notes', props: { placeholder: 'Notes' }, textId: 't1' });
+    const result = generate([textarea]);
+    expect(result).toContain('lv_textarea_set_placeholder_text(ui_notes, lv_tr("greeting"));');
+  });
+
   /** void* converts implicitly in C but not in C++, and generated UI is sometimes built as C++. */
   it('casts the tag out of user data explicitly', () => {
     const result = generate([createComponent('checkbox', { name: 'agree', props: { text: 'x' }, textId: 't1' })]);

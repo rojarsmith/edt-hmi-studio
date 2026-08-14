@@ -98,3 +98,30 @@
   pointer-events: none;
   z-index: 1000;
 }
+
+/* Language preview — sits beside the zoom controls, same visual weight */
+.language-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 148px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.language-controls .language-icon {
+  font-size: 14px;
+}
+
+.language-controls select {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}

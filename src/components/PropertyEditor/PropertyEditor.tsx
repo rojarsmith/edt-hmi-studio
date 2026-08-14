@@ -12,6 +12,8 @@ import type {
 } from '../../types';
 import type { ModbusRegisterTag } from '../../types/hmi';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
+import { resolveText } from '../../codegen/textResources';
+import { standInProp } from '../../utils/componentText';
 import ModbusBindingEditor from './ModbusBindingEditor';
 import {
   clampImageButtonStateIndex,
@@ -1312,6 +1314,129 @@ function FontSelector({
 const BUILTIN_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48];
 
 /**
+ * A text input that knows whether the words belong to the widget or to a
+ * shared text resource.
+ *
+ * Linked: editing writes the resource's value for the language the canvas is
+ * previewing — you edit what you see — and every widget showing that resource
+ * follows. Editing the default language also refreshes the widget's own
+ * literal, so the fallback used by unlink and delete never goes stale.
+ *
+ * Unlinked: a plain literal, with a one-click way to share it. Reuse-or-create
+ * is the store's rule, the same one migration applies.
+ */
+function TranslatableTextRow({
+  component,
+  prop,
+  label,
+  multiline,
+  onChange,
+}: {
+  component: LvglComponent;
+  prop: 'text' | 'placeholder' | 'title';
+  label: string;
+  multiline?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+}): React.ReactNode {
+  const texts = useEditorStore((s) => s.texts);
+  const languages = useEditorStore((s) => s.languages);
+  const previewLanguage = useEditorStore((s) => s.previewLanguage);
+  const screens = useEditorStore((s) => s.screens);
+  const updateText = useEditorStore((s) => s.updateText);
+  const linkComponentToText = useEditorStore((s) => s.linkComponentToText);
+  const unlinkComponentText = useEditorStore((s) => s.unlinkComponentText);
+
+  const literal = typeof component.props?.[prop] === 'string' ? (component.props[prop] as string) : '';
+
+  // The recorded prop, with the legacy inference as fallback — one rule,
+  // shared with the canvas
+  const standIn = standInProp(component);
+  const resource = component.textId && prop === standIn
+    ? texts.find((text) => text.id === component.textId)
+    : undefined;
+
+  if (!resource) {
+    return (
+      <div className="property-row">
+        <label>{label}</label>
+        {multiline ? (
+          <textarea
+            value={literal}
+            onChange={(e) => onChange(prop, e.target.value)}
+            rows={3}
+            style={{ width: '100%', resize: 'vertical' }}
+          />
+        ) : (
+          <input type="text" value={literal} onChange={(e) => onChange(prop, e.target.value)} />
+        )}
+        {prop === standIn && literal.trim().length > 0 && (
+          <button
+            className="text-link-btn"
+            title="Share as a translatable text resource"
+            onClick={() => linkComponentToText(component.id)}
+          >
+            🌐
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const codes = languages.map((language) => language.code);
+  const activeCode = previewLanguage ?? codes[0] ?? 'en';
+  const shown = resolveText(resource, activeCode, codes);
+  const activeName = languages.find((language) => language.code === activeCode)?.name ?? activeCode;
+
+  let usedBy = 0;
+  const count = (components: LvglComponent[]) => {
+    for (const comp of components) {
+      if (comp.textId === resource.id) usedBy++;
+      count(comp.children ?? []);
+    }
+  };
+  for (const screen of screens) count(screen.components);
+
+  const handleEdit = (value: string) => {
+    updateText(resource.id, activeCode, value);
+    // Keep the widget's own literal current while the default language is the
+    // one being edited, so falling back to it later shows today's words
+    if (activeCode === codes[0]) onChange(prop, value);
+  };
+
+  return (
+    <>
+      <div className="property-row">
+        <label>{label}</label>
+        {multiline ? (
+          <textarea
+            value={shown}
+            onChange={(e) => handleEdit(e.target.value)}
+            rows={3}
+            style={{ width: '100%', resize: 'vertical' }}
+          />
+        ) : (
+          <input type="text" value={shown} onChange={(e) => handleEdit(e.target.value)} />
+        )}
+      </div>
+      <div className="property-row text-resource-note">
+        <label />
+        <span>
+          🌐 <code>{resource.key}</code> · {activeName} · used by {usedBy}
+          <button
+            className="text-unlink-btn"
+            title="Stop sharing; keep the words currently shown"
+            onClick={() => unlinkComponentText(component.id)}
+          >
+            unlink
+          </button>
+        </span>
+      </div>
+    </>
+  );
+}
+
+/**
  * How a widget's text is styled: a named typography, or nothing.
  *
  * The font selector below only appears when no typography is assigned. With one
@@ -1717,14 +1842,7 @@ function renderComponentProps(
         <>
           <div className="property-section">
             <div className="section-header">Button</div>
-            <div className="property-row">
-              <label>Text</label>
-              <input
-                type="text"
-                value={props.text || ''}
-                onChange={(e) => onChange('text', e.target.value)}
-              />
-            </div>
+            <TranslatableTextRow component={component} prop="text" label="Text" onChange={onChange} />
             <TextStyleSelector
               component={component}
               onChange={onChange}
@@ -1750,14 +1868,7 @@ function renderComponentProps(
       return (
         <div className="property-section">
           <div className="section-header">Label</div>
-          <div className="property-row">
-            <label>Text</label>
-            <input
-              type="text"
-              value={props.text || ''}
-              onChange={(e) => onChange('text', e.target.value)}
-            />
-          </div>
+          <TranslatableTextRow component={component} prop="text" label="Text" onChange={onChange} />
           <TextStyleSelector
             component={component}
             onChange={onChange}
@@ -1793,23 +1904,8 @@ function renderComponentProps(
       return (
         <div className="property-section">
           <div className="section-header">Text Area</div>
-          <div className="property-row">
-            <label>Content</label>
-            <textarea
-              value={props.text || ''}
-              onChange={(e) => onChange('text', e.target.value)}
-              rows={3}
-              style={{ width: '100%', resize: 'vertical' }}
-            />
-          </div>
-          <div className="property-row">
-            <label>Placeholder</label>
-            <input
-              type="text"
-              value={props.placeholder || ''}
-              onChange={(e) => onChange('placeholder', e.target.value)}
-            />
-          </div>
+          <TranslatableTextRow component={component} prop="text" label="Content" multiline onChange={onChange} />
+          <TranslatableTextRow component={component} prop="placeholder" label="Placeholder" onChange={onChange} />
           <TextStyleSelector
             component={component}
             onChange={onChange}
@@ -1849,14 +1945,7 @@ function renderComponentProps(
       return (
         <div className="property-section">
           <div className="section-header">Checkbox</div>
-          <div className="property-row">
-            <label>Text</label>
-            <input
-              type="text"
-              value={props.text || ''}
-              onChange={(e) => onChange('text', e.target.value)}
-            />
-          </div>
+          <TranslatableTextRow component={component} prop="text" label="Text" onChange={onChange} />
           <TextStyleSelector
             component={component}
             onChange={onChange}
@@ -2036,7 +2125,7 @@ function renderComponentProps(
       );
 
     case 'win':
-      return <WindowEditor props={props} onChange={onChange} />;
+      return <WindowEditor component={component} props={props} onChange={onChange} />;
 
     case 'table':
       return <TableEditor props={props} onChange={onChange} />;
@@ -2763,9 +2852,11 @@ function TableEditor({
 
 // Window editor component
 function WindowEditor({
+  component,
   props,
   onChange,
 }: {
+  component: LvglComponent;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   props: Record<string, any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2795,14 +2886,7 @@ function WindowEditor({
   return (
     <div className="property-section">
       <div className="section-header">Window</div>
-      <div className="property-row">
-        <label>Title</label>
-        <input
-          type="text"
-          value={props.title || ''}
-          onChange={(e) => onChange('title', e.target.value)}
-        />
-      </div>
+      <TranslatableTextRow component={component} prop="title" label="Title" onChange={onChange} />
       <div className="property-row">
         <label>Title Bar Height</label>
         <input

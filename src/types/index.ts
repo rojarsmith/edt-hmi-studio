@@ -349,6 +349,14 @@ export interface LvglComponent {
    * every widget did before text resources existed. Populated by migration.
    */
   textId?: string;
+  /**
+   * Which prop `textId` stands in for. Recorded rather than inferred: a
+   * textarea whose placeholder is shared must not have the resource rebind to
+   * its typed content the moment that content stops being empty. Absent on
+   * data written before this existed — readers fall back to the first
+   * non-empty translatable prop, which is what the derivation would have seen.
+   */
+  textProp?: 'text' | 'placeholder' | 'title';
   // Flags
   flags?: LvglFlags;
   // Optional no-code Modbus data synchronization/write behavior
