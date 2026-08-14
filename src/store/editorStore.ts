@@ -1125,10 +1125,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? resolveText(resource, get().previewLanguage ?? codes[0] ?? '', codes)
       : undefined;
     const frozenProp = comp.textProp ?? 'text';
+    // Options live on the widget as an array, and the canvas indexes into it —
+    // freezing the joined string there would render one character per option
+    const frozenValue = frozenProp === 'options' && literal !== undefined
+      ? literal.split('\n')
+      : literal;
     get().updateComponent(componentId, {
       textId: undefined,
       textProp: undefined,
-      ...(literal !== undefined ? { props: { ...comp.props, [frozenProp]: literal } } : {}),
+      ...(frozenValue !== undefined ? { props: { ...comp.props, [frozenProp]: frozenValue } } : {}),
     });
   },
 

@@ -63,6 +63,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   const shownText = displayTextFor(component, 'text', texts, languages, previewLanguage);
   const shownPlaceholder = displayTextFor(component, 'placeholder', texts, languages, previewLanguage);
   const shownTitle = displayTextFor(component, 'title', texts, languages, previewLanguage);
+  const shownOptions = displayTextFor(component, 'options', texts, languages, previewLanguage).split('\n');
 
   // Helper: apply shadow opacity to shadow color
   const buildShadowColor = (color?: string, opacity?: number): string => {
@@ -424,7 +425,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             boxSizing: 'border-box',
             color: defaultStyle.textColor || '#333',
           }}>
-            <span>{props.options?.[props.selected || 0] || 'Select...'}</span>
+            <span>{shownOptions[props.selected || 0] || 'Select...'}</span>
             <span style={{ color: '#999', fontSize: '10px' }}>▼</span>
           </div>
         );

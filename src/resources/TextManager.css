@@ -163,3 +163,21 @@
   line-height: 1.5;
   color: #888;
 }
+
+/* Multi-line cells (options resources): same look as the inputs, one line per option */
+.text-table textarea.value-input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+  display: block;
+}
+
+.text-table textarea.value-input:focus {
+  outline: 2px solid #4a90d9;
+  outline-offset: -2px;
+  background: #f7fbff;
+}

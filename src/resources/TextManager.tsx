@@ -200,17 +200,33 @@ const TextManager: React.FC = () => {
                       }}
                     />
                   </td>
-                  {languages.map((language, index) => (
-                    <td key={language.code}>
-                      <input
-                        type="text"
-                        className={`value-input ${!text.values[language.code] && index > 0 ? 'untranslated' : ''}`}
-                        value={text.values[language.code] ?? ''}
-                        placeholder={index === 0 ? '' : text.values[languages[0].code] ?? ''}
-                        onChange={(e) => updateText(text.id, language.code, e.target.value)}
-                      />
-                    </td>
-                  ))}
+                  {languages.map((language, index) => {
+                    // An options resource holds one line per option; a plain
+                    // input would silently flatten those newlines on edit
+                    const multiline = Object.values(text.values).some((value) => value.includes('\n'));
+                    const shared = {
+                      className: `value-input ${!text.values[language.code] && index > 0 ? 'untranslated' : ''}`,
+                      value: text.values[language.code] ?? '',
+                      placeholder: index === 0 ? '' : text.values[languages[0].code] ?? '',
+                    };
+                    return (
+                      <td key={language.code}>
+                        {multiline ? (
+                          <textarea
+                            {...shared}
+                            rows={Math.min(4, (shared.value || shared.placeholder).split('\n').length)}
+                            onChange={(e) => updateText(text.id, language.code, e.target.value)}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            {...shared}
+                            onChange={(e) => updateText(text.id, language.code, e.target.value)}
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
                   <td className="col-used">{usageCounts.get(text.id) ?? 0}</td>
                   <td className="col-actions">
                     <button className="delete-btn" onClick={() => handleDeleteText(text)} title="Delete">

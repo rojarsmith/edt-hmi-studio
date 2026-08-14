@@ -41,10 +41,32 @@ describe('deriveTextResources — what becomes a resource', () => {
     expect(result.assignments.get(child.id)).toBeDefined();
   });
 
-  // Array-valued props are several strings per widget, which one textId cannot express
-  it('leaves dropdown options alone for now', () => {
-    const dropdown = createComponent('dropdown', { name: 'dd', props: { options: ['A', 'B'] } });
-    expect(deriveTextResources(screensOf(dropdown), EN).texts).toEqual([]);
+  /**
+   * Options are one resource holding the whole list, newline-joined — the
+   * exact string lv_dropdown_set_options takes. The count and order are shared
+   * across languages; only the words differ.
+   */
+  it('takes dropdown options as one newline-joined resource', () => {
+    const dropdown = createComponent('dropdown', { name: 'dd', props: { options: ['Low', 'High'] } });
+    const result = deriveTextResources(screensOf(dropdown), EN);
+    expect(result.texts).toHaveLength(1);
+    expect(result.texts[0].values.en).toBe('Low\nHigh');
+    expect(result.sourceProps.get(dropdown.id)).toBe('options');
+  });
+
+  it('shares one resource between dropdowns with identical options', () => {
+    const a = createComponent('dropdown', { name: 'a', props: { options: ['Low', 'High'] } });
+    const b = createComponent('dropdown', { name: 'b', props: { options: ['Low', 'High'] } });
+    const result = deriveTextResources(screensOf(a, b), EN);
+    expect(result.texts).toHaveLength(1);
+    expect(result.assignments.get(a.id)).toBe(result.assignments.get(b.id));
+  });
+
+  // Cells and tab names have no single-string LVGL shape, so they stay literals
+  it('still leaves table cells and tab names alone', () => {
+    const table = createComponent('table', { name: 't', props: { cellData: [['A']] } });
+    const tabs = createComponent('tabview', { name: 'tv', props: { tabs: ['One', 'Two'] } });
+    expect(deriveTextResources(screensOf(table, tabs), EN).texts).toEqual([]);
   });
 });
 

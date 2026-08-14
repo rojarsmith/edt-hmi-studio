@@ -122,6 +122,42 @@ describe('unlinkComponentText', () => {
   });
 });
 
+describe('options as shared text', () => {
+  it('links a dropdown, joining its options the way LVGL takes them', () => {
+    reset([component('dd', { type: 'dropdown', props: { options: ['Low', 'High'] } })]);
+    useEditorStore.setState({ languages: [{ code: 'en', name: 'English' }] });
+
+    useEditorStore.getState().linkComponentToText('dd');
+    const state = useEditorStore.getState();
+    expect(state.texts[0].values.en).toBe('Low\nHigh');
+    expect(state.screens[0].components[0].textProp).toBe('options');
+  });
+
+  it('unlinks back to an array, not a joined string', () => {
+    // The canvas indexes props.options — freezing the joined string there
+    // would render one character per option
+    reset([component('dd', { type: 'dropdown', props: { options: ['Low', 'High'] }, textId: 't1', textProp: 'options' })]);
+    useEditorStore.setState({
+      languages: [{ code: 'en', name: 'English' }, { code: 'zh-TW', name: '繁體中文' }],
+      texts: [{ id: 't1', key: 'levels', values: { en: 'Low\nHigh', 'zh-TW': '低\n高' } }],
+      previewLanguage: 'zh-TW',
+    });
+
+    useEditorStore.getState().unlinkComponentText('dd');
+    const comp = useEditorStore.getState().screens[0].components[0];
+    expect(comp.props.options).toEqual(['低', '高']);
+    expect(comp.textId).toBeUndefined();
+  });
+
+  it('renders the previewed language on the canvas path', () => {
+    const comp = component('dd', { type: 'dropdown', props: { options: ['Low', 'High'] }, textId: 't1', textProp: 'options' });
+    const texts = [{ id: 't1', key: 'levels', values: { en: 'Low\nHigh', 'zh-TW': '低\n高' } }];
+    const languages = [{ code: 'en', name: 'English' }, { code: 'zh-TW', name: '繁體中文' }];
+    expect(displayTextFor(comp, 'options', texts, languages, 'zh-TW')).toBe('低\n高');
+    expect(displayTextFor(comp, 'options', texts, languages, 'en')).toBe('Low\nHigh');
+  });
+});
+
 describe('displayTextFor', () => {
   const languages = [{ code: 'en', name: 'English' }, { code: 'zh-TW', name: '繁體中文' }];
   const texts = [{ id: 't1', key: 'greeting', values: { en: 'Hello', 'zh-TW': '你好' } }];

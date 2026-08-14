@@ -7,12 +7,12 @@ import { collectUsedCustomFonts } from '../fontUsage';
 import { deriveTypographies } from '../typography';
 import { resolveText } from '../textResources';
 import { standInProp } from '../../utils/componentText';
-import type { Typography, TextResource, ProjectLanguage } from '../../types';
+import type { Typography, TextResource, ProjectLanguage, TranslatableProp } from '../../types';
 
 /** A translation tag and the widget prop it stands in for. */
 interface TranslationBinding {
   tag: string;
-  prop: 'text' | 'placeholder' | 'title';
+  prop: TranslatableProp;
 }
 import {
   getScreenVarName,
@@ -379,7 +379,7 @@ function generatePropsCode(
   defaultFontSize?: number,
   suppressText: boolean = false,
   /** Translation tag for this widget, and which prop it stands in for. */
-  translation?: { tag: string; prop: 'text' | 'placeholder' | 'title' }
+  translation?: { tag: string; prop: TranslatableProp }
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -556,7 +556,13 @@ function generatePropsCode(
       break;
       
     case 'dropdown':
-      if (props.options) {
+      if (translation?.prop === 'options') {
+        // One tag stands for the whole newline-joined list — the exact string
+        // this setter takes. The callback restores the selection, which
+        // lv_dropdown_set_options resets to 0.
+        lines.push(`${indent}lv_dropdown_set_options(${varName}, lv_tr("${escapeCString(translation.tag)}"));`);
+        lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_tr_dropdown_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"${escapeCString(translation.tag)}");`);
+      } else if (props.options) {
         const optionsStr = Array.isArray(props.options)
           ? props.options.map((o: string) => escapeCString(o)).join('\\n')
           : escapeCString(props.options);
@@ -1769,13 +1775,27 @@ function generateTranslationCallbacks(kinds: Set<string>, options: CodeGenOption
     lines.push('');
   }
 
-  const emit = (name: string, setter: string) => {
+  const emit = (name: string, body: string | string[]) => {
     lines.push(`static void ${name}(lv_event_t * e) {`);
-    lines.push(`${indent}${setter}`);
+    for (const statement of Array.isArray(body) ? body : [body]) {
+      lines.push(`${indent}${statement}`);
+    }
     lines.push('}');
     lines.push('');
   };
 
+  if (kinds.has('dropdown')) {
+    // lv_dropdown_set_options resets the selection to 0, so a language switch
+    // would yank the user's choice without the save/restore. The index maps
+    // across languages because the option count and order are shared — only
+    // the words differ between a resource's language values.
+    emit('ui_tr_dropdown_cb', [
+      'lv_obj_t * obj = lv_event_get_target_obj(e);',
+      'uint32_t selected = lv_dropdown_get_selected(obj);',
+      'lv_dropdown_set_options(obj, lv_tr((const char *)lv_event_get_user_data(e)));',
+      'lv_dropdown_set_selected(obj, selected);',
+    ]);
+  }
   if (kinds.has('checkbox')) {
     emit(
       'ui_tr_checkbox_cb',
@@ -2011,6 +2031,7 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
           const prop = standInProp(comp);
           componentTags.set(comp.id, { tag: key, prop });
           if (comp.type === 'checkbox' && prop === 'text') translationCallbackKinds.add('checkbox');
+          if (comp.type === 'dropdown' && prop === 'options') translationCallbackKinds.add('dropdown');
           if (comp.type === 'textarea') {
             if (prop === 'text') translationCallbackKinds.add('textarea');
             if (prop === 'placeholder') translationCallbackKinds.add('textarea-placeholder');

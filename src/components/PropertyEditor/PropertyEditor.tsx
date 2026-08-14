@@ -109,39 +109,68 @@ function isSectionVisible(section: string, componentType: string): boolean {
   return !allowed || allowed.has(componentType);
 }
 
+/** One edit to an options list, named rather than diffed out of the result. */
+type OptionsOperation =
+  | { kind: 'edit'; index: number; value: string }
+  | { kind: 'swap'; a: number; b: number }
+  | { kind: 'delete'; index: number }
+  | { kind: 'add' };
+
+/** Apply an operation to one language's lines. */
+function applyOptionsOperation(lines: string[], op: OptionsOperation): string[] {
+  switch (op.kind) {
+    case 'edit': {
+      const next = [...lines];
+      next[op.index] = op.value;
+      return next;
+    }
+    case 'swap': {
+      const next = [...lines];
+      [next[op.a], next[op.b]] = [next[op.b], next[op.a]];
+      return next;
+    }
+    case 'delete':
+      return lines.filter((_, i) => i !== op.index);
+    case 'add':
+      return [...lines, `Option ${lines.length + 1}`];
+  }
+}
+
 // Dropdown options list editor (Task 3)
 const DropdownOptionsEditor: React.FC<{
   options: string[];
   onChange: (options: string[]) => void;
-}> = ({ options, onChange }) => {
-  const handleTextChange = (index: number, value: string) => {
-    const newOptions = [...options];
-    newOptions[index] = value;
-    onChange(newOptions);
+  /**
+   * When set, edits are reported as named operations instead of result lists.
+   * A shared options resource needs the operation: replaying it per language
+   * is exact, where diffing the result list misidentifies a reorder as soon as
+   * two options hold the same words.
+   */
+  onOperation?: (op: OptionsOperation) => void;
+}> = ({ options, onChange, onOperation }) => {
+  const apply = (op: OptionsOperation) => {
+    if (onOperation) onOperation(op);
+    else onChange(applyOptionsOperation(options, op));
   };
+
+  const handleTextChange = (index: number, value: string) => apply({ kind: 'edit', index, value });
 
   const handleMoveUp = (index: number) => {
     if (index <= 0) return;
-    const newOptions = [...options];
-    [newOptions[index - 1], newOptions[index]] = [newOptions[index], newOptions[index - 1]];
-    onChange(newOptions);
+    apply({ kind: 'swap', a: index - 1, b: index });
   };
 
   const handleMoveDown = (index: number) => {
     if (index >= options.length - 1) return;
-    const newOptions = [...options];
-    [newOptions[index], newOptions[index + 1]] = [newOptions[index + 1], newOptions[index]];
-    onChange(newOptions);
+    apply({ kind: 'swap', a: index, b: index + 1 });
   };
 
   const handleDelete = (index: number) => {
     if (options.length <= 1) return;
-    onChange(options.filter((_, i) => i !== index));
+    apply({ kind: 'delete', index });
   };
 
-  const handleAdd = () => {
-    onChange([...options, `Option ${options.length + 1}`]);
-  };
+  const handleAdd = () => apply({ kind: 'add' });
 
   return (
     <div className="dropdown-options-editor">
@@ -1314,6 +1343,106 @@ function FontSelector({
 const BUILTIN_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48];
 
 /**
+ * The dropdown options editor, aware of shared text.
+ *
+ * Linked, the rows show the previewed language, and the two kinds of edit
+ * diverge on purpose: typing rewrites one line of one language, while add,
+ * delete and reorder are structural and apply to every language in lockstep —
+ * the option count and order are shared, only the words differ. That lockstep
+ * is also what keeps the generated callback's save-and-restore of the
+ * selection index meaningful across a language switch.
+ */
+function TranslatableOptionsEditor({
+  component,
+  onChange,
+}: {
+  component: LvglComponent;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+}): React.ReactNode {
+  const texts = useEditorStore((s) => s.texts);
+  const languages = useEditorStore((s) => s.languages);
+  const previewLanguage = useEditorStore((s) => s.previewLanguage);
+  const updateText = useEditorStore((s) => s.updateText);
+  const linkComponentToText = useEditorStore((s) => s.linkComponentToText);
+  const unlinkComponentText = useEditorStore((s) => s.unlinkComponentText);
+
+  const literalOptions: string[] = Array.isArray(component.props.options)
+    ? component.props.options
+    : ['Option 1', 'Option 2', 'Option 3'];
+
+  const resource = component.textId && standInProp(component) === 'options'
+    ? texts.find((text) => text.id === component.textId)
+    : undefined;
+
+  if (!resource) {
+    return (
+      <>
+        <DropdownOptionsEditor
+          options={literalOptions}
+          onChange={(newOptions) => onChange('options', newOptions)}
+        />
+        <div className="property-row">
+          <label />
+          <button
+            className="text-link-btn"
+            title="Share the options as a translatable text resource"
+            onClick={() => linkComponentToText(component.id)}
+          >
+            🌐 Share options
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  const codes = languages.map((language) => language.code);
+  const activeCode = previewLanguage ?? codes[0] ?? 'en';
+  const activeName = languages.find((language) => language.code === activeCode)?.name ?? activeCode;
+  const shownOptions = resolveText(resource, activeCode, codes).split('\n');
+
+  const writeLines = (code: string, lines: string[]) => {
+    updateText(resource.id, code, lines.join('\n'));
+    if (code === codes[0]) onChange('options', lines);
+  };
+
+  const handleOperation = (op: OptionsOperation) => {
+    if (op.kind === 'edit') {
+      // Words are per-language: rewrite one line of the previewed language.
+      // Editing an untranslated language starts from the fallback words.
+      writeLines(activeCode, applyOptionsOperation(shownOptions, op));
+      return;
+    }
+    // Structure is shared: replay the operation on every language in lockstep
+    for (const code of Object.keys(resource.values)) {
+      writeLines(code, applyOptionsOperation(resource.values[code].split('\n'), op));
+    }
+    if (!(codes[0] in resource.values)) {
+      onChange('options', applyOptionsOperation(literalOptions, op));
+    }
+  };
+
+  return (
+    <>
+      <DropdownOptionsEditor options={shownOptions} onChange={() => {}} onOperation={handleOperation} />
+      <div className="property-row text-resource-note">
+        <label />
+        <span>
+          🌐 <code>{resource.key}</code> · {activeName}
+          <button
+            className="text-unlink-btn"
+            title="Stop sharing; keep the options currently shown"
+            onClick={() => unlinkComponentText(component.id)}
+          >
+            unlink
+          </button>
+        </span>
+      </div>
+    </>
+  );
+}
+
+/**
  * A text input that knows whether the words belong to the widget or to a
  * shared text resource.
  *
@@ -2151,10 +2280,7 @@ function renderComponentProps(
           <div className="section-header">Dropdown</div>
           <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
             <label>Options</label>
-            <DropdownOptionsEditor
-              options={props.options || ['Option 1', 'Option 2', 'Option 3']}
-              onChange={(newOptions) => onChange('options', newOptions)}
-            />
+            <TranslatableOptionsEditor component={component} onChange={onChange} />
           </div>
           <div className="property-row">
             <label>Default Selection</label>

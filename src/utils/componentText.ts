@@ -5,7 +5,7 @@
 // The fallback chain matches resolveText — and therefore what LVGL does at
 // runtime — so the canvas is a truthful preview rather than a separate rule.
 
-import type { LvglComponent, ProjectLanguage, TextResource } from '../types';
+import type { LvglComponent, ProjectLanguage, TextResource, TranslatableProp } from '../types';
 import { resolveText } from '../codegen/textResources';
 
 /**
@@ -16,15 +16,24 @@ import { resolveText } from '../codegen/textResources';
  * it must not be used for new decisions, because it flips to `text` the moment
  * a shared-placeholder textarea gains typed content.
  */
-export function standInProp(comp: LvglComponent): 'text' | 'placeholder' | 'title' {
+export function standInProp(comp: LvglComponent): TranslatableProp {
   if (comp.textProp) return comp.textProp;
   return (
-    (['text', 'placeholder', 'title'] as const).find(
+    (['text', 'placeholder', 'title', 'options'] as const).find(
       (candidate) =>
-        typeof comp.props?.[candidate] === 'string' &&
-        (comp.props[candidate] as string).trim().length > 0,
+        (typeof comp.props?.[candidate] === 'string' &&
+          (comp.props[candidate] as string).trim().length > 0) ||
+        (candidate === 'options' && Array.isArray(comp.props?.options) && comp.props.options.length > 0),
     ) ?? 'text'
   );
+}
+
+/** A prop's literal as one string — options join the way LVGL takes them. */
+export function literalStringOf(comp: LvglComponent, prop: TranslatableProp): string {
+  const value = comp.props?.[prop];
+  if (typeof value === 'string') return value;
+  if (prop === 'options' && Array.isArray(value)) return value.join('\n');
+  return '';
 }
 
 /**
@@ -35,12 +44,12 @@ export function standInProp(comp: LvglComponent): 'text' | 'placeholder' | 'titl
  */
 export function displayTextFor(
   comp: LvglComponent,
-  prop: 'text' | 'placeholder' | 'title',
+  prop: TranslatableProp,
   texts: TextResource[],
   languages: ProjectLanguage[],
   previewLanguage: string | null,
 ): string {
-  const literal = typeof comp.props?.[prop] === 'string' ? (comp.props[prop] as string) : '';
+  const literal = literalStringOf(comp, prop);
 
   if (!comp.textId) return literal;
 

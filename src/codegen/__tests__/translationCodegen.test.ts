@@ -173,6 +173,29 @@ describe('widgets carrying a tag', () => {
     expect(result).toContain('lv_textarea_set_placeholder_text(ui_notes, lv_tr("greeting"));');
   });
 
+  it('drives dropdown options from the tag, and restores the selection', () => {
+    const dropdown = createComponent('dropdown', {
+      name: 'mode',
+      props: { options: ['Low', 'High'], selected: 1 },
+      textId: 't1',
+      textProp: 'options',
+    });
+    const result = generate([dropdown]);
+    expect(result).toContain('lv_dropdown_set_options(ui_mode, lv_tr("greeting"));');
+    expect(result).toContain('lv_obj_add_event_cb(ui_mode, ui_tr_dropdown_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, (void *)"greeting");');
+    // lv_dropdown_set_options resets the selection to 0, so the callback must
+    // save and restore it or a language switch yanks the user's choice
+    expect(result).toContain('uint32_t selected = lv_dropdown_get_selected(obj);');
+    expect(result).toContain('lv_dropdown_set_selected(obj, selected);');
+  });
+
+  it('keeps a dropdown without a tag on its literal options', () => {
+    const dropdown = createComponent('dropdown', { name: 'mode', props: { options: ['Low', 'High'] } });
+    const result = generate([dropdown]);
+    expect(result).toContain('lv_dropdown_set_options(ui_mode, "Low\\nHigh");');
+    expect(result).not.toContain('ui_tr_dropdown_cb');
+  });
+
   /** void* converts implicitly in C but not in C++, and generated UI is sometimes built as C++. */
   it('casts the tag out of user data explicitly', () => {
     const result = generate([createComponent('checkbox', { name: 'agree', props: { text: 'x' }, textId: 't1' })]);

@@ -7,17 +7,18 @@
 //
 // See docs/text-typography-evaluation.md §3.
 
-import type { LvglComponent, Screen, TextResource } from '../types';
+import type { LvglComponent, Screen, TextResource, TranslatableProp } from '../types';
 
 /**
- * Props holding a single translatable string.
+ * Props a resource can stand in for, in the order the derivation checks them.
  *
- * Deliberately not the array-valued ones — dropdown options, table cells and
- * tab names are each several strings, so one widget maps to several resources
- * and the widget can no longer carry a single `textId`. That needs a different
- * shape and is left until this one is wired up.
+ * `options` holds the whole list as one newline-joined value — exactly the
+ * string `lv_dropdown_set_options` takes — so a dropdown's option count and
+ * order are shared across languages and only the words differ. Table cells and
+ * tab names remain out: they have no single-string shape on the LVGL side, so
+ * each would need per-item resources rather than this model.
  */
-const TRANSLATABLE_PROPS = ['text', 'placeholder', 'title'] as const;
+const TRANSLATABLE_PROPS = ['text', 'placeholder', 'title', 'options'] as const;
 
 export interface TextDerivation {
   /** Deduplicated, in the order first encountered so keys stay stable. */
@@ -25,7 +26,7 @@ export interface TextDerivation {
   /** Component id → text resource id. Only components with a literal appear. */
   assignments: Map<string, string>;
   /** Component id → the prop the resource stands in for. */
-  sourceProps: Map<string, 'text' | 'placeholder' | 'title'>;
+  sourceProps: Map<string, TranslatableProp>;
 }
 
 /** `Save changes` → `saveChanges`, so generated tags read like identifiers. */
@@ -56,6 +57,11 @@ export function literalOf(
   for (const prop of TRANSLATABLE_PROPS) {
     const value = props[prop];
     if (typeof value === 'string' && value.trim().length > 0) return { prop, value };
+    // Options arrive as an array from the editor; the resource holds them the
+    // way LVGL takes them — one newline-joined string
+    if (prop === 'options' && Array.isArray(value) && value.length > 0) {
+      return { prop, value: value.join('\n') };
+    }
   }
   return undefined;
 }
@@ -77,7 +83,7 @@ export function deriveTextResources(
 ): TextDerivation {
   const texts: TextResource[] = [];
   const assignments = new Map<string, string>();
-  const sourceProps = new Map<string, 'text' | 'placeholder' | 'title'>();
+  const sourceProps = new Map<string, TranslatableProp>();
   const byLiteral = new Map<string, TextResource>();
   const usedKeys = new Set<string>();
 

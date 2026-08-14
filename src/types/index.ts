@@ -237,6 +237,9 @@ export interface ProjectLanguage {
   name: string;
 }
 
+/** Props whose words a text resource can stand in for. */
+export type TranslatableProp = 'text' | 'placeholder' | 'title' | 'options';
+
 /**
  * A piece of user-visible text, held once and referred to by widgets.
  *
@@ -355,8 +358,12 @@ export interface LvglComponent {
    * its typed content the moment that content stops being empty. Absent on
    * data written before this existed — readers fall back to the first
    * non-empty translatable prop, which is what the derivation would have seen.
+   *
+   * `options` is the whole list as one newline-joined value — the exact shape
+   * `lv_dropdown_set_options` takes — so the count and order of options are
+   * shared across languages and only the words differ.
    */
-  textProp?: 'text' | 'placeholder' | 'title';
+  textProp?: TranslatableProp;
   // Flags
   flags?: LvglFlags;
   // Optional no-code Modbus data synchronization/write behavior
