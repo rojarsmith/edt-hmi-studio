@@ -4,9 +4,11 @@ import React, { memo, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { LogicNode, LogicPort } from './types';
+import type { Screen, LvglComponent } from '../../types';
 import { NODE_COLORS } from './nodeDefinitions';
 import { useLogicEditorStore } from './logicEditorStore';
 import { useAppStore } from '../../store/appStore';
+import { useEditorStore } from '../../store/editorStore';
 import './LogicNode.css';
 
 // Port type colors
@@ -24,6 +26,24 @@ interface LogicNodeData {
   onDoubleClick?: (nodeId: string) => void;
 }
 
+// The trigger's target may sit on any screen, so resolution walks them
+// all - the same scope codegen's component index has.
+function findComponentName(screens: Screen[], id: string): string | undefined {
+  const walk = (comps: LvglComponent[]): string | undefined => {
+    for (const comp of comps) {
+      if (comp.id === id) return comp.name;
+      const found = walk(comp.children);
+      if (found) return found;
+    }
+    return undefined;
+  };
+  for (const screen of screens) {
+    const found = walk(screen.components);
+    if (found) return found;
+  }
+  return undefined;
+}
+
 const LogicNodeComponent: React.FC<NodeProps> = ({ 
   data, 
   selected,
@@ -32,6 +52,14 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
   const { logicNode, onDoubleClick } = nodeData;
   const { debugState, getCurrentGraph } = useLogicEditorStore();
   const factoryDevMode = useAppStore(s => s.factoryDevMode);
+  const screens = useEditorStore(s => s.screens);
+
+  // A target that no longer resolves is worth saying out loud: codegen
+  // silently falls back to deriving a variable name from the raw id.
+  const targetComponentName =
+    logicNode.subType === 'event_trigger' && logicNode.params.targetComponent
+      ? findComponentName(screens, logicNode.params.targetComponent) ?? '(missing)'
+      : undefined;
 
   // The Event Object output is factory-dev-only: generated code still
   // discards the event (docs/logic-event-trigger.md), so in normal mode the
@@ -155,7 +183,7 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
         {/* Node Parameters Preview */}
         {Object.keys(logicNode.params).length > 0 && (
           <div className="logic-node-params">
-            {renderParamsPreview(logicNode)}
+            {renderParamsPreview(logicNode, targetComponentName)}
           </div>
         )}
       </div>
@@ -164,12 +192,19 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
 };
 
 // Render a preview of node parameters
-function renderParamsPreview(node: LogicNode): React.ReactNode {
+function renderParamsPreview(node: LogicNode, targetComponentName?: string): React.ReactNode {
   const { params, subType } = node;
-  
+
   switch (subType) {
     case 'event_trigger':
-      return <span className="param-preview">Event: {params.eventType?.replace('LV_EVENT_', '')}</span>;
+      return (
+        <>
+          {targetComponentName && (
+            <span className="param-preview">Target: {targetComponentName}</span>
+          )}
+          <span className="param-preview">Event: {params.eventType?.replace('LV_EVENT_', '')}</span>
+        </>
+      );
     case 'timer_trigger':
       return <span className="param-preview">{params.mode === 'delay' ? 'Delay' : 'Interval'}: {params.duration}ms</span>;
     case 'compare':
