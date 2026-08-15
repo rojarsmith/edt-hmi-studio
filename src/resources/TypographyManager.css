@@ -231,6 +231,9 @@
 }
 
 .tm-lang-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   padding: 6px 14px;
   border: 1px solid transparent;
   border-bottom: none;
@@ -239,6 +242,7 @@
   font-size: 12px;
   color: #666;
   cursor: pointer;
+  user-select: none;
 }
 
 .tm-lang-tab:hover {
@@ -253,10 +257,101 @@
   margin-bottom: -1px;
 }
 
-.tm-lang-tab.customised::after {
+/* The dot hangs off the code, not the tab, so it sits before the × */
+.tm-lang-tab.customised .tm-lang-code::after {
   content: '•';
   margin-left: 5px;
   color: #2f7fd0;
+}
+
+/* A tab whose language has left the project: still shown, still closable */
+.tm-lang-tab.stale .tm-lang-code {
+  text-decoration: line-through;
+  color: #a05252;
+}
+
+/* The × that closes a tab. Invisible until the tab is hovered or active, so
+   the tab row reads as language codes rather than a row of controls. */
+.tm-lang-close {
+  margin: -2px -8px -2px 2px;
+  padding: 1px 5px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1;
+  color: transparent;
+  cursor: pointer;
+}
+
+.tm-lang-tab:hover .tm-lang-close,
+.tm-lang-tab.active .tm-lang-close {
+  color: #999;
+}
+
+.tm-lang-close:hover {
+  color: #b03a2e;
+  background: #f6dcd8;
+}
+
+/* ＋ and its language menu, anchored under the button like a dropdown */
+.tm-lang-add {
+  position: relative;
+  display: inline-flex;
+}
+
+.tm-lang-add-btn {
+  padding: 6px 10px;
+  font-weight: 600;
+}
+
+.tm-lang-add-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.tm-lang-add-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 31;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #d5d5d5;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+}
+
+.tm-lang-add-menu button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-lang-add-menu button:hover {
+  background: #eaf2fb;
+}
+
+.tm-lang-add-code {
+  min-width: 30px;
+  font-weight: 600;
+  color: #1f6fc4;
+}
+
+.tm-lang-add-name {
+  color: #666;
 }
 
 .tm-lang-body {

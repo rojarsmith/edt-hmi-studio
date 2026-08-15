@@ -1495,3 +1495,17 @@
   border-color: #c0392b;
   color: #c0392b;
 }
+
+/* The device-will-draw-boxes warning. Amber, because the project still builds
+   and flashes — it just renders the one thing the canvas cannot show wrong. */
+.glyph-coverage-warning {
+  display: block;
+  flex: 1;
+  padding: 6px 8px;
+  background: #fff4e5;
+  border: 1px solid #f0c98a;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #8a5a00;
+}

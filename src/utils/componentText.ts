@@ -5,7 +5,7 @@
 // The fallback chain matches resolveText — and therefore what LVGL does at
 // runtime — so the canvas is a truthful preview rather than a separate rule.
 
-import type { LvglComponent, ProjectLanguage, TextResource, TranslatableProp } from '../types';
+import type { LvglComponent, ProjectLanguage, Screen, TextResource, TranslatableProp } from '../types';
 import { resolveText } from '../codegen/textResources';
 
 /**
@@ -26,6 +26,31 @@ export function effectiveTypographyId(
 ): string | undefined {
   const resource = comp.textId ? texts.find((text) => text.id === comp.textId) : undefined;
   return resource?.typographyId ?? comp.typographyId;
+}
+
+/**
+ * How many widgets render with each typography.
+ *
+ * Counted through `effectiveTypographyId`, so a binding imposed by a text
+ * resource counts the same as one set on the widget — it is the same rendered
+ * result. Counting only the widget's own field made the Typographies panel
+ * report "Used by 0 widgets" for a typography doing all its work through the
+ * Texts table, which reads as "safe to ignore" exactly when it is not.
+ */
+export function typographyUsageCounts(
+  screens: Screen[],
+  texts: TextResource[],
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const walk = (components: LvglComponent[]) => {
+    for (const comp of components) {
+      const id = effectiveTypographyId(comp, texts);
+      if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
+      walk(comp.children ?? []);
+    }
+  };
+  for (const screen of screens) walk(screen.components);
+  return counts;
 }
 
 /**

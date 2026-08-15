@@ -7,27 +7,31 @@
 // sizes is a list nobody can scan; groups are organisational only and capped at
 // two levels, the same cap and the same reason as the screen manager.
 //
-// On the right, Default plus a tab per language. The Default is the typography
-// itself: a language without its own tab entry renders with exactly those
-// settings, so editing the Default reaches every language that did not override
-// it. A language tab stores only the difference — which is what makes "give 繁體
-// a CJK face" one field rather than a restatement of the whole style.
+// On the right, Default plus a tab per language the author chose to customise:
+// added from the ＋ menu, closed from its ×, never grown automatically from the
+// project's language list — TouchGFX's shape. The Default is the typography
+// itself: a language without a tab renders with exactly those settings, so
+// editing the Default reaches every language that has no tab. A tab stores
+// only its differences — which is what makes "give 繁體 a CJK face" one field
+// rather than a restatement of the whole style.
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { useResourceStore } from './resourceStore';
 import type {
-  LvglComponent,
   Typography,
   TypographyAlign,
   TypographyGroup,
   TypographyLanguageStyle,
 } from '../types';
+import { typographyUsageCounts } from '../utils/componentText';
 import { MAX_TYPOGRAPHY_GROUP_DEPTH } from '../types';
 import {
+  hasLanguageOverride,
   languageStylesOf,
   resolveTypographyStyle,
   overriddenLanguages,
+  tabbedLanguages,
 } from '../utils/typographyStyle';
 import { modal } from '../components/Modal';
 import { BUNDLED_FONTS, type BundledFontSpec } from './bundledFonts';
@@ -201,6 +205,7 @@ const TypographyManager: React.FC = () => {
   const typographyGroups = useEditorStore((s) => s.typographyGroups);
   const languages = useEditorStore((s) => s.languages);
   const screens = useEditorStore((s) => s.screens);
+  const texts = useEditorStore((s) => s.texts);
   const addTypography = useEditorStore((s) => s.addTypography);
   const updateTypography = useEditorStore((s) => s.updateTypography);
   const deleteTypography = useEditorStore((s) => s.deleteTypography);
@@ -217,26 +222,19 @@ const TypographyManager: React.FC = () => {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeLanguage, setActiveLanguage] = useState<string>(DEFAULT_TAB);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [renamingGroupId, setRenamingGroupId] = useState<{ id: string; value: string } | null>(null);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  /** How many widgets reference each typography, so deleting one is informed. */
-  const usageCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    const walk = (components: LvglComponent[]) => {
-      for (const comp of components) {
-        if (comp.typographyId) {
-          counts.set(comp.typographyId, (counts.get(comp.typographyId) ?? 0) + 1);
-        }
-        walk(comp.children ?? []);
-      }
-    };
-    for (const screen of screens) walk(screen.components);
-    return counts;
-  }, [screens]);
+  /**
+   * How many widgets render with each typography, so deleting one is informed.
+   * Text-imposed bindings count too — before they did, a typography working
+   * entirely through the Texts table showed "Used by 0 widgets".
+   */
+  const usageCounts = useMemo(() => typographyUsageCounts(screens, texts), [screens, texts]);
 
   const query = searchQuery.trim().toLowerCase();
   const isSearching = query.length > 0;
@@ -269,12 +267,43 @@ const TypographyManager: React.FC = () => {
 
   const selected = typographies.find((t) => t.id === selectedId) ?? null;
 
-  // A tab for a language deleted from the project would edit nothing
-  const activeTab = activeLanguage !== DEFAULT_TAB
-    && !languages.some((language) => language.code === activeLanguage)
-    ? DEFAULT_TAB
-    : activeLanguage;
+  // The tabs this typography has, in the project's language order. An entry
+  // whose language has since left the project still shows — data the author
+  // cannot see cannot be closed — just sorted to the end.
+  const languageTabs = useMemo(() => {
+    if (!selected) return [];
+    const tabbed = tabbedLanguages(selected);
+    const known = languages.map((l) => l.code).filter((code) => tabbed.includes(code));
+    return [...known, ...tabbed.filter((code) => !known.includes(code))];
+  }, [selected, languages]);
+
+  // Falls back to Default when the active tab no longer exists — closed, or
+  // belonging to the previously selected typography
+  const activeTab = activeLanguage !== DEFAULT_TAB && languageTabs.includes(activeLanguage)
+    ? activeLanguage
+    : DEFAULT_TAB;
   const isDefaultTab = activeTab === DEFAULT_TAB;
+
+  /** ＋ menu: customising a language means giving it a tab, initially empty. */
+  const handleAddLanguageTab = (code: string) => {
+    if (!selected) return;
+    setTypographyLanguageStyle(selected.id, code, {});
+    setActiveLanguage(code);
+    setAddMenuOpen(false);
+  };
+
+  /** The × on a tab. Closing it is what makes the language follow Default. */
+  const handleCloseLanguageTab = async (code: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!selected) return;
+    const label = languages.find((l) => l.code === code)?.name ?? code;
+    // An empty tab holds nothing, so closing it asks nothing
+    if (hasLanguageOverride(selected, code) && !(await modal.confirm(
+      `Close the ${label} tab?\n\nIts settings are discarded and ${label} follows Default again.`,
+    ))) return;
+    clearTypographyLanguage(selected.id, code);
+    if (activeTab === code) setActiveLanguage(DEFAULT_TAB);
+  };
 
   const handleAddGroup = useCallback((parentId: string | null) => {
     if (!canNestTypographyGroup(parentId)) {
@@ -351,7 +380,7 @@ const TypographyManager: React.FC = () => {
       onDragEnd={() => { setDraggedId(null); setDropTargetId(null); }}
       onDragOver={(event) => handleDragOver(event, typography.groupId ?? 'tm-root')}
       onDrop={(event) => handleDrop(event, typography.groupId ?? null)}
-      onClick={() => { setSelectedId(typography.id); setActiveLanguage(DEFAULT_TAB); }}
+      onClick={() => { setSelectedId(typography.id); setActiveLanguage(DEFAULT_TAB); setAddMenuOpen(false); }}
     >
       <span className="tm-icon">🅰</span>
       <span className="tm-label">
@@ -562,6 +591,9 @@ const TypographyManager: React.FC = () => {
             The identifier the generated style is named after, not a description.
           </p>
 
+          {/* Tabs exist because the author added them, not because the
+              project has languages: ＋ opens the menu of languages without
+              one, × closes a tab and the language follows Default again */}
           <div className="tm-lang-tabs">
             <button
               type="button"
@@ -570,21 +602,63 @@ const TypographyManager: React.FC = () => {
             >
               Default
             </button>
-            {languages.map((language) => (
-              <button
-                key={language.code}
-                type="button"
-                className={[
-                  'tm-lang-tab',
-                  activeTab === language.code ? 'active' : '',
-                  overriddenLanguages(selected).includes(language.code) ? 'customised' : '',
-                ].filter(Boolean).join(' ')}
-                onClick={() => setActiveLanguage(language.code)}
-                title={language.name}
-              >
-                {language.code}
-              </button>
-            ))}
+            {languageTabs.map((code) => {
+              const language = languages.find((l) => l.code === code);
+              return (
+                <span
+                  key={code}
+                  className={[
+                    'tm-lang-tab',
+                    activeTab === code ? 'active' : '',
+                    hasLanguageOverride(selected, code) ? 'customised' : '',
+                    language ? '' : 'stale',
+                  ].filter(Boolean).join(' ')}
+                  onClick={() => setActiveLanguage(code)}
+                  title={language?.name ?? `${code} is no longer one of this project's languages`}
+                >
+                  <span className="tm-lang-code">{code}</span>
+                  <button
+                    type="button"
+                    className="tm-lang-close"
+                    onClick={(event) => handleCloseLanguageTab(code, event)}
+                    title={`Close — ${language?.name ?? code} follows Default again`}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+            {languages.some((l) => !languageTabs.includes(l.code)) && (
+              <span className="tm-lang-add">
+                <button
+                  type="button"
+                  className={`tm-lang-tab tm-lang-add-btn ${addMenuOpen ? 'active' : ''}`}
+                  onClick={() => setAddMenuOpen((open) => !open)}
+                  title="Customise a language"
+                >
+                  ＋
+                </button>
+                {addMenuOpen && (
+                  <>
+                    <span className="tm-lang-add-backdrop" onClick={() => setAddMenuOpen(false)} />
+                    <span className="tm-lang-add-menu">
+                      {languages
+                        .filter((l) => !languageTabs.includes(l.code))
+                        .map((language) => (
+                          <button
+                            key={language.code}
+                            type="button"
+                            onClick={() => handleAddLanguageTab(language.code)}
+                          >
+                            <span className="tm-lang-add-code">{language.code}</span>
+                            <span className="tm-lang-add-name">{language.name}</span>
+                          </button>
+                        ))}
+                    </span>
+                  </>
+                )}
+              </span>
+            )}
           </div>
 
           <div className="tm-lang-body">
@@ -697,19 +771,6 @@ const TypographyManager: React.FC = () => {
               )}
             </div>
 
-            {!isDefaultTab && (
-              <div className="detail-row">
-                <label />
-                <button
-                  type="button"
-                  className="tm-secondary-btn"
-                  disabled={!overriddenLanguages(selected).includes(activeTab)}
-                  onClick={() => clearTypographyLanguage(selected.id, activeTab)}
-                >
-                  Follow Default again
-                </button>
-              </div>
-            )}
           </div>
 
           {isDefaultTab && (

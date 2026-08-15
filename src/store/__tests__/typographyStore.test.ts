@@ -152,6 +152,44 @@ describe('deleteTypography', () => {
   });
 });
 
+describe('setTypographyLanguageStyle', () => {
+  // A language entry is that language's tab: added on purpose, kept while
+  // empty, and gone only when the tab is closed. TouchGFX's shape — tabs do
+  // not track the project's language list.
+  it('creates the language tab when written to, even with nothing set', () => {
+    const id = useEditorStore.getState().addTypography();
+    useEditorStore.getState().setTypographyLanguageStyle(id, 'ja', {});
+    expect(useEditorStore.getState().typographies[0].languages).toEqual({ ja: {} });
+  });
+
+  it('stores only defined fields but keeps the entry when they all revert', () => {
+    const id = useEditorStore.getState().addTypography();
+    useEditorStore.getState().setTypographyLanguageStyle(id, 'ja', { fontSize: 20 });
+    useEditorStore.getState().setTypographyLanguageStyle(id, 'ja', { fontSize: undefined });
+    // The tab survives; the language just has no differences from Default
+    expect(useEditorStore.getState().typographies[0].languages).toEqual({ ja: {} });
+  });
+
+  it('leaves other language tabs alone', () => {
+    const id = useEditorStore.getState().addTypography();
+    useEditorStore.getState().setTypographyLanguageStyle(id, 'ja', { fontSize: 20 });
+    useEditorStore.getState().setTypographyLanguageStyle(id, 'ko', { fontSize: 22 });
+    expect(useEditorStore.getState().typographies[0].languages).toEqual({
+      ja: { fontSize: 20 },
+      ko: { fontSize: 22 },
+    });
+  });
+});
+
+describe('clearTypographyLanguage', () => {
+  it('closes the tab, overrides and all', () => {
+    const id = useEditorStore.getState().addTypography();
+    useEditorStore.getState().setTypographyLanguageStyle(id, 'ja', { fontSize: 20 });
+    useEditorStore.getState().clearTypographyLanguage(id, 'ja');
+    expect(useEditorStore.getState().typographies[0].languages).toEqual({});
+  });
+});
+
 describe('setScreens', () => {
   it('loads typographies alongside the screens', () => {
     useEditorStore.getState().setScreens(

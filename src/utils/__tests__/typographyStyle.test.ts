@@ -5,6 +5,7 @@ import {
   languageStylesOf,
   overriddenLanguages,
   resolveTypographyStyle,
+  tabbedLanguages,
 } from '../typographyStyle';
 import type { Typography } from '../../types';
 
@@ -103,5 +104,16 @@ describe('reporting what a language changes', () => {
 
   it('lists the languages that actually override something', () => {
     expect(overriddenLanguages(typography)).toEqual(['zh-TW']);
+  });
+
+  // Existing and differing are two facts: en has a tab (a just-added one is
+  // an empty entry), but only zh-TW reaches the generator
+  it('counts an empty entry as a tab but not as an override', () => {
+    expect(tabbedLanguages(typography)).toEqual(['zh-TW', 'en']);
+    expect(overriddenLanguages(typography)).toEqual(['zh-TW']);
+  });
+
+  it('has no tabs when nothing was ever customised', () => {
+    expect(tabbedLanguages(base)).toEqual([]);
   });
 });

@@ -15,6 +15,7 @@ import type { ModbusRegisterTag } from '../../types/hmi';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
 import { resolveText } from '../../codegen/textResources';
 import { effectiveTypographyId, standInProp } from '../../utils/componentText';
+import { glyphCoverageGaps } from '../../utils/glyphCoverage';
 import ModbusBindingEditor from './ModbusBindingEditor';
 import {
   clampImageButtonStateIndex,
@@ -1617,6 +1618,52 @@ function WidgetAlignmentRow({
 }
 
 /**
+ * Warns when the device will draw boxes where the canvas draws words.
+ *
+ * The canvas uses the browser's fonts and shows 中文 in any widget perfectly;
+ * the flashed panel only has the fonts the project converts, and the one font
+ * never converted — the built-in Montserrat — cannot grow glyphs to match the
+ * text. Without this row the first sight of the problem is the device itself,
+ * which for a no-code tool is one flash too late.
+ */
+function GlyphCoverageWarning({ component }: { component: LvglComponent }): React.ReactNode {
+  const texts = useEditorStore((s) => s.texts);
+  const typographies = useEditorStore((s) => s.typographies);
+  const languages = useEditorStore((s) => s.languages);
+
+  const gaps = glyphCoverageGaps(component, texts, typographies, languages);
+  if (gaps.length === 0) return null;
+
+  const nameOf = (code: string | null) =>
+    code === null ? 'its text' : (languages.find((l) => l.code === code)?.name ?? code);
+  const listed = gaps
+    .map((gap) => {
+      const shown = gap.characters.slice(0, 12).join('');
+      return `${nameOf(gap.language)}: ${shown}${gap.characters.length > 12 ? '…' : ''}`;
+    })
+    .join(' · ');
+  const governed = gaps[0].typography;
+  const fixLanguages = [...new Set(
+    gaps.map((gap) => gap.language).filter((code): code is string => code !== null),
+  )];
+
+  return (
+    <div className="property-row">
+      <label />
+      <span className="glyph-coverage-warning">
+        Will show □ on the device — the built-in Montserrat has no glyphs for {listed}. The
+        canvas looks right only because it draws with the browser&apos;s fonts.{' '}
+        {governed
+          ? (fixLanguages.length > 0
+            ? `In the Typographies panel, give “${governed.name}” a ${fixLanguages.join(', ')} tab (the ＋ next to Default) with a font that covers them, such as Noto Sans TC.`
+            : `In the Typographies panel, pick a covering font for “${governed.name}” — its Default is the built-in Montserrat.`)
+          : 'Bind a Typography and set a covering font there — only a typography can give a language its own font.'}
+      </span>
+    </div>
+  );
+}
+
+/**
  * How a widget's text is styled: a named typography, and nothing else.
  *
  * There is deliberately no font control here. A face and a size set on one
@@ -1664,13 +1711,16 @@ function TextStyleSelector({
 
   if (fromText) {
     return (
-      <div className="property-row">
-        <label>Typography</label>
-        <select value={fromText.id} disabled title="Set on the text resource, in the Texts panel">
-          <option value={fromText.id}>{fromText.name}</option>
-        </select>
-        <span className="property-hint">from “{resource?.key}”</span>
-      </div>
+      <>
+        <div className="property-row">
+          <label>Typography</label>
+          <select value={fromText.id} disabled title="Set on the text resource, in the Texts panel">
+            <option value={fromText.id}>{fromText.name}</option>
+          </select>
+          <span className="property-hint">from “{resource?.key}”</span>
+        </div>
+        <GlyphCoverageWarning component={component} />
+      </>
     );
   }
 
@@ -1698,6 +1748,7 @@ function TextStyleSelector({
           </button>
         </div>
       )}
+      <GlyphCoverageWarning component={component} />
     </>
   );
 }

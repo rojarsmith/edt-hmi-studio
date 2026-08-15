@@ -50,6 +50,19 @@ export function hasLanguageOverride(typography: Typography, language: string): b
 }
 
 /**
+ * The languages that have a tab of their own, whether or not they have set
+ * anything yet.
+ *
+ * An entry existing and an entry differing are two facts: a just-added tab is
+ * an empty entry — it exists, so the editor shows it, but it renders exactly
+ * as the Default and the generator ignores it. Only `overriddenLanguages`
+ * feeds codegen.
+ */
+export function tabbedLanguages(typography: Typography): string[] {
+  return Object.keys(languageStylesOf(typography));
+}
+
+/**
  * The settings a language actually renders with.
  *
  * Passing no language — or one with no entry — returns the Default itself,

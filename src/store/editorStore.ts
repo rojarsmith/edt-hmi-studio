@@ -1345,16 +1345,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const current = languageStylesOf(typography);
         const next = { ...current[language], ...updates };
 
-        // An override equal to the Default in every field is not an override.
-        // Storing it would make the language look customised in the tabs and
-        // would keep it from following a later edit to the Default.
+        // Undefined fields inherit and are not stored — but the entry itself
+        // is kept even when empty: it is the language's tab, added on purpose
+        // and removed only by closing it. An empty entry neither marks the
+        // tab customised nor stops a later edit to the Default reaching it,
+        // because both of those read the fields, not the entry.
         const kept = Object.fromEntries(
           Object.entries(next).filter(([, value]) => value !== undefined),
         );
 
-        const languages = { ...current };
-        if (Object.keys(kept).length > 0) languages[language] = kept;
-        else delete languages[language];
+        const languages = { ...current, [language]: kept };
 
         return {
           ...typography,
