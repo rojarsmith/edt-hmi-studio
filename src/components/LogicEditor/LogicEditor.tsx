@@ -27,11 +27,11 @@ import '@xyflow/react/dist/style.css';
 import { useLogicEditorStore } from './logicEditorStore';
 import LogicNodeComponent from './LogicNode';
 import NodePalette from './NodePalette';
+import GraphManager, { promptCreateGraph } from './GraphManager';
 import VariablePanel from './VariablePanel';
 import NodeEditDialog from './NodeEditDialog';
 import type { LogicNodeDefinition, LogicNode as LogicNodeType, LogicConnection as LogicConnectionType } from './types';
 import { NODE_COLORS } from './nodeDefinitions';
-import { modal } from '../Modal';
 import './LogicEditor.css';
 
 // Custom node types
@@ -80,7 +80,6 @@ const LogicEditorInner: React.FC = () => {
   
   const {
     getCurrentGraph,
-    currentGraphId,
     addNode,
     deleteNodes,
     updateNodePosition,
@@ -95,12 +94,9 @@ const LogicEditorInner: React.FC = () => {
     stepDebug,
     graphs,
     createGraph,
-    setCurrentGraph,
-    deleteGraph,
   } = useLogicEditorStore();
 
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [showGraphList, setShowGraphList] = useState(false);
 
   const currentGraph = getCurrentGraph();
 
@@ -214,26 +210,8 @@ const LogicEditorInner: React.FC = () => {
 
   // Create new graph
   const handleCreateGraph = useCallback(async () => {
-    // Accepting the default twice used to leave two graphs called the same
-    // thing, indistinguishable in the list. Generated code deduplicates the
-    // function names either way; this only stops the editor suggesting it.
-    const taken = new Set(graphs.map(graph => graph.name));
-    let suggestion = 'New Logic Graph';
-    for (let index = 2; taken.has(suggestion); index++) suggestion = `New Logic Graph ${index}`;
-
-    const name = await modal.prompt('Enter a logic graph name:', suggestion);
-    if (name) {
-      createGraph(name);
-      setShowGraphList(false);
-    }
+    await promptCreateGraph(graphs, createGraph);
   }, [createGraph, graphs]);
-
-  // Delete current graph
-  const handleDeleteGraph = useCallback(async () => {
-    if (currentGraphId && await modal.confirm('Delete this logic graph?')) {
-      deleteGraph(currentGraphId);
-    }
-  }, [currentGraphId, deleteGraph]);
 
   // Drag start handler for palette
   const handlePaletteDragStart = useCallback(() => {
@@ -251,8 +229,11 @@ const LogicEditorInner: React.FC = () => {
 
   return (
     <div className="logic-editor" tabIndex={0} onKeyDown={handleKeyDown}>
-      {/* Left Panel - Node Palette */}
-      <NodePalette onDragStart={handlePaletteDragStart} />
+      {/* Left Panel - Node Palette + Graph Manager */}
+      <div className="logic-left-panel">
+        <NodePalette onDragStart={handlePaletteDragStart} />
+        <GraphManager />
+      </div>
 
       {/* Center - Flow Canvas */}
       <div 
@@ -291,44 +272,6 @@ const LogicEditorInner: React.FC = () => {
               maskColor="rgba(0, 0, 0, 0.8)"
               style={{ background: '#1a1a1a' }}
             />
-
-            {/* Top Panel - Graph Management & Debug */}
-            <Panel position="top-left" className="top-panel">
-              <div className="graph-selector">
-                <button 
-                  className="graph-dropdown-btn"
-                  onClick={() => setShowGraphList(!showGraphList)}
-                >
-                  📊 {currentGraph?.name || 'Select Logic Graph'}
-                  <span className="dropdown-arrow">▼</span>
-                </button>
-                {showGraphList && (
-                  <div className="graph-dropdown">
-                    {graphs.map(g => (
-                      <div 
-                        key={g.id}
-                        className={`graph-item ${g.id === currentGraphId ? 'active' : ''}`}
-                        onClick={() => {
-                          setCurrentGraph(g.id);
-                          setShowGraphList(false);
-                        }}
-                      >
-                        {g.name}
-                      </div>
-                    ))}
-                    <div className="graph-item create" onClick={handleCreateGraph}>
-                      + New Logic Graph
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {currentGraph && (
-                <button className="delete-graph-btn" onClick={handleDeleteGraph} title="Delete logic graph">
-                  🗑️
-                </button>
-              )}
-            </Panel>
 
             {/* Debug Panel */}
             <Panel position="top-right" className="debug-panel">

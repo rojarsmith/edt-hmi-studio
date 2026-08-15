@@ -1,0 +1,187 @@
+/* Logic Graph Manager Styles */
+
+.graph-manager {
+  border-top: 1px solid #333;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* Header */
+.graph-manager-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.graph-manager-header:hover {
+  background: #2a2a2a;
+}
+
+.graph-manager-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.graph-manager-count {
+  font-size: 11px;
+  color: #888;
+  background: #2d2d2d;
+  border-radius: 8px;
+  padding: 1px 7px;
+}
+
+.graph-manager-add {
+  border: none;
+  background: none;
+  color: #888;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.graph-manager-add:hover {
+  color: #2196f3;
+  background: #2d2d2d;
+}
+
+.graph-manager-toggle {
+  font-size: 10px;
+  color: #666;
+}
+
+/* Search */
+.graph-manager-search {
+  padding: 0 12px 8px;
+  position: relative;
+}
+
+.graph-manager-search input {
+  width: 100%;
+  padding: 6px 26px 6px 10px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #2d2d2d;
+  color: #fff;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.graph-manager-search input:focus {
+  border-color: #2196f3;
+}
+
+.graph-manager-search input::placeholder {
+  color: #666;
+}
+
+.graph-manager-clear-search {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: -4px;
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px;
+}
+
+.graph-manager-clear-search:hover {
+  color: #fff;
+}
+
+/* Graph List */
+.graph-manager-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding-bottom: 6px;
+}
+
+.graph-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #ccc;
+  border-left: 3px solid transparent;
+  transition: background 0.15s;
+}
+
+.graph-row:hover {
+  background: #2a2a2a;
+}
+
+.graph-row.active {
+  background: rgba(33, 150, 243, 0.15);
+  border-left-color: #2196f3;
+  color: #6bb3ff;
+}
+
+.graph-row-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.graph-row-delete {
+  border: none;
+  background: none;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+
+.graph-row:hover .graph-row-delete {
+  opacity: 1;
+}
+
+.graph-row-delete:hover {
+  color: #f44336;
+  background: #442222;
+}
+
+.graph-manager-empty {
+  padding: 14px 12px;
+  text-align: center;
+  color: #666;
+  font-size: 12px;
+}
+
+/* Scrollbar */
+.graph-manager-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.graph-manager-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.graph-manager-list::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+.graph-manager-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
