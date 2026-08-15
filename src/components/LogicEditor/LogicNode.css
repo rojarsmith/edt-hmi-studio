@@ -126,8 +126,15 @@
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
-.port-handle:hover {
-  transform: scale(1.3);
+/* Keep the library's centering translate when scaling on hover,
+   otherwise the handle jumps out of its row. */
+.port-handle.react-flow__handle-left:hover {
+  transform: translate(-50%, -50%) scale(1.3);
+  box-shadow: 0 0 6px currentColor;
+}
+
+.port-handle.react-flow__handle-right:hover {
+  transform: translate(50%, -50%) scale(1.3);
   box-shadow: 0 0 6px currentColor;
 }
 

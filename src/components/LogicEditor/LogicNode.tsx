@@ -90,7 +90,7 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
       <div className="logic-node-body">
         {/* Input Ports */}
         <div className="logic-node-inputs">
-          {logicNode.inputs.map((input: LogicPort, index: number) => (
+          {logicNode.inputs.map((input: LogicPort) => (
             <div key={input.id} className="logic-port input-port">
               <Handle
                 type="target"
@@ -99,7 +99,6 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
                 className={`port-handle ${input.type === 'execution' ? 'execution-port' : 'data-port'}`}
                 style={{
                   backgroundColor: PORT_COLORS[input.type] || PORT_COLORS.any,
-                  top: `${30 + index * 24}px`,
                 }}
               />
               <span className="port-label">{input.name}</span>
@@ -115,7 +114,7 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
 
         {/* Output Ports */}
         <div className="logic-node-outputs">
-          {logicNode.outputs.map((output: LogicPort, index: number) => (
+          {logicNode.outputs.map((output: LogicPort) => (
             <div key={output.id} className="logic-port output-port">
               <span className="port-label">{output.name}</span>
               {/* Show debug value */}
@@ -131,7 +130,6 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
                 className={`port-handle ${output.type === 'execution' ? 'execution-port' : 'data-port'}`}
                 style={{
                   backgroundColor: PORT_COLORS[output.type] || PORT_COLORS.any,
-                  top: `${30 + index * 24}px`,
                 }}
               />
             </div>
