@@ -60,8 +60,10 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 | --- | --- | --- |
 | **Code** 編輯分頁（產生的 C 原始碼），位於分頁列最右側 | 顯示 | 隱藏 |
 | **View → Code** 選單項目，位於 Preview 之後 | 顯示 | 隱藏 |
+| **Icon** 分頁與 **View → Icon** 選單項目 —— 圖庫能瀏覽、能複製 SVG，但免寫程式碼的作者目前沒有任何一條路能讓它到達面板；見 [icon-library.md](icon-library.md) | 顯示 | 隱藏 |
 | 工具列 **Info** 對話框的 **LVGL** 區段 —— heap 大小、預設字型、大字型支援 | 顯示 | 隱藏 |
-| **Deploy** 分頁的 **Image Placement** 區段 —— 每張已燒錄圖片的位址、大小與所在記憶體 | 顯示 | 隱藏 |
+| **Deploy** 分頁的 **Asset Placement** 區段 —— 每個已燒錄圖片與字型字圖的起訖位址、兩端所在記憶體，字型另有字數與平均每字位元組 | 顯示 | 隱藏 |
+| Text → Fonts 分頁 **Font Properties** 的轉檔設定 —— C 變數名、字元集模式、額外字元與範圍、涵蓋數、BPP、產生按鈕。中繼資料、名稱、警告與預覽留在一般模式 | 顯示 | 隱藏 |
 
 日後決定的項目請繼續補充於此表。
 

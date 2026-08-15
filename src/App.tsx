@@ -163,11 +163,14 @@ const EditorView: React.FC<EditorViewProps> = ({
   const [showAboutDialog, setShowAboutDialog] = useState(false);
   const [showHardwareInfo, setShowHardwareInfo] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('design');
-  // The Code tab is factory-dev-mode only — see docs/factory-dev-mode.md.
+  // The Code and Icon tabs are factory-dev-mode only — see
+  // docs/factory-dev-mode.md and docs/icon-library.md.
   const factoryDevMode = useAppStore(s => s.factoryDevMode);
-  // Derived rather than synced: leaving the mode makes the Code tab disappear,
+  // Derived rather than synced: leaving the mode makes those tabs disappear,
   // and everything downstream should immediately read as 'design' instead.
-  const effectiveTab: TabType = activeTab === 'code' && !factoryDevMode ? 'design' : activeTab;
+  const effectiveTab: TabType = (activeTab === 'code' || activeTab === 'icon') && !factoryDevMode
+    ? 'design'
+    : activeTab;
   const [previewMode, setPreviewMode] = useState<'simple' | 'wasm' | 'compile'>('simple');
   const resolvedPreviewMode = !isCompilePreviewEnabled && previewMode === 'compile'
     ? 'simple'
@@ -603,12 +606,17 @@ const EditorView: React.FC<EditorViewProps> = ({
             >
               🔤 Text
             </button>
-            <button
-              className={`tab-btn ${effectiveTab === 'icon' ? 'active' : ''}`}
-              onClick={() => setActiveTab('icon')}
-            >
-              ⭐ Icon
-            </button>
+            {/* Factory-dev only: the library browses and copies, but nothing
+                a no-code author can do with it reaches the panel yet — see
+                docs/icon-library.md for what works and what is planned. */}
+            {factoryDevMode && (
+              <button
+                className={`tab-btn ${effectiveTab === 'icon' ? 'active' : ''}`}
+                onClick={() => setActiveTab('icon')}
+              >
+                ⭐ Icon
+              </button>
+            )}
             <button
               className={`tab-btn ${effectiveTab === 'logic' ? 'active' : ''}`}
               onClick={() => setActiveTab('logic')}

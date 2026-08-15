@@ -105,7 +105,11 @@ const DesktopMenuBar = ({
           { id: 'design', label: 'Design', active: activeTab === 'design', onClick: () => onSelectTab('design') },
           { id: 'image', label: 'Image', active: activeTab === 'image', onClick: () => onSelectTab('image') },
           { id: 'text', label: 'Text', active: activeTab === 'text', onClick: () => onSelectTab('text') },
-          { id: 'icon', label: 'Icon', active: activeTab === 'icon', onClick: () => onSelectTab('icon') },
+          // Icon is factory-dev-mode only, same as Code below — the library
+          // has no no-code path to the panel yet; see docs/icon-library.md.
+          ...(factoryDevMode
+            ? [{ id: 'icon', label: 'Icon', active: activeTab === 'icon', onClick: () => onSelectTab('icon') }]
+            : []),
           { id: 'logic', label: 'Logic', active: activeTab === 'logic', onClick: () => onSelectTab('logic') },
           { id: 'protocol', label: 'Protocol', active: activeTab === 'protocol', onClick: () => onSelectTab('protocol') },
           { id: 'preview', label: 'Preview', active: activeTab === 'preview', onClick: () => onSelectTab('preview') },
