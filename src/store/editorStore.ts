@@ -10,10 +10,17 @@ import type {
   Screen,
   ScreenGroup,
   Typography,
+  TypographyGroup,
+  TypographyLanguageStyle,
   ProjectLanguage,
   TextResource,
 } from '../types';
-import { MAX_SCREEN_GROUP_DEPTH, sameTextKey } from '../types';
+import {
+  MAX_SCREEN_GROUP_DEPTH,
+  MAX_TYPOGRAPHY_GROUP_DEPTH,
+  sameTextKey,
+} from '../types';
+import { languageStylesOf } from '../utils/typographyStyle';
 import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
@@ -143,6 +150,7 @@ interface EditorState {
     typographies?: Typography[],
     languages?: ProjectLanguage[],
     texts?: TextResource[],
+    typographyGroups?: TypographyGroup[],
   ) => void;
 
   /**
@@ -182,6 +190,27 @@ interface EditorState {
   updateTypography: (id: string, updates: Partial<Typography>) => void;
   /** Removing one leaves its widgets inheriting the screen default again. */
   deleteTypography: (id: string) => void;
+  /**
+   * Change what one language overrides. Passing `undefined` for a field drops
+   * that override, so the language goes back to following the Default.
+   */
+  setTypographyLanguageStyle: (
+    id: string,
+    language: string,
+    updates: Partial<TypographyLanguageStyle>,
+  ) => void;
+  /** Drop a language's overrides entirely; it renders with the Default again. */
+  clearTypographyLanguage: (id: string, language: string) => void;
+
+  typographyGroups: TypographyGroup[];
+  getTypographyGroupDepth: (groupId: string | null | undefined) => number;
+  canNestTypographyGroup: (parentId: string | null | undefined) => boolean;
+  /** Returns null when the parent is already at the deepest allowed level. */
+  addTypographyGroup: (parentId?: string | null) => string | null;
+  renameTypographyGroup: (groupId: string, name: string) => void;
+  /** Contents are lifted to the parent rather than deleted with the folder. */
+  deleteTypographyGroup: (groupId: string) => void;
+  moveTypographyToGroup: (typographyId: string, groupId: string | null) => void;
   syncModbusBindings: (tags: ModbusRegisterTag[]) => void;
   
   // Actions - Z-order
@@ -561,6 +590,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   screens: [initialScreen],
   currentScreenId: initialScreen.id,
   typographies: [],
+  typographyGroups: [],
   languages: [],
   previewLanguage: null,
   texts: [],
@@ -1280,6 +1310,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         {
           id,
           name,
+          // Carried explicitly rather than by spreading the seed, so a caller
+          // cannot smuggle in a field this constructor does not know about
+          groupId: seed.groupId ?? null,
           fontResource: seed.fontResource ?? 'montserrat_14',
           fontSize: seed.fontSize ?? 14,
           letterSpace: seed.letterSpace ?? 0,
@@ -1297,6 +1330,119 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       typographies: get().typographies.map((typography) =>
         typography.id === id ? { ...typography, ...updates } : typography,
+      ),
+    });
+  },
+
+  setTypographyLanguageStyle: (id, language, updates) => {
+    set({
+      typographies: get().typographies.map((typography) => {
+        if (typography.id !== id) return typography;
+
+        // Read through the compatibility shim, so the first edit to a project
+        // written before languages could override anything but the font
+        // carries its existing overrides forward rather than dropping them
+        const current = languageStylesOf(typography);
+        const next = { ...current[language], ...updates };
+
+        // An override equal to the Default in every field is not an override.
+        // Storing it would make the language look customised in the tabs and
+        // would keep it from following a later edit to the Default.
+        const kept = Object.fromEntries(
+          Object.entries(next).filter(([, value]) => value !== undefined),
+        );
+
+        const languages = { ...current };
+        if (Object.keys(kept).length > 0) languages[language] = kept;
+        else delete languages[language];
+
+        return {
+          ...typography,
+          languages,
+          // Folded in above; never written back
+          languageFonts: undefined,
+        };
+      }),
+    });
+  },
+
+  clearTypographyLanguage: (id, language) => {
+    set({
+      typographies: get().typographies.map((typography) => {
+        if (typography.id !== id) return typography;
+        const languages = { ...languageStylesOf(typography) };
+        delete languages[language];
+        return { ...typography, languages, languageFonts: undefined };
+      }),
+    });
+  },
+
+  // Typography Group Actions — the same shape as screen groups, and capped at
+  // the same depth for the same reason: a tree deep enough to hide things is
+  // worse than a list.
+  getTypographyGroupDepth: (groupId) => {
+    if (!groupId) return 0;
+    const { typographyGroups } = get();
+    let depth = 0;
+    let current = typographyGroups.find((group) => group.id === groupId);
+    // Bounded, so a corrupted parent cycle cannot hang the editor
+    while (current && depth <= MAX_TYPOGRAPHY_GROUP_DEPTH) {
+      depth += 1;
+      if (!current.parentId) break;
+      current = typographyGroups.find((group) => group.id === current!.parentId);
+    }
+    return depth;
+  },
+
+  canNestTypographyGroup: (parentId) => {
+    if (!parentId) return true;
+    return get().getTypographyGroupDepth(parentId) < MAX_TYPOGRAPHY_GROUP_DEPTH;
+  },
+
+  addTypographyGroup: (parentId = null) => {
+    if (!get().canNestTypographyGroup(parentId)) return null;
+
+    const id = `typogroup_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const taken = new Set(get().typographyGroups.map((group) => group.name));
+    let name = 'New group';
+    for (let suffix = 2; taken.has(name); suffix++) name = `New group ${suffix}`;
+
+    set({
+      typographyGroups: [...get().typographyGroups, { id, name, parentId: parentId ?? null }],
+    });
+    return id;
+  },
+
+  renameTypographyGroup: (groupId, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set({
+      typographyGroups: get().typographyGroups.map((group) =>
+        group.id === groupId ? { ...group, name: trimmed } : group,
+      ),
+    });
+  },
+
+  deleteTypographyGroup: (groupId) => {
+    const group = get().typographyGroups.find((candidate) => candidate.id === groupId);
+    if (!group) return;
+    const parentId = group.parentId ?? null;
+
+    set({
+      // Contents are lifted, never deleted with the folder
+      typographyGroups: get().typographyGroups
+        .filter((candidate) => candidate.id !== groupId)
+        .map((candidate) => (candidate.parentId === groupId ? { ...candidate, parentId } : candidate)),
+      typographies: get().typographies.map((typography) =>
+        typography.groupId === groupId ? { ...typography, groupId: parentId } : typography,
+      ),
+    });
+  },
+
+  moveTypographyToGroup: (typographyId, groupId) => {
+    set({
+      typographies: get().typographies.map((typography) =>
+        typography.id === typographyId ? { ...typography, groupId } : typography,
       ),
     });
   },
@@ -1326,13 +1472,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  setScreens: (screens, screenGroups, typographies, languages, texts) => {
+  setScreens: (screens, screenGroups, typographies, languages, texts, typographyGroups) => {
     get().saveToHistory();
     const firstId = screens.length > 0 ? screens[0].id : get().currentScreenId;
     set({
       screens: cloneScreens(screens),
       screenGroups: screenGroups ? screenGroups.map(g => ({ ...g })) : [],
       typographies: typographies ? typographies.map(t => ({ ...t })) : [],
+      typographyGroups: typographyGroups ? typographyGroups.map(g => ({ ...g })) : [],
       languages: languages ? languages.map(l => ({ ...l })) : [],
       previewLanguage: languages?.[0]?.code ?? null,
       texts: texts ? texts.map(t => ({ ...t, values: { ...t.values } })) : [],

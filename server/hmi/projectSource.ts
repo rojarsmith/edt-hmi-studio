@@ -254,7 +254,7 @@ export async function writeGeneratedProjectSource(
     defaultFont: lvglConfig?.defaultFont,
     defaultFontSize: lvglConfig?.defaultFontSize,
   });
-  const fontRequests = buildFontCompileRequests(fontResources, usedFontSizes, glyphs);
+  const fontRequests = buildFontCompileRequests(fontResources, usedFontSizes, glyphs, typographies);
   if (fontRequests.length > 0) {
     // Converted outside the source tree: the working directory holds the
     // decoded .ttf and lv_font_conv's own output, and CMake globs

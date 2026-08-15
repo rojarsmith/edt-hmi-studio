@@ -18,12 +18,19 @@ import type { LvglComponent, ProjectLanguage, TextResource, Typography } from '.
 import type { FontResource } from '../../resources/types';
 import { ensureFontFaceLoaded } from '../../resources/fontFaces';
 import { effectiveTypographyId } from '../../utils/componentText';
+import { resolveTypographyStyle } from '../../utils/typographyStyle';
 
 export interface CanvasFont {
   /** CSS font-family, or undefined to leave the browser default. */
   fontFamily?: string;
   /** Pixel size, or undefined when the widget states none. */
   fontSize?: number;
+  /** Extra pixels between letters — LVGL's text_letter_space. */
+  letterSpacing?: number;
+  /** Line height in px: font size plus LVGL's text_line_space. */
+  lineHeight?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  textDecoration?: 'underline' | 'line-through';
 }
 
 function familyOf(
@@ -50,14 +57,23 @@ export function resolveCanvasFont(
     : undefined;
 
   if (typography) {
+    // Through the shared rule, so the canvas shows what the language actually
+    // resolves to rather than a second reading of the same data
     const activeCode = previewLanguage ?? languages[0]?.code;
-    const override = activeCode ? typography.languageFonts?.[activeCode] : undefined;
-    const chosen = override ?? typography;
+    const chosen = resolveTypographyStyle(typography, activeCode);
     const builtin = chosen.fontResource.match(/^montserrat_(\d+)$/);
+    const fontSize = builtin ? Number(builtin[1]) : chosen.fontSize;
     return {
       fontFamily: familyOf(chosen.fontResource, fontResources),
       // A built-in font's size lives in its name
-      fontSize: builtin ? Number(builtin[1]) : chosen.fontSize,
+      fontSize,
+      // The rest of the resolved style rides along, so a language that changes
+      // spacing or alignment previews that change — not only its face
+      ...(chosen.letterSpace ? { letterSpacing: chosen.letterSpace } : {}),
+      ...(chosen.lineSpace ? { lineHeight: fontSize + chosen.lineSpace } : {}),
+      ...(chosen.align && chosen.align !== 'auto' ? { textAlign: chosen.align } : {}),
+      ...(chosen.decor === 'underline' ? { textDecoration: 'underline' as const } : {}),
+      ...(chosen.decor === 'strikethrough' ? { textDecoration: 'line-through' as const } : {}),
     };
   }
 

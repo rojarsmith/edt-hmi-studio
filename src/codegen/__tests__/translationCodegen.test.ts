@@ -266,10 +266,52 @@ describe('widgets carrying a tag', () => {
 
     it('swaps the style font by language and reports the change', () => {
       const result = generateWithTypography();
-      expect(result).toContain('if(lv_streq(lang, "zh-TW")) lv_style_set_text_font(&ui_style_heading, &ui_font_noto_32);');
-      expect(result).toContain('else lv_style_set_text_font(&ui_style_heading, &ui_font_rajdhani_32);');
+      expect(result).toContain('if(lv_streq(lang, "zh-TW")) {');
+      expect(result).toContain('lv_style_set_text_font(&ui_style_heading, &ui_font_noto_32);');
+      expect(result).toContain('lv_style_set_text_font(&ui_style_heading, &ui_font_rajdhani_32);');
       // Without the report, objects using the style keep drawing the old font
       expect(result).toContain('lv_obj_report_style_change(&ui_style_heading);');
+    });
+
+    it('restores the Default on the way out of an overridden language', () => {
+      // A property set entering one language and left alone leaving it would
+      // persist into the next
+      const result = generateWithTypography();
+      const apply = result.slice(result.indexOf('ui_typography_apply_language_fonts(void) {'));
+      const elseBranch = apply.slice(apply.indexOf('else {'));
+      expect(elseBranch).toContain('lv_style_set_text_font(&ui_style_heading, &ui_font_rajdhani_32);');
+    });
+
+    it('carries a language override of more than the font', () => {
+      const result = generateUiSource(
+        [createScreen({ name: 'main', components: [
+          createComponent('label', { name: 'title', props: { text: 'Hello' }, textId: 't1', typographyId: 'typo2' }),
+        ] })],
+        defaultOptions({ generateComments: false }),
+        undefined, [], undefined, undefined, [], undefined, undefined,
+        [{
+          id: 'typo2', name: 'Heading', fontResource: 'ui_font_rajdhani', fontSize: 32,
+          letterSpace: 2,
+          languages: { 'zh-TW': { letterSpace: 0, align: 'center' } },
+        }],
+        TEXTS, LANGUAGES,
+      );
+      expect(result).toContain('lv_style_set_text_letter_space(&ui_style_heading, 0);');
+      expect(result).toContain('lv_style_set_text_align(&ui_style_heading, LV_TEXT_ALIGN_CENTER);');
+      // And restored on the way out
+      expect(result).toContain('lv_style_set_text_letter_space(&ui_style_heading, 2);');
+    });
+
+    it('re-applies only the properties some language actually changes', () => {
+      // Restating settings no language touches would be noise in the apply
+      // function and a second place for the Default to drift
+      const result = generateWithTypography();
+      const apply = result.slice(
+        result.indexOf('ui_typography_apply_language_fonts(void) {'),
+        result.indexOf('static void ui_typography_language_cb'),
+      );
+      expect(apply).not.toContain('lv_style_set_text_letter_space');
+      expect(apply).not.toContain('lv_style_set_text_align');
     });
 
     it('applies the boot language\'s override from init, not from the first switch', () => {

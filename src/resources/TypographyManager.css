@@ -1,8 +1,281 @@
+/* Two panes: the tree on the left, the selected typography on the right. A
+   project with thirty sizes is a list nobody can scan, which is what the tree
+   is for. */
 .typography-manager {
   display: flex;
-  flex-direction: column;
+  align-items: stretch;
   height: 100%;
+  min-height: 0;
+  gap: 0;
+}
+
+.tm-tree-pane {
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid #e6e6e6;
+  background: #fbfbfc;
+}
+
+.tm-detail-pane {
+  flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  padding: 14px 16px;
+}
+
+.tm-tree-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid #ececec;
+}
+
+/* The one action this panel exists to offer, so it looks like a button rather
+   than a link that happens to be first. */
+.tm-primary-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #4a9ae4 0%, #2f7fd0 100%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(24, 74, 122, 0.28);
+  transition: filter 0.15s, box-shadow 0.15s, transform 0.05s;
+}
+
+.tm-primary-btn:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 2px 6px rgba(24, 74, 122, 0.32);
+}
+
+.tm-primary-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 1px rgba(24, 74, 122, 0.3);
+}
+
+.tm-primary-btn-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.tm-secondary-btn {
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tm-secondary-btn:hover:not(:disabled) {
+  border-color: #4a90d9;
+  background: #f7fbff;
+}
+
+.tm-secondary-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tm-notice {
+  margin: 8px 10px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: #fff8e1;
+  border: 1px solid #f0d9a0;
+  font-size: 11px;
+  color: #7a5d1a;
+  cursor: pointer;
+}
+
+.tm-tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 0 20px;
+}
+
+.tm-tree.drop-target {
+  background: #f0f7ff;
+}
+
+.tm-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+}
+
+.tm-row:hover {
+  background: #f0f4f8;
+}
+
+.tm-row.drop-target {
+  background: #e3f0fd;
+  box-shadow: inset 2px 0 0 #4a90d9;
+}
+
+.tm-row.dragging {
+  opacity: 0.45;
+}
+
+.tm-typography.selected {
+  background: #e8f2fd;
+  box-shadow: inset 3px 0 0 #2f7fd0;
+}
+
+.tm-caret {
+  width: 10px;
+  color: #999;
+  font-size: 9px;
+}
+
+.tm-icon {
+  font-size: 12px;
+}
+
+.tm-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tm-name {
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-detail {
+  font-size: 10px;
+  color: #999;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* How many languages this typography customises — the thing that is invisible
+   until you open it otherwise. */
+.tm-badge {
+  font-size: 10px;
+  color: #2f7fd0;
+  background: #e8f2fd;
+  border-radius: 8px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.tm-usage {
+  font-size: 10px;
+  color: #aaa;
+  min-width: 12px;
+  text-align: right;
+}
+
+.tm-row-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 3px;
+  opacity: 0;
+  color: #666;
+}
+
+.tm-row:hover .tm-row-btn {
+  opacity: 1;
+}
+
+.tm-row-btn:hover {
+  color: #2f7fd0;
+}
+
+.tm-row-btn.tm-delete:hover {
+  color: #c0392b;
+}
+
+.tm-rename-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 1px solid #4a90d9;
+  border-radius: 3px;
+}
+
+/* Default plus one tab per language — TouchGFX's Language Settings. A tab that
+   customises something is marked, so which languages differ is visible without
+   opening each one. */
+.tm-lang-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 14px 0 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tm-lang-tab {
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 5px 5px 0 0;
+  background: transparent;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+}
+
+.tm-lang-tab:hover {
+  background: #f0f4f8;
+}
+
+.tm-lang-tab.active {
+  background: #fff;
+  border-color: #e0e0e0;
+  color: #1f6fc4;
+  font-weight: 600;
+  margin-bottom: -1px;
+}
+
+.tm-lang-tab.customised::after {
+  content: '•';
+  margin-left: 5px;
+  color: #2f7fd0;
+}
+
+.tm-lang-body {
+  padding: 12px 0 4px;
+}
+
+.tm-field-label.overridden {
+  color: #1f6fc4;
+  font-weight: 600;
+}
+
+.tm-override-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: #2f7fd0;
+  vertical-align: middle;
 }
 
 .typography-list {

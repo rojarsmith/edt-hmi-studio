@@ -200,6 +200,7 @@ const CompilePreview: React.FC = () => {
       fontResources,
       usedFontSizes,
       glyphs,
+      typographies,
     );
 
     const result = await compileCode(

@@ -11,6 +11,7 @@ import type { LvglComponent, Screen, TextResource, Typography } from '../types';
 import type { FontResource } from '../resources/types';
 import type { LogicGraph, LogicNode } from '../components/LogicEditor/types';
 import { effectiveTypographyId } from '../utils/componentText';
+import { hasLanguageOverride, resolveTypographyStyle } from '../utils/typographyStyle';
 
 /** ASCII baseline, always included by the conversion regardless of usage. */
 export const ASCII_BASELINE_START = 0x20;
@@ -139,6 +140,12 @@ function textsOfComponent(comp: LvglComponent): { field: string; text: string }[
   // tabview
   if (Array.isArray(props.tabs)) {
     props.tabs.forEach((t: unknown, i: number) => push(`tabs[${i}]`, t));
+  }
+
+  // An ellipsis label appends U+2026 at runtime; without this the truncation
+  // renders a missing-glyph box at the exact spot meant to look tidy
+  if (comp.type === 'label' && props.longMode === 'ellipsis') {
+    out.push({ field: 'ellipsis', text: '…' });
   }
 
   // table
@@ -287,10 +294,14 @@ export function collectGlyphs(input: CollectGlyphsInput): GlyphCollection {
             // A language with a font override renders through that font and
             // only that font — sending its characters to the base font too
             // would put the CJK back into the Latin face, which is exactly the
-            // bloat per-language fonts exist to avoid
-            const override = typography?.languageFonts?.[language];
-            const targets = override && !isBuiltinFont(override.fontResource) && customFontNames.has(override.fontResource)
-              ? [{ cFontName: override.fontResource, size: override.fontSize || 16 }]
+            // bloat per-language fonts exist to avoid. Resolved through the
+            // shared rule so both override shapes, and overrides of only the
+            // size, route the same way the generated style does.
+            const resolved = typography && hasLanguageOverride(typography, language)
+              ? resolveTypographyStyle(typography, language)
+              : undefined;
+            const targets = resolved && !isBuiltinFont(resolved.fontResource) && customFontNames.has(resolved.fontResource)
+              ? [{ cFontName: resolved.fontResource, size: resolved.fontSize || 16 }]
               : undefined;
             record(comp, {
               kind: 'widget',

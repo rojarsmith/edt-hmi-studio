@@ -14,7 +14,7 @@ import type {
 import type { ModbusRegisterTag } from '../../types/hmi';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
 import { resolveText } from '../../codegen/textResources';
-import { standInProp } from '../../utils/componentText';
+import { effectiveTypographyId, standInProp } from '../../utils/componentText';
 import ModbusBindingEditor from './ModbusBindingEditor';
 import {
   clampImageButtonStateIndex,
@@ -1577,6 +1577,45 @@ function TranslatableTextRow({
   );
 }
 
+
+/**
+ * The widget-level Text Alignment row, shown only while no typography governs
+ * the widget.
+ *
+ * Hidden rather than shown dead: LVGL resolves an object-local style above an
+ * added style, so a value set here would silently beat the typography's
+ * alignment — the exact drift a shared style exists to prevent, and invisible
+ * until the device renders it. Alignment for a governed widget lives on the
+ * typography, per language included.
+ */
+function WidgetAlignmentRow({
+  component,
+  fallbackValue,
+  onChange,
+}: {
+  component: LvglComponent;
+  fallbackValue: 'left' | 'center';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+}): React.ReactNode {
+  const texts = useEditorStore((s) => s.texts);
+  if (effectiveTypographyId(component, texts) !== undefined) return null;
+
+  return (
+    <div className="property-row">
+      <label>Text Alignment</label>
+      <select
+        value={(component.props.textAlign as string) || fallbackValue}
+        onChange={(e) => onChange('textAlign', e.target.value)}
+      >
+        <option value="left">Left</option>
+        <option value="center">Center</option>
+        <option value="right">Right</option>
+      </select>
+    </div>
+  );
+}
+
 /**
  * How a widget's text is styled: a named typography, and nothing else.
  *
@@ -1841,17 +1880,7 @@ function renderComponentProps(
             <div className="section-header">Button</div>
             <TranslatableTextRow component={component} prop="text" label="Text" onChange={onChange} />
             <TextStyleSelector component={component} />
-            <div className="property-row">
-              <label>Text Alignment</label>
-              <select
-                value={props.textAlign || 'center'}
-                onChange={(e) => onChange('textAlign', e.target.value)}
-              >
-                <option value="left">Left</option>
-                <option value="center">Center</option>
-                <option value="right">Right</option>
-              </select>
-            </div>
+            <WidgetAlignmentRow component={component} fallbackValue="center" onChange={onChange} />
           </div>
           <ContainerLayoutEditor props={props} onChange={onChange} />
         </>
@@ -1863,17 +1892,7 @@ function renderComponentProps(
           <div className="section-header">Label</div>
           <TranslatableTextRow component={component} prop="text" label="Text" onChange={onChange} />
           <TextStyleSelector component={component} />
-          <div className="property-row">
-            <label>Text Alignment</label>
-            <select
-              value={props.textAlign || 'left'}
-              onChange={(e) => onChange('textAlign', e.target.value)}
-            >
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </select>
-          </div>
+          <WidgetAlignmentRow component={component} fallbackValue="left" onChange={onChange} />
           <div className="property-row">
             <label>Long Text Mode</label>
             <select
@@ -1882,7 +1901,10 @@ function renderComponentProps(
             >
               <option value="wrap">Wrap</option>
               <option value="scroll">Scroll</option>
-              <option value="dot">Ellipsis</option>
+              {/* DOTS is LVGL's own mode and writes three ASCII periods;
+                  Ellipsis generates a truncation handler for the real … */}
+              <option value="dot">Dots (...)</option>
+              <option value="ellipsis">Ellipsis (…)</option>
               <option value="clip">Clip</option>
             </select>
           </div>

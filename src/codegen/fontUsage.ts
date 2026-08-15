@@ -9,6 +9,7 @@
 
 import type { LvglComponent, Screen, Typography } from '../types';
 import type { FontResource } from '../resources/types';
+import { overriddenLanguages, resolveTypographyStyle } from '../utils/typographyStyle';
 
 /** Size assumed when a widget selects a font without stating a size. */
 const IMPLIED_FONT_SIZE = 16;
@@ -82,9 +83,13 @@ export function collectUsedCustomFonts(
   for (const typography of typographies) {
     addFont(typography.fontResource, typography.fontSize || IMPLIED_FONT_SIZE);
     // Language overrides are swapped in at runtime by generated code, so each
-    // one's font must exist whether or not that language is ever selected
-    for (const override of Object.values(typography.languageFonts ?? {})) {
-      addFont(override.fontResource, override.fontSize || IMPLIED_FONT_SIZE);
+    // one's font must exist whether or not that language is ever selected.
+    // Resolved through the shared rule, which also reads the pre-`languages`
+    // shape — an override of only the size still lands here, on the Default's
+    // font at that size.
+    for (const language of overriddenLanguages(typography)) {
+      const style = resolveTypographyStyle(typography, language);
+      addFont(style.fontResource, style.fontSize || IMPLIED_FONT_SIZE);
     }
   }
 

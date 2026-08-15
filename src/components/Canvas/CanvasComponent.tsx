@@ -72,6 +72,11 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   const textFontStyle = {
     fontFamily: canvasFont.fontFamily,
     fontSize: canvasFont.fontSize ?? defaultFontSize,
+    // A typography's resolved spacing and decoration, so Label and Button
+    // preview what the style will actually render — per language included
+    ...(canvasFont.letterSpacing !== undefined ? { letterSpacing: canvasFont.letterSpacing } : {}),
+    ...(canvasFont.lineHeight !== undefined ? { lineHeight: `${canvasFont.lineHeight}px` } : {}),
+    ...(canvasFont.textDecoration ? { textDecoration: canvasFont.textDecoration } : {}),
   };
 
   // Helper: apply shadow opacity to shadow color
@@ -365,6 +370,16 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
           <span className="lvgl-label" style={{
             color: defaultStyle.textColor || '#333333',
             ...textFontStyle,
+            // Alignment needs a block box to align within, which is what the
+            // widget's frame is on the device
+            ...(canvasFont.textAlign
+              ? { display: 'block', width: '100%', textAlign: canvasFont.textAlign }
+              : {}),
+            // The browser's single-line ellipsis is exactly what the generated
+            // truncation does on the device, same character included
+            ...(props.longMode === 'ellipsis'
+              ? { display: 'block', width: '100%', whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' }
+              : {}),
           }}>{shownText || 'Label'}</span>
         );
       

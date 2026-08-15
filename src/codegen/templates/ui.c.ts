@@ -7,6 +7,12 @@ import { collectUsedCustomFonts } from '../fontUsage';
 import { deriveTypographies } from '../typography';
 import { resolveText } from '../textResources';
 import { effectiveTypographyId, standInProp } from '../../utils/componentText';
+import {
+  languageDifferences,
+  overriddenLanguages,
+  resolveTypographyStyle,
+  type ResolvedTypographyStyle,
+} from '../../utils/typographyStyle';
 import type { Typography, TextResource, ProjectLanguage, TranslatableProp } from '../../types';
 
 /** A typography style symbol and whether its font is custom. */
@@ -430,12 +436,16 @@ function generatePropsCode(
   };
   
   switch (type) {
-    case 'label':
-      if (translation?.prop === 'text') {
+    case 'label': {
+      const ellipsis = props.longMode === 'ellipsis';
+      if (translation?.prop === 'text' && !ellipsis) {
         // Applies the text as well as storing the tag, and re-applies it
         // whenever the language changes — no handler of ours needed
         lines.push(`${indent}lv_label_set_translation_tag(${varName}, "${escapeCString(translation.tag)}");`);
       } else if (props.text) {
+        // An ellipsis label gets no tag even when linked: the label's own
+        // re-apply would restore the full text over the truncation, so the
+        // ellipsis callback owns the text and re-resolves the tag itself
         lines.push(`${indent}lv_label_set_text(${varName}, "${escapeCString(props.text)}");`);
       }
       if (props.longMode) {
@@ -443,12 +453,17 @@ function generatePropsCode(
           'wrap': 'LV_LABEL_LONG_WRAP',
           'scroll': 'LV_LABEL_LONG_SCROLL',
           'dot': 'LV_LABEL_LONG_DOT',
+          // A single U+2026 is not something LVGL's DOTS mode can draw — it
+          // writes three ASCII periods, hard-coded. CLIP plus the generated
+          // truncation helper is what renders the real character.
+          'ellipsis': 'LV_LABEL_LONG_CLIP',
           'clip': 'LV_LABEL_LONG_CLIP',
         };
         lines.push(`${indent}lv_label_set_long_mode(${varName}, ${longModeMap[props.longMode] || 'LV_LABEL_LONG_WRAP'});`);
       }
       generateTextProps(varName);
       break;
+    }
       
     case 'btn':
       if (translation?.prop === 'text' || props.text) {
@@ -1290,6 +1305,26 @@ function generateComponentCode(
   const styleLines = generateStyleCode(varName, component.styles.default, options, '0', defaultFont, defaultFontSize, Boolean(typographyStyle));
   lines.push(...styleLines);
 
+  // Ellipsis truncation, emitted after every style so the first measurement
+  // already sees the font the label will render with. Size changes re-run it;
+  // a translation tag re-resolves through the callback since the label
+  // deliberately carries no tag of its own in this mode.
+  if (component.type === 'label' && component.props?.longMode === 'ellipsis') {
+    const tagged = componentTags?.get(component.id)?.prop === 'text'
+      ? componentTags.get(component.id)!.tag
+      : undefined;
+    if (tagged !== undefined) {
+      const tagArg = `(void *)"${escapeCString(tagged)}"`;
+      lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_ellipsis_tr_cb, LV_EVENT_SIZE_CHANGED, ${tagArg});`);
+      lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_ellipsis_tr_cb, LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, ${tagArg});`);
+      lines.push(`${indent}ui_ellipsis_apply(${varName}, lv_tr("${escapeCString(tagged)}"));`);
+    } else if (typeof component.props.text === 'string' && component.props.text.length > 0) {
+      const textArg = `(void *)"${escapeCString(component.props.text)}"`;
+      lines.push(`${indent}lv_obj_add_event_cb(${varName}, ui_ellipsis_literal_cb, LV_EVENT_SIZE_CHANGED, ${textArg});`);
+      lines.push(`${indent}ui_ellipsis_apply(${varName}, "${escapeCString(component.props.text)}");`);
+    }
+  }
+
   // Pressed state styles
   if (component.styles.pressed) {
     const pressedLines = generateStyleCode(varName, component.styles.pressed, options, 'LV_STATE_PRESSED', defaultFont, defaultFontSize);
@@ -1717,6 +1752,50 @@ function generateImageButtonSupport(
 }
 
 
+/** Style setters for the properties a language switch has to re-apply. */
+function styleAssignments(
+  symbol: string,
+  style: ResolvedTypographyStyle,
+  touched: ReadonlySet<string>,
+  fontExpr?: string,
+): string[] {
+  const lines: string[] = [];
+  const alignMap: Record<string, string> = {
+    left: 'LV_TEXT_ALIGN_LEFT', center: 'LV_TEXT_ALIGN_CENTER', right: 'LV_TEXT_ALIGN_RIGHT',
+  };
+  const decorMap: Record<string, string> = {
+    none: 'LV_TEXT_DECOR_NONE',
+    underline: 'LV_TEXT_DECOR_UNDERLINE',
+    strikethrough: 'LV_TEXT_DECOR_STRIKETHROUGH',
+  };
+
+  // fontSize has no setter of its own: an lv_font_t carries its size, so the
+  // font and the size are one assignment
+  if (touched.has('fontResource') || touched.has('fontSize')) {
+    lines.push(`lv_style_set_text_font(&${symbol}, ${fontExpr ?? `&${fontSymbol(style.fontResource, style.fontSize)}`});`);
+  }
+  if (touched.has('letterSpace')) {
+    lines.push(`lv_style_set_text_letter_space(&${symbol}, ${style.letterSpace ?? 0});`);
+  }
+  if (touched.has('lineSpace')) {
+    lines.push(`lv_style_set_text_line_space(&${symbol}, ${style.lineSpace ?? 0});`);
+  }
+  if (touched.has('align')) {
+    const align = style.align && style.align !== 'auto' ? alignMap[style.align] : 'LV_TEXT_ALIGN_AUTO';
+    lines.push(`lv_style_set_text_align(&${symbol}, ${align});`);
+  }
+  if (touched.has('decor')) {
+    lines.push(`lv_style_set_text_decor(&${symbol}, ${decorMap[style.decor ?? 'none']});`);
+  }
+  if (touched.has('baseDir')) {
+    const dir = style.baseDir === 'rtl'
+      ? 'LV_BASE_DIR_RTL'
+      : style.baseDir === 'ltr' ? 'LV_BASE_DIR_LTR' : 'LV_BASE_DIR_AUTO';
+    lines.push(`lv_style_set_base_dir(&${symbol}, ${dir});`);
+  }
+  return lines;
+}
+
 /** The C symbol for a font, as `LV_FONT_DECLARE` and lv_font_conv name it. */
 function fontSymbol(fontResource: string, fontSize: number): string {
   const builtin = fontResource.match(/^montserrat_(\d+)$/);
@@ -1815,6 +1894,64 @@ function generateTranslationCallbacks(kinds: Set<string>, options: CodeGenOption
     lines.push('');
   };
 
+  if (kinds.has('ellipsis')) {
+    // Single-line: the longest prefix of `full` that fits the label's content
+    // width with U+2026 appended. LVGL's own DOTS mode writes three ASCII
+    // periods, hard-coded in lv_label.c (LV_LABEL_DOT_NUM), so the real
+    // character means truncating here, on CLIP mode. The ellipsis travels as
+    // its UTF-8 bytes so the generated file's encoding cannot matter.
+    lines.push('#define UI_ELLIPSIS_BUF 256');
+    lines.push('');
+    lines.push('static void ui_ellipsis_apply(lv_obj_t * label, const char * full) {');
+    lines.push(`${indent}const lv_font_t * font = lv_obj_get_style_text_font(label, LV_PART_MAIN);`);
+    lines.push(`${indent}int32_t letter_space = lv_obj_get_style_text_letter_space(label, LV_PART_MAIN);`);
+    lines.push(`${indent}int32_t max_w = lv_obj_get_content_width(label);`);
+    lines.push(`${indent}lv_point_t size;`);
+    lines.push(`${indent}char buf[UI_ELLIPSIS_BUF];`);
+    lines.push(`${indent}uint32_t len;`);
+    lines.push(`${indent}uint32_t i = 0;`);
+    lines.push(`${indent}uint32_t fit = 0;`);
+    lines.push('');
+    lines.push(`${indent}lv_text_get_size(&size, full, font, letter_space, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);`);
+    lines.push(`${indent}if(size.x <= max_w) {`);
+    lines.push(`${indent}${indent}lv_label_set_text(label, full);`);
+    lines.push(`${indent}${indent}return;`);
+    lines.push(`${indent}}`);
+    lines.push('');
+    lines.push(`${indent}len = (uint32_t)lv_strlen(full);`);
+    lines.push(`${indent}if(len > sizeof(buf) - 4) len = (uint32_t)(sizeof(buf) - 4);`);
+    lines.push(`${indent}${generateComment('Never cut inside a UTF-8 sequence', options) || '/* Never cut inside a UTF-8 sequence */'}`);
+    lines.push(`${indent}while(len > 0 && (((uint8_t)full[len]) & 0xC0) == 0x80) len--;`);
+    lines.push('');
+    lines.push(`${indent}while(i < len) {`);
+    lines.push(`${indent}${indent}uint32_t next = i + 1;`);
+    lines.push(`${indent}${indent}while(next < len && (((uint8_t)full[next]) & 0xC0) == 0x80) next++;`);
+    lines.push(`${indent}${indent}lv_memcpy(buf, full, next);`);
+    lines.push(`${indent}${indent}lv_memcpy(&buf[next], "\\xE2\\x80\\xA6", 4);`);
+    lines.push(`${indent}${indent}lv_text_get_size(&size, buf, font, letter_space, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);`);
+    lines.push(`${indent}${indent}if(size.x > max_w) break;`);
+    lines.push(`${indent}${indent}fit = next;`);
+    lines.push(`${indent}${indent}i = next;`);
+    lines.push(`${indent}}`);
+    lines.push('');
+    lines.push(`${indent}lv_memcpy(buf, full, fit);`);
+    lines.push(`${indent}lv_memcpy(&buf[fit], "\\xE2\\x80\\xA6", 4);`);
+    lines.push(`${indent}lv_label_set_text(label, buf);`);
+    lines.push('}');
+    lines.push('');
+    if (kinds.has('ellipsis-tr')) {
+      emit(
+        'ui_ellipsis_tr_cb',
+        'ui_ellipsis_apply(lv_event_get_target_obj(e), lv_tr((const char *)lv_event_get_user_data(e)));',
+      );
+    }
+    if (kinds.has('ellipsis-literal')) {
+      emit(
+        'ui_ellipsis_literal_cb',
+        'ui_ellipsis_apply(lv_event_get_target_obj(e), (const char *)lv_event_get_user_data(e));',
+      );
+    }
+  }
   if (kinds.has('dropdown')) {
     // lv_dropdown_set_options resets the selection to 0, so a language switch
     // would yank the user's choice without the save/restore. The index maps
@@ -1891,12 +2028,47 @@ function generateTypographyStyles(
   const declarations: string[] = [];
   const init: string[] = [];
   const withOverrides = typographies.filter(
-    (typography) => Object.keys(typography.languageFonts ?? {}).length > 0,
+    (typography) => overriddenLanguages(typography).length > 0,
   );
   const hasLanguageFonts = withOverrides.length > 0;
   if (typographies.length === 0) return { declarations, init, hasLanguageFonts };
 
   const indent = getIndent(options);
+
+  // Fallback characters, honoured through the one hook LVGL has for the job:
+  // the lv_font_t.fallback chain. Each font a fallback typography resolves to
+  // gets a mutable copy whose chain ends in a substitute font — a second copy
+  // whose get_glyph_dsc answers every letter with the declared character. The
+  // substitute shares the source font's tables, so the character renders in
+  // the face and size of the text it stands in for.
+  interface FallbackFont { copySymbol: string; substSymbol: string; source: string }
+  const fallback = new Map<string, { char: number; wrapper: string; byFont: Map<string, FallbackFont> }>();
+  for (const typography of typographies) {
+    const char = typography.fallbackCharacter?.codePointAt(0);
+    if (char === undefined) continue;
+    const symbol = symbols.get(typography.id)!;
+    const byFont = new Map<string, FallbackFont>();
+    const styles = [undefined, ...overriddenLanguages(typography)].map(
+      (language) => resolveTypographyStyle(typography, language),
+    );
+    for (const style of styles) {
+      const key = `${style.fontResource}@${style.fontSize}`;
+      if (byFont.has(key)) continue;
+      const index = byFont.size + 1;
+      byFont.set(key, {
+        copySymbol: `${symbol}_fb${index}`,
+        substSymbol: `${symbol}_fbsub${index}`,
+        source: fontSymbol(style.fontResource, style.fontSize),
+      });
+    }
+    fallback.set(typography.id, { char, wrapper: `${symbol}_fb_dsc`, byFont });
+  }
+
+  /** The font a style assignment points at: the fallback copy when one exists. */
+  const fontExprFor = (typography: Typography, style: ResolvedTypographyStyle): string => {
+    const entry = fallback.get(typography.id)?.byFont.get(`${style.fontResource}@${style.fontSize}`);
+    return entry ? `&${entry.copySymbol}` : `&${fontSymbol(style.fontResource, style.fontSize)}`;
+  };
 
   if (options.generateComments) {
     declarations.push(generateSectionHeader('Typographies', options));
@@ -1907,6 +2079,31 @@ function generateTypographyStyles(
   }
   declarations.push('');
 
+  for (const typography of typographies) {
+    const entry = fallback.get(typography.id);
+    if (!entry) continue;
+    const charLiteral = `0x${entry.char.toString(16)}`;
+    const shown = typography.fallbackCharacter!;
+    if (options.generateComments) {
+      declarations.push(generateComment(
+        `${typography.name}: a glyph its font lacks draws '${shown}' instead`, options,
+      ));
+    }
+    for (const font of entry.byFont.values()) {
+      declarations.push(`static lv_font_t ${font.copySymbol};`);
+      declarations.push(`static lv_font_t ${font.substSymbol};`);
+    }
+    // Every font the generator can name is fmt_txt-based — converted fonts and
+    // the built-in Montserrat alike — so the substitute resolves its one
+    // character through the fmt_txt lookup against the tables it shares with
+    // the source font.
+    declarations.push(`static bool ${entry.wrapper}(const lv_font_t * font, lv_font_glyph_dsc_t * dsc, uint32_t letter, uint32_t letter_next) {`);
+    declarations.push(`${indent}LV_UNUSED(letter);`);
+    declarations.push(`${indent}return lv_font_get_glyph_dsc_fmt_txt(font, dsc, ${charLiteral}, letter_next);`);
+    declarations.push('}');
+    declarations.push('');
+  }
+
   if (hasLanguageFonts) {
     // Defined before ui_typography_init, which calls it so the boot language's
     // override applies from the first frame rather than the first switch
@@ -1916,21 +2113,35 @@ function generateTypographyStyles(
     init.push('static void ui_typography_apply_language_fonts(void) {');
     init.push(`${indent}const char * lang = lv_translation_get_language();`);
     init.push(`${indent}if(lang == NULL) return;`);
+    const indent2 = getIndent(options, 2);
     for (const typography of withOverrides) {
       const symbol = symbols.get(typography.id)!;
       if (options.generateComments) {
         init.push(`${indent}${generateComment(typography.name, options)}`);
       }
-      const entries = Object.entries(typography.languageFonts!);
-      entries.forEach(([code, override], index) => {
+
+      // The union of what any language changes. Every branch writes all of
+      // them — including the else, which restores the Default — because a
+      // style property set on the way into one language and left alone on the
+      // way out would persist into the next.
+      const codes = overriddenLanguages(typography);
+      const touched = new Set(codes.flatMap((code) => languageDifferences(typography, code)));
+
+      codes.forEach((code, index) => {
         const keyword = index === 0 ? 'if' : 'else if';
-        init.push(
-          `${indent}${keyword}(lv_streq(lang, "${escapeCString(code)}")) lv_style_set_text_font(&${symbol}, &${fontSymbol(override.fontResource, override.fontSize)});`,
-        );
+        init.push(`${indent}${keyword}(lv_streq(lang, "${escapeCString(code)}")) {`);
+        const resolved = resolveTypographyStyle(typography, code);
+        for (const line of styleAssignments(symbol, resolved, touched, fontExprFor(typography, resolved))) {
+          init.push(`${indent2}${line}`);
+        }
+        init.push(`${indent}}`);
       });
-      init.push(
-        `${indent}else lv_style_set_text_font(&${symbol}, &${fontSymbol(typography.fontResource, typography.fontSize)});`,
-      );
+      init.push(`${indent}else {`);
+      const base = resolveTypographyStyle(typography);
+      for (const line of styleAssignments(symbol, base, touched, fontExprFor(typography, base))) {
+        init.push(`${indent2}${line}`);
+      }
+      init.push(`${indent}}`);
       // No object uses the style yet at boot, in which case this is a no-op
       init.push(`${indent}lv_obj_report_style_change(&${symbol});`);
     }
@@ -1944,6 +2155,23 @@ function generateTypographyStyles(
   }
 
   init.push('static void ui_typography_init(void) {');
+  if (fallback.size > 0) {
+    if (options.generateComments) {
+      init.push(`${indent}${generateComment('Fallback chains: source-font copy -> one-character substitute', options)}`);
+    }
+    for (const typography of typographies) {
+      const entry = fallback.get(typography.id);
+      if (!entry) continue;
+      for (const font of entry.byFont.values()) {
+        init.push(`${indent}lv_memcpy(&${font.substSymbol}, &${font.source}, sizeof(lv_font_t));`);
+        init.push(`${indent}${font.substSymbol}.get_glyph_dsc = ${entry.wrapper};`);
+        init.push(`${indent}${font.substSymbol}.fallback = NULL;`);
+        init.push(`${indent}lv_memcpy(&${font.copySymbol}, &${font.source}, sizeof(lv_font_t));`);
+        init.push(`${indent}${font.copySymbol}.fallback = &${font.substSymbol};`);
+      }
+    }
+    init.push('');
+  }
   for (const typography of typographies) {
     const symbol = symbols.get(typography.id)!;
     if (options.generateComments) {
@@ -1951,7 +2179,7 @@ function generateTypographyStyles(
     }
     init.push(`${indent}lv_style_init(&${symbol});`);
     init.push(
-      `${indent}lv_style_set_text_font(&${symbol}, &${fontSymbol(typography.fontResource, typography.fontSize)});`,
+      `${indent}lv_style_set_text_font(&${symbol}, ${fontExprFor(typography, resolveTypographyStyle(typography))});`,
     );
 
     if (typography.letterSpace) {
@@ -2136,6 +2364,22 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     };
     for (const screen of screens) walkTags(screen.components);
   }
+
+  // Ellipsis labels need the truncation helper whether or not they are linked
+  // to a text resource, so this walk is independent of the tag walk above
+  const walkEllipsis = (components: LvglComponent[]) => {
+    for (const comp of components) {
+      if (comp.type === 'label' && comp.props?.longMode === 'ellipsis') {
+        const tagged = componentTags.get(comp.id)?.prop === 'text';
+        if (tagged || (typeof comp.props.text === 'string' && comp.props.text.length > 0)) {
+          translationCallbackKinds.add('ellipsis');
+          translationCallbackKinds.add(tagged ? 'ellipsis-tr' : 'ellipsis-literal');
+        }
+      }
+      walkEllipsis(comp.children ?? []);
+    }
+  };
+  for (const screen of screens) walkEllipsis(screen.components);
 
   const translationCallbacks = generateTranslationCallbacks(translationCallbackKinds, options);
   if (translationCallbacks.length > 0) {

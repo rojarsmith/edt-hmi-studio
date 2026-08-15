@@ -1,7 +1,7 @@
 // Resource Management Types
 
 import type { LogicGraph } from '../components/LogicEditor/types';
-import type { LvglComponent, Typography, ProjectLanguage, TextResource } from '../types';
+import type { LvglComponent, Typography, TypographyGroup, ProjectLanguage, TextResource } from '../types';
 import type {
   BoardId,
   CanBusConfig,
@@ -146,6 +146,8 @@ export interface ProjectFile {
    * there, so nothing renders differently.
    */
   typographies?: Typography[];
+  /** Organisational folders for the typography tree. Purely a UI grouping. */
+  typographyGroups?: TypographyGroup[];
   /** Languages the project is translated into. The first is the default. */
   languages?: ProjectLanguage[];
   /** Shared text, referenced by widgets through textId. */

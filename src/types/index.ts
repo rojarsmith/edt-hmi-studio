@@ -219,8 +219,18 @@ export const MAX_SCREEN_GROUP_DEPTH = 2;
  */
 export interface Typography {
   id: string;
-  /** Shown in the editor, e.g. "Size24". Not the C symbol. */
+  /**
+   * The identifier, shown in the editor as "Typography Id" — e.g. "Size24".
+   * It is what the generated C symbol is derived from (`ui_style_size24`), so
+   * it names the style rather than merely describing it.
+   */
   name: string;
+  /** Owning TypographyGroup, or null/undefined at the root of the tree. */
+  groupId?: string | null;
+
+  // The Default settings. A language without its own entry in `languages`
+  // renders with exactly these — that is the whole meaning of Default.
+
   /** `montserrat_N` for a built-in, or a FontResource's cFontName. */
   fontResource: string;
   /** Pixel size. Fixed by the name for built-in fonts. */
@@ -234,14 +244,80 @@ export interface Typography {
    * see docs/text-typography-evaluation.md §6.
    */
   baseDir?: 'auto' | 'ltr' | 'rtl';
+
   /**
-   * Per-language font override, keyed by language code — TouchGFX's
-   * "Language Settings". A language without an entry renders with the base
-   * font above. Generated code swaps the style's font when the language
-   * changes, so 中文 can render in Noto while everything else stays Rajdhani.
+   * Per-language overrides, keyed by language code — TouchGFX's "Language
+   * Settings". Each holds only what that language changes; everything else
+   * comes from the Default above, which is why a project can set a CJK face
+   * for 繁體 without restating spacing or alignment.
+   */
+  languages?: Record<string, TypographyLanguageStyle>;
+  /**
+   * @deprecated Pre-`languages` shape, which could only override the font.
+   * Read on load and folded into `languages`; never written.
    */
   languageFonts?: Record<string, TypographyLanguageFont>;
+
+  /**
+   * Character drawn in place of one the font does not carry.
+   *
+   * LVGL has no such setting; what it has is the `lv_font_t.fallback` chain,
+   * so generated code honours this by appending a substitute font whose
+   * `get_glyph_dsc` answers every letter with this one. Only meaningful
+   * because wildcards exist: text derived from the project is always covered
+   * by the character set, so the only glyphs that can be missing are the ones
+   * runtime values substitute in. See docs/text-typography-evaluation.md §7.1.
+   */
+  fallbackCharacter?: string;
+
+  /**
+   * Characters runtime-substituted values may need, beyond the project's own
+   * text — TouchGFX's Wildcard Characters. Literal characters, converted into
+   * every font this typography resolves to, in every language.
+   */
+  wildcardCharacters?: string;
+  /**
+   * Ranges of such characters — TouchGFX's Wildcard Ranges. Comma-separated;
+   * each side of a range is a single literal character or `0x` hex, so `0-9`
+   * means the digits and `0x4E00-0x9FFF` means the block. Parsed by
+   * `parseWildcardRanges`, which also documents why decimal is not accepted.
+   */
+  wildcardRanges?: string;
 }
+
+/**
+ * What one language changes about a typography.
+ *
+ * Every field is optional and every omission means "as the Default". Storing
+ * the difference rather than a complete copy is what makes editing the Default
+ * reach the languages that did not override it.
+ */
+export interface TypographyLanguageStyle {
+  /** `montserrat_N` for a built-in, or a FontResource's cFontName. */
+  fontResource?: string;
+  fontSize?: number;
+  letterSpace?: number;
+  lineSpace?: number;
+  align?: TypographyAlign;
+  decor?: 'none' | 'underline' | 'strikethrough';
+  baseDir?: 'auto' | 'ltr' | 'rtl';
+}
+
+/**
+ * Organisational folder in the typography tree. Purely a UI grouping — it has
+ * no effect on generated code, exactly as ScreenGroup does for screens.
+ *
+ * Nesting is capped at two levels for the same reason it is there: a tree deep
+ * enough to hide things is worse than a list.
+ */
+export interface TypographyGroup {
+  id: string;
+  name: string;
+  parentId?: string | null;
+}
+
+/** Deepest typography group level the manager allows (1-based). */
+export const MAX_TYPOGRAPHY_GROUP_DEPTH = 2;
 
 /** One language's font choice inside a typography. */
 export interface TypographyLanguageFont {
