@@ -70,6 +70,10 @@ const FontManager: React.FC = () => {
   const projectTypographies = useEditorStore((s) => s.typographies);
   const logicGraphs = useLogicEditorStore((s) => s.graphs);
   const currentProjectId = useAppStore((s) => s.currentProjectId);
+  // Conversion machinery is factory-dev only. A no-code author cares whether
+  // the font covers their text and how it looks — the C symbol, charset modes
+  // and bpp are ours, and Auto needs no tending.
+  const factoryDevMode = useAppStore((s) => s.factoryDevMode);
   const getProjectConfig = useProjectStore((s) => s.getProjectConfig);
   const [defaultFont, setDefaultFont] = useState<string | undefined>();
   const [defaultFontSize, setDefaultFontSize] = useState<number | undefined>();
@@ -543,16 +547,46 @@ const FontManager: React.FC = () => {
               onChange={(e) => updateFont(selectedFont.id, { name: e.target.value })}
             />
           </div>
+
+          {/* Correctness signals stay visible in every mode: a font that
+              cannot draw the project's text is not a developer detail */}
+          {missingGlyphs.length > 0 && (
+            <p className="charset-error">
+              This font file has no glyph for {missingGlyphs.length} character
+              {missingGlyphs.length === 1 ? '' : 's'} the project uses:
+              {' '}<span className="charset-missing-list">
+                {String.fromCodePoint(...missingGlyphs.slice(0, 40))}
+              </span>
+              {missingGlyphs.length > 40 ? ' …' : ''}
+              . They will be dropped silently during conversion and show as
+              {' '}blanks on the panel — use a font that covers them, or a fallback font.
+            </p>
+          )}
+          {glyphs.opaque.length > 0 && (
+            <p className="charset-warning">
+              {glyphs.opaque.length} place{glyphs.opaque.length === 1 ? '' : 's'} in this project
+              {' '}use custom C, which cannot be scanned for characters. Anything they display
+              {' '}has to be listed under a typography's wildcards, or this font's extra
+              {' '}characters in Factory Dev Mode.
+            </p>
+          )}
           
-          <div className="detail-row">
-            <label>C Variable Name:</label>
-            <input
-              type="text"
-              value={selectedFont.cFontName}
-              onChange={(e) => updateFont(selectedFont.id, { cFontName: e.target.value })}
-            />
+          {factoryDevMode && (
+            <div className="detail-row">
+              <label>C Variable Name:</label>
+              <input
+                type="text"
+                value={selectedFont.cFontName}
+                onChange={(e) => updateFont(selectedFont.id, { cFontName: e.target.value })}
+              />
+            </div>
+          )}
+          
+          {factoryDevMode && (<>
+          <div className="fm-dev-divider">
+            <span className="fm-dev-badge">Factory Dev Mode</span>
+            <span className="fm-dev-hint">Conversion settings. Auto already covers a no-code project.</span>
           </div>
-          
           <div className="detail-section">
             <label>Character Set:</label>
             <div className="charset-mode-row">
@@ -588,25 +622,6 @@ const FontManager: React.FC = () => {
                   {String.fromCodePoint(...[...collectedFor(selectedFont).points].sort((a, b) => a - b))
                     || '(nothing collected yet)'}
                 </div>
-              )}
-              {missingGlyphs.length > 0 && (
-                <p className="charset-error">
-                  This font file has no glyph for {missingGlyphs.length} character
-                  {missingGlyphs.length === 1 ? '' : 's'} the project uses:
-                  {' '}<span className="charset-missing-list">
-                    {String.fromCodePoint(...missingGlyphs.slice(0, 40))}
-                  </span>
-                  {missingGlyphs.length > 40 ? ' …' : ''}
-                  . They will be dropped silently during conversion and show as
-                  {' '}blanks on the panel — use a font that covers them, or a fallback font.
-                </p>
-              )}
-              {glyphs.opaque.length > 0 && (
-                <p className="charset-warning">
-                  {glyphs.opaque.length} place{glyphs.opaque.length === 1 ? '' : 's'} in this project
-                  {' '}use custom C, which cannot be scanned for characters. Anything they display
-                  {' '}has to be listed under Extra characters below.
-                </p>
               )}
             </div>
           )}
@@ -681,6 +696,7 @@ const FontManager: React.FC = () => {
               {selectedFont.bpp === 8 && '8-bit — 256 grayscale levels, highest quality'}
             </span>
           </div>
+          </>)}
           
           <div className="font-preview-section">
             <label>Preview:</label>
@@ -701,14 +717,16 @@ const FontManager: React.FC = () => {
             </div>
           </div>
           
-          <div className="detail-actions">
-            <button onClick={() => handleGenerateCommand(selectedFont)}>
-              🔧 Generate Conversion Command
-            </button>
-            <button onClick={() => handleGenerateHeader(selectedFont)}>
-              📄 Generate Header Template
-            </button>
-          </div>
+          {factoryDevMode && (
+            <div className="detail-actions">
+              <button onClick={() => handleGenerateCommand(selectedFont)}>
+                🔧 Generate Conversion Command
+              </button>
+              <button onClick={() => handleGenerateHeader(selectedFont)}>
+                📄 Generate Header Template
+              </button>
+            </div>
+          )}
         </div>
       )}
       </div>

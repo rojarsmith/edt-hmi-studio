@@ -620,3 +620,90 @@
   color: #aaa;
   font-style: italic;
 }
+
+/* --- Detail pane polish. The pane itself scrolls; the old inner 500px box
+       double-scrolled and squeezed everything into a grey card. --- */
+
+.font-manager .font-details {
+  max-height: none;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 4px 2px 24px;
+  max-width: 880px;
+}
+
+.font-manager .font-details h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #222;
+  margin: 0 0 16px;
+}
+
+.font-manager .font-meta-grid {
+  background: #fafbfc;
+  border: 1px solid #ececf0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  gap: 12px 16px;
+  margin-bottom: 18px;
+}
+
+.font-manager .font-details .detail-row {
+  margin-bottom: 12px;
+}
+
+.font-manager .font-details .detail-row input[type="text"] {
+  padding: 7px 10px;
+  border: 1px solid #d9dce1;
+  border-radius: 6px;
+  font-size: 13px;
+  min-width: 280px;
+}
+
+.font-manager .font-details .detail-row input[type="text"]:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.15);
+}
+
+/* The divider that opens the factory-dev block: the split between "what the
+   font is" and "how it is converted" should be visible, not inferred. */
+.fm-dev-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 14px;
+  padding-top: 16px;
+  border-top: 1px dashed #ddd;
+}
+
+.fm-dev-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #8a6d1a;
+  background: #fdf4d7;
+  border: 1px solid #ecd9a0;
+  border-radius: 10px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+.fm-dev-hint {
+  font-size: 11px;
+  color: #999;
+}
+
+.font-manager .font-preview-section {
+  margin-top: 18px;
+}
+
+.font-manager .preview-box {
+  background: #fff;
+  border: 1px solid #ececf0;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
