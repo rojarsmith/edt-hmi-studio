@@ -559,3 +559,64 @@
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* --- Two-pane tree layout, sharing the typography manager's visual language.
+       Appended after the legacy rules so these win at equal specificity. --- */
+
+.font-manager {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  height: 100%;
+  min-height: 0;
+  overflow: visible;
+}
+
+/* The row's "Aa" chip, rendered in the font's own face where one is loaded. */
+.fm-aa {
+  width: 26px;
+  min-width: 26px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e2e2;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  color: #444;
+}
+
+.fm-aa-ghost {
+  color: #bbb;
+  border-style: dashed;
+}
+
+/* Always visible, unlike the hover-revealed row buttons: an unadded font's
+   whole point is the affordance to add it. */
+.fm-add-btn {
+  border: 1px solid #bcd7f2;
+  border-radius: 10px;
+  background: #f0f7ff;
+  color: #1f6fc4;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fm-add-btn:hover:not(:disabled) {
+  background: #e3f0fd;
+}
+
+.fm-add-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fm-group-empty {
+  padding: 4px 8px 6px 30px;
+  font-size: 11px;
+  color: #aaa;
+  font-style: italic;
+}

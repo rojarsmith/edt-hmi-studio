@@ -19,10 +19,14 @@ import {
 import { collectGlyphs, glyphSetKey } from '../codegen/collectGlyphs';
 import { ensureFontFaceLoaded } from './fontFaces';
 import { BUNDLED_FONTS, type BundledFontSpec } from './bundledFonts';
+import { BUILTIN_FONT_SIZES } from './builtinFonts';
 import { useEditorStore } from '../store/editorStore';
 import { useAppStore } from '../store/appStore';
 import { useProjectStore } from '../store/projectStore';
 import { useLogicEditorStore } from '../components/LogicEditor';
+// The tree pane reuses the typography manager's classes on purpose: the two
+// panels are the same shape, and one visual language beats two
+import './TypographyManager.css';
 import './FontManager.css';
 
 const CHARSET_MODES: { id: CharsetMode; label: string; hint: string }[] = [
@@ -55,6 +59,7 @@ const FontManager: React.FC = () => {
     updateFont,
     selectedResourceId,
     setSelectedResource,
+    searchQuery,
   } = useResourceStore();
   
   const fonts = getFilteredFonts();
@@ -115,15 +120,42 @@ const FontManager: React.FC = () => {
   };
 
   const [addingBundled, setAddingBundled] = useState<string | null>(null);
-  const bundledAvailable = BUNDLED_FONTS.filter(
-    (spec) => !fonts.some((font) => font.bundled === spec.id),
-  );
+
+  /**
+   * Selection of a row that is not a FontResource: 'builtin:montserrat', or
+   * 'bundled:<id>' for a catalogue font the project has not added yet. Kept
+   * apart from selectedResourceId so the two cannot both claim the pane.
+   */
+  const [specialSelection, setSpecialSelection] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (name: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const selectFont = (id: string) => {
+    setSelectedResource(id);
+    setSpecialSelection(null);
+  };
+  const selectSpecial = (key: string) => {
+    setSelectedResource(null);
+    setSpecialSelection(key);
+  };
+
+  const query = searchQuery.trim().toLowerCase();
+  const matchesQuery = (text: string) => query.length === 0 || text.toLowerCase().includes(query);
 
   const handleAddBundled = async (spec: BundledFontSpec) => {
     setAddingBundled(spec.id);
     try {
       const font = await addBundledFont(spec);
       setSelectedResource(font.id);
+      setSpecialSelection(null);
       toast.success(`Added ${spec.label}`);
     } catch (error) {
       console.error('Failed to add bundled font:', error);
@@ -284,93 +316,192 @@ const FontManager: React.FC = () => {
   
   return (
     <div className="font-manager">
-      {/* Toolbar */}
-      <div className="resource-toolbar">
-        <button 
-          className="upload-btn"
-          onClick={handleUploadClick}
-          disabled={isUploading}
-        >
-          {isUploading ? 'Uploading...' : '📤 Upload Font'}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".ttf,.otf"
-          multiple
-          onChange={handleFileChange}
-          style={{ display: 'none' }}
-        />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".ttf,.otf"
+        multiple
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+
+      <div className="tm-tree-pane">
+        <div className="tm-tree-toolbar">
+          <button
+            type="button"
+            className="tm-primary-btn"
+            onClick={handleUploadClick}
+            disabled={isUploading}
+          >
+            <span className="tm-primary-btn-icon">{isUploading ? '⏳' : '＋'}</span>
+            {isUploading ? 'Uploading…' : 'Upload Font'}
+          </button>
+        </div>
+
+        <div className="tm-tree">
+          {/* Built-in: compiled into LVGL, nothing to convert or delete */}
+          <div className="tm-group">
+            <div className="tm-row tm-group-row" onClick={() => toggleGroup('builtin')}>
+              <span className="tm-caret">{collapsedGroups.has('builtin') ? '▸' : '▾'}</span>
+              <span className="tm-icon">📁</span>
+              <span className="tm-label"><span className="tm-name">Built-in</span></span>
+              <span className="tm-usage">1</span>
+            </div>
+            {!collapsedGroups.has('builtin') && matchesQuery('Montserrat') && (
+              <div
+                className={`tm-row tm-typography ${specialSelection === 'builtin:montserrat' ? 'selected' : ''}`}
+                style={{ paddingLeft: 22 }}
+                onClick={() => selectSpecial('builtin:montserrat')}
+              >
+                <span className="fm-aa">Aa</span>
+                <span className="tm-label">
+                  <span className="tm-name">Montserrat</span>
+                  <span className="tm-detail">Compiled into LVGL · {BUILTIN_FONT_SIZES.length} sizes</span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Bundled: ships with the studio; an unadded one is a row with +Add,
+              and stays in this group once added rather than moving elsewhere */}
+          <div className="tm-group">
+            <div className="tm-row tm-group-row" onClick={() => toggleGroup('bundled')}>
+              <span className="tm-caret">{collapsedGroups.has('bundled') ? '▸' : '▾'}</span>
+              <span className="tm-icon">📁</span>
+              <span className="tm-label"><span className="tm-name">Bundled</span></span>
+              <span className="tm-usage">{BUNDLED_FONTS.length}</span>
+            </div>
+            {!collapsedGroups.has('bundled') && BUNDLED_FONTS.filter((spec) => matchesQuery(spec.label)).map((spec) => {
+              const added = fonts.find((font) => font.bundled === spec.id);
+              if (added) {
+                return (
+                  <div
+                    key={spec.id}
+                    className={`tm-row tm-typography ${selectedResourceId === added.id && !specialSelection ? 'selected' : ''}`}
+                    style={{ paddingLeft: 22 }}
+                    onClick={() => selectFont(added.id)}
+                  >
+                    <span className="fm-aa" style={{ fontFamily: fontFaceMap[added.id] || added.family }}>Aa</span>
+                    <span className="tm-label">
+                      <span className="tm-name">{added.name}</span>
+                      <span className="tm-detail">{getFormatLabel(added)} · {formatFileSize(added.size)}</span>
+                    </span>
+                    {/* No delete: bundled fonts are default-present, and a
+                        deleted one would only reappear on the next open */}
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={spec.id}
+                  className={`tm-row tm-typography ${specialSelection === `bundled:${spec.id}` ? 'selected' : ''}`}
+                  style={{ paddingLeft: 22 }}
+                  onClick={() => selectSpecial(`bundled:${spec.id}`)}
+                >
+                  <span className="fm-aa fm-aa-ghost">Aa</span>
+                  <span className="tm-label">
+                    <span className="tm-name">{spec.label}</span>
+                    <span className="tm-detail">Not added yet</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="fm-add-btn"
+                    onClick={(e) => { e.stopPropagation(); handleAddBundled(spec); }}
+                    disabled={addingBundled !== null}
+                  >
+                    {addingBundled === spec.id ? '…' : '+ Add'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Project fonts: what the author uploaded */}
+          <div className="tm-group">
+            <div className="tm-row tm-group-row" onClick={() => toggleGroup('project')}>
+              <span className="tm-caret">{collapsedGroups.has('project') ? '▸' : '▾'}</span>
+              <span className="tm-icon">📁</span>
+              <span className="tm-label"><span className="tm-name">Project fonts</span></span>
+              <span className="tm-usage">{fonts.filter((font) => !font.bundled).length}</span>
+            </div>
+            {!collapsedGroups.has('project') && (
+              fonts.filter((font) => !font.bundled).length === 0 ? (
+                <div className="fm-group-empty">Nothing uploaded yet.</div>
+              ) : (
+                fonts.filter((font) => !font.bundled).map((font) => (
+                  <div
+                    key={font.id}
+                    className={`tm-row tm-typography ${selectedResourceId === font.id && !specialSelection ? 'selected' : ''}`}
+                    style={{ paddingLeft: 22 }}
+                    onClick={() => selectFont(font.id)}
+                  >
+                    <span className="fm-aa" style={{ fontFamily: fontFaceMap[font.id] || font.family }}>Aa</span>
+                    <span className="tm-label">
+                      <span className="tm-name">{font.name}</span>
+                      <span className="tm-detail">{font.family} {font.style} · {getFormatLabel(font)} · {formatFileSize(font.size)}</span>
+                    </span>
+                    <button
+                      type="button"
+                      className="tm-row-btn tm-delete"
+                      onClick={(e) => handleDelete(font.id, e)}
+                      title={`Delete ${font.name}`}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                ))
+              )
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Fonts that ship with the app, one click away from being a resource */}
-      {bundledAvailable.length > 0 && (
-        <div className="bundled-fonts">
-          <div className="bundled-fonts-title">Bundled fonts</div>
-          {bundledAvailable.map((spec) => (
-            <div key={spec.id} className="bundled-font-item">
-              <div className="bundled-font-info">
-                <span className="bundled-font-name">{spec.label}</span>
-                <span className="bundled-font-desc">{spec.description}</span>
-              </div>
-              <button
-                className="bundled-font-add"
-                onClick={() => handleAddBundled(spec)}
-                disabled={addingBundled !== null}
-              >
-                {addingBundled === spec.id ? 'Adding…' : '+ Add'}
-              </button>
-            </div>
-          ))}
-          <div className="bundled-fonts-license">
-            SIL Open Font License 1.1 — free for commercial use.
-          </div>
+      <div className="tm-detail-pane">
+      {specialSelection === 'builtin:montserrat' && (
+        <div className="font-details">
+          <h4>Montserrat</h4>
+          <p className="typography-hint">
+            LVGL's built-in face, compiled into the library itself. There is no file to convert,
+            no character set to trim, and nothing to delete — it exists at exactly the sizes
+            every target's lv_conf.h switches on: {BUILTIN_FONT_SIZES.join(', ')}px. Any other
+            size asked of it snaps to the nearest. Latin coverage only; CJK needs a bundled or
+            uploaded face.
+          </p>
         </div>
       )}
 
-
-      {/* Font List */}
-      <div className="font-list">
-        {fonts.length === 0 ? (
-          <div className="empty-state">
-            <span className="empty-icon">🔤</span>
-            <p>No font resources yet</p>
-            <p className="empty-hint">Use the button above to upload a TTF or OTF font</p>
-          </div>
-        ) : (
-          fonts.map(font => (
-            <div
-              key={font.id}
-              className={`font-item ${selectedResourceId === font.id ? 'selected' : ''}`}
-              onClick={() => setSelectedResource(font.id)}
-            >
-              <div className="font-preview">
-                <span 
-                  className="preview-text"
-                  style={{ fontFamily: fontFaceMap[font.id] || font.family }}
-                >
-                  Aa
-                </span>
-              </div>
-              <div className="font-info">
-                <span className="font-name" title={font.name}>{font.name}</span>
-                <span className="font-family">{font.family} {font.style}</span>
-                <span className="font-sizes">
-                  {getFormatLabel(font)} · {formatFileSize(font.size)}
-                </span>
-              </div>
-              <button
-                className="delete-btn"
-                onClick={(e) => handleDelete(font.id, e)}
-                title="Delete"
-              >
-                🗑️
+      {specialSelection?.startsWith('bundled:') && (() => {
+        const spec = BUNDLED_FONTS.find((candidate) => `bundled:${candidate.id}` === specialSelection);
+        if (!spec) return null;
+        return (
+          <div className="font-details">
+            <h4>{spec.label}</h4>
+            <p className="typography-hint">{spec.description}</p>
+            <p className="typography-hint">
+              Ships with the studio under the {spec.license} licence — free for commercial use.
+              Adding it makes it an ordinary project resource: converted per size, trimmed to the
+              characters the project uses, and stored in saves by reference rather than by its
+              multi-megabyte payload.
+            </p>
+            <div className="detail-actions">
+              <button onClick={() => handleAddBundled(spec)} disabled={addingBundled !== null}>
+                {addingBundled === spec.id ? 'Adding…' : `＋ Add ${spec.label} to this project`}
               </button>
             </div>
-          ))
-        )}
-      </div>
-      
+          </div>
+        );
+      })()}
+
+      {!specialSelection && !selectedFont && (
+        <div className="empty-state">
+          <span className="empty-icon">🔤</span>
+          <p>{fonts.length === 0 ? 'No font resources yet' : 'Select a font'}</p>
+          <p className="empty-hint">
+            Upload a TTF or OTF, or pick a bundled face from the tree on the left.
+          </p>
+        </div>
+      )}
+
       {/* Selected Font Details */}
       {selectedFont && (
         <div className="font-details">
@@ -580,6 +711,8 @@ const FontManager: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
+
       
       {/* Command Modal */}
       {showCommandModal && (

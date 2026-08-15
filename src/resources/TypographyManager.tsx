@@ -77,9 +77,9 @@ function fontResourceFor(family: string, size: number): string {
 /**
  * Font family picker.
  *
- * Everything that ships with the studio sits under one heading whether or not
- * the project has added it, and choosing an unadded one adds it. *Project
- * fonts* means only what the author uploaded.
+ * Mirrors the Fonts tab's tree: Built-in / Bundled / Project fonts, every
+ * entry in the same place whether or not the project has added it. Choosing
+ * an unadded bundled font adds it.
  */
 function FontFamilySelect({
   value,
@@ -132,10 +132,17 @@ function FontFamilySelect({
   };
 
   return (
+    // The same three groups, in the same order, as the Fonts tab's tree — one
+    // mental model, not one per surface. "Built-in" means compiled into LVGL;
+    // "Bundled" ships with the studio and is added by selecting it; "Project
+    // fonts" is what the author uploaded. Every entry keeps its place whether
+    // or not it has been added.
     <select value={value} disabled={adding} onChange={(event) => handleChange(event.target.value)}>
       {baseLabel !== undefined && <option value="">{baseLabel}</option>}
       <optgroup label="Built-in">
         <option value={MONTSERRAT}>Montserrat</option>
+      </optgroup>
+      <optgroup label="Bundled">
         {BUNDLED_FONTS.map((spec) => (
           <option key={spec.id} value={bundledValue(spec)}>{spec.label}</option>
         ))}

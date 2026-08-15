@@ -103,6 +103,56 @@ export function stripBundledFontData(font: FontResource): FontResource {
 }
 
 /**
+ * Every bundled font as a project resource, adding the ones not there yet.
+ *
+ * Bundled fonts are default-present, like Montserrat: nothing to add, nothing
+ * to manage, they are simply available. This costs nothing downstream — a
+ * font no widget or typography uses is neither declared nor converted, and
+ * saves store bundled fonts by reference — so the only price is reading the
+ * payloads at open, from the app's own static files.
+ *
+ * A font whose payload cannot be read (`loadData` throws) is skipped rather
+ * than added dataless: the Fonts panel then still shows its catalogue row
+ * with an Add affordance, which is the honest state — available, not loaded.
+ */
+export async function ensureBundledFonts(
+  fonts: FontResource[],
+  loadData: (file: string) => Promise<{ data: string; size: number }>,
+  generateId: () => string,
+): Promise<FontResource[]> {
+  const missing = BUNDLED_FONTS.filter(
+    (spec) => !fonts.some((font) => font.bundled === spec.id),
+  );
+  if (missing.length === 0) return fonts;
+
+  const added: FontResource[] = [];
+  for (const spec of missing) {
+    try {
+      const { data, size } = await loadData(spec.file);
+      added.push({
+        id: generateId(),
+        name: spec.label,
+        family: spec.family,
+        style: spec.style,
+        sizes: [16],
+        charsetMode: 'auto',
+        charset: 'ascii',
+        bpp: 4,
+        data,
+        bundled: spec.id,
+        cFontName: spec.cFontName,
+        size,
+        createdAt: Date.now(),
+      });
+    } catch (error) {
+      console.warn(`Bundled font ${spec.label} not loadable; leaving it addable instead:`, error);
+    }
+  }
+
+  return added.length > 0 ? [...fonts, ...added] : fonts;
+}
+
+/**
  * Fill in `data` for bundled fonts loaded without it. `loadData` receives the
  * catalog file name and returns a base64 data URL — injectable so the browser
  * can fetch from the served root while the server reads public/ from disk.

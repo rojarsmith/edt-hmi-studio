@@ -10,7 +10,7 @@ import { applyTypographies } from '../codegen/typography';
 import { normalizeBuiltinSizes } from '../resources/builtinFonts';
 import { applyTextResources } from '../codegen/textResources';
 import { migrateFontResource } from '../resources/converters/fontConverter';
-import { hydrateBundledFonts, stripBundledFontData } from '../resources/bundledFonts';
+import { ensureBundledFonts, hydrateBundledFonts, stripBundledFontData } from '../resources/bundledFonts';
 import { loadBundledFontData } from '../resources/bundledFontLoader';
 import type {
   BoardId,
@@ -504,7 +504,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     // app's own files. A failed read leaves the font dataless rather than
     // failing the whole open — the canvas falls back and the panel still lists
     // the resource.
-    const fonts = await hydrateBundledFonts(storedFonts, async (file) => {
+    const hydrated = await hydrateBundledFonts(storedFonts, async (file) => {
       try {
         return (await loadBundledFontData(file)).data;
       } catch (error) {
@@ -512,6 +512,11 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         return '';
       }
     });
+
+    // Bundled fonts are default-present: a project that does not carry one
+    // yet gains it on open, exactly as choosing it by hand would have. Unused
+    // ones cost nothing — neither declared, converted, nor saved by payload.
+    const fonts = await ensureBundledFonts(hydrated, loadBundledFontData, uuidv4);
 
     // Opening a stored project is the common path, and it has to migrate for
     // the same reason opening a file does: a project saved before typographies

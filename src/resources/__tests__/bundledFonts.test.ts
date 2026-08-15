@@ -9,6 +9,7 @@ import {
   BUNDLED_FONTS,
   BUNDLED_FONT_DIR,
   bundledFontById,
+  ensureBundledFonts,
   hydrateBundledFonts,
   stripBundledFontData,
 } from '../bundledFonts';
@@ -158,5 +159,44 @@ describe('resourceStore.addBundledFont', () => {
 
     expect(second).toBe(first);
     expect(useResourceStore.getState().fonts).toHaveLength(1);
+  });
+});
+
+describe('ensureBundledFonts', () => {
+  const loader = async (file: string) => ({ data: `data:font/otf;base64,${file}`, size: 7 });
+  let nextId = 0;
+  const genId = () => `id_${++nextId}`;
+
+  it('adds every catalogue font a project does not carry yet', async () => {
+    const fonts = await ensureBundledFonts([], loader, genId);
+    expect(fonts.map((font) => font.bundled)).toEqual(BUNDLED_FONTS.map((spec) => spec.id));
+    // Ordinary resources from the start: auto charset, ready to convert
+    expect(fonts[0].charsetMode).toBe('auto');
+    expect(fonts[0].cFontName).toBe(BUNDLED_FONTS[0].cFontName);
+  });
+
+  it('is idempotent — a second open adds nothing', async () => {
+    const once = await ensureBundledFonts([], loader, genId);
+    const twice = await ensureBundledFonts(once, loader, genId);
+    expect(twice).toBe(once);
+  });
+
+  it('leaves uploaded fonts alone and appends after them', async () => {
+    const uploaded = font({ id: 'up1', cFontName: 'ui_font_mine' });
+    const fonts = await ensureBundledFonts([uploaded], loader, genId);
+    expect(fonts[0]).toBe(uploaded);
+    expect(fonts).toHaveLength(1 + BUNDLED_FONTS.length);
+  });
+
+  it('skips a font whose payload cannot be read, rather than adding it dataless', async () => {
+    // The Fonts panel then still shows its catalogue row with an Add
+    // affordance — available, not loaded — instead of a broken resource
+    const failing = async (file: string) => {
+      if (file === BUNDLED_FONTS[0].file) throw new Error('offline');
+      return loader(file);
+    };
+    const fonts = await ensureBundledFonts([], failing, genId);
+    expect(fonts.some((font) => font.bundled === BUNDLED_FONTS[0].id)).toBe(false);
+    expect(fonts).toHaveLength(BUNDLED_FONTS.length - 1);
   });
 });
