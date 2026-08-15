@@ -1,8 +1,67 @@
+/* Two panes, the Typographies shape: the group tree on the left (tm-* classes
+   come from TypographyManager.css), the language table on the right, scoped to
+   whatever the tree has selected. */
 .text-manager {
   display: flex;
-  flex-direction: column;
+  align-items: stretch;
   height: 100%;
   min-height: 0;
+}
+
+.text-table-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 12px;
+}
+
+/* What the table is scoped to — a group's name, or every text */
+.text-scope-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.text-scope-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #222;
+}
+
+.text-scope-count {
+  font-size: 11px;
+  color: #98a1ad;
+}
+
+/* Tree rows specific to texts: the id in the same monospace as the table */
+.tm-text-row .tm-name.text-id {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11.5px;
+  color: #2b6cb0;
+}
+
+.tm-text-row.selected {
+  background: #e8f2fd;
+  box-shadow: inset 3px 0 0 #2f7fd0;
+}
+
+.tm-group-row.selected {
+  background: #eef4fa;
+  box-shadow: inset 3px 0 0 #7aa9d8;
+}
+
+.tm-all-row {
+  border-bottom: 1px solid #ececec;
+  margin-bottom: 4px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.tm-all-row.selected {
+  background: #e8f2fd;
+  box-shadow: inset 3px 0 0 #2f7fd0;
 }
 
 /* The table scrolls in both directions: a project can have many rows, and each
@@ -79,6 +138,95 @@
 
 .text-table .col-key {
   min-width: 160px;
+}
+
+/* The Id header sorts; the mark shows which way, and idles until asked */
+.text-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.text-table th.sortable:hover {
+  background: #f0f4f8;
+}
+
+.sort-mark {
+  margin-left: 5px;
+  font-size: 9px;
+  color: #2f7fd0;
+}
+
+.sort-mark.idle {
+  color: #ccc;
+}
+
+/* Tree → table sync: the selected row is the one the tree picked */
+.text-table tbody tr.selected td {
+  background: #f0f7ff;
+}
+
+.text-table tbody tr.selected td:first-child {
+  box-shadow: inset 3px 0 0 #2f7fd0;
+}
+
+/* The ＋ column header that adds a language, TouchGFX's gesture */
+.col-lang-add {
+  position: relative;
+}
+
+.lang-add-btn {
+  border: 1px solid #d9dce1;
+  border-radius: 5px;
+  background: #fff;
+  padding: 3px 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2f7fd0;
+  cursor: pointer;
+}
+
+.lang-add-btn:hover {
+  background: #eaf2fb;
+  border-color: #4a90d9;
+}
+
+.lang-add-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 190px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #d5d5d5;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+}
+
+.lang-add-menu input {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.lang-add-menu button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #4a9ae4 0%, #2f7fd0 100%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lang-add-menu button:hover {
+  filter: brightness(1.06);
 }
 
 .text-table .col-used,

@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 import { v4 as uuidv4 } from 'uuid';
 import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '../resources/types';
-import type { Screen, ScreenGroup, Typography, TypographyGroup, ProjectLanguage, TextResource } from '../types';
+import type { Screen, ScreenGroup, Typography, TypographyGroup, ProjectLanguage, TextResource, TextGroup } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import { applyTypographies } from '../codegen/typography';
 import { normalizeBuiltinSizes } from '../resources/builtinFonts';
@@ -81,6 +81,8 @@ export interface ProjectData {
   languages?: ProjectLanguage[];
   /** Shared text, referenced by widgets through textId. */
   texts?: TextResource[];
+  /** Organisational folders shown in the texts tree. */
+  textGroups?: TextGroup[];
   logicGraphs: LogicGraph[];
   variables: { id: string; name: string; type: string; defaultValue: string }[];
 }
@@ -399,7 +401,7 @@ interface ProjectStoreState {
   // Load / save project data (screens, logic, resources)
   loadProjectData: (id: string) => Promise<{ data: ProjectData; images: ImageResource[]; fonts: FontResource[] }>;
   /** Omit  to leave the stored list untouched. */
-  saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[], typographies?: Typography[], languages?: ProjectLanguage[], texts?: TextResource[], typographyGroups?: TypographyGroup[]) => Promise<void>;
+  saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[], typographies?: Typography[], languages?: ProjectLanguage[], texts?: TextResource[], typographyGroups?: TypographyGroup[], textGroups?: TextGroup[]) => Promise<void>;
 
   // Import / export
   exportProject: (id: string) => Promise<ProjectFile>;
@@ -557,7 +559,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     return { data, images, fonts };
   },
 
-  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = [], typographies, languages, texts, typographyGroups) => {
+  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = [], typographies, languages, texts, typographyGroups, textGroups) => {
     // Omitting typographies means "leave them alone", not "delete them". They
     // are written once by migration and then only by the editor, so defaulting
     // to an empty array let every autosave quietly wipe the list while the
@@ -573,7 +575,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     // Same rule as typographies: omitting them means "leave them alone", so an
     // autosave from a panel that does not know about groups cannot wipe them
     const nextTypographyGroups = typographyGroups ?? previous?.typographyGroups ?? [];
-    await dbUpdateProjectData({ projectId: id, screens, screenGroups, typographies: nextTypographies, typographyGroups: nextTypographyGroups, languages: nextLanguages, texts: nextTexts, logicGraphs, variables: [] });
+    const nextTextGroups = textGroups ?? previous?.textGroups ?? [];
+    await dbUpdateProjectData({ projectId: id, screens, screenGroups, typographies: nextTypographies, typographyGroups: nextTypographyGroups, languages: nextLanguages, texts: nextTexts, textGroups: nextTextGroups, logicGraphs, variables: [] });
     await get().syncResources(id, images, fonts);
   },
 
@@ -624,6 +627,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       })),
       screenGroups: (data.screenGroups || []).map(g => ({ ...g })),
       typographyGroups: (data.typographyGroups || []).map(g => ({ ...g })),
+      textGroups: (data.textGroups || []).map(g => ({ ...g })),
       // Without these an exported project loses every translation and named
       // style on the way out, and import re-derives a single-language table
       typographies: (data.typographies || []).map(t => ({ ...t })),
@@ -706,6 +710,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       // gets a table derived on first load, as the read-side migration does
       languages: file.languages || [],
       texts: file.texts || [],
+      textGroups: (file.textGroups || []).map(g => ({ ...g })),
       logicGraphs: file.logicGraphs || [],
       variables: (file.variables || []).map(v => ({ ...v, type: v.type as string })),
     });

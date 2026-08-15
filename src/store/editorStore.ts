@@ -14,9 +14,11 @@ import type {
   TypographyLanguageStyle,
   ProjectLanguage,
   TextResource,
+  TextGroup,
 } from '../types';
 import {
   MAX_SCREEN_GROUP_DEPTH,
+  MAX_TEXT_GROUP_DEPTH,
   MAX_TYPOGRAPHY_GROUP_DEPTH,
   sameTextKey,
 } from '../types';
@@ -151,6 +153,7 @@ interface EditorState {
     languages?: ProjectLanguage[],
     texts?: TextResource[],
     typographyGroups?: TypographyGroup[],
+    textGroups?: TextGroup[],
   ) => void;
 
   /**
@@ -179,11 +182,22 @@ interface EditorState {
   updateText: (id: string, language: string, value: string) => void;
   renameTextKey: (id: string, key: string) => void;
   /** Create an empty text resource and return its id. */
-  addText: () => string;
+  addText: (groupId?: string | null) => string;
   /** Bind a typography to a text resource, or clear it. Widgets follow it. */
   setTextTypography: (id: string, typographyId: string | undefined) => void;
   /** Removing one leaves its widgets showing their own literal again. */
   deleteText: (id: string) => void;
+
+  // Text groups — the same shape as screen and typography groups
+  textGroups: TextGroup[];
+  getTextGroupDepth: (groupId: string | null | undefined) => number;
+  canNestTextGroup: (parentId: string | null | undefined) => boolean;
+  /** Returns null when the parent is already at the deepest allowed level. */
+  addTextGroup: (parentId?: string | null) => string | null;
+  renameTextGroup: (groupId: string, name: string) => void;
+  /** Contents are lifted to the parent rather than deleted with the folder. */
+  deleteTextGroup: (groupId: string) => void;
+  moveTextToGroup: (textId: string, groupId: string | null) => void;
 
   /** Create a typography and return its id. Seeded from the project default. */
   addTypography: (seed?: Partial<Typography>) => string;
@@ -594,6 +608,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   languages: [],
   previewLanguage: null,
   texts: [],
+  textGroups: [],
   screenGroups: [],
   openScreenIds: [initialScreen.id],
 
@@ -1226,7 +1241,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  addText: () => {
+  addText: (groupId = null) => {
     const id = `text_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const taken = get().texts.map((text) => text.key);
     let key = 'newText';
@@ -1234,7 +1249,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       key = `newText${suffix}`;
     }
 
-    set({ texts: [...get().texts, { id, key, values: {} }] });
+    set({ texts: [...get().texts, { id, key, values: {}, groupId }] });
     return id;
   },
 
@@ -1447,6 +1462,75 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
+  // Text Group Actions — the same shape as screen and typography groups, and
+  // capped at the same depth for the same reason
+  getTextGroupDepth: (groupId) => {
+    if (!groupId) return 0;
+    const { textGroups } = get();
+    let depth = 0;
+    let current = textGroups.find((group) => group.id === groupId);
+    // Bounded, so a corrupted parent cycle cannot hang the editor
+    while (current && depth <= MAX_TEXT_GROUP_DEPTH) {
+      depth += 1;
+      if (!current.parentId) break;
+      current = textGroups.find((group) => group.id === current!.parentId);
+    }
+    return depth;
+  },
+
+  canNestTextGroup: (parentId) => {
+    if (!parentId) return true;
+    return get().getTextGroupDepth(parentId) < MAX_TEXT_GROUP_DEPTH;
+  },
+
+  addTextGroup: (parentId = null) => {
+    if (!get().canNestTextGroup(parentId)) return null;
+
+    const id = `textgroup_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const taken = new Set(get().textGroups.map((group) => group.name));
+    let name = 'New group';
+    for (let suffix = 2; taken.has(name); suffix++) name = `New group ${suffix}`;
+
+    set({
+      textGroups: [...get().textGroups, { id, name, parentId: parentId ?? null }],
+    });
+    return id;
+  },
+
+  renameTextGroup: (groupId, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set({
+      textGroups: get().textGroups.map((group) =>
+        group.id === groupId ? { ...group, name: trimmed } : group,
+      ),
+    });
+  },
+
+  deleteTextGroup: (groupId) => {
+    const group = get().textGroups.find((candidate) => candidate.id === groupId);
+    if (!group) return;
+    const parentId = group.parentId ?? null;
+
+    set({
+      // Contents are lifted, never deleted with the folder
+      textGroups: get().textGroups
+        .filter((candidate) => candidate.id !== groupId)
+        .map((candidate) => (candidate.parentId === groupId ? { ...candidate, parentId } : candidate)),
+      texts: get().texts.map((text) =>
+        text.groupId === groupId ? { ...text, groupId: parentId } : text,
+      ),
+    });
+  },
+
+  moveTextToGroup: (textId, groupId) => {
+    set({
+      texts: get().texts.map((text) =>
+        text.id === textId ? { ...text, groupId } : text,
+      ),
+    });
+  },
+
   deleteTypography: (id) => {
     get().saveToHistory();
     // Widgets pointing at it fall back to inheriting the screen default, which
@@ -1472,7 +1556,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  setScreens: (screens, screenGroups, typographies, languages, texts, typographyGroups) => {
+  setScreens: (screens, screenGroups, typographies, languages, texts, typographyGroups, textGroups) => {
     get().saveToHistory();
     const firstId = screens.length > 0 ? screens[0].id : get().currentScreenId;
     set({
@@ -1483,6 +1567,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       languages: languages ? languages.map(l => ({ ...l })) : [],
       previewLanguage: languages?.[0]?.code ?? null,
       texts: texts ? texts.map(t => ({ ...t, values: { ...t.values } })) : [],
+      textGroups: textGroups ? textGroups.map(g => ({ ...g })) : [],
       // A freshly loaded project starts with just its first screen open.
       openScreenIds: screens.length > 0 ? [firstId] : [],
       currentScreenId: firstId,

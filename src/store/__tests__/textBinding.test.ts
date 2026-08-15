@@ -24,6 +24,7 @@ function reset(
     typographies,
     languages: [{ code: 'en', name: 'English' }, { code: 'zh-TW', name: '繁體中文' }],
     texts,
+    textGroups: [],
     previewLanguage: 'en',
     openScreenIds: ['s1'],
     selection: { selectedIds: [], hoveredId: null },
@@ -154,5 +155,57 @@ describe('a text resource can carry a typography', () => {
     );
     useEditorStore.getState().deleteTypography('ty1');
     expect(useEditorStore.getState().texts[0].typographyId).toBeUndefined();
+  });
+});
+
+describe('text groups', () => {
+  // The same shape as screen and typography groups — TouchGFX's Groups pane
+  it('creates a group and nests one level, but not past the cap', () => {
+    const s = () => useEditorStore.getState();
+    const top = s().addTextGroup()!;
+    const child = s().addTextGroup(top)!;
+    expect(child).not.toBeNull();
+    expect(s().canNestTextGroup(child)).toBe(false);
+    expect(s().addTextGroup(child)).toBeNull();
+  });
+
+  it('names new groups uniquely and renames on request', () => {
+    const s = () => useEditorStore.getState();
+    const first = s().addTextGroup()!;
+    const second = s().addTextGroup()!;
+    const names = s().textGroups.map((group) => group.name);
+    expect(new Set(names).size).toBe(2);
+    s().renameTextGroup(first, 'StartScreen');
+    expect(s().textGroups.find((group) => group.id === first)!.name).toBe('StartScreen');
+    expect(s().textGroups.find((group) => group.id === second)).toBeDefined();
+  });
+
+  it('files a new text into the group it was created in', () => {
+    const s = () => useEditorStore.getState();
+    const group = s().addTextGroup()!;
+    const id = s().addText(group);
+    expect(s().texts.find((text) => text.id === id)!.groupId).toBe(group);
+  });
+
+  it('moves a text between groups and back to the root', () => {
+    reset([], [{ id: 't1', key: 'greeting', values: {} }]);
+    const s = () => useEditorStore.getState();
+    const group = s().addTextGroup()!;
+    s().moveTextToGroup('t1', group);
+    expect(s().texts[0].groupId).toBe(group);
+    s().moveTextToGroup('t1', null);
+    expect(s().texts[0].groupId).toBeNull();
+  });
+
+  it('lifts contents to the parent when a group is deleted', () => {
+    reset([], [{ id: 't1', key: 'greeting', values: {} }]);
+    const s = () => useEditorStore.getState();
+    const top = s().addTextGroup()!;
+    const child = s().addTextGroup(top)!;
+    s().moveTextToGroup('t1', child);
+    s().deleteTextGroup(child);
+    // The text and any subgroups climb one level rather than vanishing
+    expect(s().texts[0].groupId).toBe(top);
+    expect(s().textGroups).toHaveLength(1);
   });
 });

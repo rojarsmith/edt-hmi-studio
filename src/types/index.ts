@@ -379,7 +379,24 @@ export interface TextResource {
    * so the words and the style that suits them travel together.
    */
   typographyId?: string;
+  /** Tree folder in the Texts panel. Organisational only, like screens'. */
+  groupId?: string | null;
 }
+
+/**
+ * Organisational folder in the texts tree — TouchGFX's text groups. Purely a
+ * UI grouping with no effect on generated code, the same shape and the same
+ * two-level cap as screen and typography groups, for the same reason: a tree
+ * deep enough to hide things is worse than a list.
+ */
+export interface TextGroup {
+  id: string;
+  name: string;
+  parentId?: string | null;
+}
+
+/** Deepest text group level the manager allows (1-based). */
+export const MAX_TEXT_GROUP_DEPTH = 2;
 
 /**
  * Two text keys are the same key when they differ only in case.

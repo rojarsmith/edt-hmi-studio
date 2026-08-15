@@ -1476,7 +1476,8 @@ function TranslatableTextRow({
     : undefined;
 
   /**
-   * Which row of the text table the widget shows, chosen by key.
+   * Which row of the text table the widget shows, chosen by its Id — the
+   * label the Texts panel now uses for the same field.
    *
    * The alternative — retyping the literal until it happens to match an
    * existing row — is how a widget ends up on a near-identical duplicate.
@@ -1484,7 +1485,7 @@ function TranslatableTextRow({
    */
   const keyRow = prop !== standIn ? null : (
     <div className="property-row">
-      <label>Key</label>
+      <label>Id</label>
       <select
         value={resource?.id ?? ''}
         onChange={(e) => bindComponentToText(component.id, e.target.value || undefined)}
