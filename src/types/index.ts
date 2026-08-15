@@ -272,8 +272,10 @@ export interface Typography {
 
   /**
    * Characters runtime-substituted values may need, beyond the project's own
-   * text — TouchGFX's Wildcard Characters. Literal characters, converted into
-   * every font this typography resolves to, in every language.
+   * text — TouchGFX's Wildcard Characters. Literal characters. These are the
+   * Default's declaration: each language resolves its own through the same
+   * inheritance as the style fields, so a language without a declaration of
+   * its own carries this one into whatever font it resolves to.
    */
   wildcardCharacters?: string;
   /**
@@ -301,6 +303,15 @@ export interface TypographyLanguageStyle {
   align?: TypographyAlign;
   decor?: 'none' | 'underline' | 'strikethrough';
   baseDir?: 'auto' | 'ltr' | 'rtl';
+  /**
+   * Wildcards and the fallback character override per language too —
+   * TouchGFX's shape, where each language tab declares its own. A language
+   * that declares nothing inherits the Default's declaration, applied to
+   * whatever font that language resolves to.
+   */
+  fallbackCharacter?: string;
+  wildcardCharacters?: string;
+  wildcardRanges?: string;
 }
 
 /**

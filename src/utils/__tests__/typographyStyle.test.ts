@@ -116,4 +116,20 @@ describe('reporting what a language changes', () => {
   it('has no tabs when nothing was ever customised', () => {
     expect(tabbedLanguages(base)).toEqual([]);
   });
+
+  it('resolves wildcards and the fallback character through the same inheritance', () => {
+    // TouchGFX's shape: each tab declares its own; a tab that declares
+    // nothing carries the Default's declaration into its own font
+    const declared: Typography = {
+      ...base,
+      wildcardCharacters: '°',
+      fallbackCharacter: '?',
+      languages: { ar: { wildcardCharacters: '٪' }, ja: {} },
+    };
+    expect(resolveTypographyStyle(declared, 'ar').wildcardCharacters).toBe('٪');
+    expect(resolveTypographyStyle(declared, 'ar').fallbackCharacter).toBe('?');
+    expect(resolveTypographyStyle(declared, 'ja').wildcardCharacters).toBe('°');
+    expect(languageDifferences(declared, 'ar')).toEqual(['wildcardCharacters']);
+    expect(languageDifferences(declared, 'ja')).toEqual([]);
+  });
 });

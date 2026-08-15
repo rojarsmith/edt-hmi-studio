@@ -579,17 +579,19 @@ const TypographyManager: React.FC = () => {
 
       {selected && activeStyle && (
         <div className="tm-detail-pane">
-          <div className="detail-row">
-            <label>Typography Id:</label>
-            <input
-              type="text"
-              value={selected.name}
-              onChange={(event) => updateTypography(selected.id, { name: event.target.value })}
-            />
+          <div className="tm-detail-header">
+            <div className="detail-row">
+              <label>Typography Id:</label>
+              <input
+                type="text"
+                value={selected.name}
+                onChange={(event) => updateTypography(selected.id, { name: event.target.value })}
+              />
+            </div>
+            <p className="typography-hint">
+              The identifier the generated style is named after, not a description.
+            </p>
           </div>
-          <p className="typography-hint">
-            The identifier the generated style is named after, not a description.
-          </p>
 
           {/* Tabs exist because the author added them, not because the
               project has languages: ＋ opens the menu of languages without
@@ -771,32 +773,33 @@ const TypographyManager: React.FC = () => {
               )}
             </div>
 
-          </div>
-
-          {isDefaultTab && (
+            {/* Per tab, TouchGFX's shape: each language declares its own
+                wildcards and fallback, and a tab that declares nothing
+                inherits the Default's declaration into its own font */}
             <div className="tm-wildcards">
+              <h5 className="tm-subhead">Wildcards &amp; fallback</h5>
               <div className="detail-row">
-                <label>Wildcard characters:</label>
+                {fieldLabel('Wildcard characters:', 'wildcardCharacters')}
                 <input
                   type="text"
-                  value={selected.wildcardCharacters ?? ''}
+                  value={activeStyle.wildcardCharacters ?? ''}
                   placeholder="e.g. °℃%"
                   onChange={(event) =>
-                    updateTypography(selected.id, { wildcardCharacters: event.target.value || undefined })}
+                    setField({ wildcardCharacters: event.target.value || undefined })}
                 />
               </div>
               <div className="detail-row">
-                <label>Wildcard ranges:</label>
+                {fieldLabel('Wildcard ranges:', 'wildcardRanges')}
                 <input
                   type="text"
-                  value={selected.wildcardRanges ?? ''}
+                  value={activeStyle.wildcardRanges ?? ''}
                   placeholder="e.g. 0-9, 0x4E00-0x9FFF"
                   onChange={(event) =>
-                    updateTypography(selected.id, { wildcardRanges: event.target.value || undefined })}
+                    setField({ wildcardRanges: event.target.value || undefined })}
                 />
               </div>
               {(() => {
-                const { invalid } = parseWildcardRanges(selected.wildcardRanges ?? '');
+                const { invalid } = parseWildcardRanges(activeStyle.wildcardRanges ?? '');
                 return invalid.length > 0 ? (
                   <span className="typography-warning">
                     Ignored: {invalid.join(', ')} — each side of a range is a single character or
@@ -806,27 +809,30 @@ const TypographyManager: React.FC = () => {
               })()}
               <span className="typography-hint">
                 Characters runtime values may substitute in — a Modbus string, a formatted number —
-                which no walk of the project can see. Converted into every font this typography
-                resolves to, in every language.
+                which no walk of the project can see. Converted into the font this tab resolves to
+                {isDefaultTab
+                  ? ', and inherited by every language tab that declares none of its own.'
+                  : '; leaving these empty keeps the Default’s declaration.'}
               </span>
               <div className="detail-row">
-                <label>Fallback character:</label>
+                {fieldLabel('Fallback character:', 'fallbackCharacter')}
                 <input
                   type="text"
                   maxLength={2}
-                  value={selected.fallbackCharacter ?? ''}
+                  className="tm-char-input"
+                  value={activeStyle.fallbackCharacter ?? ''}
                   placeholder="none"
                   onChange={(event) =>
-                    updateTypography(selected.id, { fallbackCharacter: event.target.value || undefined })}
+                    setField({ fallbackCharacter: event.target.value || undefined })}
                 />
               </div>
               <span className="typography-hint">
                 Drawn in place of a glyph the font lacks — which, with the character set covering
                 the project's own text, can only be one a runtime value brought in. Generated as a
-                substitute font on LVGL's fallback chain, rendered in this typography's face.
+                substitute font on LVGL's fallback chain, rendered in this tab's face.
               </span>
             </div>
-          )}
+          </div>
 
           <div className="typography-usage-note">
             Used by {usageCounts.get(selected.id) ?? 0} widget

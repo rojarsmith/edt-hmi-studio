@@ -78,6 +78,38 @@ describe('collectTypographyWildcards', () => {
     const plain: Typography = { id: 't', name: 'P', fontResource: 'ui_font_latin', fontSize: 16 };
     expect(collectTypographyWildcards([plain], customFonts).size).toBe(0);
   });
+
+  // TouchGFX's shape: each tab declares its own, inheritance fills the rest
+  it("a tab's own declaration replaces the Default's for that language", () => {
+    const typography: Typography = {
+      ...CJK_TYPOGRAPHY,
+      languages: {
+        'zh-TW': {
+          fontResource: 'ui_font_cjk',
+          wildcardCharacters: '你',
+          wildcardRanges: '0x4E00-0x9FFF',
+        },
+      },
+    };
+    const byFont = collectTypographyWildcards([typography], customFonts);
+    const cjk = byFont.get('ui_font_cjk')!;
+    expect(cjk.codePoints.has('你'.codePointAt(0)!)).toBe(true);
+    expect(cjk.ranges).toEqual(['0x4e00-0x9fff']);
+    // The Default's characters stay out of a font whose language declared its own…
+    expect(cjk.codePoints.has('°'.codePointAt(0)!)).toBe(false);
+    // …but its fallback character still arrives, since the tab did not override it
+    expect(cjk.codePoints.has(0x3f)).toBe(true);
+    expect(byFont.get('ui_font_latin')!.codePoints.has('°'.codePointAt(0)!)).toBe(true);
+  });
+
+  it('a wildcard-only tab lands its characters in the font it resolves to', () => {
+    const typography: Typography = {
+      id: 'ty2', name: 'Body', fontResource: 'ui_font_latin', fontSize: 16,
+      languages: { ar: { wildcardCharacters: '٪' } },
+    };
+    const byFont = collectTypographyWildcards([typography], customFonts);
+    expect(byFont.get('ui_font_latin')!.codePoints.has('٪'.codePointAt(0)!)).toBe(true);
+  });
 });
 
 describe('wildcards reach the conversion request', () => {
@@ -160,5 +192,30 @@ describe('fallback character codegen', () => {
     expect(result).not.toContain('_fbsub');
     expect(result).not.toContain('lv_font_get_glyph_dsc_fmt_txt');
     expect(result).toContain('lv_style_set_text_font(&ui_style_body, &ui_font_latin_16);');
+  });
+
+  it('a language with its own fallback character gets its own wrapper', () => {
+    const typography: Typography = {
+      ...CJK_TYPOGRAPHY,
+      languages: { 'zh-TW': { fontResource: 'ui_font_cjk', fallbackCharacter: '？' } },
+    };
+    const result = generate(typography);
+    // The Default's '?' and 繁體's full-width '？', one wrapper each, and the
+    // CJK copy wired to the language's own character
+    expect(result).toContain('return lv_font_get_glyph_dsc_fmt_txt(font, dsc, 0x3f, letter_next);');
+    expect(result).toContain('return lv_font_get_glyph_dsc_fmt_txt(font, dsc, 0xff1f, letter_next);');
+    expect(result).toContain('ui_style_body_fbsub1.get_glyph_dsc = ui_style_body_fb_dsc;');
+    expect(result).toContain('ui_style_body_fbsub2.get_glyph_dsc = ui_style_body_fb_dsc2;');
+  });
+
+  it('a wildcard-only language override generates no language switching', () => {
+    // Its whole effect is extra characters in the converted font; the style
+    // never changes at runtime, so no branch and no callback are emitted
+    const typography: Typography = {
+      id: 'ty3', name: 'Quiet', fontResource: 'ui_font_latin', fontSize: 16,
+      languages: { ar: { wildcardCharacters: '٪' } },
+    };
+    const result = generate(typography);
+    expect(result).not.toContain('ui_typography_apply_language_fonts');
   });
 });

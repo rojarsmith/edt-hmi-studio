@@ -2027,8 +2027,19 @@ function generateTypographyStyles(
 ): { declarations: string[]; init: string[]; hasLanguageFonts: boolean } {
   const declarations: string[] = [];
   const init: string[] = [];
+
+  // A language needs a runtime branch only when switching to it changes the
+  // style: an lv_style property, or the fallback character, which changes the
+  // font copy the style points at. A wildcard-only override is settled at
+  // conversion time and generates nothing here.
+  const runtimeCodes = (typography: Typography): string[] =>
+    overriddenLanguages(typography).filter((code) =>
+      languageDifferences(typography, code).some(
+        (key) => key !== 'wildcardCharacters' && key !== 'wildcardRanges',
+      ),
+    );
   const withOverrides = typographies.filter(
-    (typography) => overriddenLanguages(typography).length > 0,
+    (typography) => runtimeCodes(typography).length > 0,
   );
   const hasLanguageFonts = withOverrides.length > 0;
   if (typographies.length === 0) return { declarations, init, hasLanguageFonts };
@@ -2036,37 +2047,45 @@ function generateTypographyStyles(
   const indent = getIndent(options);
 
   // Fallback characters, honoured through the one hook LVGL has for the job:
-  // the lv_font_t.fallback chain. Each font a fallback typography resolves to
-  // gets a mutable copy whose chain ends in a substitute font — a second copy
-  // whose get_glyph_dsc answers every letter with the declared character. The
-  // substitute shares the source font's tables, so the character renders in
-  // the face and size of the text it stands in for.
-  interface FallbackFont { copySymbol: string; substSymbol: string; source: string }
-  const fallback = new Map<string, { char: number; wrapper: string; byFont: Map<string, FallbackFont> }>();
+  // the lv_font_t.fallback chain. Each (font, character) pair a fallback
+  // typography resolves to — the character varies per language now, as the
+  // font always could — gets a mutable copy of the font whose chain ends in a
+  // substitute: a second copy whose get_glyph_dsc answers every letter with
+  // that language's character. The substitute shares the source font's
+  // tables, so the character renders in the face and size of the text it
+  // stands in for.
+  interface FallbackFont { copySymbol: string; substSymbol: string; source: string; wrapper: string }
+  const fallback = new Map<string, { byFont: Map<string, FallbackFont>; wrappers: Map<number, string> }>();
   for (const typography of typographies) {
-    const char = typography.fallbackCharacter?.codePointAt(0);
-    if (char === undefined) continue;
     const symbol = symbols.get(typography.id)!;
     const byFont = new Map<string, FallbackFont>();
-    const styles = [undefined, ...overriddenLanguages(typography)].map(
-      (language) => resolveTypographyStyle(typography, language),
-    );
-    for (const style of styles) {
-      const key = `${style.fontResource}@${style.fontSize}`;
+    const wrappers = new Map<number, string>();
+    for (const language of [undefined, ...overriddenLanguages(typography)]) {
+      const style = resolveTypographyStyle(typography, language);
+      const char = style.fallbackCharacter?.codePointAt(0);
+      if (char === undefined) continue;
+      const key = `${style.fontResource}@${style.fontSize}@${char}`;
       if (byFont.has(key)) continue;
+      if (!wrappers.has(char)) {
+        wrappers.set(char, wrappers.size === 0 ? `${symbol}_fb_dsc` : `${symbol}_fb_dsc${wrappers.size + 1}`);
+      }
       const index = byFont.size + 1;
       byFont.set(key, {
         copySymbol: `${symbol}_fb${index}`,
         substSymbol: `${symbol}_fbsub${index}`,
         source: fontSymbol(style.fontResource, style.fontSize),
+        wrapper: wrappers.get(char)!,
       });
     }
-    fallback.set(typography.id, { char, wrapper: `${symbol}_fb_dsc`, byFont });
+    if (byFont.size > 0) fallback.set(typography.id, { byFont, wrappers });
   }
 
   /** The font a style assignment points at: the fallback copy when one exists. */
   const fontExprFor = (typography: Typography, style: ResolvedTypographyStyle): string => {
-    const entry = fallback.get(typography.id)?.byFont.get(`${style.fontResource}@${style.fontSize}`);
+    const char = style.fallbackCharacter?.codePointAt(0);
+    const entry = char === undefined
+      ? undefined
+      : fallback.get(typography.id)?.byFont.get(`${style.fontResource}@${style.fontSize}@${char}`);
     return entry ? `&${entry.copySymbol}` : `&${fontSymbol(style.fontResource, style.fontSize)}`;
   };
 
@@ -2082,26 +2101,27 @@ function generateTypographyStyles(
   for (const typography of typographies) {
     const entry = fallback.get(typography.id);
     if (!entry) continue;
-    const charLiteral = `0x${entry.char.toString(16)}`;
-    const shown = typography.fallbackCharacter!;
-    if (options.generateComments) {
-      declarations.push(generateComment(
-        `${typography.name}: a glyph its font lacks draws '${shown}' instead`, options,
-      ));
-    }
     for (const font of entry.byFont.values()) {
       declarations.push(`static lv_font_t ${font.copySymbol};`);
       declarations.push(`static lv_font_t ${font.substSymbol};`);
     }
     // Every font the generator can name is fmt_txt-based — converted fonts and
-    // the built-in Montserrat alike — so the substitute resolves its one
+    // the built-in Montserrat alike — so a substitute resolves its one
     // character through the fmt_txt lookup against the tables it shares with
-    // the source font.
-    declarations.push(`static bool ${entry.wrapper}(const lv_font_t * font, lv_font_glyph_dsc_t * dsc, uint32_t letter, uint32_t letter_next) {`);
-    declarations.push(`${indent}LV_UNUSED(letter);`);
-    declarations.push(`${indent}return lv_font_get_glyph_dsc_fmt_txt(font, dsc, ${charLiteral}, letter_next);`);
-    declarations.push('}');
-    declarations.push('');
+    // the source font. One wrapper per distinct character: languages that
+    // declare their own fallback each get theirs.
+    for (const [char, wrapper] of entry.wrappers) {
+      if (options.generateComments) {
+        declarations.push(generateComment(
+          `${typography.name}: a glyph its font lacks draws '${String.fromCodePoint(char)}' instead`, options,
+        ));
+      }
+      declarations.push(`static bool ${wrapper}(const lv_font_t * font, lv_font_glyph_dsc_t * dsc, uint32_t letter, uint32_t letter_next) {`);
+      declarations.push(`${indent}LV_UNUSED(letter);`);
+      declarations.push(`${indent}return lv_font_get_glyph_dsc_fmt_txt(font, dsc, 0x${char.toString(16)}, letter_next);`);
+      declarations.push('}');
+      declarations.push('');
+    }
   }
 
   if (hasLanguageFonts) {
@@ -2120,12 +2140,20 @@ function generateTypographyStyles(
         init.push(`${indent}${generateComment(typography.name, options)}`);
       }
 
-      // The union of what any language changes. Every branch writes all of
-      // them — including the else, which restores the Default — because a
+      // The union of what any language changes at runtime. A fallback
+      // character difference is a font difference — a different character
+      // means the style points at a different font copy — and wildcard
+      // differences were settled at conversion time. Every branch writes all
+      // of them — including the else, which restores the Default — because a
       // style property set on the way into one language and left alone on the
       // way out would persist into the next.
-      const codes = overriddenLanguages(typography);
-      const touched = new Set(codes.flatMap((code) => languageDifferences(typography, code)));
+      const codes = runtimeCodes(typography);
+      const touched = new Set(
+        codes
+          .flatMap((code) => languageDifferences(typography, code))
+          .map((key) => (key === 'fallbackCharacter' ? 'fontResource' : key))
+          .filter((key) => key !== 'wildcardCharacters' && key !== 'wildcardRanges'),
+      );
 
       codes.forEach((code, index) => {
         const keyword = index === 0 ? 'if' : 'else if';
@@ -2164,7 +2192,7 @@ function generateTypographyStyles(
       if (!entry) continue;
       for (const font of entry.byFont.values()) {
         init.push(`${indent}lv_memcpy(&${font.substSymbol}, &${font.source}, sizeof(lv_font_t));`);
-        init.push(`${indent}${font.substSymbol}.get_glyph_dsc = ${entry.wrapper};`);
+        init.push(`${indent}${font.substSymbol}.get_glyph_dsc = ${font.wrapper};`);
         init.push(`${indent}${font.substSymbol}.fallback = NULL;`);
         init.push(`${indent}lv_memcpy(&${font.copySymbol}, &${font.source}, sizeof(lv_font_t));`);
         init.push(`${indent}${font.copySymbol}.fallback = &${font.substSymbol};`);

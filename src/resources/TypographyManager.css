@@ -22,7 +22,163 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  padding: 14px 16px;
+  padding: 20px 26px 30px;
+}
+
+/* Content is capped rather than the pane: on a wide window the form stays a
+   readable column instead of stretching labels away from their inputs. */
+.tm-detail-pane > * {
+  max-width: 720px;
+}
+
+/* ---------------------------------------------------------------------------
+   The editing form. `.detail-row` / `.detail-section` arrive from
+   FontManager.css with almost no styling, so everything here is scoped to
+   this pane: one label column, aligned controls, hints indented under the
+   controls they explain. */
+
+.tm-detail-pane .detail-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 340px);
+  column-gap: 12px;
+  align-items: center;
+  margin: 0 0 10px;
+}
+
+.tm-detail-pane .detail-row > label,
+.tm-detail-pane .detail-section > label {
+  font-size: 12px;
+  color: #5a6472;
+  text-align: right;
+  margin: 0;
+}
+
+/* The override marker still reads blue over the scoped label colour */
+.tm-detail-pane .tm-field-label.overridden {
+  color: #1f6fc4;
+  font-weight: 600;
+}
+
+/* An in-row hint drops under the control, not under the label */
+.tm-detail-pane .detail-row > .typography-hint,
+.tm-detail-pane .detail-row > .typography-warning {
+  grid-column: 2;
+  margin: 5px 0 0;
+}
+
+.tm-detail-pane .detail-section {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  column-gap: 12px;
+  align-items: start;
+  margin: 0 0 14px;
+}
+
+.tm-detail-pane .detail-section > label {
+  margin-top: 6px;
+}
+
+.tm-detail-pane .detail-section > .typography-hint,
+.tm-detail-pane .detail-section > .typography-warning {
+  grid-column: 2;
+  margin: 5px 0 0;
+}
+
+.tm-detail-pane .detail-row input[type="text"],
+.tm-detail-pane .detail-row input[type="number"],
+.tm-detail-pane .detail-row select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #d9dce1;
+  border-radius: 6px;
+  font-size: 12.5px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.tm-detail-pane .detail-row input:focus,
+.tm-detail-pane .detail-row select:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.15);
+}
+
+/* Numbers are short; a full-width box reads as a text field */
+.tm-detail-pane .detail-row input[type="number"] {
+  width: 110px;
+}
+
+/* One or two characters, shown big enough to recognise */
+.tm-detail-pane .detail-row input.tm-char-input {
+  width: 72px;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* Alignment / Decoration / Direction as one segmented control each, not a
+   scatter of look-alike buttons. */
+.tm-detail-pane .size-grid {
+  display: inline-flex;
+  gap: 0;
+  width: fit-content;
+  border: 1px solid #d9dce1;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.tm-detail-pane .size-btn {
+  min-width: 52px;
+  padding: 6px 14px;
+  border: none;
+  border-right: 1px solid #d9dce1;
+  border-radius: 0;
+  background: #fff;
+  font-size: 12px;
+  color: #555;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tm-detail-pane .size-btn:last-child {
+  border-right: none;
+}
+
+.tm-detail-pane .size-btn:hover {
+  background: #f0f6fd;
+  color: #2f7fd0;
+  border-color: #d9dce1;
+}
+
+.tm-detail-pane .size-btn.active {
+  background: linear-gradient(180deg, #4a9ae4 0%, #2f7fd0 100%);
+  border-color: #2f7fd0;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* The identity row: what everything generated is named after */
+.tm-detail-header {
+  margin-bottom: 6px;
+}
+
+.tm-detail-header input {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tm-detail-header .typography-hint,
+.tm-detail-pane > .typography-hint {
+  margin: 4px 0 0 162px;
+}
+
+/* Small section headings inside the pane */
+.tm-subhead {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a93a0;
 }
 
 .tm-tree-toolbar {
@@ -226,7 +382,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
-  margin: 14px 0 0;
+  margin: 18px 0 0;
+  padding: 0 6px;
   border-bottom: 1px solid #e0e0e0;
 }
 
@@ -354,8 +511,20 @@
   color: #666;
 }
 
+/* The tab's panel: a card the active tab connects to, so what the tab governs
+   has a visible edge. */
 .tm-lang-body {
-  padding: 12px 0 4px;
+  padding: 16px 18px 8px;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  background: #fff;
+}
+
+/* The one-line intro under the tabs spans the panel, unindented */
+.tm-lang-body > .typography-hint:first-child {
+  margin: 0 0 14px;
+  font-size: 11.5px;
 }
 
 .tm-field-label.overridden {
@@ -468,6 +637,30 @@
   border-top: 1px dashed #e6e6e6;
   font-size: 11px;
   color: #888;
+}
+
+/* Wildcards & fallback: typography-wide, not per-tab, so it sits in its own
+   card below the language panel rather than pretending to be a Default field. */
+.tm-detail-pane .tm-wildcards {
+  margin-top: 18px;
+  padding: 14px 18px 12px;
+  background: #fafbfc;
+  border: 1px solid #ececf0;
+  border-radius: 8px;
+}
+
+.tm-detail-pane .tm-wildcards > .typography-hint {
+  margin: 4px 0 12px 162px;
+}
+
+.tm-detail-pane .tm-wildcards > .typography-warning {
+  margin: 4px 0 12px 162px;
+}
+
+.tm-detail-pane .typography-usage-note {
+  margin-top: 22px;
+  padding-top: 12px;
+  color: #98a1ad;
 }
 
 /* Per-language font overrides */

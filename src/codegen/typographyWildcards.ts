@@ -74,10 +74,14 @@ export interface FontWildcards {
 /**
  * Wildcard declarations folded down to the fonts that must carry them.
  *
- * A typography's wildcards go to every font it can resolve to — the Default's
- * and each language override's — because a runtime value can arrive while any
- * language is active. Built-in Montserrat is skipped: it is compiled into
- * LVGL, not converted, so there is nothing to add glyphs to.
+ * Per language, TouchGFX's shape: each language resolves its own declaration
+ * — its tab's, or the Default's where the tab declares nothing — and that
+ * declaration goes into the font the same resolution names. The Default's
+ * declaration therefore still reaches a CJK override font when the override
+ * changes only the face, because the language inherits the declaration; a
+ * language that declares its own carries exactly that instead. Built-in
+ * Montserrat is skipped: it is compiled into LVGL, not converted, so there is
+ * nothing to add glyphs to.
  */
 export function collectTypographyWildcards(
   typographies: Typography[],
@@ -86,25 +90,21 @@ export function collectTypographyWildcards(
   const byFont = new Map<string, FontWildcards>();
 
   for (const typography of typographies) {
-    const characters = [
-      ...(typography.wildcardCharacters ?? ''),
-      ...(typography.fallbackCharacter ?? ''),
-    ];
-    const { ranges } = parseWildcardRanges(typography.wildcardRanges ?? '');
-    if (characters.length === 0 && ranges.length === 0) continue;
+    // undefined is the Default — the resolution every tabless language uses
+    for (const language of [undefined, ...overriddenLanguages(typography)]) {
+      const style = resolveTypographyStyle(typography, language);
+      const characters = [
+        ...(style.wildcardCharacters ?? ''),
+        ...(style.fallbackCharacter ?? ''),
+      ];
+      const { ranges } = parseWildcardRanges(style.wildcardRanges ?? '');
+      if (characters.length === 0 && ranges.length === 0) continue;
+      if (!customFontNames.has(style.fontResource)) continue;
 
-    const fonts = new Set(
-      [undefined, ...overriddenLanguages(typography)].map(
-        (language) => resolveTypographyStyle(typography, language).fontResource,
-      ),
-    );
-
-    for (const fontResource of fonts) {
-      if (!customFontNames.has(fontResource)) continue;
-      let entry = byFont.get(fontResource);
+      let entry = byFont.get(style.fontResource);
       if (!entry) {
         entry = { codePoints: new Set(), ranges: [] };
-        byFont.set(fontResource, entry);
+        byFont.set(style.fontResource, entry);
       }
       for (const character of characters) {
         const point = character.codePointAt(0);

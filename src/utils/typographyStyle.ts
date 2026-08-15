@@ -20,7 +20,20 @@ export interface ResolvedTypographyStyle {
   align?: Typography['align'];
   decor?: Typography['decor'];
   baseDir?: Typography['baseDir'];
+  fallbackCharacter?: string;
+  wildcardCharacters?: string;
+  wildcardRanges?: string;
 }
+
+/**
+ * The properties that live in the generated `lv_style_t`. Wildcards and the
+ * fallback character resolve through the same inheritance but are not style
+ * properties: wildcards feed the font converter, and the fallback character
+ * picks which font *copy* the style points at.
+ */
+export const TYPOGRAPHY_STYLE_KEYS = [
+  'fontResource', 'fontSize', 'letterSpace', 'lineSpace', 'align', 'decor', 'baseDir',
+] as const satisfies readonly (keyof ResolvedTypographyStyle)[];
 
 /**
  * The per-language overrides, in one shape.
@@ -80,6 +93,9 @@ export function resolveTypographyStyle(
     align: typography.align,
     decor: typography.decor,
     baseDir: typography.baseDir,
+    fallbackCharacter: typography.fallbackCharacter,
+    wildcardCharacters: typography.wildcardCharacters,
+    wildcardRanges: typography.wildcardRanges,
   };
 
   const override = language ? languageStylesOf(typography)[language] : undefined;
@@ -97,6 +113,9 @@ export function resolveTypographyStyle(
     align: override.align ?? base.align,
     decor: override.decor ?? base.decor,
     baseDir: override.baseDir ?? base.baseDir,
+    fallbackCharacter: override.fallbackCharacter ?? base.fallbackCharacter,
+    wildcardCharacters: override.wildcardCharacters ?? base.wildcardCharacters,
+    wildcardRanges: override.wildcardRanges ?? base.wildcardRanges,
   };
 }
 
@@ -114,7 +133,7 @@ export function languageDifferences(
   const base = resolveTypographyStyle(typography);
   const resolved = resolveTypographyStyle(typography, language);
   const keys: (keyof ResolvedTypographyStyle)[] = [
-    'fontResource', 'fontSize', 'letterSpace', 'lineSpace', 'align', 'decor', 'baseDir',
+    ...TYPOGRAPHY_STYLE_KEYS, 'fallbackCharacter', 'wildcardCharacters', 'wildcardRanges',
   ];
   return keys.filter((key) => resolved[key] !== base[key]);
 }
