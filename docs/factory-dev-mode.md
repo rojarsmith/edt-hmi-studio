@@ -67,6 +67,7 @@ The passphrase itself is exported as `FACTORY_DEV_MODE_PASSPHRASE` from
 | **LVGL** section of the toolbar **Info** dialog — heap size, default font, large font support | shown | hidden |
 | **Asset Placement** section of the **Deploy** tab — the range each flashed image and font glyph bitmap occupies, start to end, with the memory region of both ends, and for a font the glyph count and average bytes per glyph | shown | hidden |
 | **Font Properties** conversion settings in the Text → Fonts tab — C variable name, character-set modes, extra characters and ranges, coverage, BPP, generate buttons. Metadata, name, warnings and preview stay in normal mode | shown | hidden |
+| **Event Object** output on the Logic tab's Event Trigger node — generated code still discards the event, so the port feeds nothing yet (see [logic-event-trigger.md](logic-event-trigger.md)); one already wired stays visible in both modes so the connection is never stranded | shown | hidden |
 
 More surfaces will be added here as they are decided.
 

@@ -80,19 +80,43 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
     switch (node.subType) {
       case 'event_trigger':
         return (
-          <div className="param-group">
-            <label>Event Type</label>
-            <select
-              value={params.eventType || 'LV_EVENT_CLICKED'}
-              onChange={e => handleParamChange('eventType', e.target.value)}
-            >
-              {LVGL_EVENTS.map(evt => (
-                <option key={evt.type} value={evt.type}>
-                  {evt.label} ({evt.type})
-                </option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div className="param-group">
+              <label>Target Component</label>
+              <select
+                value={params.targetComponent || ''}
+                onChange={e => handleParamChange('targetComponent', e.target.value)}
+              >
+                <option value="">Select a component...</option>
+                {allComponents.map(comp => (
+                  <option key={comp.id} value={comp.id}>
+                    {comp.name} ({comp.type})
+                  </option>
+                ))}
+              </select>
+              {/* Codegen skips registration entirely without a target,
+                  so an empty selection deserves more than a blank row. */}
+              {!params.targetComponent && (
+                <div className="param-warning">
+                  Without a target component this trigger is not registered in
+                  generated code, and the graph never runs.
+                </div>
+              )}
+            </div>
+            <div className="param-group">
+              <label>Event Type</label>
+              <select
+                value={params.eventType || 'LV_EVENT_CLICKED'}
+                onChange={e => handleParamChange('eventType', e.target.value)}
+              >
+                {LVGL_EVENTS.map(evt => (
+                  <option key={evt.type} value={evt.type}>
+                    {evt.label} ({evt.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
         );
 
       case 'timer_trigger':

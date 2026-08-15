@@ -6,6 +6,7 @@ import type { NodeProps } from '@xyflow/react';
 import type { LogicNode, LogicPort } from './types';
 import { NODE_COLORS } from './nodeDefinitions';
 import { useLogicEditorStore } from './logicEditorStore';
+import { useAppStore } from '../../store/appStore';
 import './LogicNode.css';
 
 // Port type colors
@@ -29,8 +30,23 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
 }) => {
   const nodeData = data as unknown as LogicNodeData;
   const { logicNode, onDoubleClick } = nodeData;
-  const { debugState } = useLogicEditorStore();
-  
+  const { debugState, getCurrentGraph } = useLogicEditorStore();
+  const factoryDevMode = useAppStore(s => s.factoryDevMode);
+
+  // The Event Object output is factory-dev-only: generated code still
+  // discards the event (docs/logic-event-trigger.md), so in normal mode the
+  // port only promises what the device cannot deliver. One already wired
+  // stays visible either way - hiding it would strand a connection the
+  // author can see nowhere and delete nohow.
+  const isFactoryHiddenPort = (port: LogicPort): boolean => {
+    if (factoryDevMode) return false;
+    if (logicNode.subType !== 'event_trigger' || port.name !== 'Event Object') return false;
+    const graph = getCurrentGraph();
+    return !graph?.connections.some(
+      c => c.sourceNode === logicNode.id && c.sourceOutput === port.id
+    );
+  };
+
   const nodeColor = NODE_COLORS[logicNode.type as keyof typeof NODE_COLORS] || '#607D8B';
   const isCurrentDebugNode = debugState.currentNodeId === logicNode.id;
   const hasBreakpoint = debugState.breakpoints.includes(logicNode.id);
@@ -114,7 +130,7 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
 
         {/* Output Ports */}
         <div className="logic-node-outputs">
-          {logicNode.outputs.map((output: LogicPort) => (
+          {logicNode.outputs.filter(o => !isFactoryHiddenPort(o)).map((output: LogicPort) => (
             <div key={output.id} className="logic-port output-port">
               <span className="port-label">{output.name}</span>
               {/* Show debug value */}

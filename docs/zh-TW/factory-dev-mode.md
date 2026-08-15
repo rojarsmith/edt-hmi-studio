@@ -64,6 +64,7 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 | 工具列 **Info** 對話框的 **LVGL** 區段 —— heap 大小、預設字型、大字型支援 | 顯示 | 隱藏 |
 | **Deploy** 分頁的 **Asset Placement** 區段 —— 每個已燒錄圖片與字型字圖的起訖位址、兩端所在記憶體，字型另有字數與平均每字位元組 | 顯示 | 隱藏 |
 | Text → Fonts 分頁 **Font Properties** 的轉檔設定 —— C 變數名、字元集模式、額外字元與範圍、涵蓋數、BPP、產生按鈕。中繼資料、名稱、警告與預覽留在一般模式 | 顯示 | 隱藏 |
+| Logic 分頁 Event Trigger 節點的 **Event Object** 輸出 —— 產生的程式碼仍會丟棄事件，這個埠目前餵不出任何東西（見 [logic-event-trigger.md](logic-event-trigger.md)）；已經接了線的埠在兩種模式都顯示，連線永遠不會被藏斷 | 顯示 | 隱藏 |
 
 日後決定的項目請繼續補充於此表。
 
