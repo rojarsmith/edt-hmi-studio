@@ -99,6 +99,8 @@ export interface LogicGraph {
   variables: LogicVariable[];
   // Link to event binding
   eventBindingId?: string;
+  // Screens this graph is active on; null or absent means every screen
+  activeScreenIds?: string[] | null;
 }
 
 // Node Definition (for palette)

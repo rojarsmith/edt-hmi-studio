@@ -28,6 +28,7 @@ import { useLogicEditorStore } from './logicEditorStore';
 import LogicNodeComponent from './LogicNode';
 import NodePalette from './NodePalette';
 import GraphManager, { promptCreateGraph } from './GraphManager';
+import PropertiesPanel from './PropertiesPanel';
 import VariablePanel from './VariablePanel';
 import NodeEditDialog from './NodeEditDialog';
 import type { LogicNodeDefinition, LogicNode as LogicNodeType, LogicConnection as LogicConnectionType } from './types';
@@ -301,8 +302,11 @@ const LogicEditorInner: React.FC = () => {
         )}
       </div>
 
-      {/* Right Panel - Variables */}
-      <VariablePanel />
+      {/* Right Panel - Graph Properties + Variables */}
+      <div className="logic-right-panel">
+        <PropertiesPanel />
+        <VariablePanel />
+      </div>
 
       {/* Node Edit Dialog */}
       {editingNodeId && (

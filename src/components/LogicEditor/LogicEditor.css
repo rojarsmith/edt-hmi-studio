@@ -17,6 +17,17 @@
   border-right: 1px solid #333;
 }
 
+/* Right Panel - Graph Properties + Variables */
+.logic-right-panel {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1e1e1e;
+  border-left: 1px solid #333;
+}
+
 /* Canvas */
 .logic-editor-canvas,
 .logic-canvas {

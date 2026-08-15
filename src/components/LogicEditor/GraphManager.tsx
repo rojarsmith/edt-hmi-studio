@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useLogicEditorStore } from './logicEditorStore';
 import { modal } from '../Modal';
+import PanelChevron from './PanelChevron';
 import './GraphManager.css';
 
 // Prompt for a new graph name, suggesting one no existing graph uses.
@@ -98,22 +99,7 @@ const GraphManager: React.FC = () => {
         onClick={() => setExpanded(prev => !prev)}
         title={expanded ? 'Collapse' : 'Expand'}
       >
-        <svg
-          className={`graph-manager-toggle ${expanded ? 'open' : ''}`}
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M6 4l4 4-4 4"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <PanelChevron open={expanded} className="graph-manager-toggle" />
         <span className="graph-manager-title">Logic Graphs</span>
         <span className="graph-manager-count">{graphs.length}</span>
         <button
