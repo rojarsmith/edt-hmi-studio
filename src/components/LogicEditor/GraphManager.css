@@ -6,6 +6,25 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: relative;
+  /* Whatever height the drag stored, the palette above keeps its minimum. */
+  max-height: calc(100% - 140px);
+}
+
+/* Resize handle straddling the border with the palette above */
+.graph-manager-resizer {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 5;
+}
+
+.graph-manager-resizer:hover,
+.graph-manager-resizer.resizing {
+  background: rgba(33, 150, 243, 0.35);
 }
 
 /* Header */
@@ -56,8 +75,13 @@
 }
 
 .graph-manager-toggle {
-  font-size: 10px;
-  color: #666;
+  flex-shrink: 0;
+  color: #ccc;
+  transition: transform 0.15s ease;
+}
+
+.graph-manager-toggle.open {
+  transform: rotate(90deg);
 }
 
 /* Search */
@@ -106,7 +130,8 @@
 
 /* Graph List */
 .graph-manager-list {
-  max-height: 200px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-bottom: 6px;
 }

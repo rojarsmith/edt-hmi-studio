@@ -25,11 +25,46 @@ export async function promptCreateGraph(
   }
 }
 
+// Resize limits: the panel keeps room for its own header and search,
+// and the palette above keeps room to stay usable.
+const MIN_PANEL_HEIGHT = 120;
+const MIN_PALETTE_HEIGHT = 140;
+const DEFAULT_PANEL_HEIGHT = 260;
+
 const GraphManager: React.FC = () => {
   const { graphs, currentGraphId, createGraph, deleteGraph, setCurrentGraph } =
     useLogicEditorStore();
   const [expanded, setExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [height, setHeight] = useState(DEFAULT_PANEL_HEIGHT);
+  const [resizing, setResizing] = useState(false);
+
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startHeight = height;
+      const leftPanel = e.currentTarget.closest('.logic-left-panel');
+      const maxHeight = leftPanel
+        ? Math.max(MIN_PANEL_HEIGHT, leftPanel.clientHeight - MIN_PALETTE_HEIGHT)
+        : startHeight;
+      setResizing(true);
+
+      const onMove = (ev: PointerEvent) => {
+        setHeight(Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT, startHeight + startY - ev.clientY)));
+      };
+      const onUp = () => {
+        setResizing(false);
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    },
+    [height]
+  );
 
   const visibleGraphs = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -51,13 +86,34 @@ const GraphManager: React.FC = () => {
   );
 
   return (
-    <div className="graph-manager">
+    <div className="graph-manager" style={expanded ? { height } : undefined}>
+      {expanded && (
+        <div
+          className={`graph-manager-resizer ${resizing ? 'resizing' : ''}`}
+          onPointerDown={handleResizeStart}
+        />
+      )}
       <div
         className="graph-manager-header"
         onClick={() => setExpanded(prev => !prev)}
         title={expanded ? 'Collapse' : 'Expand'}
       >
-        <span className="graph-manager-toggle">{expanded ? '▼' : '▶'}</span>
+        <svg
+          className={`graph-manager-toggle ${expanded ? 'open' : ''}`}
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M6 4l4 4-4 4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
         <span className="graph-manager-title">Logic Graphs</span>
         <span className="graph-manager-count">{graphs.length}</span>
         <button
