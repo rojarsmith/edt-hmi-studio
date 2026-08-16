@@ -4,6 +4,7 @@
 import type { CodeGenOptions } from '../types';
 import type { LvglComponent, Screen } from '../../types';
 import type { ModbusRegisterTag } from '../../types/hmi';
+import { getNodeDefinition } from '../../components/LogicEditor/nodeDefinitions';
 import type {
   LogicGraph,
   LogicNode,
@@ -586,10 +587,14 @@ function generateFunctionBody(
   const triggerNodes = graph.nodes.filter(n => n.type === 'trigger');
   
   if (triggerNodes.length === 0) {
-    // No trigger nodes — generate all action nodes linearly
+    // No trigger nodes — generate every statement-shaped node linearly. An
+    // execution input is what marks one, judged from the definition table
+    // (stored ports can be sparse); the old category check missed var_write
+    // and tag_write, and categories no longer split along that line anyway.
     const lines: string[] = [];
     for (const node of graph.nodes) {
-      if (node.type === 'action' || node.type === 'custom') {
+      const definitionInputs = getNodeDefinition(node.subType)?.inputs ?? node.inputs;
+      if (definitionInputs.some(input => input.type === 'execution')) {
         const code = generateNodeCode(node, graph, options, context, 1);
         if (code) lines.push(code);
       }

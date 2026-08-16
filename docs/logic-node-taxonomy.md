@@ -4,7 +4,8 @@
   <strong>English</strong> · <a href="./zh-TW/logic-node-taxonomy.md">繁體中文</a>
 </p>
 
-Status: **steps 1–3 landed 2026-08-16; only the optional step 4 remains.**
+Status: **all four steps landed 2026-08-16 — this record is now history,
+kept for the reasoning.**
 This records why the Logic tab's node palette will be regrouped and how
 protocol support enters it, so the work starts from decisions rather than
 from re-deriving them.
@@ -97,4 +98,16 @@ pure display. So the regrouping lands in two decoupled steps:
 3. **Done (2026-08-16):** the Custom shelf exists only in Factory Dev Mode
    — palette offer and search alike; nodes already placed keep rendering
    and generating in every mode
-4. Stored-type/colour renames — optional, last, only with a migration story
+4. **Done (2026-08-16):** stored categories renamed to the six shelves, so
+   the display grouping and the data agree again and `paletteGroup` is gone.
+   Node colours now follow the shelves — Compare turned purple, Delay amber,
+   the tag nodes teal, Call Function gray. The migration story:
+   `normalizeLogicGraphs` re-derives every node's category from its subType
+   (the authority) at every store entry point — project open, project-list
+   open, graph import — so files carrying `condition` and `action` read
+   forever; an unknown subType keeps a still-valid stored category and falls
+   back to `custom`. Server-side code generation needs no migration: it keys
+   on subType throughout, and the one category check it had (the
+   trigger-less linear fallback) now judges by execution inputs from the
+   definition table — which also fixes its old blindness to `var_write` and
+   `tag_write`

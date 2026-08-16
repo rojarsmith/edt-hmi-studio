@@ -11,6 +11,7 @@
 ## [Unreleased]
 
 ### 變更
+- **Logic 節點分類正名為架子本身，顏色跟著走** —— 儲存的五分法 trigger-condition-action-data-custom 換成六個架子（trigger／flow／screen／data／device／custom），顯示分組與資料從此一致，過渡用的 `paletteGroup` 欄位功成身退。節點顏色跟著架子：Compare 轉紫、Delay 轉琥珀、tag 節點轉青、Call Function 轉灰。遷移的鑰匙是 subType：`normalizeLogicGraphs` 在 store 每個入口（開專案、專案清單、匯入圖）以定義表重新推導每個節點的分類，帶著 `condition`、`action` 的舊檔永遠讀得進來，未知的 subType 保留仍有效的儲存值、否則退到 `custom`。程式碼產生全面以 subType 為準；僅有的一處分類判斷（無 trigger 線性後備）改以定義表的執行輸入埠判定，順帶修好它從前看不見 `var_write` 與 `tag_write` 的盲點
 - **Logic 調色盤的 Custom 架子移入原廠人員研發模式** —— Call Function 與 C Code Block 是手寫 C，屬於原廠工程師的領域，理由與 Code、Icon 分頁搬進去時相同。閘門同時蓋住架子與搜尋，自訂節點不會從查詢那邊漏回來；已放進圖裡的節點在任何模式都照常渲染與產生 —— 藏起來的只有調色盤上的供應
 - **Logic 調色盤改按「作者在操作什麼」分組** —— Triggers／Flow／Screen／Data／Device／Custom，取代工程師視角的 trigger-condition-action-data-custom。Delay 搬進 Flow（它是流程，不是動作）；Compare 與 Logic Operation 併入 Data（它們是運算式，現在和其他圓點埠節點作伴）；Get Property 歸隊 Screen 家族；Call Function 搬到 Custom 與 C Code Block 並肩；Read Tag 與 Write Tag 有了自己的 Device 架子 —— 隨協定成長但節點不增生。依 [docs/logic-node-taxonomy.md](docs/zh-TW/logic-node-taxonomy.md) 決策三，僅動顯示層：儲存的節點 type、它們的顏色、每一張已存的圖都原封不動，並有測試同時釘住兩層，不可能無聲漂移
 - **Event Trigger 的 Event Object 輸出移入原廠人員研發模式** —— 產生的程式碼會丟棄事件（`(void)e;`），一般模式下這個埠只承諾裝置給不了的東西；已經接了線的埠在兩種模式都顯示，連線永遠不會被藏斷。更深的發現記錄在 [docs/logic-event-trigger.md](docs/zh-TW/logic-event-trigger.md)：事件圖產生的程式碼沒有任何東西會註冊，因為編輯器還說不出是哪個元件觸發 trigger —— 節點對話框上的 Target Component 選擇器試過又刻意拿掉了，這個設計問題保持開放

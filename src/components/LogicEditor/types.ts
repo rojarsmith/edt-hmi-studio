@@ -1,7 +1,16 @@
 // Logic Editor Types for Phase 4
 
-// Node Categories
-export type LogicNodeCategory = 'trigger' | 'condition' | 'action' | 'data' | 'custom';
+// Node Categories - since the 2026-08 rename these are the palette shelves:
+// what the author operates on. Projects saved earlier carry 'condition' and
+// 'action'; normalizeLogicGraphs (nodeDefinitions.ts) re-derives every
+// node's category from its subType on load, so old files read forever.
+export type LogicNodeCategory =
+  | 'trigger'
+  | 'flow'
+  | 'screen'
+  | 'data'
+  | 'device'
+  | 'custom';
 
 // Trigger Node Types
 export type TriggerNodeType = 'event_trigger' | 'timer_trigger';
@@ -110,22 +119,9 @@ export interface LogicGraph {
   activeScreenIds?: string[] | null;
 }
 
-// Palette display groups - what the author operates on. Display-level only:
-// a node's stored `type` (and the colour keyed off it) is untouched. See
-// docs/logic-node-taxonomy.md, decision 3.
-export type PaletteGroupId =
-  | 'trigger'
-  | 'flow'
-  | 'screen'
-  | 'data'
-  | 'device'
-  | 'custom';
-
 // Node Definition (for palette)
 export interface LogicNodeDefinition {
   type: LogicNodeCategory;
-  /** Palette shelf; falls back to `type` when absent. */
-  paletteGroup?: PaletteGroupId;
   subType: LogicNodeSubType;
   label: string;
   description: string;

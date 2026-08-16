@@ -47,7 +47,7 @@ const NodePalette: React.FC<NodePaletteProps> = ({ onDragStart }) => {
     ? NODE_DEFINITIONS.filter(
         def =>
           !def.deprecated &&
-          visibleShelves.has(def.paletteGroup ?? def.type) &&
+          visibleShelves.has(def.type) &&
           (def.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
             def.description.toLowerCase().includes(searchQuery.toLowerCase()))
       )

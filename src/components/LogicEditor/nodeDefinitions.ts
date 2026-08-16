@@ -1,14 +1,17 @@
 // Logic Node Definitions - All available node types
 
-import type { LogicNodeDefinition } from './types';
+import type { LogicGraph, LogicNodeCategory, LogicNodeDefinition } from './types';
 
-// Color scheme for node categories
+// Color scheme for node categories - one colour per shelf, now that the
+// stored category and the palette shelf are the same thing (step 4 of
+// docs/logic-node-taxonomy.md).
 export const NODE_COLORS = {
-  trigger: '#4CAF50',   // Green
-  condition: '#FFC107', // Yellow/Amber
-  action: '#2196F3',    // Blue
-  data: '#9C27B0',      // Purple
-  custom: '#607D8B',    // Gray
+  trigger: '#4CAF50', // Green - time and the user
+  flow: '#FFC107',    // Amber - branching and pacing
+  screen: '#2196F3',  // Blue - the panel
+  data: '#9C27B0',    // Purple - values and expressions
+  device: '#00BCD4',  // Teal - the machine behind the tags
+  custom: '#607D8B',  // Gray - hand-written C
 };
 
 // All node definitions
@@ -17,7 +20,6 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'trigger',
     subType: 'event_trigger',
-    paletteGroup: 'trigger',
     label: 'Event Trigger',
     description: 'Receives events from a component',
     icon: '⚡',
@@ -34,7 +36,6 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'trigger',
     subType: 'timer_trigger',
-    paletteGroup: 'trigger',
     label: 'Timer Trigger',
     description: 'Runs after a delay or at an interval',
     icon: '⏱️',
@@ -54,13 +55,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
 
   // ============ CONDITION NODES (Yellow) ============
   {
-    type: 'condition',
+    type: 'flow',
     subType: 'if_else',
-    paletteGroup: 'flow',
     label: 'If/Else',
     description: 'Conditional branch',
     icon: '🔀',
-    color: NODE_COLORS.condition,
+    color: NODE_COLORS.flow,
     defaultParams: {},
     inputs: [
       { name: 'Execute', type: 'execution' },
@@ -72,13 +72,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'condition',
+    type: 'flow',
     subType: 'switch',
-    paletteGroup: 'flow',
     label: 'Switch',
     description: 'Multi-branch selection',
     icon: '🔃',
-    color: NODE_COLORS.condition,
+    color: NODE_COLORS.flow,
     defaultParams: {
       cases: [0, 1, 2],
     },
@@ -94,13 +93,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'condition',
+    type: 'data',
     subType: 'compare',
-    paletteGroup: 'data',
     label: 'Compare',
     description: 'Compares two values',
     icon: '⚖️',
-    color: NODE_COLORS.condition,
+    color: NODE_COLORS.data,
     defaultParams: {
       operator: '==',
     },
@@ -113,13 +111,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'condition',
+    type: 'data',
     subType: 'logic_op',
-    paletteGroup: 'data',
     label: 'Logic Operation',
     description: 'AND, OR, NOT',
     icon: '🔗',
-    color: NODE_COLORS.condition,
+    color: NODE_COLORS.data,
     defaultParams: {
       operator: 'AND',
     },
@@ -134,13 +131,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
 
   // ============ ACTION NODES (Blue) ============
   {
-    type: 'action',
+    type: 'screen',
     subType: 'set_property',
-    paletteGroup: 'screen',
     label: 'Set Property',
     description: 'Changes a component property',
     icon: '🎨',
-    color: NODE_COLORS.action,
+    color: NODE_COLORS.screen,
     defaultParams: {
       targetComponent: '',
       property: '',
@@ -154,13 +150,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'action',
+    type: 'screen',
     subType: 'navigate_page',
-    paletteGroup: 'screen',
     label: 'Navigate to Screen',
     description: 'Switches to the specified screen',
     icon: '📄',
-    color: NODE_COLORS.action,
+    color: NODE_COLORS.screen,
     defaultParams: {
       targetScreen: '',
       animation: 'none',
@@ -173,13 +168,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'action',
+    type: 'screen',
     subType: 'show_hide',
-    paletteGroup: 'screen',
     label: 'Show/Hide',
     description: 'Controls component visibility',
     icon: '👁️',
-    color: NODE_COLORS.action,
+    color: NODE_COLORS.screen,
     defaultParams: {
       targetComponent: '',
       action: 'toggle', // 'show' | 'hide' | 'toggle'
@@ -192,13 +186,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'action',
+    type: 'screen',
     subType: 'set_text',
-    paletteGroup: 'screen',
     label: 'Set Text',
     description: 'Changes text content',
     icon: '📝',
-    color: NODE_COLORS.action,
+    color: NODE_COLORS.screen,
     defaultParams: {
       targetComponent: '',
     },
@@ -211,13 +204,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'action',
+    type: 'screen',
     subType: 'set_value',
-    paletteGroup: 'screen',
     label: 'Set Value',
     description: 'Changes a numeric value',
     icon: '🔢',
-    color: NODE_COLORS.action,
+    color: NODE_COLORS.screen,
     defaultParams: {
       targetComponent: '',
     },
@@ -230,13 +222,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'action',
+    type: 'custom',
     subType: 'call_function',
-    paletteGroup: 'custom',
     label: 'Call Function',
     description: 'Calls a custom C function',
     icon: '📞',
-    color: NODE_COLORS.action,
+    color: NODE_COLORS.custom,
     defaultParams: {
       functionName: '',
       arguments: [],
@@ -251,13 +242,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'action',
+    type: 'flow',
     subType: 'delay',
-    paletteGroup: 'flow',
     label: 'Delay',
     description: 'Waits for the specified time',
     icon: '⏳',
-    color: NODE_COLORS.action,
+    color: NODE_COLORS.flow,
     defaultParams: {
       duration: 1000, // ms
     },
@@ -273,7 +263,6 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'var_read',
-    paletteGroup: 'data',
     label: 'Read Variable',
     description: 'Reads a global or local variable',
     icon: '📖',
@@ -289,7 +278,6 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'var_write',
-    paletteGroup: 'data',
     label: 'Write Variable',
     description: 'Sets a variable value',
     icon: '✏️',
@@ -308,7 +296,6 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'math_op',
-    paletteGroup: 'data',
     label: 'Math Operation',
     description: 'Add, subtract, multiply, divide, or modulo',
     icon: '🧮',
@@ -327,7 +314,6 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'string_op',
-    paletteGroup: 'data',
     label: 'String Operation',
     description: 'Concatenates or formats strings',
     icon: '🔤',
@@ -344,13 +330,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'data',
+    type: 'screen',
     subType: 'get_property',
-    paletteGroup: 'screen',
     label: 'Get Property',
     description: 'Reads the current component property value',
     icon: '🔍',
-    color: NODE_COLORS.data,
+    color: NODE_COLORS.screen,
     defaultParams: {
       targetComponent: '',
       property: '',
@@ -361,13 +346,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'data',
+    type: 'device',
     subType: 'tag_read',
-    paletteGroup: 'device',
     label: 'Read Tag',
     description: 'Reads a protocol tag defined on the Protocol tab',
     icon: '📥',
-    color: NODE_COLORS.data,
+    color: NODE_COLORS.device,
     defaultParams: {
       tagId: '',
       tagName: '',
@@ -378,13 +362,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     ],
   },
   {
-    type: 'data',
+    type: 'device',
     subType: 'tag_write',
-    paletteGroup: 'device',
     label: 'Write Tag',
     description: 'Writes a value to a protocol tag',
     icon: '📤',
-    color: NODE_COLORS.data,
+    color: NODE_COLORS.device,
     defaultParams: {
       tagId: '',
       tagName: '',
@@ -402,13 +385,12 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     // protocol coupling the tag table exists to prevent. Saved graphs keep
     // working; the palette no longer offers it.
     deprecated: true,
-    type: 'data',
+    type: 'device',
     subType: 'modbus_holding_register',
-    paletteGroup: 'device',
     label: 'Read Holding Register',
     description: 'Reads a cached Modbus Holding Register value',
     icon: '📥',
-    color: NODE_COLORS.data,
+    color: NODE_COLORS.device,
     defaultParams: {
       address: 0,
     },
@@ -422,7 +404,6 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'custom',
     subType: 'c_code_block',
-    paletteGroup: 'custom',
     label: 'C Code Block',
     description: 'Embeds custom C code',
     icon: '💻',
@@ -446,24 +427,60 @@ export function getNodeDefinition(subType: string): LogicNodeDefinition | undefi
   return NODE_DEFINITIONS.find(def => def.subType === subType);
 }
 
-// Get nodes for one palette shelf (display grouping - deprecated stays hidden)
+// Get nodes for one palette shelf (deprecated stays hidden)
 export function getNodesByCategory(category: string): LogicNodeDefinition[] {
   return NODE_DEFINITIONS.filter(
-    def => (def.paletteGroup ?? def.type) === category && !def.deprecated
+    def => def.type === category && !def.deprecated
   );
 }
 
 // Palette shelves, grouped by what the author operates on - time and flow,
-// the screen, values, the machine. Display-level only: stored node types and
-// the colours keyed off them are untouched (docs/logic-node-taxonomy.md).
+// the screen, values, the machine. Since the 2026-08 rename the stored node
+// category IS the shelf; old spellings are normalized on load, see
+// normalizeLogicGraphs below.
 export const NODE_CATEGORIES = [
   { id: 'trigger', name: 'Triggers', icon: '⚡', color: NODE_COLORS.trigger },
-  { id: 'flow', name: 'Flow', icon: '🔀', color: NODE_COLORS.condition },
-  { id: 'screen', name: 'Screen', icon: '🖥️', color: NODE_COLORS.action },
+  { id: 'flow', name: 'Flow', icon: '🔀', color: NODE_COLORS.flow },
+  { id: 'screen', name: 'Screen', icon: '🖥️', color: NODE_COLORS.screen },
   { id: 'data', name: 'Data', icon: '📊', color: NODE_COLORS.data },
-  { id: 'device', name: 'Device', icon: '🔌', color: '#00bcd4' },
+  { id: 'device', name: 'Device', icon: '🔌', color: NODE_COLORS.device },
   { id: 'custom', name: 'Custom', icon: '💻', color: NODE_COLORS.custom },
 ];
+
+// Projects saved before the 2026-08 rename carry 'condition' and 'action',
+// and the old five-way split of 'data'. The subType is the authority:
+// normalization re-derives every node's category from the definition table,
+// so old files keep loading forever. An unknown subType (a newer file
+// visiting an older editor's vocabulary) keeps its stored value when that is
+// still a category, and falls back to 'custom' otherwise.
+export function normalizeLogicNodeCategory(
+  subType: string,
+  storedType: string,
+): LogicNodeCategory {
+  const definition = getNodeDefinition(subType);
+  if (definition) return definition.type;
+  return NODE_CATEGORIES.some(category => category.id === storedType)
+    ? (storedType as LogicNodeCategory)
+    : 'custom';
+}
+
+/** Applied wherever graphs enter the store; keeps identity when clean. */
+export function normalizeLogicGraphs(graphs: LogicGraph[]): LogicGraph[] {
+  let changed = false;
+  const normalized = graphs.map(graph => {
+    let nodesChanged = false;
+    const nodes = graph.nodes.map(node => {
+      const type = normalizeLogicNodeCategory(node.subType, node.type);
+      if (type === node.type) return node;
+      nodesChanged = true;
+      return { ...node, type };
+    });
+    if (!nodesChanged) return graph;
+    changed = true;
+    return { ...graph, nodes };
+  });
+  return changed ? normalized : graphs;
+}
 
 // The Custom shelf is the factory engineer's realm - hand-written C has no
 // place in a no-code author's palette, the same reasoning that moved the

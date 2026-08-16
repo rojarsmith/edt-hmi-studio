@@ -1,20 +1,19 @@
 import { describe, expect, it } from 'vitest';
+import type { LogicGraph } from '../types';
 import {
   NODE_CATEGORIES,
   NODE_DEFINITIONS,
   getNodesByCategory,
   getPaletteCategories,
+  normalizeLogicGraphs,
+  normalizeLogicNodeCategory,
 } from '../nodeDefinitions';
 
-// The palette regrouping is display-level only (docs/logic-node-taxonomy.md
-// decision 3): these tests pin the shelves without touching stored types.
 describe('palette grouping', () => {
   it('every definition sits on a declared shelf', () => {
     const shelfIds = new Set(NODE_CATEGORIES.map(category => category.id));
     for (const def of NODE_DEFINITIONS) {
-      expect(shelfIds, `${def.subType} has no shelf`).toContain(
-        def.paletteGroup ?? def.type
-      );
+      expect(shelfIds, `${def.subType} has no shelf`).toContain(def.type);
     }
   });
 
@@ -60,16 +59,52 @@ describe('palette grouping', () => {
     expect(normal).toEqual(['trigger', 'flow', 'screen', 'data', 'device']);
     expect(factory).toEqual(['trigger', 'flow', 'screen', 'data', 'device', 'custom']);
   });
+});
 
-  it('regrouping left every stored node type untouched', () => {
-    // The five stored categories keep their populations - this is the
-    // "presentation first, data never forced" contract.
-    const byType = (type: string) =>
-      NODE_DEFINITIONS.filter(def => def.type === type).length;
-    expect(byType('trigger')).toBe(2);
-    expect(byType('condition')).toBe(4);
-    expect(byType('action')).toBe(7);
-    expect(byType('data')).toBe(8);
-    expect(byType('custom')).toBe(1);
+// Old spellings live in every project saved before the 2026-08 rename;
+// the subType is the authority and old files must read forever.
+describe('category normalization', () => {
+  it('re-derives pre-rename categories from the subType', () => {
+    expect(normalizeLogicNodeCategory('if_else', 'condition')).toBe('flow');
+    expect(normalizeLogicNodeCategory('compare', 'condition')).toBe('data');
+    expect(normalizeLogicNodeCategory('delay', 'action')).toBe('flow');
+    expect(normalizeLogicNodeCategory('set_text', 'action')).toBe('screen');
+    expect(normalizeLogicNodeCategory('get_property', 'data')).toBe('screen');
+    expect(normalizeLogicNodeCategory('call_function', 'action')).toBe('custom');
+    expect(normalizeLogicNodeCategory('modbus_holding_register', 'data')).toBe('device');
+    expect(normalizeLogicNodeCategory('event_trigger', 'trigger')).toBe('trigger');
+  });
+
+  it('an unknown subType keeps a valid stored category and defaults to custom otherwise', () => {
+    expect(normalizeLogicNodeCategory('from_the_future', 'device')).toBe('device');
+    expect(normalizeLogicNodeCategory('from_the_future', 'condition')).toBe('custom');
+  });
+
+  it('normalizes graphs while keeping identity for clean ones', () => {
+    const stale: LogicGraph = {
+      id: 'g1',
+      name: 'old project',
+      nodes: [
+        {
+          id: 'n1',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          type: 'condition' as any,
+          subType: 'if_else',
+          label: 'If/Else',
+          position: { x: 0, y: 0 },
+          params: {},
+          inputs: [],
+          outputs: [],
+        },
+      ],
+      connections: [],
+      variables: [],
+    };
+    const clean: LogicGraph = { ...stale, id: 'g2', nodes: [] };
+
+    const result = normalizeLogicGraphs([stale, clean]);
+    expect(result[0].nodes[0].type).toBe('flow');
+    // untouched graphs keep reference identity
+    expect(result[1]).toBe(clean);
   });
 });

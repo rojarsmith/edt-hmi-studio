@@ -11,7 +11,7 @@ import type {
   LogicNodeSubType,
   DebugState,
 } from './types';
-import { getNodeDefinition } from './nodeDefinitions';
+import { getNodeDefinition, normalizeLogicGraphs } from './nodeDefinitions';
 
 interface LogicEditorStore {
   // State
@@ -585,7 +585,7 @@ export const useLogicEditorStore = create<LogicEditorStore>((set, get) => ({
 
   importGraph: (json) => {
     try {
-      const graph = JSON.parse(json) as LogicGraph;
+      const graph = normalizeLogicGraphs([JSON.parse(json) as LogicGraph])[0];
       // Generate new ID to avoid conflicts
       const newId = uuidv4();
       const importedGraph: LogicGraph = {
@@ -607,9 +607,11 @@ export const useLogicEditorStore = create<LogicEditorStore>((set, get) => ({
   },
 
   setGraphs: (graphs) => {
+    // Old projects carry pre-rename categories; the subType re-derives them
+    const normalized = normalizeLogicGraphs(graphs);
     set({
-      graphs,
-      currentGraphId: graphs.length > 0 ? graphs[0].id : null,
+      graphs: normalized,
+      currentGraphId: normalized.length > 0 ? normalized[0].id : null,
       selectedNodeIds: [],
     });
   },

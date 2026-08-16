@@ -200,7 +200,6 @@ describe('generateLogicSource', () => {
       it(`generates lv_obj_set for property "${prop}"`, () => {
         const node = createLogicNode('set_property', {
           id: 'n1',
-          type: 'action',
           params: { targetComponent: 'myBtn', property: prop, value: prop === 'y' ? 100 : prop === 'width' ? 200 : prop === 'height' ? 80 : prop === 'opacity' ? 128 : 50 },
           inputs: [],
           outputs: [],
@@ -516,7 +515,7 @@ describe('generateLogicSource', () => {
 
     it('compare generates (a == b) expression', () => {
       const cmpNode = createLogicNode('compare', {
-        id: 'c1', type: 'condition',
+        id: 'c1',
         params: { operator: '==' },
         inputs: [
           createLogicPort({ id: 'c1_a', name: 'A', type: 'int', defaultValue: 5 }),
@@ -525,7 +524,7 @@ describe('generateLogicSource', () => {
         outputs: [createLogicPort({ id: 'c1_out', name: 'result', type: 'bool' })],
       });
       const ifNode = createLogicNode('if_else', {
-        id: 'if1', type: 'condition',
+        id: 'if1',
         params: {},
         inputs: [createLogicPort({ id: 'if1_cond', name: '条件', type: 'bool' })],
         outputs: [
@@ -544,7 +543,7 @@ describe('generateLogicSource', () => {
 
     it('logic_op AND generates (a && b)', () => {
       const logicNode = createLogicNode('logic_op', {
-        id: 'lo1', type: 'condition',
+        id: 'lo1',
         params: { operator: 'AND' },
         inputs: [
           createLogicPort({ id: 'lo1_a', name: 'A', type: 'bool', defaultValue: 'true' }),
@@ -553,7 +552,7 @@ describe('generateLogicSource', () => {
         outputs: [createLogicPort({ id: 'lo1_out', name: 'result', type: 'bool' })],
       });
       const ifNode = createLogicNode('if_else', {
-        id: 'if1', type: 'condition',
+        id: 'if1',
         params: {},
         inputs: [createLogicPort({ id: 'if1_cond', name: '条件', type: 'bool' })],
         outputs: [
@@ -572,7 +571,7 @@ describe('generateLogicSource', () => {
 
     it('logic_op NOT generates (!a)', () => {
       const logicNode = createLogicNode('logic_op', {
-        id: 'lo1', type: 'condition',
+        id: 'lo1',
         params: { operator: 'NOT' },
         inputs: [
           createLogicPort({ id: 'lo1_a', name: 'A', type: 'bool', defaultValue: 'true' }),
@@ -581,7 +580,7 @@ describe('generateLogicSource', () => {
         outputs: [createLogicPort({ id: 'lo1_out', name: 'result', type: 'bool' })],
       });
       const ifNode = createLogicNode('if_else', {
-        id: 'if1', type: 'condition',
+        id: 'if1',
         params: {},
         inputs: [createLogicPort({ id: 'if1_cond', name: '条件', type: 'bool' })],
         outputs: [
@@ -681,7 +680,7 @@ describe('generateLogicSource', () => {
         outputs: [createLogicPort({ id: 'trig_out', name: 'exec', type: 'execution' })],
       });
       const ifNode = createLogicNode('if_else', {
-        id: 'if1', type: 'condition',
+        id: 'if1',
         params: {},
         inputs: [createLogicPort({ id: 'if1_cond', name: '条件', type: 'bool', defaultValue: 'true' })],
         outputs: [
@@ -731,7 +730,7 @@ describe('generateLogicSource', () => {
         outputs: [createLogicPort({ id: 'trig_out', name: 'exec', type: 'execution' })],
       });
       const ifNode = createLogicNode('if_else', {
-        id: 'if1', type: 'condition',
+        id: 'if1',
         params: {},
         inputs: [createLogicPort({ id: 'if1_cond', name: '条件', type: 'bool', defaultValue: 'true' })],
         outputs: [
@@ -774,7 +773,7 @@ describe('generateLogicSource', () => {
         outputs: [createLogicPort({ id: 'trig_out', name: 'exec', type: 'execution' })],
       });
       const switchNode = createLogicNode('switch', {
-        id: 'sw1', type: 'condition',
+        id: 'sw1',
         params: { cases: [0, 1, 2] },
         inputs: [createLogicPort({ id: 'sw1_val', name: '值', type: 'int', defaultValue: 0 })],
         outputs: [
@@ -1187,7 +1186,7 @@ describe('generateLogicSource', () => {
       const definition = getNodeDefinition('modbus_holding_register');
 
       expect(definition).toMatchObject({
-        type: 'data',
+        type: 'device',
         label: 'Read Holding Register',
         defaultParams: { address: 0 },
         inputs: [],
@@ -1296,7 +1295,6 @@ describe('generateLogicSource', () => {
       });
       const node = createLogicNode('if_else', {
         id: 'if1',
-        type: 'condition',
         inputs: [createLogicPort({ id: 'condition', name: 'Condition', type: 'bool', defaultValue: 'true' })],
         outputs: [],
       });
