@@ -33,9 +33,9 @@
 兩個刻意的處置：節點的 **Event Type** 下拉已移除 —— 過濾由綁定端的事件
 型別決定，節點本身沒有東西可設定（舊圖存下的 `eventType` 仍由 legacy 的
 `targetComponent` 註冊路徑讀取，只是不再出現在對話框裡）；**Event Object**
-輸出繼續留在 Factory Dev Mode 後面，直到進入函式學會把 `lv_event_t` 帶進
+輸出繼續留在 Factory Mode 後面，直到進入函式學會把 `lv_event_t` 帶進
 來。Edit Node 對話框同時把型別徽章移到名稱欄位上方，原始的 subtype 識別字
-只在 Factory Dev Mode 顯示 —— 機器名稱是原廠領域，與 Code 分頁同一個理由。
+只在 Factory Mode 顯示 —— 機器名稱是原廠領域，與 Code 分頁同一個理由。
 
 ## Legacy 鏈條，逐段來看（留作記錄）
 
@@ -123,7 +123,7 @@ lv_obj_add_event_cb(ui_run_button, logic_<name>_event_cb, LV_EVENT_CLICKED, NULL
 
 一個不管選哪種形狀都成立的決定：
 
-- **Event Object 輸出住在 Factory Dev Mode 後面**（2026-08-16，依需求）：
+- **Event Object 輸出住在 Factory Mode 後面**（2026-08-16，依需求）：
   callback 包裝仍然丟棄事件，所以在一般模式下這個埠只承諾裝置給不了的東西。
   埠留在節點資料裡 —— 隱藏只在渲染層 —— 而已經接了線的埠在兩種模式都顯示，
   連線永遠不會被藏斷。把事件內容餵進資料流，仍然是真正的後續工作。

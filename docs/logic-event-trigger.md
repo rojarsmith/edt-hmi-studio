@@ -43,10 +43,10 @@ Two leftovers, deliberate: the node's **Event Type** dropdown is gone — the
 binding's event type does the filtering, so the node has nothing to
 configure (a stored `eventType` from older graphs is still read by the
 legacy `targetComponent` registration, invisible in the dialog); and the
-**Event Object** output stays behind Factory Dev Mode until the entry
+**Event Object** output stays behind Factory Mode until the entry
 functions learn to carry the `lv_event_t` through. The Edit Node dialog
 also moved its type chip above the name field, and shows the raw subtype
-identifier only in Factory Dev Mode — the machine name is factory
+identifier only in Factory Mode — the machine name is factory
 territory, the same reasoning as the Code tab.
 
 ## The legacy chain, stage by stage (kept for the record)
@@ -148,7 +148,7 @@ is still dead — the binding stores `logicGraphIds` on the event instead.)
 
 One adjacent decision that stands either way:
 
-- **The Event Object output lives behind Factory Dev Mode** (2026-08-16, on
+- **The Event Object output lives behind Factory Mode** (2026-08-16, on
   request): the callback wrapper still discards the event, so in normal mode
   the port only promised what the device cannot deliver. The port stays in
   the node's data — hiding is render-only — and one already wired stays

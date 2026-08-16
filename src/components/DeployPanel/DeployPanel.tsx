@@ -398,7 +398,7 @@ const DeployPanel: React.FC = () => {
                 <div>
                   <h3>
                     Asset Placement
-                    <span className="hwinfo-dev-badge">Factory Dev Mode</span>
+                    <span className="hwinfo-dev-badge">Factory Mode</span>
                   </h3>
                   <p>
                     Where each flashed image and font glyph bitmap sits in

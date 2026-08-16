@@ -32,7 +32,7 @@ follow. Two consequences measure every palette decision:
 | **Conditions** | If/Else, Switch, Compare, Logic Operation | Mixes two natures. If/Else and Switch branch the execution flow (rectangle ports); Compare and Logic Operation are pure expressions (circle ports only, inlined by codegen). Same shelf, different kind — one of the reasons the port shapes confuse |
 | **Actions** | Set Property, Navigate to Screen, Show/Hide, Set Text, Set Value, Call Function, Delay | Mixes three targets: screen operations (the heart of an HMI), a flow utility (Delay is not an action, it is flow), and an escape hatch (Call Function is Custom by nature) |
 | **Data** | Read/Write Variable, Math, String, Get Property, **Read Holding Register** | Holds the protocol landmine. A Modbus-specific node sits beside protocol-neutral variables; adding CANbus this way means Read CAN Signal next to it, then one node family per protocol, and every graph coupled to the protocol it was drawn against |
-| **Custom** | C Code Block | Right shelf — but custom C is the factory engineer's realm, not the no-code author's. A candidate for Factory Dev Mode, same reasoning that moved the Code and Icon tabs there |
+| **Custom** | C Code Block | Right shelf — but custom C is the factory engineer's realm, not the no-code author's. A candidate for Factory Mode, same reasoning that moved the Code and Icon tabs there |
 
 ## Decision 1 — Tags cut the graph loose from the protocol
 
@@ -63,7 +63,7 @@ screen or the machine*. The palette follows it:
 | **Screen** | Set Property, **Get Property**, Show/Hide, Set Text, Set Value, Navigate to Screen | Get Property in from Data — reading and writing the same widget belong on one shelf |
 | **Data** | Read/Write Variable, Math, String, **Compare**, **Logic Operation** | Compare and Logic Operation in from Conditions — they are expressions, and now sit with the other circle-port nodes |
 | **Device** | **Read Tag**, **Write Tag** | grows with protocols without growing nodes |
-| **Custom** | **Call Function**, C Code Block | Call Function in from Actions; the category is a Factory Dev Mode candidate |
+| **Custom** | **Call Function**, C Code Block | Call Function in from Actions; the category is a Factory Mode candidate |
 
 ## Decision 3 — Presentation first, data never forced
 
@@ -95,7 +95,7 @@ pure display. So the regrouping lands in two decoupled steps:
    colours keyed off them, and every saved graph are untouched, and a test
    pins both the shelf contents and the stored-type populations so the two
    layers cannot drift silently
-3. **Done (2026-08-16):** the Custom shelf exists only in Factory Dev Mode
+3. **Done (2026-08-16):** the Custom shelf exists only in Factory Mode
    — palette offer and search alike; nodes already placed keep rendering
    and generating in every mode
 4. **Done (2026-08-16):** stored categories renamed to the six shelves, so

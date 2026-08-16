@@ -25,7 +25,7 @@ or restarted.
    edt321
    ```
 
-4. On success the field closes and a **Factory Dev Mode** badge appears both in
+4. On success the field closes and a **Factory Mode** badge appears both in
    the About dialog and in the menu bar, next to the Web/Desktop badge. The UI
    updates immediately — no reload is needed.
 
@@ -40,7 +40,7 @@ It is never written to `localStorage`, IndexedDB or the project file, so:
 - it cannot be left on by accident for the next person,
 - it never travels with an exported project.
 
-It can also be left on demand: click the **Factory Dev Mode** badge in the menu
+It can also be left on demand: click the **Factory Mode** badge in the menu
 bar and confirm. The editor returns to its normal state immediately, and getting
 back in needs the access code again.
 

@@ -28,7 +28,7 @@ CANbus 與其他協定會跟上。由此出發，每個調色盤決策用兩把�
 | **Conditions** | If/Else、Switch、Compare、Logic Operation | 混了兩種本質。If/Else 與 Switch 分岔執行流（長方體埠）；Compare 與 Logic Operation 是純運算式（只有圓點埠，codegen 直接內聯）。同一層架子、不同種東西 —— 連接埠形狀讓人困惑的原因之一 |
 | **Actions** | Set Property、Navigate to Screen、Show/Hide、Set Text、Set Value、Call Function、Delay | 混了三種對象：畫面操作（HMI 的心臟）、流程工具（Delay 不是動作，是流程）、逃生口（Call Function 本質上屬 Custom） |
 | **Data** | 變數讀寫、Math、String、Get Property、**Read Holding Register** | 埋著協定地雷。Modbus 專屬節點和協定中立的變數擺在一起；照這個方式加 CANbus，旁邊就會出現 Read CAN Signal，然後每個協定各長一族節點，而每張圖都耦合在畫它時用的那個協定上 |
-| **Custom** | C Code Block | 架子放對了 —— 但自訂 C 是原廠工程師的領域，不是 no-code 作者的。是 Factory Dev Mode 的候選人，理由和 Code、Icon 分頁搬進去時相同 |
+| **Custom** | C Code Block | 架子放對了 —— 但自訂 C 是原廠工程師的領域，不是 no-code 作者的。是 Factory Mode 的候選人，理由和 Code、Icon 分頁搬進去時相同 |
 
 ## 決策一 —— 用 Tag 把圖從協定上切開
 
@@ -56,7 +56,7 @@ Write Tag 的價值高於下面所有的重新分組。
 | **Screen（畫面）** | Set Property、**Get Property**、Show/Hide、Set Text、Set Value、Navigate to Screen | Get Property 從 Data 搬入 —— 讀和寫同一個元件，本來就該在同一層架子 |
 | **Data（資料運算）** | 變數讀寫、Math、String、**Compare**、**Logic Operation** | Compare 與 Logic Operation 從 Conditions 搬入 —— 它們是運算式，現在和其他圓點埠節點作伴 |
 | **Device（裝置通訊）** | **Read Tag**、**Write Tag** | 隨協定成長，但節點不增生 |
-| **Custom（進階）** | **Call Function**、C Code Block | Call Function 從 Actions 搬入；整類是 Factory Dev Mode 候選人 |
+| **Custom（進階）** | **Call Function**、C Code Block | Call Function 從 Actions 搬入；整類是 Factory Mode 候選人 |
 
 ## 決策三 —— 先動陳列，不逼資料搬家
 

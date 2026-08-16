@@ -97,7 +97,7 @@ const HardwareInfoDialog: React.FC<HardwareInfoDialogProps> = ({ onClose }) => {
             <>
               <div className="hwinfo-section">
                 LVGL
-                <span className="hwinfo-dev-badge">Factory Dev Mode</span>
+                <span className="hwinfo-dev-badge">Factory Mode</span>
               </div>
               <dl className="hwinfo-meta">
                 <dt>LVGL heap</dt>

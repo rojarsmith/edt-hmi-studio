@@ -87,7 +87,7 @@ const AboutDialog: React.FC<AboutDialogProps> = ({ onClose }) => {
           <div className="about-version">Version {APP_VERSION}</div>
 
           {factoryDevMode && (
-            <div className="about-mode-badge">Factory Dev Mode</div>
+            <div className="about-mode-badge">Factory Mode</div>
           )}
 
           <dl className="about-meta">

@@ -194,7 +194,7 @@ const DesktopMenuBar = ({
             onClick={() => setConfirmExitDevMode(true)}
             title="Factory engineer development mode — click to leave"
           >
-            Factory Dev Mode
+            Factory Mode
           </button>
         )}
         <span className="desktop-menu-badge">{hostMode}</span>
@@ -203,7 +203,7 @@ const DesktopMenuBar = ({
       {confirmExitDevMode && (
         <div className="modal-global-overlay" onClick={() => setConfirmExitDevMode(false)}>
           <div className="modal-dialog exit-dev-mode-dialog" onClick={e => e.stopPropagation()}>
-            <h4>Leave Factory Dev Mode?</h4>
+            <h4>Leave Factory Mode?</h4>
             <p>
               The editor returns to its normal state and anything this mode
               exposes is hidden again. Re-entering needs the access code.

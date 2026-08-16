@@ -567,7 +567,7 @@ const FontManager: React.FC = () => {
               {glyphs.opaque.length} place{glyphs.opaque.length === 1 ? '' : 's'} in this project
               {' '}use custom C, which cannot be scanned for characters. Anything they display
               {' '}has to be listed under a typography's wildcards, or this font's extra
-              {' '}characters in Factory Dev Mode.
+              {' '}characters in Factory Mode.
             </p>
           )}
           
@@ -584,7 +584,7 @@ const FontManager: React.FC = () => {
           
           {factoryDevMode && (<>
           <div className="fm-dev-divider">
-            <span className="fm-dev-badge">Factory Dev Mode</span>
+            <span className="fm-dev-badge">Factory Mode</span>
             <span className="fm-dev-hint">Conversion settings. Auto already covers a no-code project.</span>
           </div>
           <div className="detail-section">
