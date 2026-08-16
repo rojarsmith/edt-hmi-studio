@@ -189,7 +189,7 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
         </div>
 
         {/* Node Parameters Preview */}
-        {Object.keys(logicNode.params).length > 0 && (
+        {(Object.keys(logicNode.params).length > 0 || logicNode.subType === 'event_trigger') && (
           <div className="logic-node-params">
             {renderParamsPreview(logicNode)}
             {logicNode.subType === 'event_trigger' && (
@@ -217,7 +217,9 @@ function renderParamsPreview(node: LogicNode): React.ReactNode {
 
   switch (subType) {
     case 'event_trigger':
-      return <span className="param-preview">Event: {params.eventType?.replace('LV_EVENT_', '')}</span>;
+      // The binding decides the event type; the face shows the callers
+      // instead (rendered by the component alongside this preview)
+      return null;
     case 'timer_trigger':
       return <span className="param-preview">{params.mode === 'delay' ? 'Delay' : 'Interval'}: {params.duration}ms</span>;
     case 'compare':

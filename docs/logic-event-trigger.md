@@ -39,11 +39,15 @@ it. The palette-wide taxonomy decisions live in
    Button_a8da (CLICKED)` — and warns **Not called by any event** when
    nothing does.
 
-Two leftovers, deliberate: the node's own **Event Type** dropdown no longer
-gates anything on this path (the binding's event type does the filtering) —
-it survives only for the legacy `targetComponent` registration; and the
+Two leftovers, deliberate: the node's **Event Type** dropdown is gone — the
+binding's event type does the filtering, so the node has nothing to
+configure (a stored `eventType` from older graphs is still read by the
+legacy `targetComponent` registration, invisible in the dialog); and the
 **Event Object** output stays behind Factory Dev Mode until the entry
-functions learn to carry the `lv_event_t` through.
+functions learn to carry the `lv_event_t` through. The Edit Node dialog
+also moved its type chip above the name field, and shows the raw subtype
+identifier only in Factory Dev Mode — the machine name is factory
+territory, the same reasoning as the Code tab.
 
 ## The legacy chain, stage by stage (kept for the record)
 

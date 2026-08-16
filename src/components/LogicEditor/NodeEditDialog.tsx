@@ -4,9 +4,10 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useLogicEditorStore } from './logicEditorStore';
 import { useEditorStore } from '../../store/editorStore';
 import { useProjectModbusTags } from '../../hooks/useProjectModbusTags';
+import { useAppStore } from '../../store/appStore';
+import { NODE_COLORS } from './nodeDefinitions';
 import type { CompareOperator, LogicOperator, MathOperator, StringOperation } from './types';
 import type { ModbusRegisterTag } from '../../types/hmi';
-import { LVGL_EVENTS } from '../EventPanel/EventPanel';
 import './NodeEditDialog.css';
 
 interface NodeEditDialogProps {
@@ -58,6 +59,7 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
 
   // Protocol tags for the tag nodes
   const modbusTags = useProjectModbusTags();
+  const factoryDevMode = useAppStore(state => state.factoryDevMode);
 
   const handleTagSelect = useCallback(
     (tagId: string) => {
@@ -97,19 +99,15 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
   const renderParamEditor = () => {
     switch (node.subType) {
       case 'event_trigger':
+        // Which event fires this graph is the binding's decision - the
+        // component's Events panel picks the event type when it checks the
+        // graph under the Logic handler. Nothing to configure here.
         return (
-          <div className="param-group">
-            <label>Event Type</label>
-            <select
-              value={params.eventType || 'LV_EVENT_CLICKED'}
-              onChange={e => handleParamChange('eventType', e.target.value)}
-            >
-              {LVGL_EVENTS.map(evt => (
-                <option key={evt.type} value={evt.type}>
-                  {evt.label} ({evt.type})
-                </option>
-              ))}
-            </select>
+          <div className="no-params">
+            <p>
+              Fired by component events: bind this graph under a component's
+              Events → Logic Graphs. The event type is chosen there.
+            </p>
           </div>
         );
 
@@ -515,6 +513,18 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
         </div>
 
         <div className="dialog-body">
+          {/* Node type chip above the name; the raw subtype identifier is
+              factory territory, same reasoning as the Code tab */}
+          <div className="node-type-info">
+            <span
+              className="type-badge"
+              style={{ backgroundColor: NODE_COLORS[node.type] ?? '#666' }}
+            >
+              {node.type}
+            </span>
+            {factoryDevMode && <span className="subtype-label">{node.subType}</span>}
+          </div>
+
           {/* Node Label */}
           <div className="param-group">
             <label>Node Name</label>
@@ -524,14 +534,6 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
               onChange={e => setLabel(e.target.value)}
               placeholder="Node name"
             />
-          </div>
-
-          {/* Node Type Info */}
-          <div className="node-type-info">
-            <span className="type-badge" style={{ backgroundColor: getNodeColor(node.type) }}>
-              {node.type}
-            </span>
-            <span className="subtype-label">{node.subType}</span>
           </div>
 
           {/* Parameters */}
@@ -549,16 +551,5 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
     </div>
   );
 };
-
-function getNodeColor(type: string): string {
-  switch (type) {
-    case 'trigger': return '#4CAF50';
-    case 'condition': return '#FFC107';
-    case 'action': return '#2196F3';
-    case 'data': return '#9C27B0';
-    case 'custom': return '#607D8B';
-    default: return '#666';
-  }
-}
 
 export default NodeEditDialog;

@@ -30,10 +30,12 @@
 4. Event Trigger 節點面列出呼叫者 —— `Called by: Button_a8da (CLICKED)` ——
    沒人呼叫時警示 **Not called by any event**。
 
-兩個刻意保留的殘留：節點自己的 **Event Type** 下拉在這條路上不再過濾任何
-東西（過濾由綁定端的事件型別做）—— 它只為 legacy 的 `targetComponent` 註冊
-路徑而活；**Event Object** 輸出繼續留在 Factory Dev Mode 後面，直到進入
-函式學會把 `lv_event_t` 帶進來。
+兩個刻意的處置：節點的 **Event Type** 下拉已移除 —— 過濾由綁定端的事件
+型別決定，節點本身沒有東西可設定（舊圖存下的 `eventType` 仍由 legacy 的
+`targetComponent` 註冊路徑讀取，只是不再出現在對話框裡）；**Event Object**
+輸出繼續留在 Factory Dev Mode 後面，直到進入函式學會把 `lv_event_t` 帶進
+來。Edit Node 對話框同時把型別徽章移到名稱欄位上方，原始的 subtype 識別字
+只在 Factory Dev Mode 顯示 —— 機器名稱是原廠領域，與 Code 分頁同一個理由。
 
 ## Legacy 鏈條，逐段來看（留作記錄）
 

@@ -21,12 +21,13 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     type: 'trigger',
     subType: 'event_trigger',
     label: 'Event Trigger',
-    description: 'Receives events from a component',
+    description: 'Fired by component events bound on the Design tab',
     icon: '⚡',
     color: NODE_COLORS.trigger,
-    defaultParams: {
-      eventType: 'LV_EVENT_CLICKED',
-    },
+    // Which event fires the graph is the binding's decision; the node
+    // carries no parameters of its own. Saved graphs may still hold an
+    // eventType from before - the legacy registration path reads it.
+    defaultParams: {},
     inputs: [],
     outputs: [
       { name: 'Execute', type: 'execution' },
