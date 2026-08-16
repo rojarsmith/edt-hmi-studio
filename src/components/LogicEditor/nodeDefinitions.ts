@@ -17,6 +17,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'trigger',
     subType: 'event_trigger',
+    paletteGroup: 'trigger',
     label: 'Event Trigger',
     description: 'Receives events from a component',
     icon: '⚡',
@@ -33,6 +34,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'trigger',
     subType: 'timer_trigger',
+    paletteGroup: 'trigger',
     label: 'Timer Trigger',
     description: 'Runs after a delay or at an interval',
     icon: '⏱️',
@@ -54,6 +56,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'condition',
     subType: 'if_else',
+    paletteGroup: 'flow',
     label: 'If/Else',
     description: 'Conditional branch',
     icon: '🔀',
@@ -71,6 +74,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'condition',
     subType: 'switch',
+    paletteGroup: 'flow',
     label: 'Switch',
     description: 'Multi-branch selection',
     icon: '🔃',
@@ -92,6 +96,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'condition',
     subType: 'compare',
+    paletteGroup: 'data',
     label: 'Compare',
     description: 'Compares two values',
     icon: '⚖️',
@@ -110,6 +115,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'condition',
     subType: 'logic_op',
+    paletteGroup: 'data',
     label: 'Logic Operation',
     description: 'AND, OR, NOT',
     icon: '🔗',
@@ -130,6 +136,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'set_property',
+    paletteGroup: 'screen',
     label: 'Set Property',
     description: 'Changes a component property',
     icon: '🎨',
@@ -149,6 +156,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'navigate_page',
+    paletteGroup: 'screen',
     label: 'Navigate to Screen',
     description: 'Switches to the specified screen',
     icon: '📄',
@@ -167,6 +175,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'show_hide',
+    paletteGroup: 'screen',
     label: 'Show/Hide',
     description: 'Controls component visibility',
     icon: '👁️',
@@ -185,6 +194,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'set_text',
+    paletteGroup: 'screen',
     label: 'Set Text',
     description: 'Changes text content',
     icon: '📝',
@@ -203,6 +213,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'set_value',
+    paletteGroup: 'screen',
     label: 'Set Value',
     description: 'Changes a numeric value',
     icon: '🔢',
@@ -221,6 +232,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'call_function',
+    paletteGroup: 'custom',
     label: 'Call Function',
     description: 'Calls a custom C function',
     icon: '📞',
@@ -241,6 +253,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'action',
     subType: 'delay',
+    paletteGroup: 'flow',
     label: 'Delay',
     description: 'Waits for the specified time',
     icon: '⏳',
@@ -260,6 +273,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'var_read',
+    paletteGroup: 'data',
     label: 'Read Variable',
     description: 'Reads a global or local variable',
     icon: '📖',
@@ -275,6 +289,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'var_write',
+    paletteGroup: 'data',
     label: 'Write Variable',
     description: 'Sets a variable value',
     icon: '✏️',
@@ -293,6 +308,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'math_op',
+    paletteGroup: 'data',
     label: 'Math Operation',
     description: 'Add, subtract, multiply, divide, or modulo',
     icon: '🧮',
@@ -311,6 +327,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'string_op',
+    paletteGroup: 'data',
     label: 'String Operation',
     description: 'Concatenates or formats strings',
     icon: '🔤',
@@ -329,6 +346,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'get_property',
+    paletteGroup: 'screen',
     label: 'Get Property',
     description: 'Reads the current component property value',
     icon: '🔍',
@@ -345,6 +363,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'tag_read',
+    paletteGroup: 'device',
     label: 'Read Tag',
     description: 'Reads a protocol tag defined on the Protocol tab',
     icon: '📥',
@@ -361,6 +380,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'data',
     subType: 'tag_write',
+    paletteGroup: 'device',
     label: 'Write Tag',
     description: 'Writes a value to a protocol tag',
     icon: '📤',
@@ -384,6 +404,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     deprecated: true,
     type: 'data',
     subType: 'modbus_holding_register',
+    paletteGroup: 'device',
     label: 'Read Holding Register',
     description: 'Reads a cached Modbus Holding Register value',
     icon: '📥',
@@ -401,6 +422,7 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   {
     type: 'custom',
     subType: 'c_code_block',
+    paletteGroup: 'custom',
     label: 'C Code Block',
     description: 'Embeds custom C code',
     icon: '💻',
@@ -424,16 +446,21 @@ export function getNodeDefinition(subType: string): LogicNodeDefinition | undefi
   return NODE_DEFINITIONS.find(def => def.subType === subType);
 }
 
-// Get nodes by category (palette view - deprecated nodes stay hidden)
+// Get nodes for one palette shelf (display grouping - deprecated stays hidden)
 export function getNodesByCategory(category: string): LogicNodeDefinition[] {
-  return NODE_DEFINITIONS.filter(def => def.type === category && !def.deprecated);
+  return NODE_DEFINITIONS.filter(
+    def => (def.paletteGroup ?? def.type) === category && !def.deprecated
+  );
 }
 
-// Node categories for palette
+// Palette shelves, grouped by what the author operates on - time and flow,
+// the screen, values, the machine. Display-level only: stored node types and
+// the colours keyed off them are untouched (docs/logic-node-taxonomy.md).
 export const NODE_CATEGORIES = [
   { id: 'trigger', name: 'Triggers', icon: '⚡', color: NODE_COLORS.trigger },
-  { id: 'condition', name: 'Conditions', icon: '🔀', color: NODE_COLORS.condition },
-  { id: 'action', name: 'Actions', icon: '🎬', color: NODE_COLORS.action },
+  { id: 'flow', name: 'Flow', icon: '🔀', color: NODE_COLORS.condition },
+  { id: 'screen', name: 'Screen', icon: '🖥️', color: NODE_COLORS.action },
   { id: 'data', name: 'Data', icon: '📊', color: NODE_COLORS.data },
+  { id: 'device', name: 'Device', icon: '🔌', color: '#00bcd4' },
   { id: 'custom', name: 'Custom', icon: '💻', color: NODE_COLORS.custom },
 ];

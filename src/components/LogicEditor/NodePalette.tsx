@@ -12,9 +12,10 @@ interface NodePaletteProps {
 const NodePalette: React.FC<NodePaletteProps> = ({ onDragStart }) => {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     trigger: true,
-    condition: true,
-    action: true,
+    flow: true,
+    screen: true,
     data: true,
+    device: true,
     custom: true,
   });
   const [searchQuery, setSearchQuery] = useState('');

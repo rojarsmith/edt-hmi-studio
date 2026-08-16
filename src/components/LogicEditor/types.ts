@@ -110,9 +110,22 @@ export interface LogicGraph {
   activeScreenIds?: string[] | null;
 }
 
+// Palette display groups - what the author operates on. Display-level only:
+// a node's stored `type` (and the colour keyed off it) is untouched. See
+// docs/logic-node-taxonomy.md, decision 3.
+export type PaletteGroupId =
+  | 'trigger'
+  | 'flow'
+  | 'screen'
+  | 'data'
+  | 'device'
+  | 'custom';
+
 // Node Definition (for palette)
 export interface LogicNodeDefinition {
   type: LogicNodeCategory;
+  /** Palette shelf; falls back to `type` when absent. */
+  paletteGroup?: PaletteGroupId;
   subType: LogicNodeSubType;
   label: string;
   description: string;

@@ -4,7 +4,8 @@
   <strong>English</strong> · <a href="./zh-TW/logic-node-taxonomy.md">繁體中文</a>
 </p>
 
-Status: **step 1 (tags) landed 2026-08-16; the rest agreed, not started.**
+Status: **steps 1 (tags) and 2 (palette regrouping) landed 2026-08-16; the
+rest agreed, not started.**
 This records why the Logic tab's node palette will be regrouped and how
 protocol support enters it, so the work starts from decisions rather than
 from re-deriving them.
@@ -89,6 +90,10 @@ pure display. So the regrouping lands in two decoupled steps:
    side compiles by inspection only — this environment has no ARM
    toolchain). Read Holding Register is deprecated: hidden from the
    palette, saved graphs keep rendering and generating.
-2. Palette regrouping per the table above (display layer only)
+2. **Done (2026-08-16):** palette regrouping per the table above. Each
+   definition carries a display-only `paletteGroup`; stored node types, the
+   colours keyed off them, and every saved graph are untouched, and a test
+   pins both the shelf contents and the stored-type populations so the two
+   layers cannot drift silently
 3. Custom category behind Factory Dev Mode
 4. Stored-type/colour renames — optional, last, only with a migration story

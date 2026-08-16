@@ -11,6 +11,7 @@
 ## [Unreleased]
 
 ### 變更
+- **Logic 調色盤改按「作者在操作什麼」分組** —— Triggers／Flow／Screen／Data／Device／Custom，取代工程師視角的 trigger-condition-action-data-custom。Delay 搬進 Flow（它是流程，不是動作）；Compare 與 Logic Operation 併入 Data（它們是運算式，現在和其他圓點埠節點作伴）；Get Property 歸隊 Screen 家族；Call Function 搬到 Custom 與 C Code Block 並肩；Read Tag 與 Write Tag 有了自己的 Device 架子 —— 隨協定成長但節點不增生。依 [docs/logic-node-taxonomy.md](docs/zh-TW/logic-node-taxonomy.md) 決策三，僅動顯示層：儲存的節點 type、它們的顏色、每一張已存的圖都原封不動，並有測試同時釘住兩層，不可能無聲漂移
 - **Event Trigger 的 Event Object 輸出移入原廠人員研發模式** —— 產生的程式碼會丟棄事件（`(void)e;`），一般模式下這個埠只承諾裝置給不了的東西；已經接了線的埠在兩種模式都顯示，連線永遠不會被藏斷。更深的發現記錄在 [docs/logic-event-trigger.md](docs/zh-TW/logic-event-trigger.md)：事件圖產生的程式碼沒有任何東西會註冊，因為編輯器還說不出是哪個元件觸發 trigger —— 節點對話框上的 Target Component 選擇器試過又刻意拿掉了，這個設計問題保持開放
 - **Logic 圖有了自己的管理面板，位於節點清單下方** —— 原本的圖選擇器是浮在畫布上的下拉選單加一顆垃圾桶按鈕：既擋畫面，又稱不上管理。現在 Nodes 面板下方有一個可收合的 Logic Graphs 面板 —— 搜尋、新增、刪除、點選開啟，開啟中的圖有高亮標示，標題列最前面是 VS Code 樣式的收合箭頭。和 Nodes 區的交界可以拖拉調整高度，兩邊都保有最小可用高度。刪除會以名字確認。新增時拒絕與既有圖重複的名字，並帶著被拒的名字重開命名框 —— 清單裡兩個同名的圖是分不出來的；預設建議名稱照舊自動跳過已被占用的
 - **Icon 分頁移入原廠人員研發模式** —— 圖庫的瀏覽、搜尋、Copy SVG 都正常，但免寫程式碼的作者拿著它複製出的東西哪裡都去不了：studio 沒有任何功能吃 SVG，頁面也沒有插入這一步。一個通往死路的分頁比沒有分頁更糟，所以它與 Code 一樣改為原廠模式限定，直到接上真正的管線。經查證**今天就能到達硬體**的兩條路 —— LVGL 內建 `LV_SYMBOL_*` 字圖貼進 label 文字（已逐位元組驗證 codegen 輸出），以及 Copy SVG → 存檔 → Image 上傳（光柵化為正確的 ARGB8888 陣列）—— 連同操作步驟、symbol 對照表與議定的重做方向，記錄在 [docs/icon-library.md](docs/zh-TW/icon-library.md)
