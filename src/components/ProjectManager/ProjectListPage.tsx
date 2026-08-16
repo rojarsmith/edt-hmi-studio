@@ -131,7 +131,7 @@ const ProjectListPage: React.FC = () => {
       <div className="plp-header">
         <div className="plp-logo">
           <span className="plp-logo-icon">📐</span>
-          <span className="plp-logo-text">EDT GUI Studio</span>
+          <span className="plp-logo-text">EDT HMI Studio</span>
         </div>
       </div>
 

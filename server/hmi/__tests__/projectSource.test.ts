@@ -33,7 +33,7 @@ describe('writeGeneratedProjectSource', () => {
       ? await mkdir(requestedOutputDirectory, { recursive: true }).then(
           () => requestedOutputDirectory,
         )
-      : await mkdtemp(join(tmpdir(), 'edt-gui-studio-project-source-'));
+      : await mkdtemp(join(tmpdir(), 'edt-hmi-studio-project-source-'));
     if (!requestedOutputDirectory) {
       temporaryDirectories.push(outputDirectory);
     }
@@ -195,7 +195,7 @@ describe('writeGeneratedProjectSource', () => {
 
   it('resizes image-button-only assets to fixed widget bounds', async () => {
     const outputDirectory = await mkdtemp(
-      join(tmpdir(), 'edt-gui-studio-image-button-assets-'),
+      join(tmpdir(), 'edt-hmi-studio-image-button-assets-'),
     );
     temporaryDirectories.push(outputDirectory);
     const source = await import('sharp').then(({ default: sharp }) =>
@@ -286,7 +286,7 @@ describe('writeGeneratedProjectSource', () => {
 
   it('resizes img assets to fixed widget bounds', async () => {
     const outputDirectory = await mkdtemp(
-      join(tmpdir(), 'edt-gui-studio-img-assets-'),
+      join(tmpdir(), 'edt-hmi-studio-img-assets-'),
     );
     temporaryDirectories.push(outputDirectory);
     const source = await import('sharp').then(({ default: sharp }) =>
@@ -354,7 +354,7 @@ describe('writeGeneratedProjectSource', () => {
 
   it('keeps native size when an img widget is not fixed-size', async () => {
     const outputDirectory = await mkdtemp(
-      join(tmpdir(), 'edt-gui-studio-img-content-assets-'),
+      join(tmpdir(), 'edt-hmi-studio-img-content-assets-'),
     );
     temporaryDirectories.push(outputDirectory);
     const source = await import('sharp').then(({ default: sharp }) =>
@@ -422,7 +422,7 @@ describe('writeGeneratedProjectSource', () => {
 
   it('resizes shared assets to the largest fixed widget bound', async () => {
     const outputDirectory = await mkdtemp(
-      join(tmpdir(), 'edt-gui-studio-shared-image-assets-'),
+      join(tmpdir(), 'edt-hmi-studio-shared-image-assets-'),
     );
     temporaryDirectories.push(outputDirectory);
     const source = await import('sharp').then(({ default: sharp }) =>

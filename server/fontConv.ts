@@ -27,7 +27,7 @@ const requireFrom = createRequire(import.meta.url);
  * that font — expected, but it means hit rates while actively editing text are
  * lower than they look.
  */
-export const FONT_CACHE_DIR = join(tmpdir(), 'edt-gui-studio-font-cache');
+export const FONT_CACHE_DIR = join(tmpdir(), 'edt-hmi-studio-font-cache');
 
 /** What the conversion has always fallen back to when nothing else is given. */
 export const FALLBACK_RANGE = '0x20-0x7E';

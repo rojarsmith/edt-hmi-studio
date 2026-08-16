@@ -54,7 +54,7 @@
   **BIZ UDPGothic**（OFL，通用設計，為高辨識度而繪）
 - 韓文：**Noto Sans KR**；**Pretendard**（OFL，風格接近 Inter）
 
-**Noto Sans TC、SC、JP 與 KR 已隨附於 EDT GUI Studio** —— Typographies 的字型
+**Noto Sans TC、SC、JP 與 KR 已隨附於 EDT HMI Studio** —— Typographies 的字型
 下拉選單把它們列在 *Built-in* 之下，與 Montserrat 並列，且不管專案加過沒有都
 在同一個位置；選到還沒加入的那一個就會自動加入。Fonts 面板也在
 *Bundled fonts* 區塊列出它們。它們走與上傳字型相同的 auto 字元集裁剪，一套 UI

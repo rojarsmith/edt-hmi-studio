@@ -122,7 +122,7 @@ function Get-PinnedFile {
             Remove-Item -LiteralPath $temporary -Force
         }
         $client = New-Object System.Net.WebClient
-        $client.Headers.Add("User-Agent", "edt-gui-studio-bootstrap")
+        $client.Headers.Add("User-Agent", "edt-hmi-studio-bootstrap")
         try {
             $client.DownloadFile($Uri, $temporary)
             break

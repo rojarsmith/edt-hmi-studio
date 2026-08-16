@@ -4,7 +4,7 @@
   <a href="../lvgl-version.md">English</a> · <strong>繁體中文</strong>
 </p>
 
-**EDT GUI Studio 以 LVGL v9.5 作為主要版本。**
+**EDT HMI Studio 以 LVGL v9.5 作為主要版本。**
 
 | | 內容 |
 | --- | --- |

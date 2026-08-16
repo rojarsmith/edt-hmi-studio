@@ -6,7 +6,7 @@ import { useAppStore } from '../../store/appStore';
 import edtLogo from '../../assets/edt-logo.png';
 import './AboutDialog.css';
 
-const PRODUCT_NAME = 'EDT GUI Studio';
+const PRODUCT_NAME = 'EDT HMI Studio';
 const COMPANY_NAME = 'Emerging Display Technologies';
 const COMPANY_URL = 'https://www.edtc.com';
 const DEVELOPER_NAME = 'Rojar Smith';

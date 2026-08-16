@@ -189,32 +189,37 @@ export function loadProjectFromFile(file: File): Promise<ProjectFile> {
   });
 }
 
-const AUTOSAVE_KEY = 'edt-gui-studio-autosave';
-const AUTOSAVE_TIME_KEY = 'edt-gui-studio-autosave-time';
+const AUTOSAVE_KEY = 'edt-hmi-studio-autosave';
+const AUTOSAVE_TIME_KEY = 'edt-hmi-studio-autosave-time';
 
-// Keys used before the project was renamed to EDT GUI Studio
-const LEGACY_AUTOSAVE_KEY = 'lvgl-editor-autosave';
-const LEGACY_AUTOSAVE_TIME_KEY = 'lvgl-editor-autosave-time';
+// Key pairs used before the project was renamed to EDT HMI Studio,
+// newest first
+const LEGACY_AUTOSAVE_KEYS: Array<[key: string, timeKey: string]> = [
+  ['edt-gui-studio-autosave', 'edt-gui-studio-autosave-time'],
+  ['lvgl-editor-autosave', 'lvgl-editor-autosave-time'],
+];
 
 /**
  * Move an auto-save written under the old key names to the current ones.
- * Runs at most once: the legacy keys are dropped afterwards.
+ * Runs at most once per legacy name: the legacy keys are dropped afterwards.
  */
 function migrateLegacyAutoSave(): void {
   try {
-    const legacyJson = localStorage.getItem(LEGACY_AUTOSAVE_KEY);
-    if (legacyJson === null) return;
+    for (const [legacyKey, legacyTimeKey] of LEGACY_AUTOSAVE_KEYS) {
+      const legacyJson = localStorage.getItem(legacyKey);
+      if (legacyJson === null) continue;
 
-    if (localStorage.getItem(AUTOSAVE_KEY) === null) {
-      localStorage.setItem(AUTOSAVE_KEY, legacyJson);
-      const legacyTime = localStorage.getItem(LEGACY_AUTOSAVE_TIME_KEY);
-      if (legacyTime !== null) {
-        localStorage.setItem(AUTOSAVE_TIME_KEY, legacyTime);
+      if (localStorage.getItem(AUTOSAVE_KEY) === null) {
+        localStorage.setItem(AUTOSAVE_KEY, legacyJson);
+        const legacyTime = localStorage.getItem(legacyTimeKey);
+        if (legacyTime !== null) {
+          localStorage.setItem(AUTOSAVE_TIME_KEY, legacyTime);
+        }
       }
-    }
 
-    localStorage.removeItem(LEGACY_AUTOSAVE_KEY);
-    localStorage.removeItem(LEGACY_AUTOSAVE_TIME_KEY);
+      localStorage.removeItem(legacyKey);
+      localStorage.removeItem(legacyTimeKey);
+    }
   } catch (error) {
     console.error('Auto-save migration failed:', error);
   }
@@ -265,8 +270,10 @@ export function getAutoSaveTime(): Date | null {
 export function clearAutoSave(): void {
   localStorage.removeItem(AUTOSAVE_KEY);
   localStorage.removeItem(AUTOSAVE_TIME_KEY);
-  localStorage.removeItem(LEGACY_AUTOSAVE_KEY);
-  localStorage.removeItem(LEGACY_AUTOSAVE_TIME_KEY);
+  for (const [legacyKey, legacyTimeKey] of LEGACY_AUTOSAVE_KEYS) {
+    localStorage.removeItem(legacyKey);
+    localStorage.removeItem(legacyTimeKey);
+  }
 }
 
 /**

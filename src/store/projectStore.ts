@@ -144,11 +144,12 @@ export const DEFAULT_CODEGEN_OPTIONS: CodeGenOptions = {
 // IndexedDB helpers
 // ---------------------------------------------------------------------------
 
-const DB_NAME = 'edt-gui-studio-projects';
+const DB_NAME = 'edt-hmi-studio-projects';
 const DB_VERSION = 1;
 
-// Database used before the project was renamed to EDT GUI Studio
-const LEGACY_DB_NAME = 'lvgl-editor-projects';
+// Databases used before the project was renamed to EDT HMI Studio,
+// newest first
+const LEGACY_DB_NAMES = ['edt-gui-studio-projects', 'lvgl-editor-projects'];
 const STORE_NAMES = ['projects', 'projectData', 'projectResources'] as const;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
@@ -220,9 +221,9 @@ function normalizeProjectConfig(
  * Returns null when it never existed (the accidental empty database that
  * `openDB` creates in that case is deleted again).
  */
-async function openLegacyDB(): Promise<IDBPDatabase | null> {
+async function openLegacyDB(name: string): Promise<IDBPDatabase | null> {
   let created = false;
-  const db = await openDB(LEGACY_DB_NAME, undefined, {
+  const db = await openDB(name, undefined, {
     upgrade() {
       created = true;
     },
@@ -230,7 +231,7 @@ async function openLegacyDB(): Promise<IDBPDatabase | null> {
 
   if (created) {
     db.close();
-    await deleteDB(LEGACY_DB_NAME);
+    await deleteDB(name);
     return null;
   }
 
@@ -238,32 +239,34 @@ async function openLegacyDB(): Promise<IDBPDatabase | null> {
 }
 
 /**
- * Copy projects saved under the old database name into the current one.
+ * Copy projects saved under an old database name into the current one.
  * Only runs while the current database is still empty, so it can never
- * overwrite newer data; the legacy database is dropped once copied.
+ * overwrite newer data; a legacy database is dropped once copied.
  */
 async function migrateLegacyDB(db: IDBPDatabase): Promise<void> {
   try {
-    if (await db.count('projects')) return;
+    for (const legacyName of LEGACY_DB_NAMES) {
+      if (await db.count('projects')) return;
 
-    const legacy = await openLegacyDB();
-    if (!legacy) return;
+      const legacy = await openLegacyDB(legacyName);
+      if (!legacy) continue;
 
-    try {
-      for (const storeName of STORE_NAMES) {
-        if (!legacy.objectStoreNames.contains(storeName)) continue;
-        const records = await legacy.getAll(storeName);
-        if (records.length === 0) continue;
+      try {
+        for (const storeName of STORE_NAMES) {
+          if (!legacy.objectStoreNames.contains(storeName)) continue;
+          const records = await legacy.getAll(storeName);
+          if (records.length === 0) continue;
 
-        const tx = db.transaction(storeName, 'readwrite');
-        await Promise.all(records.map((record) => tx.store.put(record)));
-        await tx.done;
+          const tx = db.transaction(storeName, 'readwrite');
+          await Promise.all(records.map((record) => tx.store.put(record)));
+          await tx.done;
+        }
+      } finally {
+        legacy.close();
       }
-    } finally {
-      legacy.close();
-    }
 
-    await deleteDB(LEGACY_DB_NAME);
+      await deleteDB(legacyName);
+    }
   } catch (error) {
     console.error('Failed to migrate the legacy project database:', error);
   }

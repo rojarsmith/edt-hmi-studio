@@ -59,7 +59,7 @@ what makes a large font affordable in the first place.
   **BIZ UDPGothic** (OFL, universal-design, drawn for high legibility)
 - Korean: **Noto Sans KR**; **Pretendard** (OFL, close in feel to Inter)
 
-**Noto Sans TC, SC, JP and KR ship with EDT GUI Studio** — the Typographies
+**Noto Sans TC, SC, JP and KR ship with EDT HMI Studio** — the Typographies
 font dropdown lists them under *Built-in*, alongside Montserrat and in the same
 place whether or not the project has added one; selecting an unadded one adds
 it. The Fonts panel lists them too, under *Bundled fonts*. They go through the

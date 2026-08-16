@@ -583,7 +583,7 @@ const EditorView: React.FC<EditorViewProps> = ({
               ◀
             </button>
             <span className="logo-icon">📐</span>
-            <span className="logo-text project-name-display">{projectName || 'EDT GUI Studio'}</span>
+            <span className="logo-text project-name-display">{projectName || 'EDT HMI Studio'}</span>
           </div>
 
           {/* Main tabs */}

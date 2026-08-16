@@ -1,10 +1,10 @@
-# EDT GUI Studio — 元件設計文件目錄
+# EDT HMI Studio — 元件設計文件目錄
 
 <p align="center">
   <a href="../../components/README.md">English</a> · <strong>繁體中文</strong>
 </p>
 
-本目錄收錄 EDT GUI Studio 中所有元件的詳細設計文件。每份文件涵蓋屬性設計、樣式系統、父子關係、UI 繪製層、程式碼生成與 LVGL API 對應等內容。
+本目錄收錄 EDT HMI Studio 中所有元件的詳細設計文件。每份文件涵蓋屬性設計、樣式系統、父子關係、UI 繪製層、程式碼生成與 LVGL API 對應等內容。
 
 ---
 

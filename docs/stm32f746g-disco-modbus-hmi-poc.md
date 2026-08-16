@@ -1,6 +1,6 @@
 # STM32F746G-DISCO Modbus HMI PoC
 
-This branch contains an end-to-end proof of concept that turns an EDT GUI Studio
+This branch contains an end-to-end proof of concept that turns an EDT HMI Studio
 project into firmware for the STM32F746G-DISCO without editing C code.
 
 ## What is included

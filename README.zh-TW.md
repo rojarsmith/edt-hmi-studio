@@ -1,4 +1,4 @@
-# EDT GUI Studio
+# EDT HMI Studio
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
@@ -92,7 +92,7 @@
 ```bash
 # 複製專案
 git clone <repository-url>
-cd edt-gui-studio
+cd edt-hmi-studio
 
 # 安裝相依套件
 npm install
@@ -119,7 +119,7 @@ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
 部署到 GitHub Pages 時，可另外指定儲存庫的子路徑：
 
 ```bash
-VITE_BASE_PATH=/edt-gui-studio/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
+VITE_BASE_PATH=/edt-hmi-studio/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
 ```
 
 ### 桌面版（OmniHost）
@@ -132,10 +132,10 @@ npm ci
 npm run build:desktop-web
 
 # Linux
-dotnet publish ./desktop/EdtGuiStudio.Desktop.csproj -c Release -f net8.0
+dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net8.0
 
 # Windows
-dotnet publish ./desktop/EdtGuiStudio.Desktop.csproj -c Release -f net8.0-windows
+dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net8.0-windows
 ```
 
 桌面殼層預設啟用 OmniHost 的 VSCode 風格內建標題列，提供最大化、最小化與關閉按鈕；編輯器內部另外提供 VSCode 風格的選單列（File / Edit / View / Help）。

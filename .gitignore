@@ -30,4 +30,4 @@ firmware/vendor/*
 bin/
 obj/
 /.vs
-/desktop/.vs/EdtGuiStudio.Desktop
+/desktop/.vs/EdtHmiStudio.Desktop

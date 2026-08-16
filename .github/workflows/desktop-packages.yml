@@ -25,15 +25,15 @@ jobs:
           - runner: ubuntu-latest
             os_name: linux
             framework: net8.0
-            archive_name: edt-gui-studio-desktop-linux
+            archive_name: edt-hmi-studio-desktop-linux
           - runner: windows-latest
             os_name: windows
             framework: net8.0-windows
-            archive_name: edt-gui-studio-desktop-windows
+            archive_name: edt-hmi-studio-desktop-windows
           - runner: macos-latest
             os_name: macos
             framework: net8.0
-            archive_name: edt-gui-studio-desktop-macos
+            archive_name: edt-hmi-studio-desktop-macos
 
     steps:
       - name: Check package feed credentials
@@ -78,7 +78,7 @@ jobs:
 
       - name: Publish desktop host
         if: steps.package-feed.outputs.enabled == 'true'
-        run: dotnet publish ./desktop/EdtGuiStudio.Desktop.csproj -c Release -f ${{ matrix.framework }} -o ./artifacts/${{ matrix.archive_name }}
+        run: dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f ${{ matrix.framework }} -o ./artifacts/${{ matrix.archive_name }}
 
       - name: Create zip artifact
         if: steps.package-feed.outputs.enabled == 'true'

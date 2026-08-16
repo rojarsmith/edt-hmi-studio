@@ -1,10 +1,10 @@
-# EDT GUI Studio — Widget Design Documents
+# EDT HMI Studio — Widget Design Documents
 
 <p align="center">
   <strong>English</strong> · <a href="../zh-TW/components/README.md">繁體中文</a>
 </p>
 
-This directory holds the detailed design document for every widget in EDT GUI Studio. Each one covers the property design, the style system, parent/child rules, the UI rendering layers, code generation and the LVGL API mapping.
+This directory holds the detailed design document for every widget in EDT HMI Studio. Each one covers the property design, the style system, parent/child rules, the UI rendering layers, code generation and the LVGL API mapping.
 
 ---
 

@@ -186,7 +186,7 @@ const DesktopMenuBar = ({
       </div>
 
       <div className="desktop-menu-meta">
-        <span className="desktop-menu-project">{projectName || 'EDT GUI Studio'}</span>
+        <span className="desktop-menu-project">{projectName || 'EDT HMI Studio'}</span>
         {factoryDevMode && (
           <button
             type="button"

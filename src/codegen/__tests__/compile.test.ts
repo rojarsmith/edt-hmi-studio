@@ -28,8 +28,8 @@ import {
 // Paths
 const EMSDK_ENV = '/home/xcssa/.openclaw/workspace/tools/emsdk/emsdk_env.sh';
 const LVGL_ROOT = '/home/xcssa/.openclaw/workspace/tools/lvgl';
-const LVGL_LIB = '/home/xcssa/.openclaw/workspace/projects/edt-gui-studio/wasm/build/liblvgl_emcc.a';
-const LV_CONF_DIR = '/home/xcssa/.openclaw/workspace/projects/edt-gui-studio/wasm';
+const LVGL_LIB = '/home/xcssa/.openclaw/workspace/projects/edt-hmi-studio/wasm/build/liblvgl_emcc.a';
+const LV_CONF_DIR = '/home/xcssa/.openclaw/workspace/projects/edt-hmi-studio/wasm';
 
 const MAIN_C = `
 #include "ui.h"

@@ -4,7 +4,7 @@
   <strong>English</strong> · <a href="./zh-TW/lvgl-version.md">繁體中文</a>
 </p>
 
-**EDT GUI Studio targets LVGL v9.5 as its primary version.**
+**EDT HMI Studio targets LVGL v9.5 as its primary version.**
 
 | | Value |
 | --- | --- |
