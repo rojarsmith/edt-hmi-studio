@@ -17,7 +17,10 @@ A Target Component selector on the node's dialog was tried on 2026-08-16 and
 taken out again shortly after: pinning "who fires me" inside the trigger's
 own dialog was judged the wrong shape, and the question is deliberately back
 open. This document records the state of each stage and the shapes
-considered, so the next attempt starts from facts.
+considered, so the next attempt starts from facts. The palette-wide
+taxonomy decisions — including the tag abstraction that will give triggers
+a data-driven sibling — are recorded in
+[logic-node-taxonomy.md](logic-node-taxonomy.md).
 
 ## The chain, stage by stage
 
