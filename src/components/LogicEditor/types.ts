@@ -99,7 +99,12 @@ export interface LogicGraph {
   variables: LogicVariable[];
   // Link to event binding
   eventBindingId?: string;
-  // Screens this graph is active on; null or absent means every screen
+  // Switched off in the editor: absent from generated code entirely.
+  // Absent means on, so older projects stay unchanged.
+  enabled?: boolean;
+  // Screens this graph is active on; null or absent means every screen.
+  // Stored but not consumed anywhere yet - graphs run globally for now,
+  // and the editor only shows this in factory dev mode.
   activeScreenIds?: string[] | null;
 }
 

@@ -4,15 +4,15 @@
   <a href="../logic-event-trigger.md">English</a> · <strong>繁體中文</strong>
 </p>
 
-**Event Trigger** 節點在某個元件發出 LVGL 事件時啟動一張邏輯圖 —— 按鈕的
-`LV_EVENT_CLICKED`、滑桿的 `LV_EVENT_VALUE_CHANGED`。這條鏈幾乎整條從一開始
-就存在而且有測試：資料模型帶著目標元件欄位、程式碼產生器會註冊 callback、
-韌體樣板在正確的時機呼叫初始化函式。缺的正好是一環 —— **Edit Node 對話框
-從不問「是哪個元件觸發事件」** —— 少了它，整條鏈產生的程式碼什麼都不會跑。
-這一環已在 2026-08-16 接上：對話框現在有 Target Component 選擇器，而且在
-還沒選的期間會明講後果。
+**Event Trigger** 節點的本意，是在某個元件發出 LVGL 事件時啟動一張邏輯圖 ——
+按鈕的 `LV_EVENT_CLICKED`、滑桿的 `LV_EVENT_VALUE_CHANGED`。這條鏈幾乎整條
+都存在而且有測試：資料模型帶著目標元件欄位、程式碼產生器會註冊 callback、
+韌體樣板在正確的時機呼叫初始化函式。缺的正好是一環 —— **編輯器說不出是哪個
+元件觸發事件** —— 所以今天整條鏈產生的程式碼什麼都不會跑。
 
-本文記錄每一段的實況，讓之後的工作從事實出發。
+節點對話框上的 Target Component 選擇器在 2026-08-16 試過、隨即又拿掉了：
+把「是誰觸發我」釘在 trigger 自己的對話框裡被判斷是不對的形狀，這個問題
+刻意重新開放。本文記錄每一段的實況與考慮過的形狀，讓下一次嘗試從事實出發。
 
 ## 鏈條，逐段來看
 
@@ -20,16 +20,14 @@
 
 `nodeDefinitions.ts` 給 `event_trigger` 一個預設參數
 `eventType: 'LV_EVENT_CLICKED'`，兩個輸出：**Execute**（執行流）與
-**Event Object**（`any`）。Edit Node 對話框（`NodeEditDialog.tsx`）給它兩個
-欄位：**Target Component** 下拉選單，列出所有畫面的全部元件 —— 和
-`show_hide`、`set_property`、`get_property`、`set_text`、`set_value` 本來就有
-的是同一款 —— 寫入 `params.targetComponent`；以及 **Event Type** 下拉選單，
-列出與 Design 分頁事件系統共用的九種事件（Clicked、Pressed、Released、
+**Event Object**（`any`，原廠模式限定 —— 見下文）。Edit Node 對話框
+（`NodeEditDialog.tsx`）只給它一個欄位：**Event Type** 下拉選單，列出與
+Design 分頁事件系統共用的九種事件（Clicked、Pressed、Released、
 Long Pressed、Value Changed、Focused、Defocused、Ready、Cancel）。
 
-還沒選元件時，對話框會明講這個 trigger 不會被註冊進產生的程式碼。
-（2026-08-16 之前 Target Component 欄位根本不存在，所以每一張事件圖都是
-死碼 —— 本文其餘部分解釋的就是那段歷史。）
+刻意沒有 Target Component 欄位。值得明講，因為這個下拉選單會招來誤讀：
+事件型別沒有目標，並**不**代表「任何元件的點擊都會觸發這張圖」。沒有存目標
+時，程式碼產生器完全不會產生註冊，所以這張圖是誰都不聽，而不是誰都聽。
 
 ### 2. 產生的程式碼（`ui_logic.c`）
 
@@ -69,9 +67,9 @@ lv_obj_add_event_cb(ui_run_button, logic_<name>_event_cb, LV_EVENT_CLICKED, NULL
 
 ## 實務上這代表什麼
 
-- Event Trigger 的圖在選定 Target Component 之後就會在硬體上執行。
-  **沒選目標時依然不產生註冊** —— 但對話框現在會明講，而不是留下一張
-  無聲的死圖。（Timer Trigger 的圖從來不需要目標，兩個時期都正常。）
+- Event Trigger 的圖今天**在硬體上永遠不會執行**：編輯器沒有存目標，
+  註冊那一行永遠不會產生。（Timer Trigger 的圖不受影響 —— 它的註冊不需要
+  目標，能正常運作。）
 - Logic 分頁的 **Debug** 按鈕是手動的走訪 —— 從第一個 trigger 節點開始，
   按一次 Step 沿執行線走一步。它不模擬點擊，也不計算任何值。
 - **WASM 預覽**（Build & Run）完全忽略邏輯圖 —— `editorStateToJson.ts` 匯出
@@ -89,18 +87,24 @@ lv_obj_add_event_cb(ui_run_button, logic_<name>_event_cb, LV_EVENT_CLICKED, NULL
 - 編譯驗證測試只練過*有*目標的事件圖，所以編輯器實際產出的形狀
   （包裝有輸出、永無引用）在編譯測試的覆蓋之外。
 
-## 修補本身，以及刻意不動的部分
+## 試過的形狀，與仍然開放的問題
 
-修補就是上面說的那一個下拉選單：`event_trigger` 拿到對話框本來就為
-`show_hide` 畫好的同款 Target Component 選擇器，寫入
-`params.targetComponent`，既有的 codegen、解析與韌體路徑原封不動地亮起來，
-測試早就在了。
+**節點端目標 —— 2026-08-16 試過，隨即拿掉。** 對話框短暫帶過兄弟節點同款的
+Target Component 選擇器，寫入 `params.targetComponent`，沉睡的鏈整條亮起
+來，測試早就在了。深思後移除：把「是誰觸發我」釘在 trigger 自己的對話框裡
+被判斷是不對的產品形狀，方向要先想清楚，不能讓 UI 先把它定型。codegen 對
+`params.targetComponent`（UUID 或名稱）的理解原封不動，形狀選定之後什麼都
+不用重建。
 
-兩個鄰近的問題經過考慮後刻意維持原狀：
+**Design 端綁定 —— 從未接線。** `LogicGraph.eventBindingId` 是另一種形狀
+留下的痕跡：Design 分頁裡元件的事件指向一張圖，「是誰觸發我」跟著元件走，
+而不是放在圖裡面。今天沒有任何東西讀這個欄位。
 
-- **元件 id 失效**（選定後元件被刪除）時，解析器仍然無聲地退回名稱推導 ——
-  這是所有帶目標的節點共同的行為；只替一個節點修好反而誤導。
-- **Event Object 輸出移入 Factory Dev Mode**（同日 2026-08-16，依需求）：
+在其中一種形狀落地之前，事件圖產生的函式和 callback 包裝沒有任何東西引用。
+
+一個不管選哪種形狀都成立的決定：
+
+- **Event Object 輸出住在 Factory Dev Mode 後面**（2026-08-16，依需求）：
   callback 包裝仍然丟棄事件，所以在一般模式下這個埠只承諾裝置給不了的東西。
   埠留在節點資料裡 —— 隱藏只在渲染層 —— 而已經接了線的埠在兩種模式都顯示，
   連線永遠不會被藏斷。把事件內容餵進資料流，仍然是真正的後續工作。

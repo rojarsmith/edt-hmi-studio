@@ -3,17 +3,26 @@
 import React, { useCallback, useState } from 'react';
 import { useLogicEditorStore } from './logicEditorStore';
 import { useEditorStore } from '../../store/editorStore';
+import { useAppStore } from '../../store/appStore';
 import PanelChevron from './PanelChevron';
 import './PropertiesPanel.css';
 
 const PropertiesPanel: React.FC = () => {
   const { getCurrentGraph, updateGraph } = useLogicEditorStore();
   const { screens } = useEditorStore();
+  const factoryDevMode = useAppStore(s => s.factoryDevMode);
   const [expanded, setExpanded] = useState(true);
 
   const graph = getCurrentGraph();
+  // Absent means on - older projects never carried the field
+  const isActive = graph?.enabled !== false;
   // null or absent means the graph is active on every screen
   const onAllScreens = !graph?.activeScreenIds;
+
+  const handleActiveToggle = useCallback(() => {
+    if (!graph) return;
+    updateGraph(graph.id, { enabled: graph.enabled === false });
+  }, [graph, updateGraph]);
 
   const handleAllScreensToggle = useCallback(() => {
     if (!graph) return;
@@ -61,38 +70,62 @@ const PropertiesPanel: React.FC = () => {
                 {graph.name}
               </div>
 
+              {/* Graphs run globally for now: one switch, on or off */}
               <div className="props-section">
-                <div className="props-section-title">Active on Screens</div>
                 <label className="props-check-row">
                   <input
                     type="checkbox"
-                    checked={onAllScreens}
-                    onChange={handleAllScreensToggle}
+                    checked={isActive}
+                    onChange={handleActiveToggle}
                   />
-                  <span>All screens</span>
+                  <span>Active</span>
                 </label>
-
-                {!onAllScreens && (
-                  <div className="props-screen-list">
-                    {screens.map(screen => (
-                      <label key={screen.id} className="props-check-row">
-                        <input
-                          type="checkbox"
-                          checked={graph.activeScreenIds!.includes(screen.id)}
-                          onChange={() => handleScreenToggle(screen.id)}
-                        />
-                        <span title={screen.name}>{screen.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {!onAllScreens && activeCount === 0 && (
+                {!isActive && (
                   <div className="props-warning">
-                    This graph is active on no screen
+                    Excluded from generated code
                   </div>
                 )}
               </div>
+
+              {/* Per-screen activation is parked until codegen can honour
+                  it; the stored choice stays editable in factory dev mode */}
+              {factoryDevMode && (
+                <div className="props-section">
+                  <div className="props-section-title">Active on Screens</div>
+                  <div className="props-note">
+                    Stored only — generated code does not gate on screens yet
+                  </div>
+                  <label className="props-check-row">
+                    <input
+                      type="checkbox"
+                      checked={onAllScreens}
+                      onChange={handleAllScreensToggle}
+                    />
+                    <span>All screens</span>
+                  </label>
+
+                  {!onAllScreens && (
+                    <div className="props-screen-list">
+                      {screens.map(screen => (
+                        <label key={screen.id} className="props-check-row">
+                          <input
+                            type="checkbox"
+                            checked={graph.activeScreenIds!.includes(screen.id)}
+                            onChange={() => handleScreenToggle(screen.id)}
+                          />
+                          <span title={screen.name}>{screen.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {!onAllScreens && activeCount === 0 && (
+                    <div className="props-warning">
+                      This graph is active on no screen
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

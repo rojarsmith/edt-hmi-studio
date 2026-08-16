@@ -107,13 +107,6 @@
   margin-bottom: 16px;
 }
 
-.param-warning {
-  margin-top: 6px;
-  font-size: 11px;
-  line-height: 1.5;
-  color: #ff9800;
-}
-
 .param-group label {
   display: block;
   margin-bottom: 6px;

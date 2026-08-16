@@ -156,13 +156,9 @@
 }
 
 .param-preview {
-  display: block;
   color: #888;
   font-size: 10px;
   font-style: italic;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Connection Styles (applied via React Flow) */

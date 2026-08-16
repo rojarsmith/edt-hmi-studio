@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateCode, generateSingleFile, getGeneratedFileNames } from '../generator';
-import { createScreen, createComponent, createEvent, createBuiltinAction, createFontResource } from './helpers';
+import { createScreen, createComponent, createEvent, createBuiltinAction, createFontResource, createLogicGraph, createLogicNode } from './helpers';
 import type { GeneratedCode } from '../types';
 
 describe('getGeneratedFileNames', () => {
@@ -11,6 +11,35 @@ describe('getGeneratedFileNames', () => {
 
   it('returns the correct length', () => {
     expect(getGeneratedFileNames()).toHaveLength(6);
+  });
+});
+
+describe('disabled logic graphs', () => {
+  it('a graph switched off is absent from ui_logic.c and ui_logic.h; absent enabled means on', () => {
+    const running = createLogicGraph({
+      name: 'runs',
+      nodes: [createLogicNode('timer_trigger', { outputs: [] })],
+    });
+    const parked = createLogicGraph({
+      name: 'parked',
+      enabled: false,
+      nodes: [createLogicNode('timer_trigger', { outputs: [] })],
+    });
+    const code = generateCode([createScreen({ name: 'main' })], {}, [running, parked]);
+    expect(code['ui_logic.c']).toContain('logic_runs');
+    expect(code['ui_logic.c']).not.toContain('logic_parked');
+    expect(code['ui_logic.h']).toContain('logic_runs');
+    expect(code['ui_logic.h']).not.toContain('logic_parked');
+  });
+
+  it('generateSingleFile applies the same off switch', () => {
+    const parked = createLogicGraph({
+      name: 'parked',
+      enabled: false,
+      nodes: [createLogicNode('timer_trigger', { outputs: [] })],
+    });
+    const result = generateSingleFile([createScreen({ name: 'main' })], 'ui_logic.c', {}, [parked]);
+    expect(result).not.toContain('logic_parked');
   });
 });
 

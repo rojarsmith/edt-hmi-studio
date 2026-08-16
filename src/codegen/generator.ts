@@ -43,14 +43,17 @@ export function generateCode(
     : deriveTypographies(screens, defaultFont, defaultFontSize).typographies;
 
   const opts: CodeGenOptions = { ...DEFAULT_CODEGEN_OPTIONS, ...options };
-  
+  // A graph switched off in the editor is absent from generated code
+  // entirely - declaration, function, callbacks and registration alike
+  const activeGraphs = logicGraphs.filter(g => g.enabled !== false);
+
   return {
     'ui.h': generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols, effectiveTypographies),
     'ui.c': generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont, typographies, texts, languages),
     'ui_events.h': generateEventsHeader(screens, opts),
     'ui_events.c': generateEventsSource(screens, opts, languages),
-    'ui_logic.h': generateLogicHeader(opts, logicGraphs),
-    'ui_logic.c': generateLogicSource(opts, logicGraphs, screens),
+    'ui_logic.h': generateLogicHeader(opts, activeGraphs),
+    'ui_logic.c': generateLogicSource(opts, activeGraphs, screens),
   };
 }
 
@@ -78,6 +81,8 @@ export function generateSingleFile(
   const effectiveTypographies = typographies?.length
     ? typographies
     : deriveTypographies(screens, defaultFont, defaultFontSize).typographies;
+  // Same off-switch rule as generateCode
+  const activeGraphs = logicGraphs.filter(g => g.enabled !== false);
 
   switch (fileName) {
     case 'ui.h':
@@ -89,9 +94,9 @@ export function generateSingleFile(
     case 'ui_events.c':
       return generateEventsSource(screens, opts, languages);
     case 'ui_logic.h':
-      return generateLogicHeader(opts, logicGraphs);
+      return generateLogicHeader(opts, activeGraphs);
     case 'ui_logic.c':
-      return generateLogicSource(opts, logicGraphs, screens);
+      return generateLogicSource(opts, activeGraphs, screens);
     default:
       throw new Error(`Unknown file: ${fileName}`);
   }

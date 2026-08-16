@@ -4,37 +4,38 @@
   <strong>English</strong> · <a href="./zh-TW/logic-event-trigger.md">繁體中文</a>
 </p>
 
-The **Event Trigger** node starts a logic graph when a widget fires an LVGL
-event — a button's `LV_EVENT_CLICKED`, a slider's `LV_EVENT_VALUE_CHANGED`.
-Almost the entire chain for that existed and was tested from the start: the
-data model carries a target component, the code generator registers the
-callback, the firmware templates call the init function at the right moment.
-Exactly one link was missing — **the Edit Node dialog never asked which
-component fires the event** — and without it the whole chain generated code
-that ran nothing. That link was wired on 2026-08-16: the dialog now has a
-Target Component selector, and warns while none is chosen.
+The **Event Trigger** node is meant to start a logic graph when a widget
+fires an LVGL event — a button's `LV_EVENT_CLICKED`, a slider's
+`LV_EVENT_VALUE_CHANGED`. Almost the entire chain for that exists and is
+tested: the data model carries a target component, the code generator
+registers the callback, the firmware templates call the init function at the
+right moment. Exactly one link is missing — **the editor does not say which
+component fires the event** — so today the whole chain generates code that
+runs nothing.
 
-This document records the state of each stage, so future work starts from
-facts.
+A Target Component selector on the node's dialog was tried on 2026-08-16 and
+taken out again shortly after: pinning "who fires me" inside the trigger's
+own dialog was judged the wrong shape, and the question is deliberately back
+open. This document records the state of each stage and the shapes
+considered, so the next attempt starts from facts.
 
 ## The chain, stage by stage
 
 ### 1. The node and its dialog
 
 `nodeDefinitions.ts` gives `event_trigger` one default parameter,
-`eventType: 'LV_EVENT_CLICKED'`, and two outputs: **Execute** (execution flow)
-and **Event Object** (`any`). The Edit Node dialog (`NodeEditDialog.tsx`)
-exposes two fields for it: a **Target Component** dropdown over every
-component of every screen — the same selector `show_hide`, `set_property`,
-`get_property`, `set_text` and `set_value` already had — writing
-`params.targetComponent`, and an **Event Type** dropdown listing the nine
-events shared with the Design tab's event system (Clicked, Pressed, Released,
-Long Pressed, Value Changed, Focused, Defocused, Ready, Cancel).
+`eventType: 'LV_EVENT_CLICKED'`, and two outputs: **Execute** (execution
+flow) and **Event Object** (`any`, factory-dev-only — see below). The Edit
+Node dialog (`NodeEditDialog.tsx`) exposes one field: an **Event Type**
+dropdown listing the nine events shared with the Design tab's event system
+(Clicked, Pressed, Released, Long Pressed, Value Changed, Focused,
+Defocused, Ready, Cancel).
 
-While no component is chosen, the dialog says plainly that the trigger will
-not be registered in generated code. (Until 2026-08-16 the Target Component
-field did not exist at all, which made every event graph dead code — the
-history the rest of this document explains.)
+There is deliberately no Target Component field. Worth spelling out, because
+the dropdown invites the misreading: an event type with no target does *not*
+mean "any widget's click fires this graph". With no target stored the code
+generator emits no registration at all, so the graph listens to nothing, not
+to everything.
 
 ### 2. The generated code (`ui_logic.c`)
 
@@ -77,10 +78,9 @@ runtime side is sound; it is only ever handed nothing to register.
 
 ## What this means in practice
 
-- An Event Trigger graph runs on hardware once its Target Component is chosen.
-  **Without a target it still generates no registration** — the dialog now
-  warns about exactly that instead of leaving a silently dead graph. (Timer
-  Trigger graphs never needed a target and work either way.)
+- An Event Trigger graph **never runs on hardware** today: the editor stores
+  no target, so the registration line is never generated. (Timer Trigger
+  graphs are unaffected — their registration needs no target and works.)
 - The **Debug** button in the Logic tab is a manual walkthrough that starts at
   the first trigger node and follows execution wires as you press Step. It
   simulates no click and evaluates no values.
@@ -103,21 +103,30 @@ runtime side is sound; it is only ever handed nothing to register.
   so the editor-produced shape (wrapper emitted, never referenced) is outside
   what the compile tests check.
 
-## The repair, and what it deliberately left alone
+## The shapes tried, and the question still open
 
-The fix was the one dropdown described above — `event_trigger` gained the
-same Target Component selector the dialog already rendered for `show_hide`,
-writing `params.targetComponent`, and the existing codegen, resolution and
-firmware path lit up unchanged, tests already in place.
+**Node-side target — tried 2026-08-16, taken out again.** The dialog briefly
+carried the same Target Component selector its sibling nodes have, writing
+`params.targetComponent`, and the dormant chain lit up end to end, tests
+already in place. It was removed on reflection: pinning "who fires me"
+inside the trigger's own dialog was judged the wrong shape for the product,
+and the direction wants rethinking before the UI hardens it. Codegen keeps
+understanding `params.targetComponent` (UUID or name) untouched, so nothing
+needs rebuilding once a shape is chosen.
 
-Two adjacent questions were considered and deliberately left as they are:
+**Design-side binding — never wired.** `LogicGraph.eventBindingId` is the
+vestige of the other shape: a component's event in the Design tab points at
+a graph, so "who fires me" lives with the component rather than inside the
+graph. Nothing reads the field today.
 
-- **A stale component id** (component deleted after being chosen) still falls
-  back to name-derivation in the resolver, silently — the same behaviour every
-  other targeted node has; fixing it for one node alone would be misleading.
-- **The Event Object output moved behind Factory Dev Mode** (2026-08-16,
-  same day, on request): the callback wrapper still discards the event, so in
-  normal mode the port only promised what the device cannot deliver. The port
-  stays in the node's data — hiding is render-only — and one already wired
-  stays visible in both modes so a connection is never stranded. Feeding the
-  event into the data flow is still the real follow-up.
+Until one of these lands, an event graph generates a function and a callback
+wrapper that nothing references.
+
+One adjacent decision that stands either way:
+
+- **The Event Object output lives behind Factory Dev Mode** (2026-08-16, on
+  request): the callback wrapper still discards the event, so in normal mode
+  the port only promised what the device cannot deliver. The port stays in
+  the node's data — hiding is render-only — and one already wired stays
+  visible in both modes so a connection is never stranded. Feeding the event
+  into the data flow is still the real follow-up.
