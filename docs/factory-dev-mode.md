@@ -69,6 +69,7 @@ The passphrase itself is exported as `FACTORY_DEV_MODE_PASSPHRASE` from
 | **Font Properties** conversion settings in the Text → Fonts tab — C variable name, character-set modes, extra characters and ranges, coverage, BPP, generate buttons. Metadata, name, warnings and preview stay in normal mode | shown | hidden |
 | **Event Object** output on the Logic tab's Event Trigger node — generated code still discards the event, so the port feeds nothing yet (see [logic-event-trigger.md](logic-event-trigger.md)); one already wired stays visible in both modes so the connection is never stranded | shown | hidden |
 | **Active on Screens** in the Logic tab's Properties panel — stored per graph but consumed by nothing yet; graphs run globally for now, and normal mode shows a plain **Active** switch instead, which really switches: a graph turned off is absent from generated code entirely | shown | hidden |
+| **Custom** shelf of the Logic palette — Call Function and C Code Block, hand-written C being the factory engineer's realm; nodes already placed in a graph keep rendering and generating in every mode, only the palette offer hides | shown | hidden |
 
 More surfaces will be added here as they are decided.
 

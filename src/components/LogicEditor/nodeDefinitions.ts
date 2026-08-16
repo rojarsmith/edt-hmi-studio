@@ -464,3 +464,13 @@ export const NODE_CATEGORIES = [
   { id: 'device', name: 'Device', icon: '🔌', color: '#00bcd4' },
   { id: 'custom', name: 'Custom', icon: '💻', color: NODE_COLORS.custom },
 ];
+
+// The Custom shelf is the factory engineer's realm - hand-written C has no
+// place in a no-code author's palette, the same reasoning that moved the
+// Code and Icon tabs behind Factory Dev Mode. Nodes already placed in a
+// graph keep rendering and generating in every mode; only the offer hides.
+export function getPaletteCategories(factoryDevMode: boolean) {
+  return factoryDevMode
+    ? NODE_CATEGORIES
+    : NODE_CATEGORIES.filter(category => category.id !== 'custom');
+}

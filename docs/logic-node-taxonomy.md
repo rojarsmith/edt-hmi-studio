@@ -4,8 +4,7 @@
   <strong>English</strong> · <a href="./zh-TW/logic-node-taxonomy.md">繁體中文</a>
 </p>
 
-Status: **steps 1 (tags) and 2 (palette regrouping) landed 2026-08-16; the
-rest agreed, not started.**
+Status: **steps 1–3 landed 2026-08-16; only the optional step 4 remains.**
 This records why the Logic tab's node palette will be regrouped and how
 protocol support enters it, so the work starts from decisions rather than
 from re-deriving them.
@@ -95,5 +94,7 @@ pure display. So the regrouping lands in two decoupled steps:
    colours keyed off them, and every saved graph are untouched, and a test
    pins both the shelf contents and the stored-type populations so the two
    layers cannot drift silently
-3. Custom category behind Factory Dev Mode
+3. **Done (2026-08-16):** the Custom shelf exists only in Factory Dev Mode
+   — palette offer and search alike; nodes already placed keep rendering
+   and generating in every mode
 4. Stored-type/colour renames — optional, last, only with a migration story

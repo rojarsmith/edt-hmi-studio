@@ -1,7 +1,8 @@
 // Node Palette - Drag nodes from here to the canvas
 
 import React, { useState, useCallback } from 'react';
-import { NODE_CATEGORIES, getNodesByCategory, NODE_DEFINITIONS } from './nodeDefinitions';
+import { getPaletteCategories, getNodesByCategory, NODE_DEFINITIONS } from './nodeDefinitions';
+import { useAppStore } from '../../store/appStore';
 import type { LogicNodeDefinition } from './types';
 import './NodePalette.css';
 
@@ -36,11 +37,17 @@ const NodePalette: React.FC<NodePaletteProps> = ({ onDragStart }) => {
     [onDragStart]
   );
 
-  // Filter nodes by search query (deprecated nodes stay out of the palette)
+  const factoryDevMode = useAppStore(s => s.factoryDevMode);
+  const categories = getPaletteCategories(factoryDevMode);
+  const visibleShelves = new Set(categories.map(category => category.id));
+
+  // Filter nodes by search query (deprecated nodes and hidden shelves stay
+  // out of the palette either way)
   const filteredDefinitions = searchQuery
     ? NODE_DEFINITIONS.filter(
         def =>
           !def.deprecated &&
+          visibleShelves.has(def.paletteGroup ?? def.type) &&
           (def.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
             def.description.toLowerCase().includes(searchQuery.toLowerCase()))
       )
@@ -86,7 +93,7 @@ const NodePalette: React.FC<NodePaletteProps> = ({ onDragStart }) => {
           </div>
         ) : (
           // Category view
-          NODE_CATEGORIES.map(category => (
+          categories.map(category => (
             <div key={category.id} className="palette-category">
               <div
                 className="category-header"

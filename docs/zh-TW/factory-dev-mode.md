@@ -66,6 +66,7 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 | Text → Fonts 分頁 **Font Properties** 的轉檔設定 —— C 變數名、字元集模式、額外字元與範圍、涵蓋數、BPP、產生按鈕。中繼資料、名稱、警告與預覽留在一般模式 | 顯示 | 隱藏 |
 | Logic 分頁 Event Trigger 節點的 **Event Object** 輸出 —— 產生的程式碼仍會丟棄事件，這個埠目前餵不出任何東西（見 [logic-event-trigger.md](logic-event-trigger.md)）；已經接了線的埠在兩種模式都顯示，連線永遠不會被藏斷 | 顯示 | 隱藏 |
 | Logic 分頁 Properties 面板的 **Active on Screens** —— 逐圖儲存但目前沒有任何東西使用；圖暫定全域運作，一般模式改顯示單純的 **Active** 開關，而且真的有作用：關掉的圖完全不會出現在產生的程式碼裡 | 顯示 | 隱藏 |
+| Logic 調色盤的 **Custom** 架子 —— Call Function 與 C Code Block，手寫 C 是原廠工程師的領域；已放進圖裡的節點在任何模式都照常渲染與產生，藏起來的只有調色盤上的供應 | 顯示 | 隱藏 |
 
 日後決定的項目請繼續補充於此表。
 

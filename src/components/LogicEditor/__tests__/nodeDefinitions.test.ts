@@ -3,6 +3,7 @@ import {
   NODE_CATEGORIES,
   NODE_DEFINITIONS,
   getNodesByCategory,
+  getPaletteCategories,
 } from '../nodeDefinitions';
 
 // The palette regrouping is display-level only (docs/logic-node-taxonomy.md
@@ -51,6 +52,13 @@ describe('palette grouping', () => {
     expect(
       NODE_DEFINITIONS.some(def => def.subType === 'modbus_holding_register')
     ).toBe(true);
+  });
+
+  it('the Custom shelf exists only in factory dev mode', () => {
+    const normal = getPaletteCategories(false).map(category => category.id);
+    const factory = getPaletteCategories(true).map(category => category.id);
+    expect(normal).toEqual(['trigger', 'flow', 'screen', 'data', 'device']);
+    expect(factory).toEqual(['trigger', 'flow', 'screen', 'data', 'device', 'custom']);
   });
 
   it('regrouping left every stored node type untouched', () => {
