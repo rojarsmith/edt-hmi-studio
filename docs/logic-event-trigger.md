@@ -4,25 +4,48 @@
   <strong>English</strong> · <a href="./zh-TW/logic-event-trigger.md">繁體中文</a>
 </p>
 
-The **Event Trigger** node is meant to start a logic graph when a widget
-fires an LVGL event — a button's `LV_EVENT_CLICKED`, a slider's
-`LV_EVENT_VALUE_CHANGED`. Almost the entire chain for that exists and is
-tested: the data model carries a target component, the code generator
-registers the callback, the firmware templates call the init function at the
-right moment. Exactly one link is missing — **the editor does not say which
-component fires the event** — so today the whole chain generates code that
-runs nothing.
+The **Event Trigger** node starts a logic graph when a widget fires an LVGL
+event. The question this document tracked — *who fires the trigger?* — was
+answered on 2026-08-16 by the Design side: a component's event gains the
+**Logic Graphs** handler type, beside Built-in Action and Custom Code. The
+component owns the wiring; the graph stays a reusable named action several
+events can run. (A Target Component selector *inside* the trigger's dialog
+was tried first and taken out the same day — pinning "who fires me" into
+the node buried an application-wiring decision in the wrong place.)
 
-A Target Component selector on the node's dialog was tried on 2026-08-16 and
-taken out again shortly after: pinning "who fires me" inside the trigger's
-own dialog was judged the wrong shape, and the question is deliberately back
-open. This document records the state of each stage and the shapes
-considered, so the next attempt starts from facts. The palette-wide
-taxonomy decisions — including the tag abstraction that will give triggers
-a data-driven sibling — are recorded in
+This document records how the chain works now and the history that shaped
+it. The palette-wide taxonomy decisions live in
 [logic-node-taxonomy.md](logic-node-taxonomy.md).
 
-## The chain, stage by stage
+## How firing works now
+
+1. On the Design tab, a component's event picks **Handler Type: Logic
+   Graphs** and checks one or more graphs; the picker labels graphs that are
+   inactive or have no Event Trigger, and warns about empty or stale
+   selections.
+2. `ui_events.c` generates the component's event callback as always, and
+   inside it calls each checked graph's **event entry** in list order —
+   `logic_<graph>();` — including `ui_logic.h` for the declarations. A graph
+   that is deleted, or switched off by its Active toggle (and therefore
+   absent from generated code), produces an honest comment instead of a call
+   to a missing symbol.
+3. `ui_logic.c` gives every trigger its own entry: the exported graph
+   function runs only the **event-trigger chains**, and each timer trigger
+   owns a private callback running only its own chain (with its own
+   delay-mode deletion). A graph mixing timers and events can no longer
+   cross-fire — which was a real defect of the old one-function-per-graph
+   shape.
+4. The Event Trigger node face lists its callers — `Called by:
+   Button_a8da (CLICKED)` — and warns **Not called by any event** when
+   nothing does.
+
+Two leftovers, deliberate: the node's own **Event Type** dropdown no longer
+gates anything on this path (the binding's event type does the filtering) —
+it survives only for the legacy `targetComponent` registration; and the
+**Event Object** output stays behind Factory Dev Mode until the entry
+functions learn to carry the `lv_event_t` through.
+
+## The legacy chain, stage by stage (kept for the record)
 
 ### 1. The node and its dialog
 
@@ -81,9 +104,9 @@ runtime side is sound; it is only ever handed nothing to register.
 
 ## What this means in practice
 
-- An Event Trigger graph **never runs on hardware** today: the editor stores
-  no target, so the registration line is never generated. (Timer Trigger
-  graphs are unaffected — their registration needs no target and works.)
+- An Event Trigger graph runs on hardware once a component's event checks it
+  under the Logic handler. A graph nothing checks generates its entry
+  function and nothing calls it — the node face says so.
 - The **Debug** button in the Logic tab is a manual walkthrough that starts at
   the first trigger node and follows execution wires as you press Step. It
   simulates no click and evaluates no values.
@@ -106,24 +129,18 @@ runtime side is sound; it is only ever handed nothing to register.
   so the editor-produced shape (wrapper emitted, never referenced) is outside
   what the compile tests check.
 
-## The shapes tried, and the question still open
+## The shapes tried, for the record
 
-**Node-side target — tried 2026-08-16, taken out again.** The dialog briefly
-carried the same Target Component selector its sibling nodes have, writing
-`params.targetComponent`, and the dormant chain lit up end to end, tests
-already in place. It was removed on reflection: pinning "who fires me"
-inside the trigger's own dialog was judged the wrong shape for the product,
-and the direction wants rethinking before the UI hardens it. Codegen keeps
-understanding `params.targetComponent` (UUID or name) untouched, so nothing
-needs rebuilding once a shape is chosen.
+**Node-side target — tried 2026-08-16, taken out the same day.** The dialog
+briefly carried a Target Component selector writing
+`params.targetComponent`; the dormant chain lit up end to end. Removed on
+reflection: the wiring belongs with the component. Codegen still understands
+`params.targetComponent` (UUID or name), so the legacy registration path
+keeps generating for any graph that carries it.
 
-**Design-side binding — never wired.** `LogicGraph.eventBindingId` is the
-vestige of the other shape: a component's event in the Design tab points at
-a graph, so "who fires me" lives with the component rather than inside the
-graph. Nothing reads the field today.
-
-Until one of these lands, an event graph generates a function and a callback
-wrapper that nothing references.
+**Design-side binding — chosen, landed 2026-08-16.** The Logic handler
+described above. (`LogicGraph.eventBindingId`, the old vestige of this idea,
+is still dead — the binding stores `logicGraphIds` on the event instead.)
 
 One adjacent decision that stands either way:
 

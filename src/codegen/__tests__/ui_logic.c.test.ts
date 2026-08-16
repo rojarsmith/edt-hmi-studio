@@ -138,7 +138,7 @@ describe('generateLogicSource', () => {
       expect(result).toContain('// Timer: repeat, 500ms');
     });
 
-    it('generates timer callback function', () => {
+    it('generates timer callback function running its own chain, not the event entry', () => {
       const node = createLogicNode('timer_trigger', {
         id: 'n1',
         params: { mode: 'repeat', duration: 1000 },
@@ -147,7 +147,10 @@ describe('generateLogicSource', () => {
       const graph = createLogicGraph({ name: 'poll', nodes: [node] });
       const result = generateLogicSource(defaultOptions(), [graph]);
       expect(result).toContain('static void logic_poll_timer_cb(lv_timer_t *timer)');
-      expect(result).toContain('logic_poll();');
+      // The graph function is the EVENT entry; a timer elapsing must not
+      // route through it
+      expect(result).not.toContain('logic_poll();');
+      expect(result).toContain('// No event triggers - timer chains run from their own callbacks');
     });
 
     it('generates forward declaration for timer callback', () => {
@@ -952,7 +955,7 @@ describe('generateLogicSource', () => {
       const result = generateLogicSource(defaultOptions(), [graph]);
       expect(result).toContain('static void logic_tick_timer_cb(lv_timer_t *timer)');
       expect(result).toContain('(void)timer;');
-      expect(result).toContain('logic_tick();');
+      expect(result).not.toContain('logic_tick();');
     });
 
     it('generates comment for event registration when comments on', () => {
@@ -1178,6 +1181,92 @@ describe('generateLogicSource', () => {
       const result = generateLogicSource(defaultOptions(), [writeGraph('ro-tag', 1)], [], [tag]);
       expect(result).toContain('// Write Tag SetPoint: tag is read-only');
       expect(result).not.toContain('hmi_runtime_write_holding_register(');
+    });
+  });
+
+  describe('per-trigger entries', () => {
+    it('keeps event chains in the graph entry and timer chains in their callbacks', () => {
+      const eventTrigger = createLogicNode('event_trigger', {
+        id: 'ev',
+        params: { eventType: 'LV_EVENT_CLICKED' },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'ev-exec', name: 'Execute', type: 'execution' })],
+      });
+      const timerTrigger = createLogicNode('timer_trigger', {
+        id: 'tm',
+        params: { mode: 'repeat', duration: 500 },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'tm-exec', name: 'Execute', type: 'execution' })],
+      });
+      const showNode = createLogicNode('show_hide', {
+        id: 'show',
+        params: { targetComponent: 'evTarget', action: 'show' },
+        inputs: [],
+        outputs: [],
+      });
+      const hideNode = createLogicNode('show_hide', {
+        id: 'hide',
+        params: { targetComponent: 'tickTarget', action: 'hide' },
+        inputs: [],
+        outputs: [],
+      });
+      const graph = createLogicGraph({
+        name: 'mixed',
+        nodes: [eventTrigger, timerTrigger, showNode, hideNode],
+        connections: [
+          createLogicConnection({
+            sourceNode: 'ev',
+            sourceOutput: 'ev-exec',
+            targetNode: 'show',
+            targetInput: '',
+            type: 'execution',
+          }),
+          createLogicConnection({
+            sourceNode: 'tm',
+            sourceOutput: 'tm-exec',
+            targetNode: 'hide',
+            targetInput: '',
+            type: 'execution',
+          }),
+        ],
+      });
+
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const timerCbIndex = result.indexOf('static void logic_mixed_timer_cb(lv_timer_t *timer) {');
+      const eventChainIndex = result.indexOf('lv_obj_clear_flag(ui_ev_target');
+      const timerChainIndex = result.indexOf('lv_obj_add_flag(ui_tick_target');
+
+      expect(timerCbIndex).toBeGreaterThan(-1);
+      // The event chain lives in the graph entry, defined before the timer
+      // callbacks; the timer chain lives after, inside its callback
+      expect(eventChainIndex).toBeGreaterThan(-1);
+      expect(eventChainIndex).toBeLessThan(timerCbIndex);
+      expect(timerChainIndex).toBeGreaterThan(timerCbIndex);
+    });
+
+    it('gives each timer trigger its own callback and its own delete behavior', () => {
+      const repeatTrigger = createLogicNode('timer_trigger', {
+        id: 't1',
+        params: { mode: 'repeat', duration: 1000 },
+        inputs: [],
+        outputs: [],
+      });
+      const delayTrigger = createLogicNode('timer_trigger', {
+        id: 't2',
+        params: { mode: 'delay', duration: 3000 },
+        inputs: [],
+        outputs: [],
+      });
+      const graph = createLogicGraph({ name: 'pair', nodes: [repeatTrigger, delayTrigger] });
+
+      const result = generateLogicSource(defaultOptions(), [graph]);
+      expect(result).toContain('lv_timer_create(logic_pair_timer_cb, 1000, NULL);');
+      expect(result).toContain('lv_timer_create(logic_pair_timer2_cb, 3000, NULL);');
+      // Only the delay-mode callback deletes its timer
+      expect(result.match(/lv_timer_del\(timer\);/g)).toHaveLength(1);
+      expect(result.indexOf('lv_timer_del(timer);')).toBeGreaterThan(
+        result.indexOf('static void logic_pair_timer2_cb(lv_timer_t *timer) {')
+      );
     });
   });
 

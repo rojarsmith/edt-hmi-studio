@@ -133,7 +133,9 @@ export function generateLogicSource(
     }
     for (const graph of timerGraphs) {
       const funcName = context.logicFuncNames.get(graph.id)!;
-      lines.push(`static void ${funcName}_timer_cb(lv_timer_t *timer);`);
+      for (const { cbName } of getTimerCallbacks(graph, funcName)) {
+        lines.push(`static void ${cbName}(lv_timer_t *timer);`);
+      }
     }
     lines.push('');
   }
@@ -151,9 +153,10 @@ export function generateLogicSource(
       lines.push('');
     }
 
-    // Generate timer callbacks
+    // Generate timer callbacks - one per timer trigger, each running only
+    // its own chain, so a graph mixing timers and events cannot cross-fire
     for (const graph of timerGraphs) {
-      lines.push(generateTimerCallback(graph, options, context));
+      lines.push(generateTimerCallbacks(graph, options, context));
       lines.push('');
     }
     
@@ -365,33 +368,55 @@ function resolveVariableName(graph: LogicGraph, node: LogicNode): string {
 /**
  * Generate timer callback wrapper
  */
-function generateTimerCallback(
+/**
+ * One callback per timer trigger. The first keeps the historical
+ * `<func>_timer_cb` name; later ones count up, so a single-timer graph
+ * generates exactly what it always did.
+ */
+function getTimerCallbacks(
+  graph: LogicGraph,
+  funcName: string,
+): { node: LogicNode; cbName: string }[] {
+  return graph.nodes
+    .filter(n => n.subType === 'timer_trigger')
+    .map((node, index) => ({
+      node,
+      cbName: index === 0 ? `${funcName}_timer_cb` : `${funcName}_timer${index + 1}_cb`,
+    }));
+}
+
+function generateTimerCallbacks(
   graph: LogicGraph,
   options: CodeGenOptions,
   context: LogicCodegenContext,
 ): string {
   const funcName = context.logicFuncNames.get(graph.id)!;
   const indent = getIndent(options);
-  const lines: string[] = [];
+  const blocks: string[] = [];
 
-  if (options.generateComments) {
-    lines.push(`/** Timer callback for ${graph.name} */`);
-  }
-  lines.push(`static void ${funcName}_timer_cb(lv_timer_t *timer) {`);
-  lines.push(`${indent}(void)timer;`);
-  lines.push(`${indent}${funcName}();`);
-
-  // Check if any timer trigger is one-shot (delay mode)
-  const timerNodes = graph.nodes.filter(n => n.subType === 'timer_trigger');
-  for (const tn of timerNodes) {
-    if (tn.params.mode === 'delay') {
-      lines.push(`${indent}lv_timer_del(timer);`);
-      break;
+  for (const { node, cbName } of getTimerCallbacks(graph, funcName)) {
+    const lines: string[] = [];
+    if (options.generateComments) {
+      lines.push(`/** Timer callback for ${graph.name} */`);
     }
+    lines.push(`static void ${cbName}(lv_timer_t *timer) {`);
+    lines.push(`${indent}(void)timer;`);
+
+    // Only this trigger's chain: an event trigger in the same graph must
+    // not fire because a timer elapsed
+    const chain = generateExecutionChain(node.id, graph, options, context, 1, new Set());
+    if (chain.trim()) {
+      lines.push(chain);
+    }
+    if (node.params.mode === 'delay') {
+      lines.push(`${indent}lv_timer_del(timer);`);
+    }
+
+    lines.push('}');
+    blocks.push(lines.join('\n'));
   }
 
-  lines.push('}');
-  return lines.join('\n');
+  return blocks.join('\n\n');
 }
 
 /**
@@ -434,15 +459,14 @@ function generateInitFunction(
       }
     }
 
-    // Register timer triggers
-    const timerTriggers = graph.nodes.filter(n => n.subType === 'timer_trigger');
-    for (const trigger of timerTriggers) {
+    // Register timer triggers - each on its own callback
+    for (const { node: trigger, cbName } of getTimerCallbacks(graph, functionName)) {
       const duration = trigger.params.duration || 1000;
       const mode = trigger.params.mode || 'repeat';
       if (options.generateComments) {
         lines.push(`${indent}// ${graph.name}: timer ${mode}, ${duration}ms`);
       }
-      lines.push(`${indent}lv_timer_create(${functionName}_timer_cb, ${duration}, NULL);`);
+      lines.push(`${indent}lv_timer_create(${cbName}, ${duration}, NULL);`);
       hasContent = true;
     }
   }
@@ -562,16 +586,18 @@ function generateLogicFunction(
   }
   
   lines.push(`void ${functionName}(void) {`);
-  
+
   const body = generateFunctionBody(graph, options, context);
   if (body.trim()) {
     lines.push(body);
+  } else if (graph.nodes.some(n => n.subType === 'timer_trigger')) {
+    lines.push(getIndent(options) + '// No event triggers - timer chains run from their own callbacks');
   } else {
     lines.push(getIndent(options) + '// Empty logic graph');
   }
-  
+
   lines.push('}');
-  
+
   return lines.join('\n');
 }
 
@@ -583,9 +609,12 @@ function generateFunctionBody(
   options: CodeGenOptions,
   context: LogicCodegenContext,
 ): string {
-  // Find trigger nodes (entry points)
+  // The graph function is the graph's EVENT entry: it runs the chains of
+  // its event triggers and nothing else. Timer chains live in per-trigger
+  // callbacks - see generateTimerCallbacks - so the Design tab's Logic
+  // handler (and the legacy event registration) cannot fire them.
   const triggerNodes = graph.nodes.filter(n => n.type === 'trigger');
-  
+
   if (triggerNodes.length === 0) {
     // No trigger nodes — generate every statement-shaped node linearly. An
     // execution input is what marks one, judged from the definition table
@@ -605,12 +634,13 @@ function generateFunctionBody(
   // Follow execution flow from each trigger
   const visited = new Set<string>();
   const lines: string[] = [];
-  
+
   for (const trigger of triggerNodes) {
+    if (trigger.subType !== 'event_trigger') continue;
     const code = generateExecutionChain(trigger.id, graph, options, context, 1, visited);
     if (code) lines.push(code);
   }
-  
+
   return lines.join('\n');
 }
 

@@ -175,11 +175,14 @@ export interface BuiltinAction {
 export interface EventBinding {
   id: string;
   eventType: LvglEventType;
-  handlerType: 'builtin' | 'custom';
+  handlerType: 'builtin' | 'custom' | 'logic';
   // For builtin actions
   action?: BuiltinAction;
   // For custom C code
   customCode?: string;
+  // For 'logic': graphs whose event entry this event fires, in list order.
+  // The component owns the wiring; the graph stays a reusable named action.
+  logicGraphIds?: string[];
 }
 
 // Screen Definition (Phase 3 - Multi-screen support)

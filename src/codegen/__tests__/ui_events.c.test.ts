@@ -6,7 +6,70 @@ import {
   createComponent,
   createEvent,
   createBuiltinAction,
+  createLogicGraph,
 } from './helpers';
+
+describe('logic handler', () => {
+  const screensWith = (logicGraphIds: string[]) => [
+    createScreen({
+      name: 'main',
+      components: [
+        createComponent('btn', {
+          name: 'runBtn',
+          events: [
+            createEvent({
+              eventType: 'LV_EVENT_CLICKED',
+              handlerType: 'logic',
+              logicGraphIds,
+            }),
+          ],
+        }),
+      ],
+    }),
+  ];
+
+  it('calls each selected graph in list order and includes ui_logic.h', () => {
+    const alpha = createLogicGraph({ id: 'ga', name: 'alpha' });
+    const beta = createLogicGraph({ id: 'gb', name: 'beta' });
+    const result = generateEventsSource(
+      screensWith(['gb', 'ga']),
+      defaultOptions({ generateComments: false }),
+      [],
+      [alpha, beta],
+    );
+    expect(result).toContain('#include "ui_logic.h"');
+    const betaCall = result.indexOf('logic_beta();');
+    const alphaCall = result.indexOf('logic_alpha();');
+    expect(betaCall).toBeGreaterThan(-1);
+    expect(alphaCall).toBeGreaterThan(betaCall);
+  });
+
+  it('a deleted or inactive graph comments instead of calling a missing symbol', () => {
+    const result = generateEventsSource(
+      screensWith(['gone']),
+      defaultOptions({ generateComments: false }),
+      [],
+      [],
+    );
+    expect(result).toContain('// Logic graph unavailable (deleted or inactive)');
+    expect(result).not.toMatch(/logic_\w+\(\);/);
+  });
+
+  it('an empty selection says so', () => {
+    const result = generateEventsSource(
+      screensWith([]),
+      defaultOptions({ generateComments: false }),
+      [],
+      [],
+    );
+    expect(result).toContain('// No logic graphs selected');
+  });
+
+  it('leaves ui_logic.h out when no event uses the logic handler', () => {
+    const result = generateEventsSource([], defaultOptions());
+    expect(result).not.toContain('#include "ui_logic.h"');
+  });
+});
 
 describe('generateEventsSource', () => {
   it('includes ui.h and ui_events.h', () => {

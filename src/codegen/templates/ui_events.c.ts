@@ -2,6 +2,8 @@
 
 import type { Screen, LvglComponent, EventBinding, BuiltinAction, ProjectLanguage } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
+import type { LogicGraph } from '../../components/LogicEditor/types';
+import { getLogicFuncNames } from '../utils/nameUtils';
 import type { CodeGenOptions } from '../types';
 import {
   getEventHandlerName,
@@ -317,6 +319,42 @@ function generateBuiltinActionCode(
 }
 
 /**
+ * The Logic handler: call each selected graph's event entry in list order.
+ * A graph that is gone - deleted, or switched off and therefore absent from
+ * generated code - gets a comment, never a call to a missing symbol.
+ */
+function generateLogicHandlerCode(
+  event: EventBinding,
+  options: CodeGenOptions,
+  logicGraphs: LogicGraph[],
+  logicFuncNames: Map<string, string>,
+): string[] {
+  const lines: string[] = [];
+  const indent2 = getIndent(options, 2);
+  const graphIds = event.logicGraphIds ?? [];
+
+  if (graphIds.length === 0) {
+    lines.push(`${indent2}// No logic graphs selected`);
+    return lines;
+  }
+
+  for (const graphId of graphIds) {
+    const graph = logicGraphs.find(g => g.id === graphId);
+    const funcName = graph ? logicFuncNames.get(graph.id) : undefined;
+    if (!graph || !funcName) {
+      lines.push(`${indent2}// Logic graph unavailable (deleted or inactive)`);
+      continue;
+    }
+    if (options.generateComments) {
+      lines.push(`${indent2}${generateComment(`Run logic: ${graph.name}`, options)}`);
+    }
+    lines.push(`${indent2}${funcName}();`);
+  }
+
+  return lines;
+}
+
+/**
  * Generate event handler function
  */
 function generateEventHandler(
@@ -324,23 +362,25 @@ function generateEventHandler(
   event: EventBinding,
   options: CodeGenOptions,
   screens: Screen[],
-  languages: ProjectLanguage[]
+  languages: ProjectLanguage[],
+  logicGraphs: LogicGraph[],
+  logicFuncNames: Map<string, string>,
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
   const funcName = getEventHandlerName(component.name, event.eventType, options);
-  
+
   lines.push(`void ${funcName}(lv_event_t *e) {`);
   lines.push(`${indent}lv_event_code_t code = lv_event_get_code(e);`);
-  
+
   // Suppress unused variable warning if needed
   if (event.handlerType === 'builtin' && event.action) {
     lines.push(`${indent}(void)code; // Suppress unused variable warning`);
   }
-  
+
   lines.push('');
   lines.push(`${indent}if (code == ${event.eventType}) {`);
-  
+
   if (event.handlerType === 'builtin' && event.action) {
     // Generate builtin action code
     const actionLines = generateBuiltinActionCode(event.action, options, screens, languages);
@@ -350,6 +390,8 @@ function generateEventHandler(
     const indent2 = getIndent(options, 2);
     const customLines = event.customCode.split('\n').map(line => `${indent2}${line}`);
     lines.push(...customLines);
+  } else if (event.handlerType === 'logic') {
+    lines.push(...generateLogicHandlerCode(event, options, logicGraphs, logicFuncNames));
   } else {
     // Empty handler with user code marker
     if (options.userCodeMarkers) {
@@ -357,10 +399,10 @@ function generateEventHandler(
       lines.push(`${indent2}${generateUserCodeSection(`${component.name}_${event.eventType}`, options)}`);
     }
   }
-  
+
   lines.push(`${indent}}`);
   lines.push('}');
-  
+
   return lines.join('\n');
 }
 
@@ -371,12 +413,22 @@ export function generateEventsSource(
   screens: Screen[],
   options: CodeGenOptions,
   languages: ProjectLanguage[] = [],
+  logicGraphs: LogicGraph[] = [],
 ): string {
   const lines: string[] = [];
+  // The same name table ui_logic.h/.c share, computed over the same graph
+  // list, so an event handler and the function it calls cannot disagree
+  const logicFuncNames = getLogicFuncNames(logicGraphs);
+  const hasLogicHandlers = getAllEvents(screens).some(
+    ({ event }) => event.handlerType === 'logic'
+  );
 
   // Includes
   lines.push(generateInclude('ui.h'));
   lines.push(generateInclude('ui_events.h'));
+  if (hasLogicHandlers) {
+    lines.push(generateInclude('ui_logic.h'));
+  }
   lines.push('');
 
   // Emitted before the handlers that call it, and only when one does. The
@@ -396,7 +448,7 @@ export function generateEventsSource(
     }
 
     for (const { component, event } of allEvents) {
-      lines.push(generateEventHandler(component, event, options, screens, languages));
+      lines.push(generateEventHandler(component, event, options, screens, languages, logicGraphs, logicFuncNames));
       lines.push('');
     }
   } else {

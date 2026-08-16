@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useEditorStore } from '../../store/editorStore';
+import { useLogicEditorStore } from '../LogicEditor';
 import type { EventBinding, LvglEventType, BuiltinActionType, BuiltinAction } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
 import { LVGL_EVENTS } from './EventPanel';
@@ -52,9 +53,14 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [eventType, setEventType] = useState<LvglEventType>(
     event?.eventType || 'LV_EVENT_CLICKED'
   );
-  const [handlerType, setHandlerType] = useState<'builtin' | 'custom'>(
+  const [handlerType, setHandlerType] = useState<'builtin' | 'custom' | 'logic'>(
     event?.handlerType || 'builtin'
   );
+  // Logic handler: graphs whose event entry this event fires, in list order
+  const [logicGraphIds, setLogicGraphIds] = useState<string[]>(
+    event?.logicGraphIds ?? []
+  );
+  const logicGraphs = useLogicEditorStore(state => state.graphs);
   const [actionType, setActionType] = useState<BuiltinActionType>(
     event?.action?.type || 'navigate'
   );
@@ -126,6 +132,8 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       }
 
       newEvent.action = action;
+    } else if (handlerType === 'logic') {
+      newEvent.logicGraphIds = logicGraphIds;
     } else {
       newEvent.customCode = customCode;
     }
@@ -133,12 +141,31 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     onSave(newEvent);
   }, [
     event, eventType, handlerType, actionType,
-    targetScreen, targetComponent, property, value, languageCode, customCode, onSave
+    targetScreen, targetComponent, property, value, languageCode, customCode,
+    logicGraphIds, onSave
   ]);
 
   const generateCodePreview = (): string => {
     if (handlerType === 'custom') {
       return customCode;
+    }
+
+    if (handlerType === 'logic') {
+      let code = `static void event_handler(lv_event_t *e) {\n`;
+      code += `    lv_event_code_t code = lv_event_get_code(e);\n\n`;
+      code += `    if (code == ${eventType}) {\n`;
+      if (logicGraphIds.length === 0) {
+        code += `        // No logic graphs selected\n`;
+      }
+      for (const graphId of logicGraphIds) {
+        const graph = logicGraphs.find(g => g.id === graphId);
+        code += graph
+          ? `        logic_${graph.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}();\n`
+          : `        // Logic graph unavailable (deleted or inactive)\n`;
+      }
+      code += `    }\n`;
+      code += `}`;
+      return code;
     }
 
     let code = `static void event_handler(lv_event_t *e) {\n`;
@@ -418,7 +445,13 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
               >
                 Built-in Action
               </button>
-              <button 
+              <button
+                className={`tab-btn ${handlerType === 'logic' ? 'active' : ''}`}
+                onClick={() => setHandlerType('logic')}
+              >
+                Logic Graphs
+              </button>
+              <button
                 className={`tab-btn ${handlerType === 'custom' ? 'active' : ''}`}
                 onClick={() => setHandlerType('custom')}
               >
@@ -428,7 +461,67 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
           </div>
 
           {/* Handler Configuration */}
-          {handlerType === 'builtin' ? (
+          {handlerType === 'logic' ? (
+            <div className="form-section">
+              <label className="section-label">Logic Graphs</label>
+              <p className="field-hint">
+                Fires the Event Trigger chains of the checked graphs, in list
+                order. Graphs stay reusable — several events can run the same
+                graph.
+              </p>
+              {logicGraphs.length === 0 ? (
+                <p className="field-hint">
+                  No logic graphs yet. Create one on the Logic tab first.
+                </p>
+              ) : (
+                <div className="logic-graph-list">
+                  {logicGraphs.map(graph => {
+                    const inactive = graph.enabled === false;
+                    const hasEventTrigger = graph.nodes.some(
+                      node => node.subType === 'event_trigger'
+                    );
+                    return (
+                      <label key={graph.id} className="logic-graph-row">
+                        <input
+                          type="checkbox"
+                          checked={logicGraphIds.includes(graph.id)}
+                          onChange={() =>
+                            setLogicGraphIds(prev =>
+                              prev.includes(graph.id)
+                                ? prev.filter(id => id !== graph.id)
+                                : [...prev, graph.id]
+                            )
+                          }
+                        />
+                        <span className="logic-graph-name">{graph.name}</span>
+                        {inactive && (
+                          <span className="logic-graph-flag">
+                            inactive — generates no code
+                          </span>
+                        )}
+                        {!inactive && !hasEventTrigger && (
+                          <span className="logic-graph-flag">
+                            no Event Trigger — nothing will run
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {logicGraphIds.some(id => !logicGraphs.some(g => g.id === id)) && (
+                <p className="field-warning">
+                  A selected graph no longer exists; it will be skipped in
+                  generated code.
+                </p>
+              )}
+              {logicGraphIds.length === 0 && (
+                <p className="field-warning">
+                  Nothing selected — this event will generate no code.
+                </p>
+              )}
+            </div>
+          ) : handlerType === 'builtin' ? (
             <div className="form-section">
               <label className="section-label">Action Type</label>
               <select 

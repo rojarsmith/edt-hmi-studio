@@ -4,19 +4,38 @@
   <a href="../logic-event-trigger.md">English</a> · <strong>繁體中文</strong>
 </p>
 
-**Event Trigger** 節點的本意，是在某個元件發出 LVGL 事件時啟動一張邏輯圖 ——
-按鈕的 `LV_EVENT_CLICKED`、滑桿的 `LV_EVENT_VALUE_CHANGED`。這條鏈幾乎整條
-都存在而且有測試：資料模型帶著目標元件欄位、程式碼產生器會註冊 callback、
-韌體樣板在正確的時機呼叫初始化函式。缺的正好是一環 —— **編輯器說不出是哪個
-元件觸發事件** —— 所以今天整條鏈產生的程式碼什麼都不會跑。
+**Event Trigger** 節點在某個元件發出 LVGL 事件時啟動一張邏輯圖。本文追蹤的
+那個問題 —— *是誰觸發 trigger？* —— 在 2026-08-16 由 Design 端回答了：元件
+的事件多了 **Logic Graphs** 處理類型，與 Built-in Action、Custom Code 並列。
+接線歸元件所有；圖保持為可重用的具名動作，多個事件可以執行同一張圖。
+（trigger 對話框*內部*的 Target Component 選擇器先試過、同日拿掉 —— 把
+「是誰觸發我」釘進節點，是把應用層接線決策埋錯了地方。）
 
-節點對話框上的 Target Component 選擇器在 2026-08-16 試過、隨即又拿掉了：
-把「是誰觸發我」釘在 trigger 自己的對話框裡被判斷是不對的形狀，這個問題
-刻意重新開放。本文記錄每一段的實況與考慮過的形狀，讓下一次嘗試從事實出發。
-整個調色盤層級的分類決策 —— 包括將讓 trigger 多出一個資料驅動手足的 tag
-抽象層 —— 記錄在 [logic-node-taxonomy.md](logic-node-taxonomy.md)。
+本文記錄這條鏈現在怎麼運作，以及塑造它的歷史。調色盤層級的分類決策在
+[logic-node-taxonomy.md](logic-node-taxonomy.md)。
 
-## 鏈條，逐段來看
+## 現在的觸發方式
+
+1. Design 分頁裡，元件的事件選 **Handler Type: Logic Graphs**，勾選一或多張
+   圖；選擇器會標示停用的圖與沒有 Event Trigger 的圖，並對空選與失效選擇
+   提出警告。
+2. `ui_events.c` 照常產生元件的事件 callback，並在其中按清單順序呼叫每張
+   勾選圖的**事件進入函式** —— `logic_<graph>();` —— 同時引入 `ui_logic.h`。
+   已刪除的圖、或被 Active 開關關掉（因此不存在於產生碼裡）的圖，會產生
+   誠實的註解，而不是對不存在符號的呼叫。
+3. `ui_logic.c` 給每個 trigger 自己的進入點：匯出的圖函式只跑
+   **event trigger 的鏈**，每個 timer trigger 擁有只跑自己鏈的私有 callback
+   （含各自的 delay 模式刪除）。混合 timer 與 event 的圖不再交叉觸發 ——
+   那是舊的「一圖一函式」形狀的真實缺陷。
+4. Event Trigger 節點面列出呼叫者 —— `Called by: Button_a8da (CLICKED)` ——
+   沒人呼叫時警示 **Not called by any event**。
+
+兩個刻意保留的殘留：節點自己的 **Event Type** 下拉在這條路上不再過濾任何
+東西（過濾由綁定端的事件型別做）—— 它只為 legacy 的 `targetComponent` 註冊
+路徑而活；**Event Object** 輸出繼續留在 Factory Dev Mode 後面，直到進入
+函式學會把 `lv_event_t` 帶進來。
+
+## Legacy 鏈條，逐段來看（留作記錄）
 
 ### 1. 節點與它的對話框
 
@@ -69,9 +88,9 @@ lv_obj_add_event_cb(ui_run_button, logic_<name>_event_cb, LV_EVENT_CLICKED, NULL
 
 ## 實務上這代表什麼
 
-- Event Trigger 的圖今天**在硬體上永遠不會執行**：編輯器沒有存目標，
-  註冊那一行永遠不會產生。（Timer Trigger 的圖不受影響 —— 它的註冊不需要
-  目標，能正常運作。）
+- Event Trigger 的圖在某個元件的事件以 Logic handler 勾選它之後，就會在
+  硬體上執行。沒有任何事件勾選的圖，進入函式產生了但沒有人呼叫 —— 節點面
+  會明講。
 - Logic 分頁的 **Debug** 按鈕是手動的走訪 —— 從第一個 trigger 節點開始，
   按一次 Step 沿執行線走一步。它不模擬點擊，也不計算任何值。
 - **WASM 預覽**（Build & Run）完全忽略邏輯圖 —— `editorStateToJson.ts` 匯出
@@ -89,20 +108,16 @@ lv_obj_add_event_cb(ui_run_button, logic_<name>_event_cb, LV_EVENT_CLICKED, NULL
 - 編譯驗證測試只練過*有*目標的事件圖，所以編輯器實際產出的形狀
   （包裝有輸出、永無引用）在編譯測試的覆蓋之外。
 
-## 試過的形狀，與仍然開放的問題
+## 試過的形狀，留作記錄
 
-**節點端目標 —— 2026-08-16 試過，隨即拿掉。** 對話框短暫帶過兄弟節點同款的
-Target Component 選擇器，寫入 `params.targetComponent`，沉睡的鏈整條亮起
-來，測試早就在了。深思後移除：把「是誰觸發我」釘在 trigger 自己的對話框裡
-被判斷是不對的產品形狀，方向要先想清楚，不能讓 UI 先把它定型。codegen 對
-`params.targetComponent`（UUID 或名稱）的理解原封不動，形狀選定之後什麼都
-不用重建。
+**節點端目標 —— 2026-08-16 試過，同日拿掉。** 對話框短暫帶過寫入
+`params.targetComponent` 的 Target Component 選擇器，沉睡的鏈整條亮起來。
+深思後移除：接線屬於元件。codegen 對 `params.targetComponent`（UUID 或
+名稱）的理解保留，帶著它的圖照舊走 legacy 註冊路徑。
 
-**Design 端綁定 —— 從未接線。** `LogicGraph.eventBindingId` 是另一種形狀
-留下的痕跡：Design 分頁裡元件的事件指向一張圖，「是誰觸發我」跟著元件走，
-而不是放在圖裡面。今天沒有任何東西讀這個欄位。
-
-在其中一種形狀落地之前，事件圖產生的函式和 callback 包裝沒有任何東西引用。
+**Design 端綁定 —— 選定，2026-08-16 落地。** 就是上文的 Logic handler。
+（這個想法的舊痕跡 `LogicGraph.eventBindingId` 依然是死的 —— 綁定改存在
+事件的 `logicGraphIds` 欄位上。）
 
 一個不管選哪種形狀都成立的決定：
 

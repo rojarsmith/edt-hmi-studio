@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import { useLogicEditorStore } from '../LogicEditor';
 import type { EventBinding, LvglEventType } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
 import EventEditDialog from './EventEditDialog';
@@ -21,6 +22,7 @@ export const LVGL_EVENTS: { type: LvglEventType; label: string; description: str
 
 const EventPanel: React.FC = () => {
   const { selection, getComponentById, updateComponent } = useEditorStore();
+  const logicGraphs = useLogicEditorStore(state => state.graphs);
   const [editingEvent, setEditingEvent] = useState<EventBinding | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -79,6 +81,12 @@ const EventPanel: React.FC = () => {
   const getHandlerDescription = (event: EventBinding): string => {
     if (event.handlerType === 'custom') {
       return 'Custom code';
+    }
+    if (event.handlerType === 'logic') {
+      const names = (event.logicGraphIds ?? []).map(
+        id => logicGraphs.find(graph => graph.id === id)?.name ?? '(missing)'
+      );
+      return names.length > 0 ? `Run logic: ${names.join(', ')}` : 'Run logic: nothing selected';
     }
     if (event.action) {
       switch (event.action.type) {

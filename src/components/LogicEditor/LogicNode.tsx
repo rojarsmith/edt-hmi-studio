@@ -4,9 +4,11 @@ import React, { memo, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { LogicNode, LogicPort } from './types';
+import type { Screen, LvglComponent } from '../../types';
 import { NODE_COLORS } from './nodeDefinitions';
 import { useLogicEditorStore } from './logicEditorStore';
 import { useAppStore } from '../../store/appStore';
+import { useEditorStore } from '../../store/editorStore';
 import './LogicNode.css';
 
 // Port type colors
@@ -24,6 +26,32 @@ interface LogicNodeData {
   onDoubleClick?: (nodeId: string) => void;
 }
 
+// Design-side events with the Logic handler are what fire an Event Trigger.
+// The node face lists them, because a trigger nothing calls reads exactly
+// like one that works.
+function collectLogicCallers(screens: Screen[], graphId: string): string[] {
+  const callers: string[] = [];
+  const walk = (components: LvglComponent[]) => {
+    for (const component of components) {
+      for (const event of component.events) {
+        if (
+          event.handlerType === 'logic'
+          && (event.logicGraphIds ?? []).includes(graphId)
+        ) {
+          callers.push(
+            `${component.name} (${event.eventType.replace('LV_EVENT_', '')})`
+          );
+        }
+      }
+      walk(component.children);
+    }
+  };
+  for (const screen of screens) {
+    walk(screen.components);
+  }
+  return callers;
+}
+
 const LogicNodeComponent: React.FC<NodeProps> = ({ 
   data, 
   selected,
@@ -32,6 +60,12 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
   const { logicNode, onDoubleClick } = nodeData;
   const { debugState, getCurrentGraph } = useLogicEditorStore();
   const factoryDevMode = useAppStore(s => s.factoryDevMode);
+  const screens = useEditorStore(s => s.screens);
+
+  const logicCallers =
+    logicNode.subType === 'event_trigger'
+      ? collectLogicCallers(screens, getCurrentGraph()?.id ?? '')
+      : [];
 
   // The Event Object output is factory-dev-only: generated code still
   // discards the event (docs/logic-event-trigger.md), so in normal mode the
@@ -158,6 +192,18 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
         {Object.keys(logicNode.params).length > 0 && (
           <div className="logic-node-params">
             {renderParamsPreview(logicNode)}
+            {logicNode.subType === 'event_trigger' && (
+              logicCallers.length > 0 ? (
+                <span className="param-preview">
+                  Called by: {logicCallers.slice(0, 2).join(', ')}
+                  {logicCallers.length > 2 ? ` +${logicCallers.length - 2} more` : ''}
+                </span>
+              ) : (
+                <span className="param-preview param-preview-warning">
+                  Not called by any event
+                </span>
+              )
+            )}
           </div>
         )}
       </div>
