@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateCode, generateSingleFile, getGeneratedFileNames } from '../generator';
-import { createScreen, createComponent, createEvent, createBuiltinAction, createFontResource, createLogicGraph, createLogicNode } from './helpers';
+import { createScreen, createComponent, createEvent, createBuiltinAction, createFontResource, createLogicGraph, createLogicNode, createLogicPort, createLogicConnection, createModbusTag } from './helpers';
 import type { GeneratedCode } from '../types';
 
 describe('getGeneratedFileNames', () => {
@@ -40,6 +40,61 @@ describe('disabled logic graphs', () => {
     });
     const result = generateSingleFile([createScreen({ name: 'main' })], 'ui_logic.c', {}, [parked]);
     expect(result).not.toContain('logic_parked');
+  });
+});
+
+describe('protocol tags through generateCode', () => {
+  it('threads tags to ui_logic.c so Write Tag reaches the runtime', () => {
+    const tag = createModbusTag({ id: 'sp-tag', name: 'SetPoint', address: 7 });
+    const trigger = createLogicNode('event_trigger', {
+      id: 'trigger',
+      params: { eventType: 'LV_EVENT_CLICKED', targetComponent: 'button' },
+      inputs: [],
+      outputs: [createLogicPort({ id: 'execute', name: 'Execute', type: 'execution' })],
+    });
+    const writeNode = createLogicNode('tag_write', {
+      id: 'tagwrite',
+      type: 'data',
+      params: { tagId: 'sp-tag', tagName: 'SetPoint' },
+      inputs: [
+        createLogicPort({ id: 'exec', name: 'Execute', type: 'execution' }),
+        createLogicPort({ id: 'val', name: 'Value', type: 'any', defaultValue: 42 }),
+      ],
+      outputs: [createLogicPort({ id: 'done', name: 'Done', type: 'execution' })],
+    });
+    const graph = createLogicGraph({
+      name: 'command',
+      nodes: [trigger, writeNode],
+      connections: [
+        createLogicConnection({
+          sourceNode: 'trigger',
+          sourceOutput: 'execute',
+          targetNode: 'tagwrite',
+          targetInput: '',
+          type: 'execution',
+        }),
+      ],
+    });
+
+    const code = generateCode(
+      [createScreen({ name: 'main' })],
+      {},
+      [graph],
+      undefined,
+      [],
+      [],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      [],
+      [tag],
+    );
+    expect(code['ui_logic.c']).toContain(
+      '(void)hmi_runtime_write_holding_register(7U, (float)(42));',
+    );
   });
 });
 

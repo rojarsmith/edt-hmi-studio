@@ -9,6 +9,7 @@ import {
   createLogicPort,
   createComponent,
   createScreen,
+  createModbusTag,
 } from './helpers';
 import { getNodeDefinition } from '../../components/LogicEditor/nodeDefinitions';
 
@@ -1029,6 +1030,155 @@ describe('generateLogicSource', () => {
       const graph = createLogicGraph({ name: 'empty_flow', nodes: [] });
       const result = generateLogicSource(defaultOptions(), [graph]);
       expect(result).toContain('// Empty logic graph');
+    });
+  });
+
+  describe('tag nodes', () => {
+    const clickTrigger = () =>
+      createLogicNode('event_trigger', {
+        id: 'trigger',
+        params: { eventType: 'LV_EVENT_CLICKED', targetComponent: 'button' },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'execute', name: 'Execute', type: 'execution' })],
+      });
+
+    it('reads an int16 tag through the cache with cast and scale', () => {
+      const tag = createModbusTag({
+        id: 'speed-tag',
+        name: 'MotorSpeed',
+        address: 5,
+        dataType: 'int16',
+        scale: 0.1,
+      });
+      const readNode = createLogicNode('tag_read', {
+        id: 'read',
+        type: 'data',
+        params: { tagId: 'speed-tag', tagName: 'MotorSpeed' },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'value', name: 'Value', type: 'any' })],
+      });
+      const writeVar = createLogicNode('var_write', {
+        id: 'write',
+        params: { variableName: 'speed' },
+        inputs: [createLogicPort({ id: 'in', name: 'Value', type: 'int' })],
+        outputs: [],
+      });
+      const graph = createLogicGraph({
+        name: 'poll',
+        nodes: [clickTrigger(), readNode, writeVar],
+        connections: [
+          createLogicConnection({
+            sourceNode: 'trigger',
+            sourceOutput: 'execute',
+            targetNode: 'write',
+            targetInput: '',
+            type: 'execution',
+          }),
+          createLogicConnection({
+            sourceNode: 'read',
+            sourceOutput: 'value',
+            targetNode: 'write',
+            targetInput: 'in',
+            type: 'data',
+          }),
+        ],
+      });
+
+      const result = generateLogicSource(defaultOptions(), [graph], [], [tag]);
+      expect(result).toContain('((int16_t)logic_read_holding_register_cached(5U) * 0.1f)');
+      expect(result).toContain('#include "hmi_runtime.h"');
+    });
+
+    it('a tag that no longer exists reads as zero, said out loud', () => {
+      const readNode = createLogicNode('tag_read', {
+        id: 'read',
+        type: 'data',
+        params: { tagId: 'gone', tagName: 'Ghost' },
+        inputs: [],
+        outputs: [createLogicPort({ id: 'value', name: 'Value', type: 'any' })],
+      });
+      const writeVar = createLogicNode('var_write', {
+        id: 'write',
+        params: { variableName: 'v' },
+        inputs: [createLogicPort({ id: 'in', name: 'Value', type: 'int' })],
+        outputs: [],
+      });
+      const graph = createLogicGraph({
+        name: 'ghost',
+        nodes: [clickTrigger(), readNode, writeVar],
+        connections: [
+          createLogicConnection({
+            sourceNode: 'trigger',
+            sourceOutput: 'execute',
+            targetNode: 'write',
+            targetInput: '',
+            type: 'execution',
+          }),
+          createLogicConnection({
+            sourceNode: 'read',
+            sourceOutput: 'value',
+            targetNode: 'write',
+            targetInput: 'in',
+            type: 'data',
+          }),
+        ],
+      });
+
+      const result = generateLogicSource(defaultOptions(), [graph], [], []);
+      expect(result).toContain('0 /* tag Ghost no longer exists */');
+    });
+
+    const writeGraph = (tagId: string, defaultValue: number) => {
+      const writeNode = createLogicNode('tag_write', {
+        id: 'tagwrite',
+        type: 'data',
+        params: { tagId, tagName: 'SetPoint' },
+        inputs: [
+          createLogicPort({ id: 'exec', name: 'Execute', type: 'execution' }),
+          createLogicPort({ id: 'val', name: 'Value', type: 'any', defaultValue }),
+        ],
+        outputs: [createLogicPort({ id: 'done', name: 'Done', type: 'execution' })],
+      });
+      return createLogicGraph({
+        name: 'command',
+        nodes: [clickTrigger(), writeNode],
+        connections: [
+          createLogicConnection({
+            sourceNode: 'trigger',
+            sourceOutput: 'execute',
+            targetNode: 'tagwrite',
+            targetInput: '',
+            type: 'execution',
+          }),
+        ],
+      });
+    };
+
+    it('writes a holding-register tag as the engineering value', () => {
+      const tag = createModbusTag({ id: 'sp-tag', name: 'SetPoint', address: 7 });
+      const result = generateLogicSource(defaultOptions(), [writeGraph('sp-tag', 42)], [], [tag]);
+      expect(result).toContain('(void)hmi_runtime_write_holding_register(7U, (float)(42));');
+      expect(result).toContain('#include "hmi_runtime.h"');
+    });
+
+    it('writes a coil tag as a boolean', () => {
+      const tag = createModbusTag({
+        id: 'run-tag',
+        name: 'SetPoint',
+        area: 'coil',
+        address: 3,
+        dataType: 'bool',
+        access: 'write',
+      });
+      const result = generateLogicSource(defaultOptions(), [writeGraph('run-tag', 1)], [], [tag]);
+      expect(result).toContain('(void)hmi_runtime_write_coil(3U, (1) != 0);');
+    });
+
+    it('refuses to write a read-only tag', () => {
+      const tag = createModbusTag({ id: 'ro-tag', name: 'SetPoint', access: 'read' });
+      const result = generateLogicSource(defaultOptions(), [writeGraph('ro-tag', 1)], [], [tag]);
+      expect(result).toContain('// Write Tag SetPoint: tag is read-only');
+      expect(result).not.toContain('hmi_runtime_write_holding_register(');
     });
   });
 

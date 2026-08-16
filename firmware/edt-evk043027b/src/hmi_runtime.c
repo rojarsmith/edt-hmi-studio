@@ -773,3 +773,48 @@ bool hmi_runtime_read_holding_register(
 
     return false;
 }
+
+static bool queue_descriptor_write(
+    hmi_area_t area,
+    uint16_t address,
+    float value)
+{
+    size_t index;
+
+    if (!g_status.initialized) {
+        return false;
+    }
+
+    for (index = 0U; index < g_binding_count; ++index) {
+        hmi_binding_state_t *state = &g_binding_states[index];
+        const hmi_binding_descriptor_t *descriptor = state->descriptor;
+
+        if ((descriptor == NULL) ||
+            (descriptor->area != area) ||
+            (descriptor->address != address) ||
+            !access_is_writable(descriptor->access)) {
+            continue;
+        }
+
+        /*
+         * Same contract as the widget path: the newest value wins, and the
+         * pending flag is cleared only once the request is on the wire.
+         */
+        state->pending_write_value = value;
+        state->write_pending = true;
+        return true;
+    }
+
+    return false;
+}
+
+bool hmi_runtime_write_holding_register(uint16_t address, float value)
+{
+    return queue_descriptor_write(HMI_AREA_HOLDING_REGISTER, address, value);
+}
+
+bool hmi_runtime_write_coil(uint16_t address, bool value)
+{
+    return queue_descriptor_write(
+        HMI_AREA_COIL, address, value ? 1.0f : 0.0f);
+}

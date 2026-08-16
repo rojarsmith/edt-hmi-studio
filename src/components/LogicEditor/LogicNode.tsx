@@ -74,6 +74,8 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
       case 'delay': return '⏳';
       case 'var_read': return '📖';
       case 'var_write': return '✏️';
+      case 'tag_read': return '📥';
+      case 'tag_write': return '📤';
       case 'math_op': return '🧮';
       case 'string_op': return '🔤';
       case 'get_property': return '🔍';
@@ -192,6 +194,9 @@ function renderParamsPreview(node: LogicNode): React.ReactNode {
       return params.functionName ? <span className="param-preview">Function: {params.functionName}</span> : null;
     case 'modbus_holding_register':
       return <span className="param-preview">Holding Register: {params.address ?? 0}</span>;
+    case 'tag_read':
+    case 'tag_write':
+      return <span className="param-preview">Tag: {params.tagName || '(not set)'}</span>;
     default:
       return null;
   }

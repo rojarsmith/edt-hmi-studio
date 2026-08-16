@@ -5,6 +5,7 @@ import Editor from '@monaco-editor/react';
 import { useEditorStore } from '../../store/editorStore';
 import { useLogicEditorStore } from '../LogicEditor';
 import { useResourceStore } from '../../resources/resourceStore';
+import { useProjectModbusTags } from '../../hooks/useProjectModbusTags';
 import { generateCode, getGeneratedFileNames, downloadAsZip } from '../../codegen';
 import type { CodeGenOptions, GeneratedCode } from '../../codegen/types';
 import { DEFAULT_CODEGEN_OPTIONS } from '../../codegen/types';
@@ -18,6 +19,7 @@ const CodePanel: React.FC = () => {
   const { graphs: logicGraphs } = useLogicEditorStore();
   const imageResources = useResourceStore((s) => s.images);
   const fontResources = useResourceStore((s) => s.fonts);
+  const modbusTags = useProjectModbusTags();
   
   // Selected file
   const [selectedFile, setSelectedFile] = useState<FileName>('ui.h');
@@ -33,8 +35,23 @@ const CodePanel: React.FC = () => {
   
   // Generate code
   const generatedCode = useMemo(() => {
-    return generateCode(screens, options, logicGraphs, undefined, imageResources, fontResources);
-  }, [screens, options, logicGraphs, imageResources, fontResources]);
+    return generateCode(
+      screens,
+      options,
+      logicGraphs,
+      undefined,
+      imageResources,
+      fontResources,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      modbusTags,
+    );
+  }, [screens, options, logicGraphs, imageResources, fontResources, modbusTags]);
   
   // Current file content
   const currentContent = generatedCode[selectedFile];

@@ -35,12 +35,13 @@ const NodePalette: React.FC<NodePaletteProps> = ({ onDragStart }) => {
     [onDragStart]
   );
 
-  // Filter nodes by search query
+  // Filter nodes by search query (deprecated nodes stay out of the palette)
   const filteredDefinitions = searchQuery
     ? NODE_DEFINITIONS.filter(
         def =>
-          def.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          def.description.toLowerCase().includes(searchQuery.toLowerCase())
+          !def.deprecated &&
+          (def.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            def.description.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : null;
 

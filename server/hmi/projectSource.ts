@@ -218,6 +218,7 @@ export async function writeGeneratedProjectSource(
     typographies,
     projectTexts,
     projectLanguages,
+    communication?.tags ?? [],
   );
   const generatedBindings = generateHmiBindings(
     screens,

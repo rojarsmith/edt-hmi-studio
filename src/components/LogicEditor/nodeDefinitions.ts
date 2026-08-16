@@ -344,6 +344,45 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
   },
   {
     type: 'data',
+    subType: 'tag_read',
+    label: 'Read Tag',
+    description: 'Reads a protocol tag defined on the Protocol tab',
+    icon: '📥',
+    color: NODE_COLORS.data,
+    defaultParams: {
+      tagId: '',
+      tagName: '',
+    },
+    inputs: [],
+    outputs: [
+      { name: 'Value', type: 'any' },
+    ],
+  },
+  {
+    type: 'data',
+    subType: 'tag_write',
+    label: 'Write Tag',
+    description: 'Writes a value to a protocol tag',
+    icon: '📤',
+    color: NODE_COLORS.data,
+    defaultParams: {
+      tagId: '',
+      tagName: '',
+    },
+    inputs: [
+      { name: 'Execute', type: 'execution' },
+      { name: 'Value', type: 'any' },
+    ],
+    outputs: [
+      { name: 'Done', type: 'execution' },
+    ],
+  },
+  {
+    // Superseded by Read Tag: an address typed into a node is exactly the
+    // protocol coupling the tag table exists to prevent. Saved graphs keep
+    // working; the palette no longer offers it.
+    deprecated: true,
+    type: 'data',
     subType: 'modbus_holding_register',
     label: 'Read Holding Register',
     description: 'Reads a cached Modbus Holding Register value',
@@ -385,9 +424,9 @@ export function getNodeDefinition(subType: string): LogicNodeDefinition | undefi
   return NODE_DEFINITIONS.find(def => def.subType === subType);
 }
 
-// Get nodes by category
+// Get nodes by category (palette view - deprecated nodes stay hidden)
 export function getNodesByCategory(category: string): LogicNodeDefinition[] {
-  return NODE_DEFINITIONS.filter(def => def.type === category);
+  return NODE_DEFINITIONS.filter(def => def.type === category && !def.deprecated);
 }
 
 // Node categories for palette

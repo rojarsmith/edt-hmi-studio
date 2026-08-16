@@ -3,7 +3,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useLogicEditorStore } from './logicEditorStore';
 import { useEditorStore } from '../../store/editorStore';
+import { useProjectModbusTags } from '../../hooks/useProjectModbusTags';
 import type { CompareOperator, LogicOperator, MathOperator, StringOperation } from './types';
+import type { ModbusRegisterTag } from '../../types/hmi';
 import { LVGL_EVENTS } from '../EventPanel/EventPanel';
 import './NodeEditDialog.css';
 
@@ -53,6 +55,22 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
 
   const variables = getVariables();
   const allComponents = getAllComponents();
+
+  // Protocol tags for the tag nodes
+  const modbusTags = useProjectModbusTags();
+
+  const handleTagSelect = useCallback(
+    (tagId: string) => {
+      setParams(prev => ({
+        ...prev,
+        tagId,
+        // Snapshot the name so the node face can say which tag without
+        // loading the protocol config.
+        tagName: modbusTags.find(tag => tag.id === tagId)?.name ?? prev.tagName ?? '',
+      }));
+    },
+    [modbusTags]
+  );
 
   useEffect(() => {
     if (node) {
@@ -331,6 +349,75 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
             </select>
           </div>
         );
+
+      case 'tag_read':
+      case 'tag_write': {
+        const forWrite = node.subType === 'tag_write';
+        const candidates = modbusTags.filter(tag =>
+          forWrite
+            ? tag.access === 'write' || tag.access === 'readwrite'
+            : tag.access === 'read' || tag.access === 'readwrite'
+        );
+        // What codegen can actually deliver today; a disabled option with its
+        // reason beats a tag that silently vanished from the list.
+        const unsupportedReason = (tag: ModbusRegisterTag): string | null => {
+          if (forWrite) {
+            return tag.area === 'discrete-input' || tag.area === 'input-register'
+              ? 'read-only area'
+              : null;
+          }
+          if (tag.area !== 'holding-register') {
+            return 'only holding registers are readable';
+          }
+          if (
+            tag.dataType === 'uint32'
+            || tag.dataType === 'int32'
+            || tag.dataType === 'float32'
+          ) {
+            return '32-bit reads not supported yet';
+          }
+          return null;
+        };
+        const selectedMissing =
+          !!params.tagId && !modbusTags.some(tag => tag.id === params.tagId);
+        return (
+          <div className="param-group">
+            <label>Tag</label>
+            <select
+              value={params.tagId || ''}
+              onChange={e => handleTagSelect(e.target.value)}
+            >
+              <option value="">Select a tag...</option>
+              {selectedMissing && (
+                <option value={params.tagId}>
+                  {params.tagName || params.tagId} (missing)
+                </option>
+              )}
+              {candidates.map(tag => {
+                const reason = unsupportedReason(tag);
+                return (
+                  <option key={tag.id} value={tag.id} disabled={!!reason}>
+                    {tag.name} — {tag.area} {tag.address} ({tag.dataType})
+                    {reason ? ` — ${reason}` : ''}
+                  </option>
+                );
+              })}
+            </select>
+            {!params.tagId && (
+              <div className="param-warning">
+                Without a tag this node generates no code. Tags are defined on
+                the Protocol tab.
+              </div>
+            )}
+            {selectedMissing && (
+              <div className="param-warning">
+                This tag no longer exists on the Protocol tab, so this node
+                generates no code.
+              </div>
+            )}
+          </div>
+        );
+      }
 
       case 'modbus_holding_register':
         return (

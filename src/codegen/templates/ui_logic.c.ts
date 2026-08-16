@@ -3,6 +3,7 @@
 
 import type { CodeGenOptions } from '../types';
 import type { LvglComponent, Screen } from '../../types';
+import type { ModbusRegisterTag } from '../../types/hmi';
 import type {
   LogicGraph,
   LogicNode,
@@ -43,6 +44,8 @@ interface LogicCodegenContext {
   pagesByName: Map<string, PageReference>;
   /** Graph id → C function name, deduplicated. Shared with ui_logic.h. */
   logicFuncNames: Map<string, string>;
+  /** Protocol tags by id, for the tag_read / tag_write nodes. */
+  tagsById: Map<string, ModbusRegisterTag>;
 }
 
 /**
@@ -52,11 +55,17 @@ export function generateLogicSource(
   options: CodeGenOptions,
   graphs: LogicGraph[] = [],
   screens: Screen[] = [],
+  tags: ModbusRegisterTag[] = [],
 ): string {
-  const context = createLogicCodegenContext(screens, options, graphs);
+  const context = createLogicCodegenContext(screens, options, graphs, tags);
   const lines: string[] = [];
   const hasHoldingRegisterNodes = graphs.some(graph =>
-    graph.nodes.some(node => node.subType === 'modbus_holding_register')
+    graph.nodes.some(node =>
+      node.subType === 'modbus_holding_register' || node.subType === 'tag_read'
+    )
+  );
+  const hasTagWriteNodes = graphs.some(graph =>
+    graph.nodes.some(node => node.subType === 'tag_write')
   );
   const hasButtonTextNodes = graphs.some(graph =>
     graph.nodes.some(node =>
@@ -68,7 +77,7 @@ export function generateLogicSource(
   // Includes
   lines.push(generateInclude('ui.h'));
   lines.push(generateInclude('ui_logic.h'));
-  if (hasHoldingRegisterNodes) {
+  if (hasHoldingRegisterNodes || hasTagWriteNodes) {
     lines.push(generateInclude('hmi_runtime.h'));
   }
   lines.push(generateInclude('string.h', true));
@@ -203,6 +212,7 @@ function createLogicCodegenContext(
   screens: Screen[],
   options: CodeGenOptions,
   graphs: LogicGraph[] = [],
+  tags: ModbusRegisterTag[] = [],
 ): LogicCodegenContext {
   const componentEntries: Array<{ component: LvglComponent; screenName: string }> = [];
 
@@ -284,6 +294,7 @@ function createLogicCodegenContext(
     pagesById,
     pagesByName,
     logicFuncNames: getLogicFuncNames(graphs),
+    tagsById: new Map(tags.map(tag => [tag.id, tag])),
   };
 }
 
@@ -734,6 +745,37 @@ function generateNodeExpression(
       const address = normalizeHoldingRegisterAddress(node.params.address);
       return `logic_read_holding_register_cached(${address}U)`;
     }
+    case 'tag_read': {
+      const tag = context.tagsById.get(node.params.tagId);
+      if (!tag) {
+        return node.params.tagId
+          ? `0 /* tag ${commentSafe(node.params.tagName || node.params.tagId)} no longer exists */`
+          : '0 /* no tag selected */';
+      }
+      if (tag.area !== 'holding-register') {
+        return `0 /* tag ${commentSafe(tag.name)}: only holding registers are readable */`;
+      }
+      if (
+        tag.dataType === 'uint32'
+        || tag.dataType === 'int32'
+        || tag.dataType === 'float32'
+      ) {
+        return `0 /* tag ${commentSafe(tag.name)}: 32-bit reads not supported yet */`;
+      }
+      // The cache descriptor is raw uint16 (see hmiBindingGenerator); the
+      // tag's type and scale are applied here, where sign survives - the
+      // runtime read API clamps negatives away.
+      const address = normalizeHoldingRegisterAddress(tag.address);
+      const raw = `logic_read_holding_register_cached(${address}U)`;
+      let expression =
+        tag.dataType === 'int16' ? `(int16_t)${raw}`
+        : tag.dataType === 'bool' ? `(${raw} != 0U)`
+        : raw;
+      if (Number.isFinite(tag.scale) && tag.scale !== 1 && tag.scale !== 0) {
+        expression = `(${expression} * ${cFloatLiteral(tag.scale)})`;
+      }
+      return expression;
+    }
     case 'get_property': {
       const target = resolveComponent(
         node.params.targetComponent,
@@ -762,6 +804,15 @@ function normalizeHoldingRegisterAddress(address: unknown): number {
     return 0;
   }
   return Math.max(0, Math.min(65535, Math.trunc(numericAddress)));
+}
+
+/** Tag names are author text; keep them from terminating the comment. */
+function commentSafe(text: unknown): string {
+  return String(text).replace(/\*\//g, '* /');
+}
+
+function cFloatLiteral(value: number): string {
+  return `${Number.isInteger(value) ? value.toFixed(1) : value}f`;
 }
 
 // ============ Node Code Generators ============
@@ -819,9 +870,12 @@ function generateNodeCode(
     case 'math_op':
     case 'string_op':
     case 'get_property':
+    case 'tag_read':
       return ''; // Data nodes don't generate standalone code
     case 'var_write':
       return generateVarWriteCode(node, graph, context, indent);
+    case 'tag_write':
+      return generateTagWriteCode(node, graph, context, indent);
     case 'c_code_block':
       return generateCustomCodeBlock(node, indent);
     default:
@@ -1093,8 +1147,37 @@ function generateVarWriteCode(
 ): string {
   const value = getInputValue(node, 'Value', graph, context, '值');
   const cVarName = resolveVariableName(graph, node);
-  
+
   return `${indent}${cVarName} = ${value};`;
+}
+
+function generateTagWriteCode(
+  node: LogicNode,
+  graph: LogicGraph,
+  context: LogicCodegenContext,
+  indent: string,
+): string {
+  const tag = context.tagsById.get(node.params.tagId);
+  if (!tag) {
+    return node.params.tagId
+      ? `${indent}// Write Tag: tag ${commentSafe(node.params.tagName || node.params.tagId)} no longer exists`
+      : `${indent}// Write Tag: no tag selected`;
+  }
+  if (tag.area === 'discrete-input' || tag.area === 'input-register') {
+    return `${indent}// Write Tag ${commentSafe(tag.name)}: ${tag.area} is a read-only area`;
+  }
+  if (tag.access === 'read') {
+    return `${indent}// Write Tag ${commentSafe(tag.name)}: tag is read-only`;
+  }
+
+  // The runtime queues the write onto this tag's binding descriptor, which
+  // carries data type and scale - the value here is the engineering value.
+  const value = getInputValue(node, 'Value', graph, context);
+  const address = normalizeHoldingRegisterAddress(tag.address);
+  if (tag.area === 'coil') {
+    return `${indent}(void)hmi_runtime_write_coil(${address}U, (${value}) != 0);`;
+  }
+  return `${indent}(void)hmi_runtime_write_holding_register(${address}U, (float)(${value}));`;
 }
 
 function generateCustomCodeBlock(node: LogicNode, indent: string): string {

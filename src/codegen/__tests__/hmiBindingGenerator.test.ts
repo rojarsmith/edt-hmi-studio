@@ -4,6 +4,7 @@ import {
   createComponent,
   createLogicGraph,
   createLogicNode,
+  createModbusTag,
   createScreen,
 } from './helpers';
 import { generateHmiBindings } from '../hmiBindingGenerator';
@@ -145,5 +146,85 @@ describe('generateHmiBindings', () => {
     expect(source).toContain('.area = HMI_AREA_HOLDING_REGISTER');
     expect(source).toContain('.access = HMI_ACCESS_READ');
     expect(source).toContain('.poll_ms = 400U');
+  });
+
+  it('polls a 16-bit tag referenced by Read Tag as a raw uint16 descriptor', () => {
+    const tag = createModbusTag({
+      id: 'speed-tag',
+      name: 'MotorSpeed',
+      address: 5,
+      dataType: 'int16',
+      scale: 0.1,
+      pollIntervalMs: 100,
+    });
+    const generated = generateHmiBindings(
+      [createScreen()],
+      { ...createDefaultCommunicationConfig(), tags: [tag] },
+      {},
+      [
+        createLogicGraph({
+          nodes: [
+            createLogicNode('tag_read', { params: { tagId: 'speed-tag' } }),
+          ],
+        }),
+      ],
+    );
+
+    const source = generated['hmi_bindings_generated.c'];
+    // Raw on the wire: ui_logic.c applies the tag's type and scale where
+    // the int16 sign survives.
+    expect(source).toContain('.address = 5U');
+    expect(source).toContain('.data_type = HMI_DATA_UINT16');
+    expect(source).toContain('.scale = 1.0f');
+    expect(source).toContain('.access = HMI_ACCESS_READ');
+  });
+
+  it('emits a write-only descriptor carrying the tag type and scale for Write Tag', () => {
+    const tag = createModbusTag({
+      id: 'sp-tag',
+      name: 'SetPoint',
+      address: 7,
+      dataType: 'float32',
+      scale: 10,
+    });
+    const generated = generateHmiBindings(
+      [createScreen()],
+      { ...createDefaultCommunicationConfig(), tags: [tag] },
+      {},
+      [
+        createLogicGraph({
+          nodes: [
+            createLogicNode('tag_write', { params: { tagId: 'sp-tag' } }),
+          ],
+        }),
+      ],
+    );
+
+    const source = generated['hmi_bindings_generated.c'];
+    expect(source).toContain('.access = HMI_ACCESS_WRITE');
+    expect(source).toContain('.data_type = HMI_DATA_FLOAT32');
+    expect(source).toContain('.scale = 10.0f');
+    expect(source).toContain('.address = 7U');
+    expect(source).toContain('.poll_ms = 0U');
+  });
+
+  it('a Write Tag pointing at a read-only tag emits no descriptor', () => {
+    const tag = createModbusTag({ id: 'ro-tag', access: 'read' });
+    const generated = generateHmiBindings(
+      [createScreen()],
+      { ...createDefaultCommunicationConfig(), tags: [tag] },
+      {},
+      [
+        createLogicGraph({
+          nodes: [
+            createLogicNode('tag_write', { params: { tagId: 'ro-tag' } }),
+          ],
+        }),
+      ],
+    );
+
+    expect(generated['hmi_bindings_generated.c']).toContain(
+      'hmi_binding_descriptor_count = 0U',
+    );
   });
 });

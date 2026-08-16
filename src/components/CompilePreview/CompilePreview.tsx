@@ -4,6 +4,7 @@ import { useLogicEditorStore } from '../LogicEditor';
 import { useResourceStore } from '../../resources';
 import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
+import { useProjectModbusTags } from '../../hooks/useProjectModbusTags';
 import { generateCode } from '../../codegen';
 import { compileCode, type CompileStatus, type WasmRuntime, type FontCompileRequest } from './compilerService';
 import { collectGlyphs } from '../../codegen/collectGlyphs';
@@ -49,6 +50,7 @@ const CompilePreview: React.FC = () => {
   const projectLanguages = useEditorStore((s) => s.languages);
   const projectTexts = useEditorStore((s) => s.texts);
   const { images: imageResources, fonts: fontResources } = useResourceStore();
+  const modbusTags = useProjectModbusTags();
   const currentProjectId = useAppStore((s) => s.currentProjectId);
   const getProjectConfig = useProjectStore((s) => s.getProjectConfig);
 
@@ -72,8 +74,8 @@ const CompilePreview: React.FC = () => {
 
   // Generate C code from current editor state
   const generateCCode = useCallback(() => {
-    return generateCode(screens, {}, logicGraphs, undefined, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, typographies, projectTexts, projectLanguages);
-  }, [screens, logicGraphs, typographies, projectTexts, projectLanguages, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont]);
+    return generateCode(screens, {}, logicGraphs, undefined, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, typographies, projectTexts, projectLanguages, modbusTags);
+  }, [screens, logicGraphs, typographies, projectTexts, projectLanguages, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, modbusTags]);
 
   // Render framebuffer to canvas
   const renderFramebuffer = useCallback((fbData: Uint8Array, width: number, height: number) => {

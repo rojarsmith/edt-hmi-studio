@@ -4,9 +4,9 @@
   <a href="../logic-node-taxonomy.md">English</a> · <strong>繁體中文</strong>
 </p>
 
-狀態：**方向已定，尚未動工**（2026-08-16）。本文記錄 Logic 分頁的節點調色盤
-為什麼要重新分組、通訊協定支援打算怎麼進來，讓後續工作從決策出發，而不是
-重新推導一遍。
+狀態：**第一步（tag）已於 2026-08-16 落地；其餘已議定、尚未動工。**
+本文記錄 Logic 分頁的節點調色盤為什麼要重新分組、通訊協定支援怎麼進來，
+讓後續工作從決策出發，而不是重新推導一遍。
 
 ## 量尺
 
@@ -69,8 +69,14 @@ custom`），它同時決定節點顏色，而且存在每個專案的圖裡。�
 
 ## 議定順序
 
-1. Tag 抽象層：Read Tag / Write Tag 節點，tag 在 Protocol 分頁定義
-   （Write Tag 是誠實性缺口，不是錦上添花）
+1. **已完成（2026-08-16）：** Read Tag / Write Tag 節點對接 Protocol 分頁的
+   tag 表。Read Tag 涵蓋 16-bit 的 holding-register tag —— 以無物件描述子
+   輪詢原始值，tag 的型別與 scale 在 `ui_logic.c` 套用，int16 的正負號因此
+   躲過 runtime 讀取 API 的鉗位。Write Tag 涵蓋 coil 與 holding-register 的
+   全部資料型別：它騎在一個帶著 tag 型別與 scale 的純寫入描述子上，由新增
+   的 `hmi_runtime_write_holding_register`／`hmi_runtime_write_coil` 排入
+   佇列（三塊板都加了；韌體端只能目視檢查 —— 這個環境沒有 ARM 工具鏈）。
+   Read Holding Register 標記棄用：調色盤不再列出，已存的圖照常渲染與產生。
 2. 依上表重新分組調色盤（僅顯示層）
 3. Custom 分類移入 Factory Dev Mode
 4. 儲存 type／顏色的正名 —— 可選、最後、且要先有遷移方案

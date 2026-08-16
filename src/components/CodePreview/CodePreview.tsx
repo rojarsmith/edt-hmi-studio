@@ -6,6 +6,7 @@ import { useLogicEditorStore } from '../LogicEditor';
 import { useResourceStore } from '../../resources/resourceStore';
 import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
+import { useProjectModbusTags } from '../../hooks/useProjectModbusTags';
 import { generateCode, getGeneratedFileNames } from '../../codegen/generator';
 import type { CodeGenOptions, GeneratedCode } from '../../codegen/types';
 import { toast } from '../Toast';
@@ -17,6 +18,7 @@ const CodePreview: React.FC = () => {
   const { currentTheme } = useThemeStore();
   const imageResources = useResourceStore((s) => s.images);
   const fontResources = useResourceStore((s) => s.fonts);
+  const modbusTags = useProjectModbusTags();
   const currentProjectId = useAppStore((s) => s.currentProjectId);
   const getProjectConfig = useProjectStore((s) => s.getProjectConfig);
   const [selectedFile, setSelectedFile] = useState<keyof GeneratedCode>('ui.c');
@@ -47,12 +49,12 @@ const CodePreview: React.FC = () => {
 
   const generatedCode = useMemo(() => {
     try {
-      return generateCode(screens, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont);
+      return generateCode(screens, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, undefined, undefined, undefined, modbusTags);
     } catch {
       console.error('Code generation error');
       return null;
     }
-  }, [screens, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont]);
+  }, [screens, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, modbusTags]);
 
   const currentCode = generatedCode?.[selectedFile] || '// Code generation failed';
 

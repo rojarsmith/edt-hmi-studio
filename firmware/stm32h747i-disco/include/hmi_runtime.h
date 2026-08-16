@@ -138,6 +138,16 @@ bool hmi_runtime_read_holding_register(
     uint16_t address,
     uint16_t *value);
 
+/*
+ * Queue a write onto the writable binding descriptor matching a zero-based
+ * Modbus address. The value is the engineering value: the descriptor's
+ * scale divides it and its data type encodes it, exactly as a widget write
+ * does. Never blocks; false means the runtime is not initialized or no
+ * writable descriptor carries that address.
+ */
+bool hmi_runtime_write_holding_register(uint16_t address, float value);
+bool hmi_runtime_write_coil(uint16_t address, bool value);
+
 #ifdef __cplusplus
 }
 #endif

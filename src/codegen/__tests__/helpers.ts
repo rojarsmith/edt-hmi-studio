@@ -3,6 +3,7 @@
 import type { Screen, LvglComponent, EventBinding, Animation, StyleProps, Theme, BuiltinAction } from '../../types';
 import type { CodeGenOptions } from '../types';
 import type { ImageResource, FontResource } from '../../resources/types';
+import type { ModbusRegisterTag } from '../../types/hmi';
 import type { LogicGraph, LogicNode, LogicConnection, LogicVariable, LogicNodeCategory, LogicNodeSubType, LogicPort } from '../../components/LogicEditor/types';
 import { DEFAULT_CODEGEN_OPTIONS } from '../types';
 
@@ -17,6 +18,22 @@ export function resetIdCounter(): void {
 
 export function defaultOptions(overrides: Partial<CodeGenOptions> = {}): CodeGenOptions {
   return { ...DEFAULT_CODEGEN_OPTIONS, ...overrides };
+}
+
+export function createModbusTag(
+  overrides: Partial<ModbusRegisterTag> = {}
+): ModbusRegisterTag {
+  return {
+    id: overrides.id ?? uid(),
+    name: 'tag',
+    area: 'holding-register',
+    address: 0,
+    dataType: 'uint16',
+    access: 'readwrite',
+    scale: 1,
+    pollIntervalMs: 250,
+    ...overrides,
+  };
 }
 
 export function createStyleProps(overrides: Partial<StyleProps> = {}): StyleProps {

@@ -2,6 +2,7 @@
 
 import type { Screen, Theme, Typography, TextResource, ProjectLanguage } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
+import type { ModbusRegisterTag } from '../types/hmi';
 import type { ImageResource, FontResource } from '../resources/types';
 import type { CodeGenOptions, GeneratedCode } from './types';
 import { DEFAULT_CODEGEN_OPTIONS } from './types';
@@ -34,7 +35,8 @@ export function generateCode(
   symbolFont?: string,
   typographies?: Typography[],
   texts: TextResource[] = [],
-  languages: ProjectLanguage[] = []
+  languages: ProjectLanguage[] = [],
+  modbusTags: ModbusRegisterTag[] = []
 ): GeneratedCode {
   // The same stored-or-derived rule ui.c applies internally: ui.h must declare
   // fonts for exactly the typography set ui.c initialises.
@@ -53,7 +55,7 @@ export function generateCode(
     'ui_events.h': generateEventsHeader(screens, opts),
     'ui_events.c': generateEventsSource(screens, opts, languages),
     'ui_logic.h': generateLogicHeader(opts, activeGraphs),
-    'ui_logic.c': generateLogicSource(opts, activeGraphs, screens),
+    'ui_logic.c': generateLogicSource(opts, activeGraphs, screens, modbusTags),
   };
 }
 
@@ -74,7 +76,8 @@ export function generateSingleFile(
   symbolFont?: string,
   typographies?: Typography[],
   texts: TextResource[] = [],
-  languages: ProjectLanguage[] = []
+  languages: ProjectLanguage[] = [],
+  modbusTags: ModbusRegisterTag[] = []
 ): string {
   const opts: CodeGenOptions = { ...DEFAULT_CODEGEN_OPTIONS, ...options };
   // Same stored-or-derived rule as generateCode, for the same reason
@@ -96,7 +99,7 @@ export function generateSingleFile(
     case 'ui_logic.h':
       return generateLogicHeader(opts, activeGraphs);
     case 'ui_logic.c':
-      return generateLogicSource(opts, activeGraphs, screens);
+      return generateLogicSource(opts, activeGraphs, screens, modbusTags);
     default:
       throw new Error(`Unknown file: ${fileName}`);
   }

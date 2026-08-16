@@ -20,13 +20,15 @@ export type ActionNodeType =
   | 'delay';
 
 // Data Node Types
-export type DataNodeType = 
-  | 'var_read' 
-  | 'var_write' 
-  | 'math_op' 
-  | 'string_op' 
+export type DataNodeType =
+  | 'var_read'
+  | 'var_write'
+  | 'math_op'
+  | 'string_op'
   | 'get_property'
-  | 'modbus_holding_register';
+  | 'modbus_holding_register'
+  | 'tag_read'
+  | 'tag_write';
 
 // Custom Node Types
 export type CustomNodeType = 'c_code_block';
@@ -120,6 +122,8 @@ export interface LogicNodeDefinition {
   defaultParams: Record<string, any>;
   inputs: Omit<LogicPort, 'id'>[];
   outputs: Omit<LogicPort, 'id'>[];
+  // Hidden from the palette; saved graphs keep rendering and generating.
+  deprecated?: boolean;
 }
 
 // Compare Operators

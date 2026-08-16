@@ -5,6 +5,7 @@ import type {
   ModbusAccess,
   ModbusDataType,
   ModbusRegisterArea,
+  ModbusRegisterTag,
   ModbusWidgetProperty,
   ModbusWriteBehavior,
 } from '../types/hmi';
@@ -75,17 +76,67 @@ const WIDGET_ENUM: Record<string, string> = {
 
 function collectLogicHoldingRegisterAddresses(
   graphs: LogicGraph[],
+  tags: ModbusRegisterTag[],
 ): number[] {
+  const tagsById = new Map(tags.map((tag) => [tag.id, tag]));
   const addresses = new Set<number>();
 
   for (const graph of graphs) {
     for (const node of graph.nodes) {
-      if (node.subType !== 'modbus_holding_register') continue;
-      addresses.add(integerInRange(node.params.address, 0, 65535, 0));
+      if (node.subType === 'modbus_holding_register') {
+        addresses.add(integerInRange(node.params.address, 0, 65535, 0));
+        continue;
+      }
+      if (node.subType !== 'tag_read') continue;
+      // Read Tag polls through the same raw-uint16 descriptor shape the
+      // legacy address node uses; ui_logic.c applies the tag's type and
+      // scale where sign survives. Only what codegen can read is polled.
+      const tag = tagsById.get(node.params.tagId);
+      if (
+        !tag
+        || tag.area !== 'holding-register'
+        || tag.dataType === 'uint32'
+        || tag.dataType === 'int32'
+        || tag.dataType === 'float32'
+        || !(tag.access === 'read' || tag.access === 'readwrite')
+      ) {
+        continue;
+      }
+      addresses.add(integerInRange(tag.address, 0, 65535, 0));
     }
   }
 
   return [...addresses].sort((left, right) => left - right);
+}
+
+/**
+ * Write Tag needs a descriptor carrying the tag's area, data type and scale
+ * for hmi_runtime_write_* to queue onto. Object-less and write-only, so the
+ * poll loop never touches it.
+ */
+function collectLogicWriteTags(
+  graphs: LogicGraph[],
+  tags: ModbusRegisterTag[],
+): ModbusRegisterTag[] {
+  const tagsById = new Map(tags.map((tag) => [tag.id, tag]));
+  const collected = new Map<string, ModbusRegisterTag>();
+
+  for (const graph of graphs) {
+    for (const node of graph.nodes) {
+      if (node.subType !== 'tag_write') continue;
+      const tag = tagsById.get(node.params.tagId);
+      if (
+        !tag
+        || (tag.area !== 'coil' && tag.area !== 'holding-register')
+        || !(tag.access === 'write' || tag.access === 'readwrite')
+      ) {
+        continue;
+      }
+      collected.set(tag.id, tag);
+    }
+  }
+
+  return [...collected.values()].sort((left, right) => left.address - right.address);
 }
 
 function finiteNumber(value: number, fallback: number): number {
@@ -174,7 +225,8 @@ function generateSource(
 ): string {
   const bindings = collectBoundComponents(screens, options);
   const logicHoldingRegisterAddresses =
-    collectLogicHoldingRegisterAddresses(logicGraphs);
+    collectLogicHoldingRegisterAddresses(logicGraphs, communication.tags ?? []);
+  const logicWriteTags = collectLogicWriteTags(logicGraphs, communication.tags ?? []);
   const parity = {
     none: 'HMI_PARITY_NONE',
     even: 'HMI_PARITY_EVEN',
@@ -199,7 +251,11 @@ function generateSource(
     '',
   ];
 
-  if (bindings.length === 0 && logicHoldingRegisterAddresses.length === 0) {
+  if (
+    bindings.length === 0
+    && logicHoldingRegisterAddresses.length === 0
+    && logicWriteTags.length === 0
+  ) {
     lines.push(
       'const hmi_binding_descriptor_t hmi_binding_descriptors[1] = {{0}};',
       'const size_t hmi_binding_descriptor_count = 0U;',
@@ -246,6 +302,28 @@ function generateSource(
       `        .address = ${address}U,`,
       '        .scale = 1.0f,',
       `        .poll_ms = ${integerInRange(communication.pollIntervalMs, 10, 60000, 250)}U,`,
+      '        .write_value = 0.0f,',
+      '        .value_reader = NULL,',
+      '        .value_writer = NULL,',
+      '    },',
+    );
+  }
+  for (const tag of logicWriteTags) {
+    lines.push(
+      '    {',
+      '        .object = NULL,',
+      `        .area = ${AREA_ENUM[tag.area]},`,
+      `        .data_type = ${DATA_TYPE_ENUM[tag.dataType]},`,
+      // Write-only regardless of the tag's own access: reads for this tag
+      // travel on their own descriptor, and a readwrite one here would put
+      // an object-less binding into the poll rotation for nothing.
+      '        .access = HMI_ACCESS_WRITE,',
+      '        .widget = HMI_WIDGET_GENERIC,',
+      '        .property = HMI_PROPERTY_VALUE,',
+      '        .write_behavior = HMI_WRITE_WIDGET_VALUE,',
+      `        .address = ${integerInRange(tag.address, 0, 65535, 0)}U,`,
+      `        .scale = ${cFloat(tag.scale, 1)},`,
+      '        .poll_ms = 0U,',
       '        .write_value = 0.0f,',
       '        .value_reader = NULL,',
       '        .value_writer = NULL,',

@@ -4,10 +4,10 @@
   <strong>English</strong> · <a href="./zh-TW/logic-node-taxonomy.md">繁體中文</a>
 </p>
 
-Status: **direction agreed, nothing implemented** (2026-08-16). This records
-why the Logic tab's node palette will be regrouped and how protocol support
-is meant to enter it, so the work starts from decisions rather than from
-re-deriving them.
+Status: **step 1 (tags) landed 2026-08-16; the rest agreed, not started.**
+This records why the Logic tab's node palette will be regrouped and how
+protocol support enters it, so the work starts from decisions rather than
+from re-deriving them.
 
 ## The yardstick
 
@@ -78,8 +78,17 @@ pure display. So the regrouping lands in two decoupled steps:
 
 ## Agreed sequence
 
-1. Tag abstraction: Read Tag / Write Tag nodes, tags defined on the
-   Protocol tab (Write Tag is the honesty gap, not a nicety)
+1. **Done (2026-08-16):** Read Tag / Write Tag nodes against the Protocol
+   tab's tag table. Read Tag covers 16-bit holding-register tags — polled
+   raw over an object-less descriptor, with the tag's type and scale applied
+   in `ui_logic.c` where int16 sign survives the runtime read API's clamp.
+   Write Tag covers coil and holding-register tags of every data type: it
+   rides a write-only descriptor carrying the tag's type and scale, queued
+   through the new `hmi_runtime_write_holding_register` /
+   `hmi_runtime_write_coil` runtime calls (all three boards; the firmware
+   side compiles by inspection only — this environment has no ARM
+   toolchain). Read Holding Register is deprecated: hidden from the
+   palette, saved graphs keep rendering and generating.
 2. Palette regrouping per the table above (display layer only)
 3. Custom category behind Factory Dev Mode
 4. Stored-type/colour renames — optional, last, only with a migration story
