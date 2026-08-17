@@ -48,8 +48,9 @@ backgrounds with a 128/64/32/16 px size ladder and a wordmark lockup.
 
 ## 4. Usage guidance
 
-- Legible at 128–32 px; at 16 px the interior merges, so a favicon
-  should use a simplified glyph (panel + gauge only) — not yet drawn.
+- Legible at 128–32 px; at 16 px the interior merges, so the favicon
+  uses a simplified glyph (panel + gauge only, thicker strokes):
+  `logo-favicon.svg`, inlined as a data URI in `index.html`.
 - The wordmark is not outlined into the SVG. Pair the mark with
   "EDT HMI Studio" set in system-ui semibold, letter-spacing ~0.13em,
   exactly as the splash screen does.

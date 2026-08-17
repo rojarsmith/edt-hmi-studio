@@ -43,8 +43,9 @@ EDT 的顯示器製造本業。
 
 ## 4. 使用指引
 
-- 128–32 px 清晰可讀；16 px 時內部細節聚合，favicon 應使用
-  簡化 glyph（僅面板 + 儀表）— 尚未繪製。
+- 128–32 px 清晰可讀；16 px 時內部細節聚合，favicon 使用簡化
+  glyph（僅面板 + 儀表，加粗線條）：`logo-favicon.svg`，以 data URI
+  內聯於 `index.html`。
 - 字標未轉曲進 SVG。與圖標並用時，以 system-ui semibold、
   字距約 0.13em 排「EDT HMI Studio」，與 splash 畫面一致。
 - 選定變體後：favicon 內聯進 `index.html`；app 內使用時將選中
