@@ -11,7 +11,8 @@ import type { Plugin } from 'vite';
 import { execFile } from 'node:child_process';
 import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { convertFonts } from './server/fontConv';
@@ -38,13 +39,63 @@ interface LvglConfigRequest {
   memSize: number; // KB
 }
 
-// Paths
-const EMSDK_ENV = '/home/xcssa/.openclaw/workspace/tools/emsdk/emsdk_env.sh';
-const LVGL_PARENT_DIR = '/home/xcssa/.openclaw/workspace/tools';
-const PROJECT_DIR = '/home/xcssa/.openclaw/workspace/projects/edt-hmi-studio';
-const LV_CONF_DIR = join(PROJECT_DIR, 'wasm');
-const LIBLVGL_PATH = join(PROJECT_DIR, 'wasm/build/liblvgl_emcc.a');
-const LV_CONF_TEMPLATE_PATH = join(PROJECT_DIR, 'wasm/lv_conf.h');
+// Paths — overridable via env vars; project paths default to this repo (the plugin lives at repo root).
+const EMSDK_ENV =
+  process.env.EMSDK_ENV ?? '/home/xcssa/.openclaw/workspace/tools/emsdk/emsdk_env.sh';
+const LVGL_ROOT = process.env.LVGL_ROOT ?? '/home/xcssa/.openclaw/workspace/tools/lvgl';
+const LVGL_PARENT_DIR = dirname(LVGL_ROOT);
+const PROJECT_DIR = dirname(fileURLToPath(import.meta.url));
+const LV_CONF_DIR = process.env.LV_CONF_DIR ?? join(PROJECT_DIR, 'wasm');
+const LIBLVGL_PATH = process.env.LVGL_LIB ?? join(PROJECT_DIR, 'wasm', 'build', 'liblvgl_emcc.a');
+const LV_CONF_TEMPLATE_PATH = join(LV_CONF_DIR, 'lv_conf.h');
+
+/** Normalize a path for embedding in a bash command (Git Bash on Windows chokes on backslashes). */
+function toShellPath(p: string): string {
+  return p.replaceAll('\\', '/');
+}
+
+// The compile commands are bash scripts (find/while/sed), so bash is required even
+// when emcc itself is on PATH; emcc can come from PATH or from sourcing emsdk_env.sh.
+type EmccMode = 'path' | 'emsdk';
+
+async function detectToolchain(): Promise<{ mode: EmccMode | null; missing: string[] }> {
+  const missing: string[] = [];
+  let mode: EmccMode | null = null;
+  const bash = await runShell('true', tmpdir());
+  if (bash.code !== 0) {
+    missing.push(
+      'bash not found on PATH — the compile feature needs a POSIX shell (on Windows, install Git Bash and add it to PATH)',
+    );
+  } else if ((await runShell('command -v emcc', tmpdir())).code === 0) {
+    mode = 'path';
+  } else if (existsSync(EMSDK_ENV)) {
+    mode = 'emsdk';
+  } else {
+    missing.push(
+      `emcc is not on PATH and no emsdk env script at ${EMSDK_ENV} (install emsdk, or set EMSDK_ENV to your emsdk_env.sh)`,
+    );
+  }
+  if (!existsSync(LVGL_ROOT)) {
+    missing.push(`LVGL checkout not found at ${LVGL_ROOT} (set LVGL_ROOT)`);
+  }
+  return { mode, missing };
+}
+
+let toolchainPromise: Promise<{ mode: EmccMode | null; missing: string[] }> | null = null;
+
+/** Detect once on first use; the dev server keeps the result for its lifetime. */
+function getToolchain(): Promise<{ mode: EmccMode | null; missing: string[] }> {
+  toolchainPromise ??= detectToolchain();
+  return toolchainPromise;
+}
+
+function toolchainError(missing: string[]): string {
+  return `emcc toolchain unavailable:\n- ${missing.join('\n- ')}`;
+}
+
+function emccPrefix(mode: EmccMode): string {
+  return mode === 'emsdk' ? `source ${toShellPath(EMSDK_ENV)} 2>/dev/null && ` : '';
+}
 
 // Build cache: buildId → directory path
 const builds = new Map<string, string>();
@@ -111,24 +162,29 @@ async function buildLvglLib(config: LvglConfigRequest): Promise<{ libPath: strin
   const customConf = await generateCustomLvConf(config);
   await writeFile(join(cacheDir, 'lv_conf.h'), customConf, 'utf-8');
 
-  const LVGL_DIR = join(LVGL_PARENT_DIR, 'lvgl');
+  const { mode, missing } = await getToolchain();
+  if (!mode || missing.length > 0) {
+    throw new Error(toolchainError(missing));
+  }
+
+  const shCacheDir = toShellPath(cacheDir);
 
   // Build command (similar to build_lvgl_lib.sh but using custom conf dir)
-  const buildCmd = `source ${EMSDK_ENV} 2>/dev/null && \
-    find "${LVGL_DIR}/src" -name "*.c" > /tmp/lvgl_sources_${configHash}.txt && \
-    mkdir -p "${cacheDir}/objs" && \
+  const buildCmd = `${emccPrefix(mode)} \
+    find "${toShellPath(LVGL_ROOT)}/src" -name "*.c" > /tmp/lvgl_sources_${configHash}.txt && \
+    mkdir -p "${shCacheDir}/objs" && \
     while IFS= read -r src; do
-      obj="${cacheDir}/objs/$(echo "$src" | sed 's|/|_|g').o"
+      obj="${shCacheDir}/objs/$(echo "$src" | sed 's|/|_|g').o"
       if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
         emcc -O2 -c "$src" -o "$obj" \
-          -I"${cacheDir}" \
-          -I"${LVGL_PARENT_DIR}" \
+          -I"${shCacheDir}" \
+          -I"${toShellPath(LVGL_PARENT_DIR)}" \
           -DLV_CONF_INCLUDE_SIMPLE \
           -Wno-unused-function \
           -Wno-implicit-function-declaration
       fi
     done < /tmp/lvgl_sources_${configHash}.txt && \
-    emar rcs "${libPath}" "${cacheDir}"/objs/*.o`;
+    emar rcs "${toShellPath(libPath)}" "${shCacheDir}"/objs/*.o`;
 
   const result = await runShell(buildCmd, cacheDir);
   if (result.code !== 0) {
@@ -376,6 +432,19 @@ export default function compilePlugin(): Plugin {
         };
 
         const { files, fonts, width, height, lvglConfig } = body;
+
+        const { mode, missing } = await getToolchain();
+        if (!mode || missing.length > 0) {
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            success: false,
+            error: toolchainError(missing),
+            buildId: '',
+          }));
+          return;
+        }
+
         const buildId = randomUUID();
         const buildDir = join(tmpdir(), `lvgl-build-${buildId}`);
 
@@ -406,7 +475,7 @@ export default function compilePlugin(): Plugin {
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({
               success: false,
-              error: 'liblvgl_emcc.a not found. Run wasm/build_lvgl_lib.sh first.',
+              error: `liblvgl_emcc.a not found at ${libPath}. Run wasm/build_lvgl_lib.sh first (or set LVGL_LIB).`,
               buildId: '',
             }));
             return;
@@ -446,14 +515,14 @@ export default function compilePlugin(): Plugin {
           const fontFiles = Object.keys(fontCFiles);
           const sourceFiles = ['main_wrapper.c', ...cFiles, ...fontFiles].join(' ');
 
-          const emccCmd = `source ${EMSDK_ENV} 2>/dev/null && emcc ${sourceFiles} \
+          const emccCmd = `${emccPrefix(mode)}emcc ${sourceFiles} \
             -O2 -DLV_CONF_INCLUDE_SIMPLE \
-            -I${LVGL_PARENT_DIR} \
-            -I${LVGL_PARENT_DIR}/lvgl \
-            -I${LVGL_PARENT_DIR}/lvgl/src \
-            -I${confIncludeDir} \
+            -I"${toShellPath(LVGL_PARENT_DIR)}" \
+            -I"${toShellPath(LVGL_ROOT)}" \
+            -I"${toShellPath(join(LVGL_ROOT, 'src'))}" \
+            -I"${toShellPath(confIncludeDir)}" \
             -I. \
-            ${libPath} \
+            "${toShellPath(libPath)}" \
             -sALLOW_MEMORY_GROWTH=1 \
             -sINITIAL_MEMORY=33554432 \
             -sEXPORTED_FUNCTIONS="['_main','_app_tick','_app_mouse_event','_app_key_event','_wasi_get_framebuffer','_wasi_get_fb_ready','_wasi_clear_fb_ready','_wasi_get_width','_wasi_get_height']" \

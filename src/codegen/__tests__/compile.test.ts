@@ -5,8 +5,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { execSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { generateCode } from '../generator';
 import type { GeneratedCode } from '../types';
@@ -25,11 +26,52 @@ import {
   createLogicPort,
 } from './helpers';
 
-// Paths
-const EMSDK_ENV = '/home/xcssa/.openclaw/workspace/tools/emsdk/emsdk_env.sh';
-const LVGL_ROOT = '/home/xcssa/.openclaw/workspace/tools/lvgl';
-const LVGL_LIB = '/home/xcssa/.openclaw/workspace/projects/edt-hmi-studio/wasm/build/liblvgl_emcc.a';
-const LV_CONF_DIR = '/home/xcssa/.openclaw/workspace/projects/edt-hmi-studio/wasm';
+// Paths — overridable via env vars; lib and lv_conf.h default to the repo's wasm/ dir.
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const EMSDK_ENV =
+  process.env.EMSDK_ENV ?? '/home/xcssa/.openclaw/workspace/tools/emsdk/emsdk_env.sh';
+const LVGL_ROOT = process.env.LVGL_ROOT ?? '/home/xcssa/.openclaw/workspace/tools/lvgl';
+const LVGL_LIB = process.env.LVGL_LIB ?? join(REPO_ROOT, 'wasm', 'build', 'liblvgl_emcc.a');
+const LV_CONF_DIR = process.env.LV_CONF_DIR ?? join(REPO_ROOT, 'wasm');
+const BASH = '/bin/bash';
+
+/**
+ * Detect whether the emcc toolchain and LVGL artifacts are available.
+ * emcc can come from PATH directly, or from sourcing emsdk_env.sh in bash.
+ */
+function detectToolchain(): { emccMode: 'path' | 'emsdk' | null; missing: string[] } {
+  const missing: string[] = [];
+  let emccMode: 'path' | 'emsdk' | null = null;
+  try {
+    execSync('emcc --version', { stdio: 'ignore', timeout: 30_000 });
+    emccMode = 'path';
+  } catch {
+    if (existsSync(EMSDK_ENV) && existsSync(BASH)) {
+      emccMode = 'emsdk';
+    } else {
+      missing.push(
+        `emcc is not on PATH and no emsdk env script at ${EMSDK_ENV} (set EMSDK_ENV to your emsdk_env.sh)`,
+      );
+    }
+  }
+  if (!existsSync(LVGL_ROOT)) {
+    missing.push(`LVGL checkout not found at ${LVGL_ROOT} (set LVGL_ROOT)`);
+  }
+  if (!existsSync(LVGL_LIB)) {
+    missing.push(`liblvgl_emcc.a not found at ${LVGL_LIB} (run wasm/build_lvgl_lib.sh or set LVGL_LIB)`);
+  }
+  if (!existsSync(join(LV_CONF_DIR, 'lv_conf.h'))) {
+    missing.push(`lv_conf.h not found in ${LV_CONF_DIR} (set LV_CONF_DIR)`);
+  }
+  return { emccMode, missing };
+}
+
+const { emccMode, missing } = detectToolchain();
+if (missing.length > 0) {
+  console.warn(
+    `[compile.test] Skipping compile verification tests:\n  - ${missing.join('\n  - ')}`,
+  );
+}
 
 const MAIN_C = `
 #include "ui.h"
@@ -63,16 +105,15 @@ function compileGenerated(
 
     const sourceFiles = ['main.c', 'ui.c', 'ui_events.c', 'ui_logic.c', ...extraCFiles];
 
-    const cmd = [
-      `source ${EMSDK_ENV} 2>/dev/null &&`,
+    const emccCmd = [
       `emcc ${sourceFiles.join(' ')}`,
       `-O0 -DLV_CONF_INCLUDE_SIMPLE`,
-      `-I/home/xcssa/.openclaw/workspace/tools`,
-      `-I${LVGL_ROOT}`,
-      `-I${LVGL_ROOT}/src`,
-      `-I${LV_CONF_DIR}`,
+      `"-I${dirname(LVGL_ROOT)}"`,
+      `"-I${LVGL_ROOT}"`,
+      `"-I${join(LVGL_ROOT, 'src')}"`,
+      `"-I${LV_CONF_DIR}"`,
       `-I.`,
-      LVGL_LIB,
+      `"${LVGL_LIB}"`,
       `-sALLOW_MEMORY_GROWTH=1`,
       `-Wno-unused-function`,
       `-Wno-implicit-function-declaration`,
@@ -80,25 +121,28 @@ function compileGenerated(
       ...extraFlags,
       `-o output.js`,
     ].join(' ');
+    const cmd =
+      emccMode === 'emsdk' ? `source ${EMSDK_ENV} 2>/dev/null && ${emccCmd}` : emccCmd;
 
     execSync(cmd, {
       cwd: tmpDir,
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 60_000,
-      shell: '/bin/bash',
+      ...(emccMode === 'emsdk' ? { shell: BASH } : {}),
     });
     return { success: true, stderr: '' };
-  } catch (err: any) {
+  } catch (err) {
+    const e = err as { stderr?: { toString(): string }; message?: string };
     return {
       success: false,
-      stderr: err.stderr?.toString() ?? err.message,
+      stderr: e.stderr?.toString() ?? e.message ?? String(err),
     };
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
-describe('Compile verification', { timeout: 300_000 }, () => {
+describe.skipIf(missing.length > 0)('Compile verification', { timeout: 300_000 }, () => {
   // ── 1. Empty project (no screens) ──
   it('compiles empty project', { timeout: 30_000 }, () => {
     const code = generateCode([], defaultOptions());
