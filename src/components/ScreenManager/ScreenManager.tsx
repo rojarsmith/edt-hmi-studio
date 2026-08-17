@@ -8,7 +8,27 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { MAX_SCREEN_GROUP_DEPTH } from '../../types';
 import type { Screen, ScreenGroup } from '../../types';
+import PanelChevron from '../LogicEditor/PanelChevron';
 import './ScreenManager.css';
+
+// Line-drawn "new group" glyph, matching the panel's monochrome icon
+// language (same stroke treatment as PanelChevron).
+const FolderPlusIcon: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M1.5 4.5a1 1 0 0 1 1-1H6l1.5 1.5h6a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1Z"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M8 7.75v3.5M6.25 9.5h3.5"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+    />
+  </svg>
+);
 
 interface PendingDelete {
   kind: 'screen' | 'group';
@@ -23,6 +43,13 @@ interface RenameState {
 
 /** Stand-in group id for "no group", so the root area can be a drop target. */
 const ROOT_DROP = '__root__';
+
+// Resize limits, mirroring the other collapsible managers: the panel keeps
+// room for its own header, the component palette above keeps its minimum,
+// and the hierarchy panel below keeps whatever height it currently holds.
+const MIN_PANEL_HEIGHT = 120;
+const MIN_ABOVE_HEIGHT = 160;
+const DEFAULT_PANEL_HEIGHT = 220;
 
 const ScreenManager: React.FC = () => {
   const screens = useEditorStore(s => s.screens);
@@ -41,7 +68,45 @@ const ScreenManager: React.FC = () => {
   const moveScreenToGroup = useEditorStore(s => s.moveScreenToGroup);
 
   const [collapsed, setCollapsed] = useState(false);
+  const [panelHeight, setPanelHeight] = useState(DEFAULT_PANEL_HEIGHT);
+  const [resizing, setResizing] = useState(false);
   const [query, setQuery] = useState('');
+
+  // Top-edge drag, like the graph manager and hierarchy panel: pulling up
+  // grows this panel at the component palette's expense.
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startHeight = panelHeight;
+      const leftPanel = e.currentTarget.closest('.left-panel');
+      const hierarchyHeight =
+        leftPanel?.querySelector('.hierarchy-panel')?.getBoundingClientRect().height ?? 0;
+      const maxHeight = leftPanel
+        ? Math.max(
+            MIN_PANEL_HEIGHT,
+            leftPanel.clientHeight - MIN_ABOVE_HEIGHT - hierarchyHeight,
+          )
+        : startHeight;
+      setResizing(true);
+
+      const onMove = (ev: PointerEvent) => {
+        setPanelHeight(
+          Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT, startHeight + startY - ev.clientY)),
+        );
+      };
+      const onUp = () => {
+        setResizing(false);
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    },
+    [panelHeight],
+  );
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
   const [renaming, setRenaming] = useState<RenameState | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -251,7 +316,9 @@ const ScreenManager: React.FC = () => {
           onClick={() => handleToggleGroup(group.id)}
           onDoubleClick={() => setRenaming({ id: group.id, value: group.name })}
         >
-          <span className="sm-caret">{isCollapsed ? '▸' : '▾'}</span>
+          <span className="sm-caret">
+            <PanelChevron open={!isCollapsed} className="sm-row-chevron" />
+          </span>
           <span className="sm-icon">📁</span>
           {renaming?.id === group.id ? (
             renderRenameInput(group.id)
@@ -280,7 +347,7 @@ const ScreenManager: React.FC = () => {
             title={`New group in ${group.name}`}
             aria-label={`New group in ${group.name}`}
           >
-            📁
+            <FolderPlusIcon />
           </button>
           <button
             type="button"
@@ -312,19 +379,25 @@ const ScreenManager: React.FC = () => {
     rootScreens.length > 0 || rootGroups.some(groupMatches);
 
   return (
-    <div className={`screen-manager ${collapsed ? 'collapsed' : ''}`}>
-      <div className="sm-header">
-        <button
-          type="button"
-          className="sm-collapse-toggle"
-          onClick={() => setCollapsed(c => !c)}
-          title={collapsed ? 'Expand screen manager' : 'Collapse screen manager'}
-          aria-expanded={!collapsed}
-        >
-          <span className="sm-caret">{collapsed ? '▸' : '▾'}</span>
-          <h3>🖥️ Screens</h3>
-        </button>
-        <div className="sm-header-actions">
+    <div
+      className={`screen-manager ${collapsed ? 'collapsed' : ''}`}
+      style={collapsed ? undefined : { height: panelHeight }}
+    >
+      {!collapsed && (
+        <div
+          className={`sm-resizer ${resizing ? 'resizing' : ''}`}
+          onPointerDown={handleResizeStart}
+        />
+      )}
+      <div
+        className="sm-header"
+        onClick={() => setCollapsed(c => !c)}
+        title={collapsed ? 'Expand' : 'Collapse'}
+      >
+        <PanelChevron open={!collapsed} className="sm-toggle" />
+        <span className="sm-title">Screens</span>
+        <span className="sm-count">{screens.length}</span>
+        <div className="sm-header-actions" onClick={e => e.stopPropagation()}>
           <button
             type="button"
             className="sm-header-btn"
@@ -341,7 +414,7 @@ const ScreenManager: React.FC = () => {
             title="New screen group"
             aria-label="New screen group"
           >
-            📁
+            <FolderPlusIcon />
           </button>
         </div>
       </div>
