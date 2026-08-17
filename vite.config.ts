@@ -34,6 +34,20 @@ function compilePreviewModulePlugin(enableCompilePreview: boolean): Plugin {
   }
 }
 
+/**
+ * Replaces %APP_VERSION% in index.html with the package version, so the
+ * splash screen can show it before any JS runs. `define` only reaches JS,
+ * not HTML, hence this tiny transform.
+ */
+function appVersionHtmlPlugin(): Plugin {
+  return {
+    name: 'app-version-html',
+    transformIndexHtml(html) {
+      return html.replaceAll('%APP_VERSION%', pkg.version)
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -50,6 +64,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
+      appVersionHtmlPlugin(),
       compilePreviewModulePlugin(enableCompilePreview),
       hmiPlugin(),
       ...(enableCompilePreview ? [compilePlugin()] : []),
