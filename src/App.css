@@ -42,51 +42,11 @@ body {
   gap: 16px;
 }
 
-.app-logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.back-to-list-btn {
-  background: none;
-  border: none;
-  color: #888;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 4px;
-  transition: color 0.15s, background 0.15s;
-}
-
-.back-to-list-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.logo-icon {
-  font-size: 20px;
-}
-
-.logo-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.project-name-display {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Main tabs */
 .app-tabs {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-left: 16px;
 }
 
 .tab-btn {

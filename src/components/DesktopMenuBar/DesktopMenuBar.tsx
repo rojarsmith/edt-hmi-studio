@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { isDesktopHostAvailable } from '../../utils/desktopHost';
 import { useAppStore } from '../../store/appStore';
 import './DesktopMenuBar.css';
@@ -19,6 +19,8 @@ interface MenuAction {
   label: string;
   shortcut?: string;
   active?: boolean;
+  /** Draw a separator line above this item. */
+  dividerBefore?: boolean;
   onClick: () => void;
 }
 
@@ -42,6 +44,7 @@ interface DesktopMenuBarProps {
   onOpenSettings: () => void;
   onOpenHelp: () => void;
   onOpenAbout: () => void;
+  onExitProject: () => void;
 }
 
 const DesktopMenuBar = ({
@@ -58,6 +61,7 @@ const DesktopMenuBar = ({
   onOpenSettings,
   onOpenHelp,
   onOpenAbout,
+  onExitProject,
 }: DesktopMenuBarProps) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [confirmExitDevMode, setConfirmExitDevMode] = useState(false);
@@ -88,6 +92,9 @@ const DesktopMenuBar = ({
           { id: 'save', label: 'Save Project', shortcut: 'Ctrl+S', onClick: onSaveProject },
           { id: 'export', label: 'Export Project', onClick: onExportProject },
           { id: 'import', label: 'Import Project', onClick: onImportProject },
+          // Leaves the editor for the project list; kept apart from the file
+          // operations above, like a classic File menu's exit entry.
+          { id: 'exit', label: 'Exit Project', dividerBefore: true, onClick: onExitProject },
         ] satisfies MenuAction[],
       },
       {
@@ -135,6 +142,7 @@ const DesktopMenuBar = ({
     [
       activeTab,
       factoryDevMode,
+      onExitProject,
       onExportProject,
       onImportProject,
       onNewProject,
@@ -169,15 +177,17 @@ const DesktopMenuBar = ({
             {openMenuId === menu.id && (
               <div className="desktop-menu-dropdown">
                 {menu.items.map(item => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`desktop-menu-item ${item.active ? 'active' : ''}`}
-                    onClick={() => handleMenuAction(item)}
-                  >
-                    <span className="desktop-menu-item-label">{item.label}</span>
-                    {item.shortcut && <span className="desktop-menu-shortcut">{item.shortcut}</span>}
-                  </button>
+                  <Fragment key={item.id}>
+                    {item.dividerBefore && <div className="desktop-menu-separator" />}
+                    <button
+                      type="button"
+                      className={`desktop-menu-item ${item.active ? 'active' : ''}`}
+                      onClick={() => handleMenuAction(item)}
+                    >
+                      <span className="desktop-menu-item-label">{item.label}</span>
+                      {item.shortcut && <span className="desktop-menu-shortcut">{item.shortcut}</span>}
+                    </button>
+                  </Fragment>
                 ))}
               </div>
             )}

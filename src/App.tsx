@@ -299,6 +299,9 @@ const EditorView: React.FC<EditorViewProps> = ({
   }, [currentProjectId, screens, screenGroups, typographies, typographyGroups, languages, texts, textGroups, images, fonts, saveProjectData, goToProjectList]);
 
   const handleBackToList = useCallback(async () => {
+    if (!(await modal.confirm('Return to the project list? The current project will be saved automatically.'))) {
+      return;
+    }
     // Save current project first
     if (currentProjectId) {
       try {
@@ -575,17 +578,10 @@ const EditorView: React.FC<EditorViewProps> = ({
           onOpenSettings={() => setShowProjectSettings(true)}
           onOpenHelp={() => setShowHelpPanel(true)}
           onOpenAbout={() => setShowAboutDialog(true)}
+          onExitProject={handleBackToList}
         />
 
         <div className="app-command-bar">
-          <div className="app-logo">
-            <button className="back-to-list-btn" onClick={handleBackToList} title="Back to project list">
-              ◀
-            </button>
-            <span className="logo-icon">📐</span>
-            <span className="logo-text project-name-display">{projectName || 'EDT HMI Studio'}</span>
-          </div>
-
           {/* Main tabs */}
           <div className="app-tabs">
             <button
@@ -657,6 +653,7 @@ const EditorView: React.FC<EditorViewProps> = ({
             <ToolbarButton icon="💾" label="Save" onClick={handleSaveProject} shortcut="Ctrl+S" />
             <ToolbarButton icon="📤" label="Export" onClick={handleExportProject} />
             <ToolbarButton icon="📥" label="Import" onClick={handleImportProject} />
+            <ToolbarButton icon="🚪" label="Exit Project" onClick={handleBackToList} />
             <div className="toolbar-divider" />
             <ToolbarButton icon="↩️" label="Undo" onClick={() => useEditorStore.getState().undo()} shortcut="Ctrl+Z" />
             <ToolbarButton icon="↪️" label="Redo" onClick={() => useEditorStore.getState().redo()} shortcut="Ctrl+Y" />

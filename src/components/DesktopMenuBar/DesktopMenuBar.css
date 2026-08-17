@@ -85,6 +85,12 @@
   font-size: 11px;
 }
 
+.desktop-menu-separator {
+  height: 1px;
+  margin: 6px 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .desktop-menu-meta {
   display: flex;
   align-items: center;
