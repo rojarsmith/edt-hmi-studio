@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { componentCategories, getComponentsByCategory } from '../../utils/componentDefinitions';
 import type { ComponentDefinition, ComponentCategory } from '../../types';
+import PanelChevron from '../LogicEditor/PanelChevron';
 import './ComponentPanel.css';
 
 interface DraggableComponentProps {
@@ -45,10 +46,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
 }) => {
   return (
     <div className="category-section">
+      {/* Same header language as the screen manager: left twisty, no icon. */}
       <div className="category-header" onClick={onToggle}>
-        <span className="category-icon">{category.icon}</span>
+        <PanelChevron open={!isCollapsed} className="category-chevron" />
         <span className="category-name">{category.name}</span>
-        <span className={`collapse-icon ${isCollapsed ? 'collapsed' : ''}`}>▼</span>
       </div>
       {!isCollapsed && (
         <div className="category-components">

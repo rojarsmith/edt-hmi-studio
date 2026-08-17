@@ -56,6 +56,29 @@ function nextScreenName(screens: Screen[]): string {
   return nextDefaultName(screens, 'Screen');
 }
 
+/**
+ * First unused `${base}_${N}` component id across every screen, children
+ * included. Same rule as nextDefaultName: numbers freed by deletions are
+ * reused before the count grows, and N starts at 1.
+ */
+function nextComponentName(screens: Screen[], base: string): string {
+  const prefix = `${base}_`;
+  const used = new Set<number>();
+  const visit = (components: LvglComponent[]) => {
+    for (const component of components) {
+      if (component.name.startsWith(prefix)) {
+        const suffix = component.name.slice(prefix.length);
+        if (/^\d+$/.test(suffix)) used.add(Number(suffix));
+      }
+      visit(component.children);
+    }
+  };
+  for (const screen of screens) visit(screen.components);
+  let n = 1;
+  while (used.has(n)) n += 1;
+  return `${prefix}${n}`;
+}
+
 function nextGroupName(groups: ScreenGroup[]): string {
   return nextDefaultName(groups, 'Group');
 }
@@ -853,7 +876,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newComponent: LvglComponent = {
       id,
       type,
-      name: `${definition.name}_${id.slice(0, 4)}`,
+      name: nextComponentName(get().screens, definition.name),
       x: finalX,
       y: finalY,
       width: definition.defaultWidth,

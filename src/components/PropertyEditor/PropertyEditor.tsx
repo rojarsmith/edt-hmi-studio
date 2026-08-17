@@ -358,8 +358,8 @@ const PropertyEditor: React.FC = () => {
           <h3>Properties</h3>
         </div>
         <div className="no-selection">
-          <p>No widget selected</p>
-          <p className="hint">Select a widget on the canvas to edit it</p>
+          <p>No component selected</p>
+          <p className="hint">Select a component on the canvas to edit it</p>
         </div>
       </div>
     );
@@ -374,7 +374,7 @@ const PropertyEditor: React.FC = () => {
       <div className="property-sections">
         {/* Component Info */}
         <div className="property-section">
-          <div className="section-header">Widget Information</div>
+          <div className="section-header">Component</div>
           <div className="property-row">
             <label>Type</label>
             <div className="property-value readonly">
@@ -383,7 +383,7 @@ const PropertyEditor: React.FC = () => {
             </div>
           </div>
           <div className="property-row">
-            <label>Name</label>
+            <label>Id</label>
             <input
               type="text"
               value={component.name}
@@ -1489,9 +1489,9 @@ function TranslatableTextRow({
       <select
         value={resource?.id ?? ''}
         onChange={(e) => bindComponentToText(component.id, e.target.value || undefined)}
-        title="The text resource this widget shows"
+        title="The text resource this component shows"
       >
-        <option value="">(none — the widget's own text)</option>
+        <option value="">(none — the component's own text)</option>
         {texts.map((text) => (
           <option key={text.id} value={text.id}>
             {text.key}

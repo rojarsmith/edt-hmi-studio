@@ -74,6 +74,7 @@
 .category-header {
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   cursor: pointer;
   user-select: none;
@@ -84,9 +85,14 @@
   background: #e8e8e8;
 }
 
-.category-icon {
-  font-size: 14px;
-  margin-right: 8px;
+.category-chevron {
+  flex-shrink: 0;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+
+.category-chevron.open {
+  transform: rotate(90deg);
 }
 
 .category-name {
@@ -94,16 +100,6 @@
   font-size: 13px;
   font-weight: 500;
   color: #444;
-}
-
-.collapse-icon {
-  font-size: 10px;
-  color: #888;
-  transition: transform 0.2s;
-}
-
-.collapse-icon.collapsed {
-  transform: rotate(-90deg);
 }
 
 .category-components {

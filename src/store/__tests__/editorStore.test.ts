@@ -55,6 +55,39 @@ describe('editorStore', () => {
       expect(screen.components[0].children[0].type).toBe('label');
     });
 
+    it('numbers component ids from 1 per type, without duplicates', () => {
+      const store = useEditorStore.getState();
+      store.addComponent('btn', 0, 0);
+      store.addComponent('btn', 10, 10);
+      store.addComponent('label', 20, 20);
+      const screen = () =>
+        useEditorStore.getState().screens.find(p => p.id === useEditorStore.getState().currentScreenId)!;
+      expect(screen().components.map(c => c.name)).toEqual(['Button_1', 'Button_2', 'Label_1']);
+    });
+
+    it('reuses a freed number before growing the count', () => {
+      const store = useEditorStore.getState();
+      const first = store.addComponent('btn', 0, 0);
+      store.addComponent('btn', 10, 10);
+      store.deleteComponents([first]);
+      store.addComponent('btn', 20, 20);
+      const state = useEditorStore.getState();
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      // Button_1 was deleted, so the gap fills before Button_3 is handed out.
+      expect(screen.components.map(c => c.name).sort()).toEqual(['Button_1', 'Button_2']);
+    });
+
+    it('counts names on children and other screens when numbering', () => {
+      const store = useEditorStore.getState();
+      const parentId = store.addComponent('obj', 0, 0);
+      store.addComponent('btn', 5, 5, parentId);
+      store.addComponent('btn', 10, 10);
+      const state = useEditorStore.getState();
+      const screen = state.screens.find(p => p.id === state.currentScreenId)!;
+      expect(screen.components[0].children[0].name).toBe('Button_1');
+      expect(screen.components[1].name).toBe('Button_2');
+    });
+
     it('should return empty string for unknown component type', () => {
       const store = useEditorStore.getState();
       const id = store.addComponent('nonexistent', 0, 0);
