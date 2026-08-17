@@ -264,12 +264,6 @@ export function useKeyboardShortcuts() {
       window.dispatchEvent(new CustomEvent('save-project'));
     }
 
-    // Open: Ctrl+O
-    if (isMod && e.key === 'o') {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('open-project'));
-    }
-
     // New: Ctrl+N
     if (isMod && e.key === 'n') {
       e.preventDefault();

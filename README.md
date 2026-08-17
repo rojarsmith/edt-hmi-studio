@@ -173,7 +173,6 @@ The desktop shell enables NativeWebHost's VSCode-style built-in title bar by def
 | Shortcut | Action |
 |--------|------|
 | `Ctrl + N` | New project |
-| `Ctrl + O` | Open project |
 | `Ctrl + S` | Save project |
 | `F1` / `?` | Show help |
 

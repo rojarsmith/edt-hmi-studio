@@ -342,18 +342,15 @@ const EditorView: React.FC<EditorViewProps> = ({
   useEffect(() => {
     const handleToggleHelp = () => setShowHelpPanel(prev => !prev);
     const handleSaveProjectEvt = () => handleSaveProject();
-    const handleOpenProject = () => handleImportProject();
     const handleNewProject = () => handleNewProjectClick();
 
     window.addEventListener('toggle-help-panel', handleToggleHelp);
     window.addEventListener('save-project', handleSaveProjectEvt);
-    window.addEventListener('open-project', handleOpenProject);
     window.addEventListener('new-project', handleNewProject);
 
     return () => {
       window.removeEventListener('toggle-help-panel', handleToggleHelp);
       window.removeEventListener('save-project', handleSaveProjectEvt);
-      window.removeEventListener('open-project', handleOpenProject);
       window.removeEventListener('new-project', handleNewProject);
     };
   }, [handleSaveProject, handleNewProjectClick]);
@@ -592,7 +589,6 @@ const EditorView: React.FC<EditorViewProps> = ({
           projectName={projectName}
           activeTab={effectiveTab}
           onNewProject={handleNewProjectClick}
-          onOpenProject={handleImportProject}
           onSaveProject={handleSaveProject}
           onExportProject={handleExportProject}
           onImportProject={handleImportProject}

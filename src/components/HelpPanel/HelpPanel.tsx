@@ -52,7 +52,6 @@ const shortcutGroups: ShortcutGroup[] = [
     shortcuts: [
       { keys: 'F1 / ?', description: 'Show keyboard shortcut help' },
       { keys: 'Ctrl + S', description: 'Save project' },
-      { keys: 'Ctrl + O', description: 'Open project' },
       { keys: 'Ctrl + N', description: 'Create new project' },
     ],
   },

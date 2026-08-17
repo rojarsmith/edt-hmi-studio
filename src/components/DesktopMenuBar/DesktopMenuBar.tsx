@@ -34,7 +34,6 @@ interface DesktopMenuBarProps {
   projectName: string;
   activeTab: EditorTab;
   onNewProject: () => void;
-  onOpenProject: () => void;
   onSaveProject: () => void;
   onExportProject: () => void;
   onImportProject: () => void;
@@ -51,7 +50,6 @@ const DesktopMenuBar = ({
   projectName,
   activeTab,
   onNewProject,
-  onOpenProject,
   onSaveProject,
   onExportProject,
   onImportProject,
@@ -88,7 +86,6 @@ const DesktopMenuBar = ({
         label: 'File',
         items: [
           { id: 'new', label: 'New Project', shortcut: 'Ctrl+N', onClick: onNewProject },
-          { id: 'open', label: 'Open Project', shortcut: 'Ctrl+O', onClick: onOpenProject },
           { id: 'save', label: 'Save Project', shortcut: 'Ctrl+S', onClick: onSaveProject },
           { id: 'export', label: 'Export Project', onClick: onExportProject },
           { id: 'import', label: 'Import Project', onClick: onImportProject },
@@ -148,7 +145,6 @@ const DesktopMenuBar = ({
       onNewProject,
       onOpenAbout,
       onOpenHelp,
-      onOpenProject,
       onOpenSettings,
       onRedo,
       onSaveProject,

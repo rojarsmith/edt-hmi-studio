@@ -173,7 +173,6 @@ dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net10.0-windo
 | 快捷鍵 | 功能 |
 |--------|------|
 | `Ctrl + N` | 新增專案 |
-| `Ctrl + O` | 開啟專案 |
 | `Ctrl + S` | 儲存專案 |
 | `F1` / `?` | 顯示說明 |
 
