@@ -1,28 +1,75 @@
 /* Hierarchy Panel Styles - Light theme to match ComponentPanel */
 
+/* Structure mirrors the logic editor's GraphManager: collapsible header with
+   a left twisty, count badge, and a draggable top edge. Light palette to fit
+   the panels around it. */
 .hierarchy-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex-shrink: 0;
+  position: relative;
   background: #f8f9fa;
   color: #333;
   font-size: 13px;
+  /* Whatever height the drag stored, the panels above keep their minimum. */
+  max-height: calc(100% - 220px);
+}
+
+/* Resize handle straddling the border with the panels above */
+.hierarchy-resizer {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 5;
+}
+
+.hierarchy-resizer:hover,
+.hierarchy-resizer.resizing {
+  background: rgba(33, 150, 243, 0.35);
 }
 
 .hierarchy-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   border-bottom: 1px solid #e0e0e0;
   background: #fff;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
 }
 
-.hierarchy-header h3 {
-  margin: 0;
-  font-size: 14px;
+.hierarchy-header:hover {
+  background: #f0f0f0;
+}
+
+.hierarchy-toggle {
+  flex-shrink: 0;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+
+.hierarchy-toggle.open {
+  transform: rotate(90deg);
+}
+
+.hierarchy-title {
+  flex: 1;
+  font-size: 13px;
   font-weight: 600;
   color: #333;
+}
+
+.hierarchy-count {
+  font-size: 11px;
+  color: #777;
+  background: #ececec;
+  border-radius: 8px;
+  padding: 1px 7px;
 }
 
 .hierarchy-actions {
@@ -89,14 +136,13 @@
   opacity: 0.5;
 }
 
-/* Expand button */
+/* Expand button — the same twisty as the panel header */
 .expand-btn {
   width: 16px;
   height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
   color: #888;
   flex-shrink: 0;
 }
@@ -107,6 +153,14 @@
 
 .expand-btn.has-children:hover {
   color: #333;
+}
+
+.tree-expand-chevron {
+  transition: transform 0.15s ease;
+}
+
+.tree-expand-chevron.open {
+  transform: rotate(90deg);
 }
 
 /* Type icon */

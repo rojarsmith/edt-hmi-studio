@@ -196,9 +196,10 @@ body {
   min-height: 0;
 }
 
+/* The hierarchy panel manages its own height: a stored value while expanded
+   (drag its top edge), header-only when collapsed. */
 .left-panel > *:last-child {
-  flex: 1;
-  overflow-y: auto;
+  flex: 0 0 auto;
   min-height: 0;
   border-top: 1px solid #e0e0e0;
 }

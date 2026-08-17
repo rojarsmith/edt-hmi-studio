@@ -3,7 +3,14 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import type { LvglComponent } from '../../types';
+import PanelChevron from '../LogicEditor/PanelChevron';
 import './HierarchyPanel.css';
+
+// Resize limits, mirroring the logic editor's GraphManager: the panel keeps
+// room for its own header, and the panels above keep room to stay usable.
+const MIN_PANEL_HEIGHT = 120;
+const MIN_ABOVE_HEIGHT = 220;
+const DEFAULT_PANEL_HEIGHT = 280;
 
 /**
  * The component array is stored back-to-front: index 0 is created first and so
@@ -168,7 +175,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         onDragEnd={handleDragEnd}
         onDrop={handleDrop}
       >
-        {/* Expand/Collapse button */}
+        {/* Expand/Collapse button — same twisty as the panel header */}
         <span
           className={`expand-btn ${hasChildren ? 'has-children' : ''}`}
           onClick={(e) => {
@@ -176,7 +183,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             if (hasChildren) onToggleExpand(component.id);
           }}
         >
-          {hasChildren ? (isExpanded ? '▼' : '▶') : ''}
+          {hasChildren && <PanelChevron open={isExpanded} className="tree-expand-chevron" />}
         </span>
         
         {/* Type icon */}
@@ -263,9 +270,47 @@ const HierarchyPanel: React.FC = () => {
   
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  
+  const [panelExpanded, setPanelExpanded] = useState(true);
+  const [panelHeight, setPanelHeight] = useState(DEFAULT_PANEL_HEIGHT);
+  const [resizing, setResizing] = useState(false);
+
   const currentScreen = screens.find(p => p.id === currentScreenId);
   const components = useMemo(() => currentScreen?.components || [], [currentScreen?.components]);
+
+  const componentCount = useMemo(() => {
+    const count = (comps: LvglComponent[]): number =>
+      comps.reduce((sum, comp) => sum + 1 + count(comp.children), 0);
+    return count(components);
+  }, [components]);
+
+  // Same drag behaviour as the logic editor's GraphManager: the panel is
+  // bottom-docked, so dragging its top edge up grows it.
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startHeight = panelHeight;
+      const leftPanel = e.currentTarget.closest('.left-panel');
+      const maxHeight = leftPanel
+        ? Math.max(MIN_PANEL_HEIGHT, leftPanel.clientHeight - MIN_ABOVE_HEIGHT)
+        : startHeight;
+      setResizing(true);
+
+      const onMove = (ev: PointerEvent) => {
+        setPanelHeight(Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT, startHeight + startY - ev.clientY)));
+      };
+      const onUp = () => {
+        setResizing(false);
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    },
+    [panelHeight],
+  );
   
   const handleSelect = useCallback((id: string, addToSelection: boolean) => {
     selectComponent(id, addToSelection);
@@ -372,10 +417,22 @@ const HierarchyPanel: React.FC = () => {
   }, []);
   
   return (
-    <div className="hierarchy-panel">
-      <div className="hierarchy-header">
-        <h3>📋 Hierarchy</h3>
-        <div className="hierarchy-actions">
+    <div className="hierarchy-panel" style={panelExpanded ? { height: panelHeight } : undefined}>
+      {panelExpanded && (
+        <div
+          className={`hierarchy-resizer ${resizing ? 'resizing' : ''}`}
+          onPointerDown={handleResizeStart}
+        />
+      )}
+      <div
+        className="hierarchy-header"
+        onClick={() => setPanelExpanded(prev => !prev)}
+        title={panelExpanded ? 'Collapse' : 'Expand'}
+      >
+        <PanelChevron open={panelExpanded} className="hierarchy-toggle" />
+        <span className="hierarchy-title">Hierarchy</span>
+        <span className="hierarchy-count">{componentCount}</span>
+        <div className="hierarchy-actions" onClick={e => e.stopPropagation()}>
           <button
             className="hierarchy-btn"
             onClick={handleExpandAll}
@@ -392,36 +449,38 @@ const HierarchyPanel: React.FC = () => {
           </button>
         </div>
       </div>
-      
-      <div
-        className="hierarchy-tree"
-        onDragOver={handleDragOverRoot}
-        onDrop={handleDropOnRoot}
-      >
-        {components.length === 0 ? (
-          <div className="empty-message">
-            No components
-          </div>
-        ) : (
-          toDisplayOrder(components).map(comp => (
-            <TreeNode
-              key={comp.id}
-              component={comp}
-              depth={0}
-              onSelect={handleSelect}
-              onToggleVisibility={handleToggleVisibility}
-              onToggleLock={handleToggleLock}
-              onRename={handleRename}
-              onDragStart={handleDragStart}
-              onDrop={handleDrop}
-              selectedIds={selection.selectedIds}
-              draggedId={draggedId}
-              expandedIds={expandedIds}
-              onToggleExpand={handleToggleExpand}
-            />
-          ))
-        )}
-      </div>
+
+      {panelExpanded && (
+        <div
+          className="hierarchy-tree"
+          onDragOver={handleDragOverRoot}
+          onDrop={handleDropOnRoot}
+        >
+          {components.length === 0 ? (
+            <div className="empty-message">
+              No components
+            </div>
+          ) : (
+            toDisplayOrder(components).map(comp => (
+              <TreeNode
+                key={comp.id}
+                component={comp}
+                depth={0}
+                onSelect={handleSelect}
+                onToggleVisibility={handleToggleVisibility}
+                onToggleLock={handleToggleLock}
+                onRename={handleRename}
+                onDragStart={handleDragStart}
+                onDrop={handleDrop}
+                selectedIds={selection.selectedIds}
+                draggedId={draggedId}
+                expandedIds={expandedIds}
+                onToggleExpand={handleToggleExpand}
+              />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 };
