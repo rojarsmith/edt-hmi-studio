@@ -19,11 +19,13 @@ interface NewProjectDialogProps {
     display: DisplayConfig,
     lvglConfig: LvglConfig,
     protocol: ProtocolId,
+    description: string,
   ) => void;
 }
 
 const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }) => {
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [boardId, setBoardId] = useState<BoardId>(DEFAULT_BOARD_ID);
   const [protocol, setProtocol] = useState<ProtocolId>(
     () => getBoardProtocols(DEFAULT_BOARD_ID)[0],
@@ -52,7 +54,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
       symbolFont: DEFAULT_LVGL_CONFIG.symbolFont,
       memSize: board.lvgl.memSizeKb,
     };
-    onCreate(projectName, boardId, display, lvglConfig, protocol);
+    onCreate(projectName, boardId, display, lvglConfig, protocol, description);
   };
 
   return (
@@ -70,6 +72,18 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
               onChange={e => setName(e.target.value)}
               placeholder="Untitled Project"
               autoFocus
+            />
+          </label>
+
+          {/* Optional; shown on the project card. */}
+          <label className="npd-label">
+            Description
+            <input
+              className="npd-input"
+              type="text"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Optional one-line summary"
             />
           </label>
 

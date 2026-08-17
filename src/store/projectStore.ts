@@ -52,6 +52,13 @@ export interface LvglConfig {
 export interface ProjectConfig {
   id: string;
   name: string;
+  /** Optional one-line summary shown on the project card. */
+  description?: string;
+  /**
+   * Optional custom card thumbnail as a data URI. Absent means the card
+   * renders a schematic of the entry screen instead.
+   */
+  thumbnail?: string;
   createdAt: number;
   updatedAt: number;
   boardId: BoardId;
@@ -97,6 +104,11 @@ export interface ProjectResource {
 export interface ProjectListItem {
   config: ProjectConfig;
   size: number; // approximate bytes
+  /**
+   * The project's first screen, kept for the card's schematic thumbnail.
+   * Null for a project whose data record is missing.
+   */
+  entryScreen: Screen | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -389,7 +401,7 @@ interface ProjectStoreState {
   // Actions
   init: () => Promise<void>;
   refreshList: () => Promise<void>;
-  createProject: (name: string, boardId: BoardId, display: DisplayConfig, lvglConfig: LvglConfig, protocol?: ProtocolId) => Promise<string>;
+  createProject: (name: string, boardId: BoardId, display: DisplayConfig, lvglConfig: LvglConfig, protocol?: ProtocolId, description?: string) => Promise<string>;
   /**
    * Resolves once every configuration write issued so far has landed. Panels
    * that edit configuration debounce their saves, so an action on another tab —
@@ -437,19 +449,20 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       for (const r of resources) {
         size += JSON.stringify(r.data).length;
       }
-      items.push({ config, size });
+      items.push({ config, size, entryScreen: data?.screens?.[0] ?? null });
     }
     // Sort by updatedAt descending
     items.sort((a, b) => b.config.updatedAt - a.config.updatedAt);
     set({ projects: items });
   },
 
-  createProject: async (name, boardId, display, lvglConfig, protocol) => {
+  createProject: async (name, boardId, display, lvglConfig, protocol, description) => {
     const id = uuidv4();
     const now = Date.now();
     const config: ProjectConfig = {
       id,
       name,
+      description: description?.trim() || undefined,
       createdAt: now,
       updatedAt: now,
       boardId,
@@ -618,6 +631,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     const projectFile: ProjectFile = {
       version: '1.0.0',
       name: config.name,
+      description: config.description,
+      thumbnail: config.thumbnail,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
       canvasSize: { width: config.display.width, height: config.display.height },
@@ -673,6 +688,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     const config: ProjectConfig = normalizeProjectConfig({
       id,
       name: name || file.name || 'Imported Project',
+      description: file.description,
+      thumbnail: file.thumbnail,
       createdAt: now,
       updatedAt: now,
       boardId,

@@ -126,6 +126,10 @@ export interface ResourceStore {
 export interface ProjectFile {
   version: string;
   name: string;
+  /** Optional one-line summary shown on the project card. */
+  description?: string;
+  /** Optional custom card thumbnail as a data URI. */
+  thumbnail?: string;
   createdAt: number;
   updatedAt: number;
   canvasSize: {

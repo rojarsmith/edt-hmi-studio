@@ -9,8 +9,11 @@ import { loadProjectFromFile, loadAutoSavedProject, clearAutoSave } from '../../
 import { modal } from '../Modal';
 import { toast } from '../Toast';
 import ProjectCard from './ProjectCard';
+import DemoCard from './DemoCard';
 import NewProjectDialog from './NewProjectDialog';
 import AboutDialog from '../AboutDialog';
+import { DEMO_PROJECTS, type DemoEntry } from '../../demos';
+import type { ProjectFile } from '../../resources/types';
 import type { Screen } from '../../types';
 import type { BoardId, ProtocolId } from '../../types/hmi';
 import tealLogo from '../../assets/logo-square-teal.svg';
@@ -27,6 +30,8 @@ const ProjectListPage: React.FC = () => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [migrationChecked, setMigrationChecked] = useState(false);
+  const [activeTab, setActiveTab] = useState<'projects' | 'demos'>('projects');
+  const [demoFiles, setDemoFiles] = useState<Record<string, ProjectFile>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +49,23 @@ const ProjectListPage: React.FC = () => {
     window.addEventListener('mousedown', handlePointerDown);
     return () => window.removeEventListener('mousedown', handlePointerDown);
   }, []);
+
+  // Load demo project files the first time the Demos tab is opened; they feed
+  // the cards' schematic thumbnails.
+  useEffect(() => {
+    if (activeTab !== 'demos' || Object.keys(demoFiles).length > 0) return;
+    let cancelled = false;
+    Promise.all(
+      DEMO_PROJECTS.map(async entry => [entry.id, await entry.load()] as const),
+    )
+      .then(pairs => {
+        if (!cancelled) setDemoFiles(Object.fromEntries(pairs));
+      })
+      .catch(err => toast.error('Failed to load demo projects: ' + String(err)));
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, demoFiles]);
 
   // Initialize store
   useEffect(() => {
@@ -108,9 +130,10 @@ const ProjectListPage: React.FC = () => {
     display: DisplayConfig,
     lvglConfig: LvglConfig,
     protocol: ProtocolId,
+    description: string,
   ) => {
     try {
-      const id = await createProject(name, boardId, display, lvglConfig, protocol);
+      const id = await createProject(name, boardId, display, lvglConfig, protocol, description);
       setShowNewDialog(false);
       await handleOpenProject(id);
     } catch (err) {
@@ -142,9 +165,56 @@ const ProjectListPage: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleUseDemo = async (entry: DemoEntry) => {
+    try {
+      const file = demoFiles[entry.id] ?? (await entry.load());
+      // Always a fresh copy: demos are immutable app assets, the import is
+      // the user's own editable project. The name is asked first so the copy
+      // does not land in the list under the demo's own title.
+      const name = await modal.prompt('Name the new project', file.name);
+      if (name === null) return;
+      const id = await importProject(
+        { ...file, description: file.description ?? entry.description },
+        name.trim() || file.name,
+      );
+      toast.success(`Demo "${file.name}" added to your projects`);
+      await handleOpenProject(id);
+    } catch (err) {
+      toast.error('Failed to open demo: ' + String(err));
+    }
+  };
+
+  // Editing a demo also works on a copy — bundled assets cannot be written in
+  // place. The copy keeps the demo's exact name; exporting it produces the
+  // JSON that replaces the file under examples/ to update the shipped demo.
+  const handleEditDemo = async (entry: DemoEntry) => {
+    try {
+      const file = demoFiles[entry.id] ?? (await entry.load());
+      const id = await importProject(
+        { ...file, description: file.description ?? entry.description },
+        file.name,
+      );
+      toast.success('Editing a copy — export it to update the shipped demo');
+      await handleOpenProject(id);
+    } catch (err) {
+      toast.error('Failed to open demo: ' + String(err));
+    }
+  };
+
   const filtered = search
-    ? projects.filter(p => p.config.name.toLowerCase().includes(search.toLowerCase()))
+    ? projects.filter(p =>
+        (p.config.name + ' ' + (p.config.description ?? ''))
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+      )
     : projects;
+
+  // Factory-only test projects stay hidden until the mode is unlocked.
+  const visibleDemos = DEMO_PROJECTS.filter(d => factoryDevMode || !d.factoryOnly).filter(
+    d =>
+      !search ||
+      (d.name + ' ' + d.description).toLowerCase().includes(search.toLowerCase()),
+  );
 
   // Same menu markup and classes as DesktopMenuBar so the dropdowns render
   // identically; that stylesheet is loaded globally via App.tsx.
@@ -223,42 +293,77 @@ const ProjectListPage: React.FC = () => {
       </div>
 
       <div className="plp-content">
+        <div className="plp-tabs">
+          <button
+            className={`plp-tab ${activeTab === 'projects' ? 'active' : ''}`}
+            onClick={() => setActiveTab('projects')}
+          >
+            My Projects
+          </button>
+          <button
+            className={`plp-tab ${activeTab === 'demos' ? 'active' : ''}`}
+            onClick={() => setActiveTab('demos')}
+          >
+            Demos
+          </button>
+        </div>
+
         <div className="plp-toolbar">
           <input
             className="plp-search"
             type="text"
-            placeholder="Search projects..."
+            placeholder={activeTab === 'demos' ? 'Search demos...' : 'Search projects...'}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          <div className="plp-actions">
-            <button className="plp-btn plp-btn-primary" onClick={() => setShowNewDialog(true)}>
-          + New Project
-            </button>
-            <button className="plp-btn" onClick={() => fileInputRef.current?.click()}>
-              📂 Import Project
-            </button>
-          </div>
+          {activeTab === 'projects' && (
+            <div className="plp-actions">
+              <button className="plp-btn plp-btn-primary" onClick={() => setShowNewDialog(true)}>
+            + New Project
+              </button>
+              <button className="plp-btn" onClick={() => fileInputRef.current?.click()}>
+                📂 Import Project
+              </button>
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="plp-empty">Loading...</div>
-        ) : filtered.length === 0 ? (
-          <div className="plp-empty">
-            {search ? 'No matching projects' : 'No projects yet. Click "New Project" to get started.'}
-          </div>
-        ) : (
-          <div className="plp-grid">
-            {filtered.map(item => (
-              <ProjectCard
-                key={item.config.id}
-                item={item}
-                onOpen={handleOpenProject}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
+        <div className="plp-scroll">
+          {activeTab === 'projects' ? (
+            loading ? (
+              <div className="plp-empty">Loading...</div>
+            ) : filtered.length === 0 ? (
+              <div className="plp-empty">
+                {search ? 'No matching projects' : 'No projects yet. Click "New Project" to get started.'}
+              </div>
+            ) : (
+              <div className="plp-grid">
+                {filtered.map(item => (
+                  <ProjectCard
+                    key={item.config.id}
+                    item={item}
+                    onOpen={handleOpenProject}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            )
+          ) : visibleDemos.length === 0 ? (
+            <div className="plp-empty">No matching demos</div>
+          ) : (
+            <div className="plp-grid">
+              {visibleDemos.map(entry => (
+                <DemoCard
+                  key={entry.id}
+                  entry={entry}
+                  file={demoFiles[entry.id] ?? null}
+                  onUse={handleUseDemo}
+                  onEdit={handleEditDemo}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <input
