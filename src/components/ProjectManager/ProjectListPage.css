@@ -10,25 +10,21 @@
   height: 56px;
   display: flex;
   align-items: center;
+  gap: 14px;
   padding: 0 32px;
   border-bottom: 1px solid #2a2a3e;
   flex-shrink: 0;
 }
 
-.plp-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* Sized to the menu row (~30px) rather than the old wordmark. */
+.plp-logo-img {
+  width: 30px;
+  height: 30px;
+  display: block;
 }
 
-.plp-logo-icon {
-  font-size: 24px;
-}
-
-.plp-logo-text {
-  font-size: 18px;
-  font-weight: 700;
-  color: #fff;
+.plp-factory-badge {
+  margin-left: auto;
 }
 
 .plp-content {

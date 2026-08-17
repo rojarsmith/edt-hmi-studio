@@ -10,8 +10,10 @@ import { modal } from '../Modal';
 import { toast } from '../Toast';
 import ProjectCard from './ProjectCard';
 import NewProjectDialog from './NewProjectDialog';
+import AboutDialog from '../AboutDialog';
 import type { Screen } from '../../types';
 import type { BoardId, ProtocolId } from '../../types/hmi';
+import tealLogo from '../../assets/logo-square-teal.svg';
 import './ProjectListPage.css';
 
 const ProjectListPage: React.FC = () => {
@@ -21,9 +23,27 @@ const ProjectListPage: React.FC = () => {
   const { importResources } = useResourceStore();
 
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [showAboutDialog, setShowAboutDialog] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [migrationChecked, setMigrationChecked] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Factory engineer development mode — entered through the About dialog,
+  // left through the header badge. See docs/factory-dev-mode.md.
+  const factoryDevMode = useAppStore(s => s.factoryDevMode);
+  const lockFactoryDevMode = useAppStore(s => s.lockFactoryDevMode);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!headerRef.current?.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    window.addEventListener('mousedown', handlePointerDown);
+    return () => window.removeEventListener('mousedown', handlePointerDown);
+  }, []);
 
   // Initialize store
   useEffect(() => {
@@ -126,13 +146,80 @@ const ProjectListPage: React.FC = () => {
     ? projects.filter(p => p.config.name.toLowerCase().includes(search.toLowerCase()))
     : projects;
 
+  // Same menu markup and classes as DesktopMenuBar so the dropdowns render
+  // identically; that stylesheet is loaded globally via App.tsx.
+  const menus = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'new', label: 'New Project', onClick: () => setShowNewDialog(true) },
+        { id: 'import', label: 'Import Project', onClick: () => fileInputRef.current?.click() },
+      ],
+    },
+    {
+      id: 'help',
+      label: 'Help',
+      items: [
+        // Deliberately menu-only, like the editor: About is also the entry
+        // point to factory engineer development mode.
+        { id: 'about', label: 'About', onClick: () => setShowAboutDialog(true) },
+      ],
+    },
+  ];
+
+  const handleLeaveFactoryMode = () => {
+    modal
+      .confirm('Leave Factory Mode? Re-entering needs the access code.')
+      .then(yes => {
+        if (yes) lockFactoryDevMode();
+      });
+  };
+
   return (
     <div className="project-list-screen">
-      <div className="plp-header">
-        <div className="plp-logo">
-          <span className="plp-logo-icon">📐</span>
-          <span className="plp-logo-text">EDT HMI Studio</span>
+      <div className="plp-header" ref={headerRef}>
+        <img className="plp-logo-img" src={tealLogo} alt="EDT HMI Studio" />
+        <div className="desktop-menu-list">
+          {menus.map(menu => (
+            <div key={menu.id} className="desktop-menu-group">
+              <button
+                type="button"
+                className={`desktop-menu-trigger ${openMenuId === menu.id ? 'active' : ''}`}
+                onClick={() => setOpenMenuId(current => (current === menu.id ? null : menu.id))}
+              >
+                {menu.label}
+              </button>
+              {openMenuId === menu.id && (
+                <div className="desktop-menu-dropdown">
+                  {menu.items.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="desktop-menu-item"
+                      onClick={() => {
+                        setOpenMenuId(null);
+                        item.onClick();
+                      }}
+                    >
+                      <span className="desktop-menu-item-label">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
+        {factoryDevMode && (
+          <button
+            type="button"
+            className="desktop-menu-badge factory-dev plp-factory-badge"
+            onClick={handleLeaveFactoryMode}
+            title="Factory engineer development mode — click to leave"
+          >
+            Factory Mode
+          </button>
+        )}
       </div>
 
       <div className="plp-content">
@@ -188,6 +275,8 @@ const ProjectListPage: React.FC = () => {
           onCreate={handleCreate}
         />
       )}
+
+      {showAboutDialog && <AboutDialog onClose={() => setShowAboutDialog(false)} />}
     </div>
   );
 };
