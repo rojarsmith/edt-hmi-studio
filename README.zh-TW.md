@@ -122,30 +122,25 @@ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
 VITE_BASE_PATH=/edt-hmi-studio/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
 ```
 
-### 桌面版（OmniHost）
+### 桌面版（NativeWebHost）
 
-`desktop/` 使用 [OmniHost](https://github.com/maikebing/OmniHost) 將既有的 Vite 前端包裝成桌面應用程式。
+`desktop/` 使用 [NativeWebHost](https://github.com/IoTSharp/NativeWebHost) v2（OmniHost 改名後的延續）將既有的 Vite 前端包裝成桌面應用程式。套件已公開發佈於 [nuget.org](https://www.nuget.org/packages/NativeWebHost)，不再需要私有 feed 或認證。建置需要 .NET 10 SDK。
 
 ```bash
 # 先建置前端靜態資源
 npm ci
 npm run build:desktop-web
 
-# Linux
-dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net8.0
+# Linux（WebKitGTK）/ macOS（WKWebView，上游標示為實驗性）
+dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net10.0
 
-# Windows
-dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net8.0-windows
+# Windows（WebView2）
+dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net10.0-windows
 ```
 
-桌面殼層預設啟用 OmniHost 的 VSCode 風格內建標題列，提供最大化、最小化與關閉按鈕；編輯器內部另外提供 VSCode 風格的選單列（File / Edit / View / Help）。
+桌面殼層預設啟用 NativeWebHost 的 VSCode 風格內建標題列，提供最大化、最小化與關閉按鈕；編輯器內部另外提供 VSCode 風格的選單列（File / Edit / View / Help）。殼層會注入 `nativeWeb` JavaScript bridge（並保留 `omni` 舊別名），前端以此偵測桌面模式。
 
-OmniHost 目前透過 `maikebing` 的 GitHub Packages 發佈，因此在本機或 CI 建置桌面版之前，需要設定：
-
-- `OMNIHOST_PACKAGES_USERNAME`
-- `OMNIHOST_PACKAGES_TOKEN`（需具備讀取 `maikebing/OmniHost` GitHub Packages 的權限）
-
-設定好 `OMNIHOST_PACKAGES_TOKEN` secret 之後，`.github/workflows/desktop-packages.yml` 會分別在 Linux、macOS、Windows 建置並上傳壓縮檔產物。由於 OmniHost 目前的公開版本尚未提供 macOS 原生執行環境，macOS 產物是為了維持一致的建置與發佈流程而保留，執行時會提示平台限制。
+`.github/workflows/desktop-packages.yml` 會在每次 push 到 `main` 時分別於 Linux、Windows、macOS 建置並上傳壓縮檔產物。macOS 執行環境（AppKit + WKWebView）在上游標示為實驗性。
 
 ## ⌨️ 快捷鍵
 

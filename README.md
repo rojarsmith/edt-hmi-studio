@@ -122,30 +122,25 @@ When deploying to GitHub Pages, a repository sub-path can also be given:
 VITE_BASE_PATH=/edt-hmi-studio/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
 ```
 
-### Desktop build (OmniHost)
+### Desktop build (NativeWebHost)
 
-`desktop/` wraps the existing Vite front end as a desktop application using [OmniHost](https://github.com/maikebing/OmniHost).
+`desktop/` wraps the existing Vite front end as a desktop application using [NativeWebHost](https://github.com/IoTSharp/NativeWebHost) v2 (the renamed continuation of OmniHost). The packages are published on [nuget.org](https://www.nuget.org/packages/NativeWebHost), so no private feed or credentials are needed. Building requires the .NET 10 SDK.
 
 ```bash
 # Build the front-end assets first
 npm ci
 npm run build:desktop-web
 
-# Linux
-dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net8.0
+# Linux (WebKitGTK) / macOS (WKWebView, experimental upstream)
+dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net10.0
 
-# Windows
-dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net8.0-windows
+# Windows (WebView2)
+dotnet publish ./desktop/EdtHmiStudio.Desktop.csproj -c Release -f net10.0-windows
 ```
 
-The desktop shell enables OmniHost's VSCode-style built-in title bar by default, providing maximise, minimise and close buttons; the editor itself adds a VSCode-style menu bar (File / Edit / View / Help).
+The desktop shell enables NativeWebHost's VSCode-style built-in title bar by default, providing maximise, minimise and close buttons; the editor itself adds a VSCode-style menu bar (File / Edit / View / Help). The shell injects a `nativeWeb` JavaScript bridge (with `omni` kept as a legacy alias) that the front end uses to detect desktop mode.
 
-OmniHost is currently distributed through `maikebing`'s GitHub Packages, so building the desktop version locally or in CI requires:
-
-- `OMNIHOST_PACKAGES_USERNAME`
-- `OMNIHOST_PACKAGES_TOKEN` (needs read access to the `maikebing/OmniHost` GitHub Packages feed)
-
-`.github/workflows/desktop-packages.yml` builds and uploads an archive for Linux, macOS and Windows once the `OMNIHOST_PACKAGES_TOKEN` secret is configured. Because the current public release of OmniHost has no native macOS runtime, the macOS artifact exists to keep the build and distribution flow uniform; at runtime it reports the platform limitation.
+`.github/workflows/desktop-packages.yml` builds and uploads an archive for Linux, Windows and macOS on every push to `main`. The macOS runtime (AppKit + WKWebView) is marked experimental upstream.
 
 ## ⌨️ Keyboard shortcuts
 

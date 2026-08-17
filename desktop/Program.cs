@@ -1,13 +1,11 @@
-using OmniHost;
-using OmniHost.Core;
-using OmniHost.Gtk;
-using OmniHost.WebKitGtk;
+using NativeWebHost;
+using NativeWebHost.Linux;
+using NativeWebHost.Mac;
 #if WINDOWS
-using OmniHost.WebView2;
-using OmniHost.Windows;
+using NativeWebHost.Windows;
 #endif
 
-var builder = OmniApp.CreateBuilder(args)
+var builder = NativeWebApp.CreateBuilder(args)
     .Configure(options =>
     {
         options.Title = "EDT HMI Studio";
@@ -17,11 +15,11 @@ var builder = OmniApp.CreateBuilder(args)
         options.Width = 1440;
         options.Height = 960;
         options.StartMaximized = true;
-        options.ScrollBarMode = OmniScrollBarMode.Auto;
-        options.BuiltInTitleBarStyle = OmniBuiltInTitleBarStyle.VsCode;
+        options.ScrollBarMode = NativeWebScrollBarMode.Auto;
+        options.BuiltInTitleBarStyle = NativeWebBuiltInTitleBarStyle.VsCode;
         options.WindowStyle = OperatingSystem.IsWindows()
-            ? OmniWindowStyle.VsCode
-            : OmniWindowStyle.Frameless;
+            ? NativeWebWindowStyle.VsCode
+            : NativeWebWindowStyle.Frameless;
     })
     .UseDesktopApp(new EdtHmiStudioDesktopApp());
 
@@ -29,7 +27,7 @@ ConfigureCurrentPlatform(builder);
 
 await builder.Build().RunAsync();
 
-static void ConfigureCurrentPlatform(OmniHostBuilder builder)
+static void ConfigureCurrentPlatform(NativeWebHostBuilder builder)
 {
     if (OperatingSystem.IsLinux())
     {
@@ -43,7 +41,7 @@ static void ConfigureCurrentPlatform(OmniHostBuilder builder)
     if (OperatingSystem.IsWindows())
     {
         builder
-            .UseAdapter(new WebView2AdapterFactory())
+            .UseAdapter(new NativeWebView2AdapterFactory())
             .UseRuntime(new Win32Runtime());
         return;
     }
@@ -51,8 +49,10 @@ static void ConfigureCurrentPlatform(OmniHostBuilder builder)
 
     if (OperatingSystem.IsMacOS())
     {
-        throw new PlatformNotSupportedException(
-            "OmniHost does not yet provide a native macOS runtime or adapter. This build exists only to keep the desktop packaging artifacts uniform across platforms.");
+        builder
+            .UseAdapter(new WKWebViewAdapterFactory())
+            .UseRuntime(new MacRuntime());
+        return;
     }
 
     throw new PlatformNotSupportedException("This platform is not supported yet.");

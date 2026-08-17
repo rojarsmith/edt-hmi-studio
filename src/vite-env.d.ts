@@ -16,18 +16,21 @@ declare module 'virtual:compile-preview' {
   export default CompilePreview;
 }
 
-interface OmniHostWindowApi {
+interface NativeWebHostWindowApi {
   minimize: () => void;
   maximize: () => void;
   close: () => void;
 }
 
-interface OmniHostBridge {
-  window: OmniHostWindowApi;
+interface NativeWebHostBridge {
+  window: NativeWebHostWindowApi;
   invoke?: (handler: string, payload?: unknown) => Promise<unknown>;
   on?: (event: string, handler: (payload: unknown) => void) => void;
 }
 
 interface Window {
-  omni?: OmniHostBridge;
+  /** Injected by the NativeWebHost v2 desktop shell. */
+  nativeWeb?: NativeWebHostBridge;
+  /** Legacy alias kept by the shell for OmniHost-era callers. */
+  omni?: NativeWebHostBridge;
 }
