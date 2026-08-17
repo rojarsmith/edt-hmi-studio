@@ -42,26 +42,39 @@ body {
   gap: 16px;
 }
 
-/* Main tabs */
+/* Main tabs — uniform hard-edged blocks, flush against each other,
+   icon above label, description in the hover tooltip. */
 .app-tabs {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  align-items: stretch;
+  gap: 0;
 }
 
 .tab-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
+  justify-content: center;
+  gap: 4px;
+  width: 84px;
+  padding: 7px 0;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: 0;
   cursor: pointer;
   color: #999;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab-btn-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.tab-btn-label {
+  line-height: 1;
 }
 
 .tab-btn:hover {

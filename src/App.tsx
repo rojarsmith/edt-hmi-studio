@@ -58,6 +58,30 @@ type TabType =
   | 'preview'
   | 'deploy'
   | 'code';
+
+/** The main feature tabs, in row order. The description is the hover tooltip. */
+const TAB_DEFS: {
+  id: TabType;
+  icon: string;
+  label: string;
+  description: string;
+  /** Only rendered while factory engineer development mode is unlocked. */
+  factoryOnly?: boolean;
+}[] = [
+  { id: 'design', icon: '🎨', label: 'Design', description: 'Lay out screens and widgets on the canvas' },
+  { id: 'image', icon: '🖼️', label: 'Image', description: 'Manage image resources' },
+  { id: 'text', icon: '🔤', label: 'Text', description: 'Texts, languages and typography' },
+  // Factory-dev only: the library browses and copies, but nothing a no-code
+  // author can do with it reaches the panel yet — see docs/icon-library.md.
+  { id: 'icon', icon: '⭐', label: 'Icon', description: 'Browse the built-in icon library', factoryOnly: true },
+  { id: 'logic', icon: '🔗', label: 'Logic', description: 'Wire up no-code logic graphs' },
+  { id: 'protocol', icon: '🔌', label: 'Protocol', description: 'Configure field-bus communication and tags' },
+  { id: 'preview', icon: '📱', label: 'Preview', description: 'Run the UI in the built-in simulator' },
+  { id: 'deploy', icon: '🚀', label: 'Deploy', description: 'Build firmware and flash the board' },
+  // Factory-dev only, kept last so the normal tab order is undisturbed.
+  { id: 'code', icon: '💻', label: 'Code', description: 'Inspect the generated C code', factoryOnly: true },
+];
+
 const isCompilePreviewEnabled = import.meta.env.VITE_ENABLE_COMPILE_PREVIEW !== 'false';
 
 const App: React.FC = () => {
@@ -584,69 +608,17 @@ const EditorView: React.FC<EditorViewProps> = ({
         <div className="app-command-bar">
           {/* Main tabs */}
           <div className="app-tabs">
-            <button
-              className={`tab-btn ${effectiveTab === 'design' ? 'active' : ''}`}
-              onClick={() => setActiveTab('design')}
-            >
-              🎨 Design
-            </button>
-            <button
-              className={`tab-btn ${effectiveTab === 'image' ? 'active' : ''}`}
-              onClick={() => setActiveTab('image')}
-            >
-              🖼️ Image
-            </button>
-            <button
-              className={`tab-btn ${effectiveTab === 'text' ? 'active' : ''}`}
-              onClick={() => setActiveTab('text')}
-            >
-              🔤 Text
-            </button>
-            {/* Factory-dev only: the library browses and copies, but nothing
-                a no-code author can do with it reaches the panel yet — see
-                docs/icon-library.md for what works and what is planned. */}
-            {factoryDevMode && (
+            {TAB_DEFS.filter(tab => !tab.factoryOnly || factoryDevMode).map(tab => (
               <button
-                className={`tab-btn ${effectiveTab === 'icon' ? 'active' : ''}`}
-                onClick={() => setActiveTab('icon')}
+                key={tab.id}
+                className={`tab-btn ${effectiveTab === tab.id ? 'active' : ''}`}
+                title={tab.description}
+                onClick={() => setActiveTab(tab.id)}
               >
-                ⭐ Icon
+                <span className="tab-btn-icon">{tab.icon}</span>
+                <span className="tab-btn-label">{tab.label}</span>
               </button>
-            )}
-            <button
-              className={`tab-btn ${effectiveTab === 'logic' ? 'active' : ''}`}
-              onClick={() => setActiveTab('logic')}
-            >
-              🔗 Logic
-            </button>
-            <button
-              className={`tab-btn ${effectiveTab === 'protocol' ? 'active' : ''}`}
-              onClick={() => setActiveTab('protocol')}
-            >
-              🔌 Protocol
-            </button>
-            <button
-              className={`tab-btn ${effectiveTab === 'preview' ? 'active' : ''}`}
-              onClick={() => setActiveTab('preview')}
-            >
-              📱 Preview
-            </button>
-            <button
-              className={`tab-btn ${effectiveTab === 'deploy' ? 'active' : ''}`}
-              onClick={() => setActiveTab('deploy')}
-            >
-              🚀 Deploy
-            </button>
-            {/* Last in the row: it only exists in factory dev mode, so keeping
-                it on the end leaves the normal tab order undisturbed. */}
-            {factoryDevMode && (
-              <button
-                className={`tab-btn ${effectiveTab === 'code' ? 'active' : ''}`}
-                onClick={() => setActiveTab('code')}
-              >
-                💻 Code
-              </button>
-            )}
+            ))}
           </div>
 
           <div className="app-toolbar">
