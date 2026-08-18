@@ -77,7 +77,7 @@
   margin-bottom: 4px;
 }
 
-.category-header {
+.palette-category .category-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -87,28 +87,28 @@
   transition: background 0.15s;
 }
 
-.category-header:hover {
+.palette-category .category-header:hover {
   background: #2a2a2a;
 }
 
-.category-icon {
+.palette-category .category-icon {
   font-size: 14px;
 }
 
-.category-name {
+.palette-category .category-name {
   flex: 1;
   font-size: 13px;
   font-weight: 500;
   color: #ddd;
 }
 
-.category-toggle {
+.palette-category .category-toggle {
   font-size: 10px;
   color: #666;
 }
 
 /* Nodes */
-.category-nodes {
+.palette-category .category-nodes {
   padding: 4px 0;
 }
 

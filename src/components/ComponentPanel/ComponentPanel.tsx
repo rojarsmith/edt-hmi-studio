@@ -64,7 +64,13 @@ const CategorySection: React.FC<CategorySectionProps> = ({
 
 const ComponentPanel: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [collapsed, setCollapsed] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+
+  const componentCount = useMemo(
+    () => componentCategories.reduce((sum, c) => sum + getComponentsByCategory(c.id).length, 0),
+    [],
+  );
 
   const toggleCategory = (categoryId: string) => {
     setCollapsedCategories(prev => {
@@ -99,36 +105,48 @@ const ComponentPanel: React.FC = () => {
   }, [searchQuery]);
 
   return (
-    <div className="component-panel">
-      <div className="panel-header">
-        <h3>Components</h3>
+    <div className={`component-panel ${collapsed ? 'collapsed' : ''}`}>
+      {/* Header mirrors the screen manager: left twisty, title, count badge,
+          the whole bar toggles collapse. */}
+      <div
+        className="cp-header"
+        onClick={() => setCollapsed(c => !c)}
+        title={collapsed ? 'Expand' : 'Collapse'}
+      >
+        <PanelChevron open={!collapsed} className="cp-toggle" />
+        <span className="cp-title">Components</span>
+        <span className="cp-count">{componentCount}</span>
       </div>
-      
-      <div className="search-box">
-        <input
-          type="text"
-          placeholder="Search components..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
-        {searchQuery && (
-          <button className="clear-search" onClick={() => setSearchQuery('')}>
-            ×
-          </button>
-        )}
-      </div>
-      
-      <div className="categories-container">
-        {filteredCategories.map(({ category, components }) => (
-          <CategorySection
-            key={category.id}
-            category={category}
-            components={components}
-            isCollapsed={collapsedCategories.has(category.id)}
-            onToggle={() => toggleCategory(category.id)}
-          />
-        ))}
-      </div>
+
+      {!collapsed && (
+        <>
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="Search components..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="clear-search" onClick={() => setSearchQuery('')}>
+                ×
+              </button>
+            )}
+          </div>
+
+          <div className="categories-container">
+            {filteredCategories.map(({ category, components }) => (
+              <CategorySection
+                key={category.id}
+                category={category}
+                components={components}
+                isCollapsed={collapsedCategories.has(category.id)}
+                onToggle={() => toggleCategory(category.id)}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };

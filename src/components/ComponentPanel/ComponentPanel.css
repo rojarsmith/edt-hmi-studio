@@ -6,17 +6,57 @@
   overflow: hidden;
 }
 
-.panel-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #fff;
+/* Collapsed leaves just the header bar. */
+.component-panel.collapsed {
+  height: auto;
 }
 
-.panel-header h3 {
-  margin: 0;
-  font-size: 14px;
+/* Header mirrors the screen manager / hierarchy panel: left twisty, title,
+   count badge; the whole bar toggles collapse. */
+.cp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.cp-header:hover {
+  background: #f0f0f0;
+}
+
+.component-panel.collapsed .cp-header {
+  border-bottom: none;
+}
+
+.cp-toggle {
+  flex-shrink: 0;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+
+.cp-toggle.open {
+  transform: rotate(90deg);
+}
+
+.cp-title {
+  flex: 1;
+  font-size: 13px;
   font-weight: 600;
   color: #333;
+}
+
+.cp-count {
+  font-size: 11px;
+  color: #777;
+  background: #ececec;
+  border-radius: 8px;
+  padding: 1px 7px;
 }
 
 .search-box {
@@ -67,11 +107,11 @@
   padding: 8px 0;
 }
 
-.category-section {
+.component-panel .category-section {
   margin-bottom: 4px;
 }
 
-.category-header {
+.component-panel .category-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -81,28 +121,28 @@
   transition: background-color 0.15s;
 }
 
-.category-header:hover {
+.component-panel .category-header:hover {
   background: #e8e8e8;
 }
 
-.category-chevron {
+.component-panel .category-chevron {
   flex-shrink: 0;
   color: #888;
   transition: transform 0.15s ease;
 }
 
-.category-chevron.open {
+.component-panel .category-chevron.open {
   transform: rotate(90deg);
 }
 
-.category-name {
+.component-panel .category-name {
   flex: 1;
   font-size: 13px;
   font-weight: 500;
-  color: #444;
+  color: #2f3438;
 }
 
-.category-components {
+.component-panel .category-components {
   padding: 4px 8px;
 }
 

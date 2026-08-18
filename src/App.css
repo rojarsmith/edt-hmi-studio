@@ -196,6 +196,17 @@ body {
   min-height: 0;
 }
 
+/* A collapsed component palette shrinks to its header bar and hands the
+   freed space to the screen manager, keeping the hierarchy bottom-docked. */
+.left-panel > .component-panel.collapsed {
+  flex: 0 0 auto;
+}
+
+.left-panel > .component-panel.collapsed ~ .screen-manager {
+  flex: 1 1 auto;
+  max-height: none;
+}
+
 /* The hierarchy panel manages its own height: a stored value while expanded
    (drag its top edge), header-only when collapsed. */
 .left-panel > *:last-child {
