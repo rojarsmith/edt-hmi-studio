@@ -232,6 +232,18 @@ body {
   border-left: none;
 }
 
+/* A collapsed property editor shrinks to its header bar and hands the freed
+   space to the events panel, keeping the animation panel bottom-docked. */
+.right-panel > .property-editor.collapsed {
+  flex: 0 0 auto;
+}
+
+.right-panel > .property-editor.collapsed ~ .event-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 /* Drag overlay */
 .drag-overlay-item {
   display: flex;

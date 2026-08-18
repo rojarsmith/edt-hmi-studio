@@ -7,17 +7,76 @@
   overflow: hidden;
 }
 
-.property-editor .panel-header {
-  padding: 12px 16px;
+/* Collapsed leaves just the header bar. */
+.property-editor.collapsed {
+  height: auto;
+}
+
+/* Header mirrors the component palette: left twisty, title; the whole bar
+   toggles collapse. */
+.pe-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
   border-bottom: 1px solid #e0e0e0;
+  background: #fff;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.pe-header:hover {
+  background: #f0f0f0;
+}
+
+.property-editor.collapsed .pe-header {
+  border-bottom: none;
+}
+
+.pe-toggle {
+  flex-shrink: 0;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+
+.pe-toggle.open {
+  transform: rotate(90deg);
+}
+
+.pe-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Search sits below the pinned Type/Id rows; same treatment as the other
+   managers' search boxes. */
+.pe-search {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.pe-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
   background: #fff;
 }
 
-.property-editor .panel-header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
+.pe-search input:focus {
+  border-color: #2196F3;
+}
+
+/* Sections and subsections the property search has ruled out. */
+.pe-filtered-out {
+  display: none;
 }
 
 .no-selection {
@@ -542,13 +601,13 @@
   color: #333;
 }
 
-.collapsible-arrow {
-  font-size: 9px;
-  transition: transform 0.15s;
-  display: inline-block;
+.collapsible-chevron {
+  flex-shrink: 0;
+  color: #888;
+  transition: transform 0.15s ease;
 }
 
-.collapsible-arrow.open {
+.collapsible-chevron.open {
   transform: rotate(90deg);
 }
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
 import { BUILTIN_FONTS } from '../../resources/builtinFonts';
@@ -23,6 +23,7 @@ import {
   normalizeImageButtonProps,
   normalizeImageButtonStateValue,
 } from './imageButtonModel';
+import PanelChevron from '../LogicEditor/PanelChevron';
 import './PropertyEditor.css';
 
 // Inline CollapsibleSection component
@@ -35,7 +36,7 @@ const CollapsibleSection: React.FC<{
   return (
     <div className="collapsible-section">
       <div className="collapsible-header" onClick={() => setOpen(!open)}>
-        <span className={`collapsible-arrow ${open ? 'open' : ''}`}>▶</span>
+        <PanelChevron open={open} className="collapsible-chevron" />
         <span>{title}</span>
       </div>
       {open && <div className="collapsible-body">{children}</div>}
@@ -237,7 +238,45 @@ const PropertyEditor: React.FC = () => {
     tags: ModbusRegisterTag[];
   } | null>(null);
   const [radiusLinked, setRadiusLinked] = useState(true);
-  
+  const [panelExpanded, setPanelExpanded] = useState(true);
+  const [query, setQuery] = useState('');
+  const sectionsRef = useRef<HTMLDivElement>(null);
+
+  // Text-driven property search. A section after the pinned Component block
+  // stays visible when its title, one of its collapsible subsections'
+  // titles, or any field label matches. Filtering walks the rendered DOM on
+  // every render — deliberately without a dependency list, so sections that
+  // come and go with the selection are re-filtered too; the walk is tiny.
+  useEffect(() => {
+    const root = sectionsRef.current;
+    if (!root) return;
+    const q = query.trim().toLowerCase();
+    const matches = (text: string | null | undefined) =>
+      !!text && text.toLowerCase().includes(q);
+    root
+      .querySelectorAll<HTMLElement>('.property-section:not([data-pe-pinned])')
+      .forEach(section => {
+        const titleMatch = !q || matches(section.querySelector('.section-header')?.textContent);
+        let anyChildVisible = false;
+        section.querySelectorAll<HTMLElement>('.collapsible-section').forEach(sub => {
+          const subMatch =
+            !q ||
+            titleMatch ||
+            matches(sub.querySelector('.collapsible-header')?.textContent) ||
+            [...sub.querySelectorAll('label')].some(l => matches(l.textContent));
+          sub.classList.toggle('pe-filtered-out', !subMatch);
+          if (subMatch) anyChildVisible = true;
+        });
+        const directLabelMatch = [...section.querySelectorAll('label')]
+          .filter(l => !l.closest('.collapsible-section'))
+          .some(l => matches(l.textContent));
+        section.classList.toggle(
+          'pe-filtered-out',
+          !(titleMatch || directLabelMatch || anyChildVisible),
+        );
+      });
+  });
+
   const selectedId = selection.selectedIds[0];
   const component = selectedId ? getComponentById(selectedId) : undefined;
   const definition = component ? getComponentDefinition(component.type) : undefined;
@@ -351,29 +390,39 @@ const PropertyEditor: React.FC = () => {
     [selectedId, component, updateComponent]
   );
 
+  const panelHeader = (
+    <div
+      className="pe-header"
+      onClick={() => setPanelExpanded(prev => !prev)}
+      title={panelExpanded ? 'Collapse' : 'Expand'}
+    >
+      <PanelChevron open={panelExpanded} className="pe-toggle" />
+      <span className="pe-title">Properties</span>
+    </div>
+  );
+
   if (!component) {
     return (
-      <div className="property-editor">
-        <div className="panel-header">
-          <h3>Properties</h3>
-        </div>
-        <div className="no-selection">
-          <p>No component selected</p>
-          <p className="hint">Select a component on the canvas to edit it</p>
-        </div>
+      <div className={`property-editor ${panelExpanded ? '' : 'collapsed'}`}>
+        {panelHeader}
+        {panelExpanded && (
+          <div className="no-selection">
+            <p>No component selected</p>
+            <p className="hint">Select a component on the canvas to edit it</p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="property-editor">
-      <div className="panel-header">
-        <h3>Properties</h3>
-      </div>
-      
-      <div className="property-sections">
-        {/* Component Info */}
-        <div className="property-section">
+    <div className={`property-editor ${panelExpanded ? '' : 'collapsed'}`}>
+      {panelHeader}
+
+      {panelExpanded && (
+      <div className="property-sections" ref={sectionsRef}>
+        {/* Component Info — pinned above the search box, never filtered */}
+        <div className="property-section" data-pe-pinned="true">
           <div className="section-header">Component</div>
           <div className="property-row">
             <label>Type</label>
@@ -390,6 +439,16 @@ const PropertyEditor: React.FC = () => {
               onChange={(e) => handlePropertyChange('name', e.target.value)}
             />
           </div>
+        </div>
+
+        <div className="pe-search">
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search properties..."
+            aria-label="Search properties"
+          />
         </div>
 
         {/* Position */}
@@ -1223,6 +1282,7 @@ const PropertyEditor: React.FC = () => {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };
