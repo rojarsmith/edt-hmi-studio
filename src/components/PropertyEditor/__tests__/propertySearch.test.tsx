@@ -96,6 +96,16 @@ describe('PropertyEditor search', () => {
     expect(sectionByTitle(container, 'Size')!.classList.contains('pe-filtered-out')).toBe(false);
   });
 
+  it('places Events directly above Modbus Binding', () => {
+    const { container } = render(<PropertyEditor />);
+    const sections = [...container.querySelectorAll('.property-sections > .property-section')];
+    const eventsIdx = sections.findIndex(s => s.classList.contains('pe-events-section'));
+    const modbusIdx = sections.findIndex(s => s.classList.contains('modbus-binding-section'));
+    expect(eventsIdx).toBeGreaterThan(-1);
+    expect(modbusIdx).toBeGreaterThan(-1);
+    expect(eventsIdx).toBe(modbusIdx - 1);
+  });
+
   it('collapses the whole panel from its header', () => {
     const { container } = render(<PropertyEditor />);
     expect(container.querySelector('.property-sections')).not.toBeNull();

@@ -11,7 +11,6 @@ import {
 import ComponentPanel from './components/ComponentPanel';
 import Canvas from './components/Canvas';
 import PropertyEditor from './components/PropertyEditor';
-import EventPanel from './components/EventPanel';
 import AnimationPanel from './components/AnimationPanel';
 import ScreenTabs from './components/ScreenTabs';
 import ScreenManager from './components/ScreenManager';
@@ -495,7 +494,6 @@ const EditorView: React.FC<EditorViewProps> = ({
               </div>
               <div className="right-panel">
                 <PropertyEditor />
-                <EventPanel />
                 <AnimationPanel />
               </div>
             </div>

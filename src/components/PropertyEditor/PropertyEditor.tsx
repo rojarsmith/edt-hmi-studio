@@ -24,6 +24,7 @@ import {
   normalizeImageButtonStateValue,
 } from './imageButtonModel';
 import PanelChevron from '../LogicEditor/PanelChevron';
+import EventPanel from '../EventPanel';
 import './PropertyEditor.css';
 
 // Inline CollapsibleSection component
@@ -1163,6 +1164,11 @@ const PropertyEditor: React.FC = () => {
 
         {/* Component-specific props */}
         {renderComponentProps(component, handlePropsChange, handleBatchPropsChange)}
+
+        {/* Events — a category here rather than its own panel; component
+            properties only for now. Sits between the layout sections above
+            and the communication binding below. */}
+        <EventPanel />
 
         <ModbusBindingEditor
           componentType={component.type}

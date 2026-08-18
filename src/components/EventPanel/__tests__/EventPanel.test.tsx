@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { useEditorStore } from '../../../store/editorStore';
 import type { BuiltinAction, LvglComponent } from '../../../types';
@@ -62,5 +62,42 @@ describe('EventPanel — navigate description', () => {
     selectButtonWith({ type: 'navigate', targetScreen: '' });
     render(<EventPanel />);
     expect(screen.getByText('Navigate to: Not set')).toBeInTheDocument();
+  });
+});
+
+describe('EventPanel — property-section shape', () => {
+  it('renders as a property category with line icons and named tooltips', () => {
+    selectButtonWith({ type: 'navigate', targetScreen: 'Settings' });
+    const { container } = render(<EventPanel />);
+
+    // A category inside the property editor, not a standalone panel.
+    expect(container.querySelector('.property-section')).not.toBeNull();
+    expect(container.querySelector('.event-panel')).toBeNull();
+
+    // Monochrome line icons instead of emoji, each named on hover.
+    expect(container.querySelector('.event-icon svg')).not.toBeNull();
+    expect(screen.getByTitle('Edit event').querySelector('svg')).not.toBeNull();
+    expect(screen.getByTitle('Delete event').querySelector('svg')).not.toBeNull();
+    expect(screen.getByTitle('Add event')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('⚡');
+  });
+
+  it('collapses from its header, sparing the add button', () => {
+    selectButtonWith({ type: 'navigate', targetScreen: 'Settings' });
+    const { container } = render(<EventPanel />);
+    expect(container.querySelector('.event-list')).not.toBeNull();
+    fireEvent.click(container.querySelector('.pe-events-header')!);
+    expect(container.querySelector('.event-list')).toBeNull();
+    // The add button still works while collapsed and does not re-toggle.
+    fireEvent.click(screen.getByTitle('Add event'));
+    expect(container.querySelector('.event-list')).toBeNull();
+    fireEvent.click(container.querySelector('.pe-events-header')!);
+    expect(container.querySelector('.event-list')).not.toBeNull();
+  });
+
+  it('renders nothing without a selection — the editor owns that state', () => {
+    useEditorStore.setState({ selection: { selectedIds: [], hoveredId: null } });
+    const { container } = render(<EventPanel />);
+    expect(container.firstChild).toBeNull();
   });
 });

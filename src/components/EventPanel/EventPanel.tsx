@@ -4,6 +4,7 @@ import { useLogicEditorStore } from '../LogicEditor';
 import type { EventBinding, LvglEventType } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
 import EventEditDialog from './EventEditDialog';
+import PanelChevron from '../LogicEditor/PanelChevron';
 import './EventPanel.css';
 
 // LVGL Event type definitions
@@ -20,12 +21,55 @@ export const LVGL_EVENTS: { type: LvglEventType; label: string; description: str
   { type: 'LV_EVENT_CANCEL', label: 'Cancel', description: 'Triggered when the operation is canceled' },
 ];
 
+// Monochrome line icons, in the panel family's stroke language.
+const BoltIcon: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M8.6 1.5 3.6 9h3.5L6.2 14.5 12.4 6.6H8.8l.9-5.1Z"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const PencilIcon: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M11.2 2.8a1.3 1.3 0 0 1 1.84 0l.16.16a1.3 1.3 0 0 1 0 1.84L5.7 12.3l-3.2 1 1-3.2Z"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const TrashIcon: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path d="M3 4.5h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    <path
+      d="M6.2 4.5V3.2A1.2 1.2 0 0 1 7.4 2h1.2a1.2 1.2 0 0 1 1.2 1.2v1.3"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+    />
+    <path
+      d="M4.3 4.5l.6 8.4a1.2 1.2 0 0 0 1.2 1.1h3.8a1.2 1.2 0 0 0 1.2-1.1l.6-8.4"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 const EventPanel: React.FC = () => {
   const { selection, getComponentById, updateComponent } = useEditorStore();
   const logicGraphs = useLogicEditorStore(state => state.graphs);
   const [editingEvent, setEditingEvent] = useState<EventBinding | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   const selectedId = selection.selectedIds[0];
   const component = selectedId ? getComponentById(selectedId) : undefined;
@@ -121,29 +165,33 @@ const EventPanel: React.FC = () => {
     return 'Not configured';
   };
 
-  if (!component) {
-    return (
-      <div className="event-panel">
-        <div className="panel-header">
-          <h3>Events</h3>
-        </div>
-        <div className="no-selection">
-          <p>No component selected</p>
-          <p className="hint">Select a component to add events</p>
-        </div>
-      </div>
-    );
-  }
+  // Rendered as a category inside the property editor's sections, so there
+  // is nothing to show without a selected component — the editor's own
+  // empty state covers that.
+  if (!component) return null;
 
   return (
-    <div className="event-panel">
-      <div className="panel-header">
-        <h3>Events</h3>
-        <button className="add-event-btn" onClick={handleAddEvent} title="Add event">
-          <span>+</span>
+    <div className="property-section pe-events-section">
+      <div
+        className="section-header pe-events-header"
+        onClick={() => setExpanded(prev => !prev)}
+        title={expanded ? 'Collapse' : 'Expand'}
+      >
+        <PanelChevron open={expanded} className="pe-events-toggle" />
+        <span className="pe-events-title">Events</span>
+        <button
+          className="pe-events-add"
+          onClick={e => {
+            e.stopPropagation();
+            handleAddEvent();
+          }}
+          title="Add event"
+        >
+          ＋
         </button>
       </div>
 
+      {expanded && (
       <div className="event-list">
         {component.events.length === 0 ? (
           <div className="no-events">
@@ -157,7 +205,12 @@ const EventPanel: React.FC = () => {
             <div key={event.id} className="event-item">
               <div className="event-info" onClick={() => handleEditEvent(event)}>
                 <div className="event-type">
-                  <span className="event-icon">⚡</span>
+                  <span
+                    className="event-icon"
+                    title={LVGL_EVENTS.find(e => e.type === event.eventType)?.description ?? getEventLabel(event.eventType)}
+                  >
+                    <BoltIcon />
+                  </span>
                   {getEventLabel(event.eventType)}
                 </div>
                 <div className="event-handler">
@@ -165,25 +218,26 @@ const EventPanel: React.FC = () => {
                 </div>
               </div>
               <div className="event-actions">
-                <button 
-                  className="event-edit-btn" 
+                <button
+                  className="event-edit-btn"
                   onClick={() => handleEditEvent(event)}
-                  title="Edit"
+                  title="Edit event"
                 >
-                  ✏️
+                  <PencilIcon />
                 </button>
-                <button 
-                  className="event-delete-btn" 
+                <button
+                  className="event-delete-btn"
                   onClick={() => handleDeleteEvent(event.id)}
-                  title="Delete"
+                  title="Delete event"
                 >
-                  🗑️
+                  <TrashIcon />
                 </button>
               </div>
             </div>
           ))
         )}
       </div>
+      )}
 
       {isDialogOpen && (
         <EventEditDialog
