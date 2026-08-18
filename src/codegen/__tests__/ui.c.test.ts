@@ -63,6 +63,16 @@ describe('generateUiSource', () => {
       expect(result).toContain('ui_load_screen_home();');
     });
 
+    it('boots into the flagged entry screen instead of the first', () => {
+      const screens = [
+        createScreen({ name: 'home' }),
+        createScreen({ name: 'settings', isEntry: true }),
+      ];
+      const result = generateUiSource(screens, defaultOptions());
+      expect(result).toContain('ui_load_screen_settings();');
+      expect(result).not.toContain('ui_load_screen_home();');
+    });
+
     it('generates screen background color', () => {
       const screens = [createScreen({ name: 'main', backgroundColor: '#FF0000' })];
       const result = generateUiSource(screens, defaultOptions());

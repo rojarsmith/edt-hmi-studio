@@ -45,7 +45,7 @@ function flattenTree(
   const result: WasmComponent[] = [];
 
   // Build child-to-tab/tile mapping for container parents
-  let childToVirtualParent: Record<string, string> = {};
+  const childToVirtualParent: Record<string, string> = {};
   if (parentComp?.type === 'tabview' && parentComp.props?.tabs) {
     const tabChildMap: Record<string, string[]> = parentComp.props.tabChildMap || {};
     const defaultTab = String(parentComp.props.activeTab || 0);

@@ -193,6 +193,13 @@ export interface Screen {
   backgroundColor?: string;
   /** Owning ScreenGroup, or null/undefined when the screen sits at the root. */
   groupId?: string | null;
+  /**
+   * Marks the project's entry screen — the one the generated firmware boots
+   * into. At most one screen carries the flag; when none does (projects saved
+   * before it existed), the first screen is the entry. Resolve through
+   * getEntryScreen() rather than reading the flag directly.
+   */
+  isEntry?: boolean;
 }
 
 /**

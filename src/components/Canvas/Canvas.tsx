@@ -64,26 +64,23 @@ function getAbsolutePosition(comp: LvglComponent, allComps: LvglComponent[]): { 
 const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const dragStartMousePos = useRef({ x: 0, y: 0 });
   const dragStartCompPos = useRef({ x: 0, y: 0 });
   const [spacePressed, setSpacePressed] = useState(false);
   const rafRef = useRef<number>(0);
 
-  // Use refs for values that handlers need but shouldn't trigger re-creation
+  // Transient interaction state lives in refs so the mouse handlers read the
+  // current value synchronously without re-creating themselves. Panning never
+  // affects rendering, so it needs no state at all; space-pan does (cursor
+  // class), so its handlers write the ref and the state together.
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
   const spacePressedRef = useRef(false);
   const potentialDragRef = useRef<{ id: string, startX: number, startY: number, originalX: number, originalY: number, initialSelectionState: boolean } | null>(null);
 
-  // Keep refs in sync
-  isPanningRef.current = isPanning;
-  panStartRef.current = panStart;
-  spacePressedRef.current = spacePressed;
-  
-  // Box selection state
-  const [boxSelection, setBoxSelection] = useState<BoxSelection>({
+  // Box selection state — drives the marquee rendering, while the ref hands
+  // handlers the current value synchronously. Updated together below.
+  const [boxSelection, setBoxSelectionState] = useState<BoxSelection>({
     isSelecting: false,
     startX: 0,
     startY: 0,
@@ -91,7 +88,10 @@ const Canvas: React.FC = () => {
     currentY: 0,
   });
   const boxSelectionRef = useRef(boxSelection);
-  boxSelectionRef.current = boxSelection;
+  const setBoxSelection = useCallback((next: BoxSelection) => {
+    boxSelectionRef.current = next;
+    setBoxSelectionState(next);
+  }, []);
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; targetId: string | null } | null>(null);
@@ -151,6 +151,7 @@ const Canvas: React.FC = () => {
         ) {
           return;
         }
+        spacePressedRef.current = true;
         setSpacePressed(true);
         e.preventDefault();
       }
@@ -158,8 +159,9 @@ const Canvas: React.FC = () => {
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
+        spacePressedRef.current = false;
         setSpacePressed(false);
-        setIsPanning(false);
+        isPanningRef.current = false;
       }
     };
 
@@ -195,8 +197,8 @@ const Canvas: React.FC = () => {
 
       // Middle mouse button or space + left click for panning
       if (e.button === 1 || (spacePressedRef.current && e.button === 0)) {
-        setIsPanning(true);
-        setPanStart({ x: e.clientX - c.panX, y: e.clientY - c.panY });
+        isPanningRef.current = true;
+        panStartRef.current = { x: e.clientX - c.panX, y: e.clientY - c.panY };
         e.preventDefault();
         return;
       }
@@ -224,7 +226,7 @@ const Canvas: React.FC = () => {
         }
       }
     },
-    [clearSelection]
+    [clearSelection, setBoxSelection]
   );
 
   // Handle resize logic
@@ -311,11 +313,11 @@ const Canvas: React.FC = () => {
           const { canvas: c } = useEditorStore.getState();
           const x = (e.clientX - rect.left) / c.zoom;
           const y = (e.clientY - rect.top) / c.zoom;
-          setBoxSelection(prev => ({
-            ...prev,
+          setBoxSelection({
+            ...boxSelectionRef.current,
             currentX: x,
             currentY: y,
-          }));
+          });
         }
         return;
       }
@@ -396,7 +398,7 @@ const Canvas: React.FC = () => {
         });
       }
     },
-    [setPan, moveComponentAndUpdateDrag, handleResize, reparentComponent, moveComponent, startDrag]
+    [setPan, moveComponentAndUpdateDrag, handleResize, reparentComponent, moveComponent, startDrag, setBoxSelection]
   );
 
   // Handle mouse up — read all transient state from refs/getState
@@ -407,9 +409,7 @@ const Canvas: React.FC = () => {
       rafRef.current = 0;
     }
     
-    if (isPanningRef.current) {
-      setIsPanning(false);
-    }
+    isPanningRef.current = false;
     
     // Handle deferred click selection logic if NO drag happened
     if (potentialDragRef.current && !useEditorStore.getState().drag.isDragging) {
@@ -567,7 +567,7 @@ const Canvas: React.FC = () => {
       endDrag();
       canvasRef.current?.classList.remove('dragging-move');
     }
-  }, [selectComponents, saveToHistory, endDrag, reparentComponent, moveComponent]);
+  }, [selectComponent, selectComponents, saveToHistory, endDrag, reparentComponent, moveComponent, setBoxSelection]);
 
   // Handle component selection
   const handleComponentClick = useCallback(

@@ -23,6 +23,7 @@ import {
   sameTextKey,
 } from '../types';
 import { languageStylesOf } from '../utils/typographyStyle';
+import { getEntryScreen } from '../utils/entryScreen';
 import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
@@ -132,6 +133,11 @@ interface EditorState {
   addScreen: (groupId?: string | null) => string;
   deleteScreen: (screenId: string) => void;
   renameScreen: (screenId: string, name: string) => void;
+  /**
+   * Make `screenId` the project's entry screen, clearing the flag everywhere
+   * else so exactly one screen carries it.
+   */
+  setEntryScreen: (screenId: string) => void;
   setCurrentScreen: (screenId: string) => void;
   updateScreenBackground: (screenId: string, color: string) => void;
   /** Open a tab for the screen (or focus its existing tab) and make it current. */
@@ -724,6 +730,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set(state => ({
       screens: state.screens.map(s =>
         s.id === screenId ? { ...s, name } : s
+      ),
+    }));
+  },
+
+  setEntryScreen: (screenId) => {
+    const { screens } = get();
+    if (!screens.some(s => s.id === screenId)) return;
+    if (getEntryScreen(screens)?.id === screenId) return;
+
+    get().saveToHistory();
+    set(state => ({
+      screens: state.screens.map(s =>
+        s.isEntry || s.id === screenId ? { ...s, isEntry: s.id === screenId } : s
       ),
     }));
   },
@@ -1581,7 +1600,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setScreens: (screens, screenGroups, typographies, languages, texts, typographyGroups, textGroups) => {
     get().saveToHistory();
-    const firstId = screens.length > 0 ? screens[0].id : get().currentScreenId;
+    const firstId = getEntryScreen(screens)?.id ?? get().currentScreenId;
     set({
       screens: cloneScreens(screens),
       screenGroups: screenGroups ? screenGroups.map(g => ({ ...g })) : [],
@@ -1591,7 +1610,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       previewLanguage: languages?.[0]?.code ?? null,
       texts: texts ? texts.map(t => ({ ...t, values: { ...t.values } })) : [],
       textGroups: textGroups ? textGroups.map(g => ({ ...g })) : [],
-      // A freshly loaded project starts with just its first screen open.
+      // A freshly loaded project starts with just its entry screen open.
       openScreenIds: screens.length > 0 ? [firstId] : [],
       currentScreenId: firstId,
       selection: { selectedIds: [], hoveredId: null },

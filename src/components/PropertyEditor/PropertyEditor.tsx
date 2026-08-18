@@ -15,6 +15,7 @@ import type { ModbusRegisterTag } from '../../types/hmi';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
 import { resolveText } from '../../codegen/textResources';
 import { effectiveTypographyId, standInProp } from '../../utils/componentText';
+import { getEntryScreen } from '../../utils/entryScreen';
 import { glyphCoverageGaps } from '../../utils/glyphCoverage';
 import ModbusBindingEditor from './ModbusBindingEditor';
 import {
@@ -227,7 +228,15 @@ const STYLE_STATES: { key: StyleState; label: string }[] = [
 ];
 
 const PropertyEditor: React.FC = () => {
-  const { selection, getComponentById, updateComponent } = useEditorStore();
+  const {
+    selection,
+    getComponentById,
+    updateComponent,
+    screens,
+    currentScreenId,
+    renameScreen,
+    setEntryScreen,
+  } = useEditorStore();
   const currentProjectId = useAppStore((state) => state.currentProjectId);
   const projectList = useProjectStore((state) => state.projects);
   const getProjectConfig = useProjectStore((state) => state.getProjectConfig);
@@ -462,14 +471,94 @@ const PropertyEditor: React.FC = () => {
   );
 
   if (!component) {
+    const currentScreen = screens.find(s => s.id === currentScreenId);
+    if (!currentScreen) {
+      return (
+        <div className={`property-editor ${panelExpanded ? '' : 'collapsed'}`}>
+          {panelHeader}
+          {panelExpanded && (
+            <div className="no-selection">
+              <p>No component selected</p>
+              <p className="hint">Select a component on the canvas to edit it</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // With nothing selected the panel edits the current screen itself.
+    const isEntry = getEntryScreen(screens)?.id === currentScreen.id;
+    // Commits on blur/Enter so a rename lands on the undo stack once, not per
+    // keystroke; anything blank rolls back to the current name.
+    const commitScreenName = (input: HTMLInputElement) => {
+      const name = input.value.trim();
+      if (name && name !== currentScreen.name) renameScreen(currentScreen.id, name);
+      else input.value = currentScreen.name;
+    };
+
     return (
       <div className={`property-editor ${panelExpanded ? '' : 'collapsed'}`}>
         {panelHeader}
+
         {panelExpanded && (
-          <div className="no-selection">
-            <p>No component selected</p>
-            <p className="hint">Select a component on the canvas to edit it</p>
+        <div className="property-sections" ref={sectionsRef} onClick={handleSectionsClick}>
+          {/* Screen Info — pinned above the search box, never filtered */}
+          <div className="property-section" data-pe-pinned="true">
+            <div className="section-header">Screen</div>
+            <div className="property-row">
+              <label>Type</label>
+              <div className="property-value readonly">
+                <span className="component-type-icon">📄</span>
+                Screen
+              </div>
+            </div>
+            <div className="property-row">
+              <label>Id</label>
+              {/* Uncontrolled while editing; the key remounts it when the
+                  name changes elsewhere (e.g. a manager rename). */}
+              <input
+                key={`${currentScreen.id}:${currentScreen.name}`}
+                type="text"
+                defaultValue={currentScreen.name}
+                onBlur={(e) => commitScreenName(e.currentTarget)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitScreenName(e.currentTarget);
+                  else if (e.key === 'Escape') e.currentTarget.value = currentScreen.name;
+                }}
+              />
+            </div>
           </div>
+
+          <div className="pe-search">
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search properties..."
+              aria-label="Search properties"
+            />
+          </div>
+
+          {/* General */}
+          <div className="property-section">
+            <div className="section-header">General</div>
+            <div className="property-row">
+              <label>Entry Screen</label>
+              <input
+                type="checkbox"
+                checked={isEntry}
+                disabled={isEntry}
+                onChange={() => setEntryScreen(currentScreen.id)}
+                title={
+                  isEntry
+                    ? 'This screen is shown first at startup. Mark another screen as entry to move it.'
+                    : 'Show this screen first at startup'
+                }
+                aria-label="Entry Screen"
+              />
+            </div>
+          </div>
+        </div>
         )}
       </div>
     );

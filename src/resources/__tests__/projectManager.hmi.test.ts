@@ -95,6 +95,19 @@ describe('HMI project file round-trip', () => {
     expect(parsed.communication).toEqual(communication);
   });
 
+  it('carries the entry screen flag through the file, so the firmware boots there', () => {
+    const screens: Screen[] = [
+      { id: 'screen-1', name: 'Main', components: [] },
+      { id: 'screen-2', name: 'Settings', components: [], isEntry: true },
+    ];
+
+    const parsed = parseProject(
+      serializeProject(createProjectFile('Entry HMI', screens, canvas, [], [])),
+    );
+
+    expect(parsed.screens.map(s => s.isEntry)).toEqual([undefined, true]);
+  });
+
   it('migrates a legacy project to the supported board and default Modbus client config', () => {
     const parsed = parseProject(JSON.stringify({
       version: '1.0.0',

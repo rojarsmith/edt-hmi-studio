@@ -6,6 +6,7 @@ import type { ProjectFile } from '../../resources/types';
 import type { DemoEntry } from '../../demos';
 import type { Screen } from '../../types';
 import { getBoardDefinition, DEFAULT_BOARD_ID } from '../../types/hmi';
+import { getEntryScreen } from '../../utils/entryScreen';
 import { useAppStore } from '../../store/appStore';
 import ScreenThumbnail from './ScreenThumbnail';
 import './ProjectCard.css';
@@ -24,9 +25,8 @@ const DemoCard: React.FC<DemoCardProps> = ({ entry, file, onUse, onEdit }) => {
   // factory engineer development mode is unlocked. See docs/factory-dev-mode.md.
   const factoryDevMode = useAppStore(s => s.factoryDevMode);
   const board = getBoardDefinition(file?.boardId ?? DEFAULT_BOARD_ID);
-  const entryScreen: Screen | undefined = (file?.screens ?? file?.pages)?.[0] as
-    | Screen
-    | undefined;
+  const entryScreen: Screen | undefined =
+    getEntryScreen(((file?.screens ?? file?.pages) ?? []) as Screen[]) ?? undefined;
   const width = file?.display?.width ?? file?.canvasSize.width ?? 480;
   const height = file?.display?.height ?? file?.canvasSize.height ?? 272;
 

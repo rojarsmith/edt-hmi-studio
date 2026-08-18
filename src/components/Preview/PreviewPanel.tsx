@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
 import type { LvglComponent, Animation } from '../../types';
+import { getEntryScreen } from '../../utils/entryScreen';
 import {
   getImageButtonState,
   getNextImageButtonStateIndex,
@@ -44,6 +45,22 @@ interface AnimState {
   scaleX: number;
   scaleY: number;
   opacity: number;
+}
+
+// Collect all animations from all components
+function collectAnimations(comps: LvglComponent[]): { compId: string; anim: Animation }[] {
+  const result: { compId: string; anim: Animation }[] = [];
+  for (const comp of comps) {
+    if (comp.animations && comp.animations.length > 0) {
+      for (const anim of comp.animations) {
+        result.push({ compId: comp.id, anim });
+      }
+    }
+    if (comp.children.length > 0) {
+      result.push(...collectAnimations(comp.children));
+    }
+  }
+  return result;
 }
 
 function computeAnimState(anim: Animation, progress: number): Partial<AnimState> {
@@ -93,7 +110,11 @@ const PreviewPanel: React.FC = () => {
   const { images } = useResourceStore();
   const [scale, setScale] = useState(1);
   const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
-  const [previewPageId, setPreviewPageId] = useState<string>(currentScreenId);
+  // This panel simulates the device, so it boots where the firmware boots: the
+  // entry screen, not whichever screen is being edited. From there the footer
+  // buttons and in-preview navigation move around freely.
+  const entryScreenId = getEntryScreen(screens)?.id ?? currentScreenId;
+  const [previewPageId, setPreviewPageId] = useState<string>(entryScreenId);
   const [animPlaying, setAnimPlaying] = useState(false);
   const [animPaused, setAnimPaused] = useState(false);
   const animStartRef = useRef<number>(0);
@@ -102,18 +123,27 @@ const PreviewPanel: React.FC = () => {
   const [imageButtonStateIndices, setImageButtonStateIndices] =
     useState<Map<string, number>>(new Map());
 
-  // Sync preview screen with editor when not playing
-  useEffect(() => {
-    if (!animPlaying) setPreviewPageId(currentScreenId);
-  }, [currentScreenId, animPlaying]);
+  // Re-boot when the entry screen moves, or when playback stops. Adjusted
+  // during render behind a previous-value guard rather than in an effect, so
+  // the preview never paints a stale screen first.
+  const [prevSync, setPrevSync] = useState({ screenId: entryScreenId, playing: animPlaying });
+  if (prevSync.screenId !== entryScreenId || prevSync.playing !== animPlaying) {
+    setPrevSync({ screenId: entryScreenId, playing: animPlaying });
+    if (!animPlaying) setPreviewPageId(entryScreenId);
+  }
 
-  const previewPage = screens.find(p => p.id === previewPageId) || screens.find(p => p.id === currentScreenId);
+  const previewPage = screens.find(p => p.id === previewPageId) || screens.find(p => p.id === entryScreenId);
   const components = useMemo(() => previewPage?.components || [], [previewPage?.components]);
   const bgColor = previewPage?.backgroundColor || '#ffffff';
 
-  useEffect(() => {
+  // Image buttons restart from their configured initial state whenever the
+  // previewed components change — the same render-phase adjustment pattern.
+  // The null start makes the first render populate the map too.
+  const [prevComponents, setPrevComponents] = useState<LvglComponent[] | null>(null);
+  if (prevComponents !== components) {
+    setPrevComponents(components);
     setImageButtonStateIndices(collectInitialImageButtonStates(components));
-  }, [components, previewPageId]);
+  }
 
   // Load image from resource store or URL
   const loadImage = useCallback((src: string): HTMLImageElement | null => {
@@ -157,22 +187,6 @@ const PreviewPanel: React.FC = () => {
 
     return img.complete ? img : null;
   }, [images]);
-
-  // Collect all animations from all components
-  const collectAnimations = useCallback((comps: LvglComponent[]): { compId: string; anim: Animation }[] => {
-    const result: { compId: string; anim: Animation }[] = [];
-    for (const comp of comps) {
-      if (comp.animations && comp.animations.length > 0) {
-        for (const anim of comp.animations) {
-          result.push({ compId: comp.id, anim });
-        }
-      }
-      if (comp.children.length > 0) {
-        result.push(...collectAnimations(comp.children));
-      }
-    }
-    return result;
-  }, []);
 
   // Animation playback
   const startAnimation = useCallback(() => {
@@ -230,7 +244,7 @@ const PreviewPanel: React.FC = () => {
     };
 
     animFrameRef.current = requestAnimationFrame(tick);
-  }, [components, collectAnimations]);
+  }, [components]);
 
   const pauseAnimation = useCallback(() => {
     if (animPlaying && !animPaused) {
@@ -286,15 +300,19 @@ const PreviewPanel: React.FC = () => {
       };
       animFrameRef.current = requestAnimationFrame(tick);
     }
-  }, [animPlaying, animPaused, components, collectAnimations]);
+  }, [animPlaying, animPaused, components]);
 
+  // Reset is a restart of the simulated device: animations and widget states
+  // go back to their initial values, and the preview returns to the entry
+  // screen however far navigation wandered from it.
   const resetAnimation = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
     setAnimPlaying(false);
     setAnimPaused(false);
     setAnimStates(new Map());
+    setPreviewPageId(entryScreenId);
     setImageButtonStateIndices(collectInitialImageButtonStates(components));
-  }, [components]);
+  }, [components, entryScreenId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -693,7 +711,7 @@ const PreviewPanel: React.FC = () => {
       const padLeft = styles.paddingLeft ?? styles.padding ?? 0;
       
       let visibleChildren = comp.children;
-      let childOffsetX = x + padLeft;
+      const childOffsetX = x + padLeft;
       let childOffsetY = y + padTop;
       
       if (comp.type === 'tabview') {
@@ -783,7 +801,14 @@ const PreviewPanel: React.FC = () => {
           ) : (
             <button className="preview-btn" onClick={pauseAnimation} title="Pause">⏸</button>
           )}
-          <button className="preview-btn" onClick={resetAnimation} title="Reset" disabled={!animPlaying && animStates.size === 0}>⏹</button>
+          <button
+            className="preview-btn"
+            onClick={resetAnimation}
+            title="Restart from the entry screen"
+            disabled={!animPlaying && animStates.size === 0 && previewPageId === entryScreenId}
+          >
+            ⏹
+          </button>
           <span className="preview-divider" />
           <button onClick={() => setScale(s => Math.max(0.5, s - 0.25))}>−</button>
           <span>{Math.round(scale * 100)}%</span>
@@ -813,8 +838,10 @@ const PreviewPanel: React.FC = () => {
               key={p.id}
               className={`preview-screen-btn ${p.id === previewPageId ? 'active' : ''}`}
               onClick={() => setPreviewPageId(p.id)}
+              title={p.id === entryScreenId ? `${p.name} (entry screen)` : p.name}
             >
               {p.name}
+              {p.id === entryScreenId && <span className="preview-screen-entry">Entry</span>}
             </button>
           ))}
         </div>

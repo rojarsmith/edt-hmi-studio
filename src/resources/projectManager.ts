@@ -42,6 +42,7 @@ export function createProjectFile(
       components: screen.components,
       backgroundColor: screen.backgroundColor,
       groupId: screen.groupId ?? null,
+      isEntry: screen.isEntry,
     })),
     screenGroups: screenGroups.map(group => ({ ...group })),
     resources: {

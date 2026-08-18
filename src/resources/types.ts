@@ -191,6 +191,12 @@ export interface ProjectScreen {
   components: LvglComponent[];
   backgroundColor?: string;
   groupId?: string | null;
+  /**
+   * Marks the screen the generated firmware boots into. See `Screen.isEntry`
+   * in `src/types`; a file without it boots its first screen, which is what
+   * every project written before the flag existed expects.
+   */
+  isEntry?: boolean;
 }
 
 /** Organisational folder for screens. See `ScreenGroup` in `src/types`. */

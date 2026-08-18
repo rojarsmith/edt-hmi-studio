@@ -6,6 +6,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import { getEntryScreen } from '../../utils/entryScreen';
 import { MAX_SCREEN_GROUP_DEPTH } from '../../types';
 import type { Screen, ScreenGroup } from '../../types';
 import PanelChevron from '../LogicEditor/PanelChevron';
@@ -118,6 +119,8 @@ const ScreenManager: React.FC = () => {
 
   const normalizedQuery = query.trim().toLowerCase();
   const isSearching = normalizedQuery.length > 0;
+
+  const entryScreenId = useMemo(() => getEntryScreen(screens)?.id, [screens]);
 
   const matchesQuery = useCallback(
     (name: string) => !isSearching || name.toLowerCase().includes(normalizedQuery),
@@ -279,7 +282,14 @@ const ScreenManager: React.FC = () => {
         {renaming?.id === screen.id ? (
           renderRenameInput(screen.id)
         ) : (
-          <span className="sm-label">{screen.name}</span>
+          <span className="sm-label">
+            <span className="sm-label-text">{screen.name}</span>
+            {screen.id === entryScreenId && (
+              <span className="sm-entry-badge" title="Entry screen — shown first at startup">
+                Entry
+              </span>
+            )}
+          </span>
         )}
         <button
           type="button"

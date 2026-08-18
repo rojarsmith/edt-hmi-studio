@@ -197,6 +197,39 @@
   text-overflow: ellipsis;
 }
 
+/* Screen labels hold the name plus an optional Entry badge, so they lay out
+   as a row of their own; the name keeps the ellipsis. */
+.sm-screen .sm-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sm-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sits right of the screen's name on the project's entry screen. */
+.sm-entry-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: #1976d2;
+  background: #e3f2fd;
+  border: 1px solid rgba(25, 118, 210, 0.25);
+  border-radius: 8px;
+  padding: 2px 6px;
+}
+
+/* The current row's background matches the badge fill, so swap to white. */
+.sm-screen.current .sm-entry-badge {
+  background: #fff;
+}
+
 /* Open screens read slightly stronger than closed ones. */
 .sm-screen.open .sm-label {
   color: #222;

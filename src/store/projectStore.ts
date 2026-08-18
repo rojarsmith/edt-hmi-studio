@@ -7,6 +7,7 @@ import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '.
 import type { Screen, ScreenGroup, Typography, TypographyGroup, ProjectLanguage, TextResource, TextGroup } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import { applyTypographies } from '../codegen/typography';
+import { getEntryScreen } from '../utils/entryScreen';
 import { normalizeBuiltinSizes } from '../resources/builtinFonts';
 import { applyTextResources } from '../codegen/textResources';
 import { migrateFontResource } from '../resources/converters/fontConverter';
@@ -105,8 +106,9 @@ export interface ProjectListItem {
   config: ProjectConfig;
   size: number; // approximate bytes
   /**
-   * The project's first screen, kept for the card's schematic thumbnail.
-   * Null for a project whose data record is missing.
+   * The project's entry screen (the flagged one, or the first screen when
+   * none is flagged), kept for the card's schematic thumbnail. Null for a
+   * project whose data record is missing.
    */
   entryScreen: Screen | null;
 }
@@ -449,7 +451,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       for (const r of resources) {
         size += JSON.stringify(r.data).length;
       }
-      items.push({ config, size, entryScreen: data?.screens?.[0] ?? null });
+      items.push({ config, size, entryScreen: getEntryScreen(data?.screens ?? []) });
     }
     // Sort by updatedAt descending
     items.sort((a, b) => b.config.updatedAt - a.config.updatedAt);
@@ -642,6 +644,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         components: s.components,
         backgroundColor: s.backgroundColor,
         groupId: s.groupId ?? null,
+        // The firmware build reads its boot screen from here, so dropping the
+        // flag would silently start the device on the first screen instead.
+        isEntry: s.isEntry,
       })),
       screenGroups: (data.screenGroups || []).map(g => ({ ...g })),
       typographyGroups: (data.typographyGroups || []).map(g => ({ ...g })),
@@ -709,6 +714,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       components: s.components,
       backgroundColor: s.backgroundColor ?? '#F5F5F5',
       groupId: s.groupId ?? null,
+      isEntry: s.isEntry,
     }));
 
     // Import is its own path into the app, so it has to run the same migrations

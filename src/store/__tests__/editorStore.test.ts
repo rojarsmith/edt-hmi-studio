@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useEditorStore } from '../editorStore';
+import { getEntryScreen } from '../../utils/entryScreen';
 
 // Reset store before each test
 function resetStore() {
@@ -576,6 +577,67 @@ describe('editorStore', () => {
       const state = useEditorStore.getState();
       expect(state.screens.some(s => s.id === created)).toBe(false);
       expect(state.openScreenIds).not.toContain(created);
+    });
+  });
+
+  // --- entry screen ---
+  describe('entry screen', () => {
+    it('defaults to the first screen when no flag is set', () => {
+      useEditorStore.getState().addScreen();
+
+      const entry = getEntryScreen(useEditorStore.getState().screens);
+      expect(entry?.id).toBe('test-screen-1');
+    });
+
+    it('moves the flag so exactly one screen carries it', () => {
+      const second = useEditorStore.getState().addScreen();
+      useEditorStore.getState().setEntryScreen(second);
+
+      let screens = useEditorStore.getState().screens;
+      expect(getEntryScreen(screens)?.id).toBe(second);
+      expect(screens.filter(s => s.isEntry)).toHaveLength(1);
+
+      useEditorStore.getState().setEntryScreen('test-screen-1');
+
+      screens = useEditorStore.getState().screens;
+      expect(getEntryScreen(screens)?.id).toBe('test-screen-1');
+      expect(screens.filter(s => s.isEntry)).toHaveLength(1);
+    });
+
+    it('ignores unknown screen ids', () => {
+      useEditorStore.getState().setEntryScreen('nope');
+
+      expect(getEntryScreen(useEditorStore.getState().screens)?.id).toBe('test-screen-1');
+      expect(useEditorStore.getState().history).toHaveLength(0);
+    });
+
+    it('setting the current entry again leaves history untouched', () => {
+      const second = useEditorStore.getState().addScreen();
+      useEditorStore.getState().setEntryScreen(second);
+      const historyBefore = useEditorStore.getState().history.length;
+
+      useEditorStore.getState().setEntryScreen(second);
+
+      expect(useEditorStore.getState().history).toHaveLength(historyBefore);
+    });
+
+    it('falls back to the first remaining screen when the entry is deleted', () => {
+      const second = useEditorStore.getState().addScreen();
+      useEditorStore.getState().setEntryScreen(second);
+
+      useEditorStore.getState().deleteScreen(second);
+
+      const screens = useEditorStore.getState().screens;
+      expect(getEntryScreen(screens)?.id).toBe('test-screen-1');
+    });
+
+    it('undo restores the previous entry', () => {
+      const second = useEditorStore.getState().addScreen();
+      useEditorStore.getState().setEntryScreen(second);
+
+      useEditorStore.getState().undo();
+
+      expect(getEntryScreen(useEditorStore.getState().screens)?.id).toBe('test-screen-1');
     });
   });
 

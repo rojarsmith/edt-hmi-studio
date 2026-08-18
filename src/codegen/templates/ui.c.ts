@@ -7,6 +7,7 @@ import { collectUsedCustomFonts } from '../fontUsage';
 import { deriveTypographies } from '../typography';
 import { resolveText } from '../textResources';
 import { effectiveTypographyId, standInProp } from '../../utils/componentText';
+import { getEntryScreen } from '../../utils/entryScreen';
 import {
   languageDifferences,
   overriddenLanguages,
@@ -2605,9 +2606,10 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     lines.push('');
   }
   
-  // Load first screen
-  if (screens.length > 0) {
-    const loadFunc = getScreenLoadFuncName(screens[0].name, options);
+  // Load the entry screen
+  const entryScreen = getEntryScreen(screens);
+  if (entryScreen) {
+    const loadFunc = getScreenLoadFuncName(entryScreen.name, options);
     lines.push(`${indent}${loadFunc}();`);
   }
   
