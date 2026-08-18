@@ -8,9 +8,11 @@
   color: #333;
   font-size: 13px;
   border-bottom: 1px solid #e0e0e0;
-  /* Height comes from the drag-stored inline value while expanded. */
-  flex: 0 1 auto;
+  /* Height comes from the drag-stored inline value while expanded; the panel
+     clips its own content so a short panel never paints over the one below. */
+  flex: 0 0 auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* Collapsed leaves just the header bar. */
@@ -18,88 +20,9 @@
   flex: 0 0 auto;
 }
 
-/* Resize handle straddling the border with the component palette above */
-.sm-resizer {
-  position: absolute;
-  top: -4px;
-  left: 0;
-  right: 0;
-  height: 8px;
-  cursor: row-resize;
-  z-index: 5;
-}
-
-.sm-resizer:hover,
-.sm-resizer.resizing {
-  background: rgba(33, 150, 243, 0.35);
-}
-
-/* Header mirrors the hierarchy panel / logic graph manager: left twisty,
-   title, count badge, actions; the whole bar toggles collapse. */
-.sm-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #fff;
-  flex-shrink: 0;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s;
-}
-
-.sm-header:hover {
-  background: #f0f0f0;
-}
-
+/* The bar and its grip come from panelBar.css; only the collapsed look is ours. */
 .screen-manager.collapsed .sm-header {
   border-bottom: none;
-}
-
-.sm-toggle {
-  flex-shrink: 0;
-  color: #888;
-  transition: transform 0.15s ease;
-}
-
-.sm-toggle.open {
-  transform: rotate(90deg);
-}
-
-.sm-title {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-}
-
-.sm-count {
-  font-size: 11px;
-  color: #777;
-  background: #ececec;
-  border-radius: 8px;
-  padding: 1px 7px;
-}
-
-.sm-header-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.sm-header-btn {
-  background: transparent;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  padding: 2px 6px;
-  font-size: 14px;
-  border-radius: 3px;
-}
-
-.sm-header-btn:hover {
-  background: #e8e8e8;
-  color: #333;
 }
 
 .sm-search {

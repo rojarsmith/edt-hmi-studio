@@ -10,6 +10,8 @@ import { getEntryScreen } from '../../utils/entryScreen';
 import { MAX_SCREEN_GROUP_DEPTH } from '../../types';
 import type { Screen, ScreenGroup } from '../../types';
 import PanelChevron from '../LogicEditor/PanelChevron';
+import { useDockedPanelResize } from '../../hooks/useDockedPanelResize';
+import '../panelBar.css';
 import './ScreenManager.css';
 
 // Line-drawn "new group" glyph, matching the panel's monochrome icon
@@ -46,11 +48,10 @@ interface RenameState {
 const ROOT_DROP = '__root__';
 
 // Resize limits, mirroring the other collapsible managers: the panel keeps
-// room for its own header, the component palette above keeps its minimum,
-// and the hierarchy panel below keeps whatever height it currently holds.
+// room for its own header, whether it is being dragged or lending height to a
+// panel below it.
 const MIN_PANEL_HEIGHT = 120;
-const MIN_ABOVE_HEIGHT = 160;
-const DEFAULT_PANEL_HEIGHT = 220;
+const DEFAULT_PANEL_HEIGHT = 180;
 
 const ScreenManager: React.FC = () => {
   const screens = useEditorStore(s => s.screens);
@@ -69,45 +70,16 @@ const ScreenManager: React.FC = () => {
   const moveScreenToGroup = useEditorStore(s => s.moveScreenToGroup);
 
   const [collapsed, setCollapsed] = useState(false);
-  const [panelHeight, setPanelHeight] = useState(DEFAULT_PANEL_HEIGHT);
-  const [resizing, setResizing] = useState(false);
   const [query, setQuery] = useState('');
 
-  // Top-edge drag, like the graph manager and hierarchy panel: pulling up
-  // grows this panel at the component palette's expense.
-  const handleResizeStart = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      const startY = e.clientY;
-      const startHeight = panelHeight;
-      const leftPanel = e.currentTarget.closest('.left-panel');
-      const hierarchyHeight =
-        leftPanel?.querySelector('.hierarchy-panel')?.getBoundingClientRect().height ?? 0;
-      const maxHeight = leftPanel
-        ? Math.max(
-            MIN_PANEL_HEIGHT,
-            leftPanel.clientHeight - MIN_ABOVE_HEIGHT - hierarchyHeight,
-          )
-        : startHeight;
-      setResizing(true);
-
-      const onMove = (ev: PointerEvent) => {
-        setPanelHeight(
-          Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT, startHeight + startY - ev.clientY)),
-        );
-      };
-      const onUp = () => {
-        setResizing(false);
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onUp);
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onUp);
-    },
-    [panelHeight],
-  );
+  // Top-edge drag, like the graph manager and hierarchy panel: pulling up grows
+  // this panel at the palette's expense, then at the panels' above it.
+  const { height: panelHeight, resizing, panelRef, onResizeStart } =
+    useDockedPanelResize<HTMLDivElement>({
+      minHeight: MIN_PANEL_HEIGHT,
+      defaultHeight: DEFAULT_PANEL_HEIGHT,
+      expanded: !collapsed,
+    });
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
   const [renaming, setRenaming] = useState<RenameState | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -391,26 +363,27 @@ const ScreenManager: React.FC = () => {
   return (
     <div
       className={`screen-manager ${collapsed ? 'collapsed' : ''}`}
+      ref={panelRef}
       style={collapsed ? undefined : { height: panelHeight }}
     >
       {!collapsed && (
         <div
-          className={`sm-resizer ${resizing ? 'resizing' : ''}`}
-          onPointerDown={handleResizeStart}
+          className={`panel-grip ${resizing ? 'resizing' : ''}`}
+          onPointerDown={onResizeStart}
         />
       )}
       <div
-        className="sm-header"
+        className="sm-header panel-bar"
         onClick={() => setCollapsed(c => !c)}
         title={collapsed ? 'Expand' : 'Collapse'}
       >
-        <PanelChevron open={!collapsed} className="sm-toggle" />
-        <span className="sm-title">Screens</span>
-        <span className="sm-count">{screens.length}</span>
-        <div className="sm-header-actions" onClick={e => e.stopPropagation()}>
+        <PanelChevron open={!collapsed} className="panel-bar-toggle" />
+        <span className="panel-bar-title">Screens</span>
+        <span className="panel-bar-count">{screens.length}</span>
+        <div className="panel-bar-actions" onClick={e => e.stopPropagation()}>
           <button
             type="button"
-            className="sm-header-btn"
+            className="panel-bar-btn"
             onClick={() => addScreen(null)}
             title="New screen"
             aria-label="New screen"
@@ -419,7 +392,7 @@ const ScreenManager: React.FC = () => {
           </button>
           <button
             type="button"
-            className="sm-header-btn"
+            className="panel-bar-btn"
             onClick={() => handleAddGroup(null)}
             title="New screen group"
             aria-label="New screen group"

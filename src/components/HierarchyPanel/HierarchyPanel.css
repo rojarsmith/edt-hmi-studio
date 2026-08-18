@@ -6,7 +6,6 @@
 .hierarchy-panel {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
   position: relative;
   background: #f8f9fa;
   color: #333;
@@ -14,86 +13,13 @@
   /* Mid-column now, so it draws its own divider instead of relying on the
      column's last-child rule. */
   border-top: 1px solid #e0e0e0;
-  /* Whatever height the drag stored, the panels above keep their minimum. */
-  max-height: calc(100% - 220px);
-}
-
-/* Resize handle straddling the border with the panels above */
-.hierarchy-resizer {
-  position: absolute;
-  top: -4px;
-  left: 0;
-  right: 0;
-  height: 8px;
-  cursor: row-resize;
-  z-index: 5;
-}
-
-.hierarchy-resizer:hover,
-.hierarchy-resizer.resizing {
-  background: rgba(33, 150, 243, 0.35);
-}
-
-.hierarchy-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #fff;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s;
-}
-
-.hierarchy-header:hover {
-  background: #f0f0f0;
-}
-
-.hierarchy-toggle {
+  /* Holds exactly the height the drag stored, and clips its own content so a
+     short panel never paints over the one below it. */
   flex-shrink: 0;
-  color: #888;
-  transition: transform 0.15s ease;
+  overflow: hidden;
 }
 
-.hierarchy-toggle.open {
-  transform: rotate(90deg);
-}
-
-.hierarchy-title {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-}
-
-.hierarchy-count {
-  font-size: 11px;
-  color: #777;
-  background: #ececec;
-  border-radius: 8px;
-  padding: 1px 7px;
-}
-
-.hierarchy-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.hierarchy-btn {
-  background: transparent;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  padding: 2px 6px;
-  font-size: 14px;
-  border-radius: 3px;
-}
-
-.hierarchy-btn:hover {
-  background: #e8e8e8;
-  color: #333;
-}
+/* Bar and grip come from panelBar.css. */
 
 .hierarchy-tree {
   flex: 1;

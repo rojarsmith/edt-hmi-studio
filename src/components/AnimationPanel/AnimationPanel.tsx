@@ -3,6 +3,8 @@ import { useEditorStore } from '../../store/editorStore';
 import type { Animation, AnimationType } from '../../types';
 import AnimationEditDialog from './AnimationEditDialog';
 import PanelChevron from '../LogicEditor/PanelChevron';
+import { useDockedPanelResize } from '../../hooks/useDockedPanelResize';
+import '../panelBar.css';
 import './AnimationPanel.css';
 
 const ANIM_TYPE_LABELS: Record<AnimationType, string> = {
@@ -30,10 +32,9 @@ const ANIM_TYPE_ICONS: Record<AnimationType, string> = {
 };
 
 // Resize limits, mirroring the hierarchy panel: the panel keeps room for its
-// own header, and the panels above keep room to stay usable.
+// own header, whether it is being dragged or lending height to a panel below.
 const MIN_PANEL_HEIGHT = 120;
-const MIN_ABOVE_HEIGHT = 220;
-const DEFAULT_PANEL_HEIGHT = 240;
+const DEFAULT_PANEL_HEIGHT = 140;
 
 const AnimationPanel: React.FC = () => {
   const { selection, getComponentById, updateComponent } = useEditorStore();
@@ -41,38 +42,16 @@ const AnimationPanel: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(true);
-  const [panelHeight, setPanelHeight] = useState(DEFAULT_PANEL_HEIGHT);
-  const [resizing, setResizing] = useState(false);
   const [query, setQuery] = useState('');
 
-  // Same drag behaviour as the hierarchy panel: bottom-docked, so dragging
-  // the top edge up grows it.
-  const handleResizeStart = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      const startY = e.clientY;
-      const startHeight = panelHeight;
-      const column = e.currentTarget.closest('.left-panel, .right-panel');
-      const maxHeight = column
-        ? Math.max(MIN_PANEL_HEIGHT, column.clientHeight - MIN_ABOVE_HEIGHT)
-        : startHeight;
-      setResizing(true);
-
-      const onMove = (ev: PointerEvent) => {
-        setPanelHeight(Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT, startHeight + startY - ev.clientY)));
-      };
-      const onUp = () => {
-        setResizing(false);
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onUp);
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onUp);
-    },
-    [panelHeight],
-  );
+  // Same drag behaviour as the hierarchy panel: bottom-docked, so dragging the
+  // top edge up grows it into the space above.
+  const { height: panelHeight, resizing, panelRef, onResizeStart } =
+    useDockedPanelResize<HTMLDivElement>({
+      minHeight: MIN_PANEL_HEIGHT,
+      defaultHeight: DEFAULT_PANEL_HEIGHT,
+      expanded: panelExpanded,
+    });
 
   const selectedId = selection.selectedIds[0];
   const component = selectedId ? getComponentById(selectedId) : undefined;
@@ -120,24 +99,35 @@ const AnimationPanel: React.FC = () => {
   }, [selectedId, component, animations, isCreating, updateComponent]);
 
   return (
-    <div className="animation-panel" style={panelExpanded ? { height: panelHeight } : undefined}>
+    <div
+      className="animation-panel"
+      ref={panelRef}
+      style={panelExpanded ? { height: panelHeight } : undefined}
+    >
       {panelExpanded && (
         <div
-          className={`anim-panel-resizer ${resizing ? 'resizing' : ''}`}
-          onPointerDown={handleResizeStart}
+          className={`panel-grip ${resizing ? 'resizing' : ''}`}
+          onPointerDown={onResizeStart}
         />
       )}
       <div
-        className="anim-panel-header"
+        className="anim-panel-header panel-bar"
         onClick={() => setPanelExpanded(prev => !prev)}
         title={panelExpanded ? 'Collapse' : 'Expand'}
       >
-        <PanelChevron open={panelExpanded} className="anim-panel-toggle" />
-        <span className="anim-panel-title">Animations</span>
-        <span className="anim-panel-count">{animations.length}</span>
+        <PanelChevron open={panelExpanded} className="panel-bar-toggle" />
+        <span className="panel-bar-title">Animations</span>
+        <span className="panel-bar-count">{animations.length}</span>
         {component && (
-          <div className="anim-panel-actions" onClick={e => e.stopPropagation()}>
-            <button className="add-anim-btn" onClick={handleAddAnim} title="Add animation">＋</button>
+          <div className="panel-bar-actions" onClick={e => e.stopPropagation()}>
+            <button
+              type="button"
+              className="panel-bar-btn"
+              onClick={handleAddAnim}
+              title="Add animation"
+            >
+              ＋
+            </button>
           </div>
         )}
       </div>

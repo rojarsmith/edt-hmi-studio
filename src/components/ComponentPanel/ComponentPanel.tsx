@@ -3,6 +3,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { componentCategories, getComponentsByCategory } from '../../utils/componentDefinitions';
 import type { ComponentDefinition, ComponentCategory } from '../../types';
 import PanelChevron from '../LogicEditor/PanelChevron';
+import '../panelBar.css';
 import './ComponentPanel.css';
 
 interface DraggableComponentProps {
@@ -109,13 +110,13 @@ const ComponentPanel: React.FC = () => {
       {/* Header mirrors the screen manager: left twisty, title, count badge,
           the whole bar toggles collapse. */}
       <div
-        className="cp-header"
+        className="cp-header panel-bar"
         onClick={() => setCollapsed(c => !c)}
         title={collapsed ? 'Expand' : 'Collapse'}
       >
-        <PanelChevron open={!collapsed} className="cp-toggle" />
-        <span className="cp-title">Components</span>
-        <span className="cp-count">{componentCount}</span>
+        <PanelChevron open={!collapsed} className="panel-bar-toggle" />
+        <span className="panel-bar-title">Components</span>
+        <span className="panel-bar-count">{componentCount}</span>
       </div>
 
       {!collapsed && (

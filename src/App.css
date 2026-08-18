@@ -181,30 +181,35 @@ body {
 }
 
 /*
- * Three stacked sections: component palette, screen manager, hierarchy. The
- * outer two share the leftover height; the screen manager sizes itself and
- * shrinks to its header bar when collapsed (see ScreenManager.css).
+ * Four stacked sections: the component palette, then the hierarchy, screen
+ * manager and animation panels, each keeping exactly the height its top-edge
+ * drag stored. The palette is the section that flexes, so it is the one the
+ * others eat into - it keeps its header bar back, which is what stops the
+ * hierarchy below from ending up on top of the palette's title. Drags stop at
+ * that same line; see maxDockedPanelHeight in utils/panelResize.ts.
  */
 .left-panel > *:first-child {
   flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.left-panel > .screen-manager {
-  flex: 0 1 auto;
-  min-height: 0;
+  /* No scrolling here: the palette scrolls its own category list, and a second
+     scrollbar around the whole panel would sit right next to it. */
+  overflow: hidden;
+  /* Its own bar plus a bar's worth of content, so a drag above never leaves it
+     a bare title. Keep in step with MIN_FLEXIBLE_HEIGHT in
+     utils/panelResize.ts. */
+  min-height: 76px;
 }
 
 /* A collapsed component palette shrinks to its header bar and hands the
-   freed space to the screen manager, keeping the hierarchy bottom-docked. */
+   freed space to the screen manager, keeping the panels below docked. The
+   screen manager then flexes, so it inherits the palette's floor. */
 .left-panel > .component-panel.collapsed {
   flex: 0 0 auto;
+  min-height: 0;
 }
 
-.left-panel > .component-panel.collapsed ~ .screen-manager {
+.left-panel > .component-panel.collapsed ~ .screen-manager:not(.collapsed) {
   flex: 1 1 auto;
-  max-height: none;
+  min-height: 76px;
 }
 
 /* The column's bottom panel manages its own height: a stored value while

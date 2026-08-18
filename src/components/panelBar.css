@@ -1,0 +1,98 @@
+/*
+ * The bar at the top of a collapsible panel, and the grip that drags it.
+ *
+ * Every panel docked down a side column wears this, so a column of them reads
+ * as one stack of controls: same bar height whether or not the panel carries
+ * buttons, same twisty, same title, same count badge, same drag grip. Panel
+ * stylesheets add what is theirs alone - nothing that belongs to the bar.
+ */
+
+.panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Fixed, so buttons in one bar cannot make it taller than its neighbours. */
+  height: 38px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.panel-bar:hover {
+  background: #f0f0f0;
+}
+
+.panel-bar-toggle {
+  flex-shrink: 0;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+
+.panel-bar-toggle.open {
+  transform: rotate(90deg);
+}
+
+.panel-bar-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.panel-bar-count {
+  font-size: 11px;
+  color: #777;
+  background: #ececec;
+  border-radius: 8px;
+  padding: 1px 7px;
+}
+
+.panel-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.panel-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.panel-bar-btn:hover {
+  background: #e8e8e8;
+  color: #333;
+}
+
+/* The drag grip runs along the panel's own top edge - inside it, so the panel
+   can clip its content without clipping the grip. */
+.panel-grip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 5;
+}
+
+.panel-grip:hover,
+.panel-grip.resizing {
+  background: rgba(33, 150, 243, 0.35);
+}

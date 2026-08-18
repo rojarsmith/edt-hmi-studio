@@ -4,13 +4,15 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import type { LvglComponent } from '../../types';
 import PanelChevron from '../LogicEditor/PanelChevron';
+import { useDockedPanelResize } from '../../hooks/useDockedPanelResize';
+import '../panelBar.css';
 import './HierarchyPanel.css';
 
 // Resize limits, mirroring the logic editor's GraphManager: the panel keeps
-// room for its own header, and the panels above keep room to stay usable.
+// room for its own header, whether it is being dragged or lending height to a
+// panel below it.
 const MIN_PANEL_HEIGHT = 120;
-const MIN_ABOVE_HEIGHT = 220;
-const DEFAULT_PANEL_HEIGHT = 280;
+const DEFAULT_PANEL_HEIGHT = 180;
 
 /**
  * The component array is stored back-to-front: index 0 is created first and so
@@ -271,8 +273,12 @@ const HierarchyPanel: React.FC = () => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [panelExpanded, setPanelExpanded] = useState(true);
-  const [panelHeight, setPanelHeight] = useState(DEFAULT_PANEL_HEIGHT);
-  const [resizing, setResizing] = useState(false);
+  const { height: panelHeight, resizing, panelRef, onResizeStart } =
+    useDockedPanelResize<HTMLDivElement>({
+      minHeight: MIN_PANEL_HEIGHT,
+      defaultHeight: DEFAULT_PANEL_HEIGHT,
+      expanded: panelExpanded,
+    });
 
   const currentScreen = screens.find(p => p.id === currentScreenId);
   const components = useMemo(() => currentScreen?.components || [], [currentScreen?.components]);
@@ -283,35 +289,6 @@ const HierarchyPanel: React.FC = () => {
     return count(components);
   }, [components]);
 
-  // Same drag behaviour as the logic editor's GraphManager: the panel is
-  // bottom-docked, so dragging its top edge up grows it.
-  const handleResizeStart = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      const startY = e.clientY;
-      const startHeight = panelHeight;
-      const leftPanel = e.currentTarget.closest('.left-panel');
-      const maxHeight = leftPanel
-        ? Math.max(MIN_PANEL_HEIGHT, leftPanel.clientHeight - MIN_ABOVE_HEIGHT)
-        : startHeight;
-      setResizing(true);
-
-      const onMove = (ev: PointerEvent) => {
-        setPanelHeight(Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT, startHeight + startY - ev.clientY)));
-      };
-      const onUp = () => {
-        setResizing(false);
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onUp);
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onUp);
-    },
-    [panelHeight],
-  );
-  
   const handleSelect = useCallback((id: string, addToSelection: boolean) => {
     selectComponent(id, addToSelection);
   }, [selectComponent]);
@@ -417,31 +394,37 @@ const HierarchyPanel: React.FC = () => {
   }, []);
   
   return (
-    <div className="hierarchy-panel" style={panelExpanded ? { height: panelHeight } : undefined}>
+    <div
+      className="hierarchy-panel"
+      ref={panelRef}
+      style={panelExpanded ? { height: panelHeight } : undefined}
+    >
       {panelExpanded && (
         <div
-          className={`hierarchy-resizer ${resizing ? 'resizing' : ''}`}
-          onPointerDown={handleResizeStart}
+          className={`panel-grip ${resizing ? 'resizing' : ''}`}
+          onPointerDown={onResizeStart}
         />
       )}
       <div
-        className="hierarchy-header"
+        className="hierarchy-header panel-bar"
         onClick={() => setPanelExpanded(prev => !prev)}
         title={panelExpanded ? 'Collapse' : 'Expand'}
       >
-        <PanelChevron open={panelExpanded} className="hierarchy-toggle" />
-        <span className="hierarchy-title">Hierarchy</span>
-        <span className="hierarchy-count">{componentCount}</span>
-        <div className="hierarchy-actions" onClick={e => e.stopPropagation()}>
+        <PanelChevron open={panelExpanded} className="panel-bar-toggle" />
+        <span className="panel-bar-title">Hierarchy</span>
+        <span className="panel-bar-count">{componentCount}</span>
+        <div className="panel-bar-actions" onClick={e => e.stopPropagation()}>
           <button
-            className="hierarchy-btn"
+            type="button"
+            className="panel-bar-btn"
             onClick={handleExpandAll}
             title="Expand all"
           >
             ⊞
           </button>
           <button
-            className="hierarchy-btn"
+            type="button"
+            className="panel-bar-btn"
             onClick={handleCollapseAll}
             title="Collapse all"
           >
