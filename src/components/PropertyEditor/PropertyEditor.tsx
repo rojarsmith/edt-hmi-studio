@@ -241,7 +241,29 @@ const PropertyEditor: React.FC = () => {
   const [radiusLinked, setRadiusLinked] = useState(true);
   const [panelExpanded, setPanelExpanded] = useState(true);
   const [query, setQuery] = useState('');
+  // Collapsed categories, keyed by header title so the state carries across
+  // selection changes and re-renders of the hand-written sections.
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const sectionsRef = useRef<HTMLDivElement>(null);
+
+  // One delegated handler folds any plain category from its header — the
+  // same gesture as the hierarchy tree's members. Sections with their own
+  // header behaviour (Events, Modbus) manage themselves.
+  const handleSectionsClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const header = target.closest('.section-header');
+    if (!header || !sectionsRef.current?.contains(header)) return;
+    if (header.closest('.pe-events-section') || header.closest('.modbus-binding-section')) return;
+    if (target.closest('button, input, select, label')) return;
+    const title = header.textContent?.trim();
+    if (!title) return;
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  }, []);
 
   // Text-driven property search. A section after the pinned Component block
   // stays visible when its title, one of its collapsible subsections'
@@ -251,6 +273,15 @@ const PropertyEditor: React.FC = () => {
   useEffect(() => {
     const root = sectionsRef.current;
     if (!root) return;
+
+    // Fold collapsed categories: everything but the header hides. Applied on
+    // every render for the same reason as the search filter below.
+    root.querySelectorAll<HTMLElement>('.property-section').forEach(section => {
+      if (section.classList.contains('pe-events-section') || section.classList.contains('modbus-binding-section')) return;
+      const title = section.querySelector('.section-header')?.textContent?.trim();
+      section.classList.toggle('pe-collapsed', !!title && collapsedSections.has(title));
+    });
+
     const q = query.trim().toLowerCase();
     const matches = (text: string | null | undefined) =>
       !!text && text.toLowerCase().includes(q);
@@ -391,6 +422,26 @@ const PropertyEditor: React.FC = () => {
     [selectedId, component, updateComponent]
   );
 
+  // The hierarchy panel's member controls, applied to categories: fold or
+  // open every plain section at once. Titles are read off the DOM at click
+  // time so the buttons stay correct for whatever sections the current
+  // component renders.
+  const collapseAllSections = () => {
+    const root = sectionsRef.current;
+    if (!root) return;
+    const titles = [...root.querySelectorAll('.property-section')]
+      .filter(
+        s =>
+          !s.classList.contains('pe-events-section') &&
+          !s.classList.contains('modbus-binding-section'),
+      )
+      .map(s => s.querySelector('.section-header')?.textContent?.trim())
+      .filter((t): t is string => !!t);
+    setCollapsedSections(new Set(titles));
+  };
+
+  const expandAllSections = () => setCollapsedSections(new Set());
+
   const panelHeader = (
     <div
       className="pe-header"
@@ -399,6 +450,14 @@ const PropertyEditor: React.FC = () => {
     >
       <PanelChevron open={panelExpanded} className="pe-toggle" />
       <span className="pe-title">Properties</span>
+      <div className="pe-header-actions" onClick={e => e.stopPropagation()}>
+        <button className="pe-header-btn" onClick={expandAllSections} title="Expand all">
+          ⊞
+        </button>
+        <button className="pe-header-btn" onClick={collapseAllSections} title="Collapse all">
+          ⊟
+        </button>
+      </div>
     </div>
   );
 
@@ -421,7 +480,7 @@ const PropertyEditor: React.FC = () => {
       {panelHeader}
 
       {panelExpanded && (
-      <div className="property-sections" ref={sectionsRef}>
+      <div className="property-sections" ref={sectionsRef} onClick={handleSectionsClick}>
         {/* Component Info — pinned above the search box, never filtered */}
         <div className="property-section" data-pe-pinned="true">
           <div className="section-header">Component</div>

@@ -52,6 +52,27 @@
   color: #333;
 }
 
+.pe-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.pe-header-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pe-header-btn:hover {
+  background: #e8e8e8;
+  color: #333;
+}
+
 /* Search sits below the pinned Type/Id rows; same treatment as the other
    managers' search boxes. */
 .pe-search {
@@ -121,6 +142,40 @@
   text-transform: uppercase;
   margin-bottom: 12px;
   letter-spacing: 0.5px;
+}
+
+/* Plain category headers fold their section, with the family's twisty drawn
+   as a masked pseudo-element — Events and Modbus bring their own headers. */
+.property-section:not(.pe-events-section):not(.modbus-binding-section) > .section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.property-section:not(.pe-events-section):not(.modbus-binding-section) > .section-header::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  background: #888;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M6 4l4 4-4 4' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M6 4l4 4-4 4' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") center / contain no-repeat;
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+
+.property-section.pe-collapsed > .section-header::before {
+  transform: rotate(0deg);
+}
+
+.property-section.pe-collapsed > .section-header {
+  margin-bottom: 0;
+}
+
+.property-section.pe-collapsed > :not(.section-header) {
+  display: none;
 }
 
 .property-row {

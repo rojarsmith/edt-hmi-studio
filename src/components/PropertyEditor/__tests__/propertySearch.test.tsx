@@ -106,6 +106,29 @@ describe('PropertyEditor search', () => {
     expect(eventsIdx).toBe(modbusIdx - 1);
   });
 
+  it('folds a category from its header, like a hierarchy member', () => {
+    const { container } = render(<PropertyEditor />);
+    const position = sectionByTitle(container, 'Position')!;
+    fireEvent.click(position.querySelector('.section-header')!);
+    expect(position.classList.contains('pe-collapsed')).toBe(true);
+    // Other categories are untouched, and a second click reopens.
+    expect(sectionByTitle(container, 'Size')!.classList.contains('pe-collapsed')).toBe(false);
+    fireEvent.click(position.querySelector('.section-header')!);
+    expect(position.classList.contains('pe-collapsed')).toBe(false);
+  });
+
+  it('collapses and expands every category from the header buttons', () => {
+    const { container } = render(<PropertyEditor />);
+    fireEvent.click(screen.getByTitle('Collapse all'));
+    expect(sectionByTitle(container, 'Position')!.classList.contains('pe-collapsed')).toBe(true);
+    expect(sectionByTitle(container, 'Size')!.classList.contains('pe-collapsed')).toBe(true);
+    // Events keeps its own toggle and is not swept up.
+    expect(container.querySelector('.pe-events-section')!.classList.contains('pe-collapsed')).toBe(false);
+    fireEvent.click(screen.getByTitle('Expand all'));
+    expect(sectionByTitle(container, 'Position')!.classList.contains('pe-collapsed')).toBe(false);
+    expect(sectionByTitle(container, 'Size')!.classList.contains('pe-collapsed')).toBe(false);
+  });
+
   it('collapses the whole panel from its header', () => {
     const { container } = render(<PropertyEditor />);
     expect(container.querySelector('.property-sections')).not.toBeNull();
