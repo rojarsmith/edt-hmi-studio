@@ -196,9 +196,6 @@ const EventPanel: React.FC = () => {
         {component.events.length === 0 ? (
           <div className="no-events">
             <p>No event bindings</p>
-            <button className="add-first-event" onClick={handleAddEvent}>
-              + Add Event
-            </button>
           </div>
         ) : (
           component.events.map(event => (

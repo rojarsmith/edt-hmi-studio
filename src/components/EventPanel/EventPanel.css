@@ -55,25 +55,8 @@
 }
 
 .no-events p {
-  margin: 0 0 12px 0;
+  margin: 0;
   font-size: 13px;
-}
-
-.add-first-event {
-  padding: 8px 16px;
-  border: 1px dashed #ccc;
-  background: transparent;
-  color: #666;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-}
-
-.add-first-event:hover {
-  border-color: #2196F3;
-  color: #2196F3;
-  background: #e3f2fd;
 }
 
 .event-item {
