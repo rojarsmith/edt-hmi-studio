@@ -67,8 +67,18 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 | Logic 分頁 Event Trigger 節點的 **Event Object** 輸出 —— 產生的程式碼仍會丟棄事件，這個埠目前餵不出任何東西（見 [logic-event-trigger.md](logic-event-trigger.md)）；已經接了線的埠在兩種模式都顯示，連線永遠不會被藏斷 | 顯示 | 隱藏 |
 | Logic 分頁 Properties 面板的 **Active on Screens** —— 逐圖儲存但目前沒有任何東西使用；圖暫定全域運作，一般模式改顯示單純的 **Active** 開關，而且真的有作用：關掉的圖完全不會出現在產生的程式碼裡 | 顯示 | 隱藏 |
 | Logic 調色盤的 **Custom** 架子 —— Call Function 與 C Code Block，手寫 C 是原廠工程師的領域；已放進圖裡的節點在任何模式都照常渲染與產生，藏起來的只有調色盤上的供應 | 顯示 | 隱藏 |
+| Properties 面板標題列的**收合三角形**，可把整個面板收成一條標題列。面板內各分區的收合、以及標題列的全部展開／全部收合按鈕，兩種模式都照常提供 | 顯示 | 隱藏 |
 
 日後決定的項目請繼續補充於此表。
+
+### 關於 Properties 面板
+
+右側欄位裡只有屬性編輯器，整個收掉只會留下一條空白帶——原廠工程師想把畫布
+拉寬時有用，但對其他人來說只是把屬性弄不見，還得再找同一個三角形才能叫回來。
+
+收合狀態跟 Code 分頁一樣是「推導」而非「儲存」：`expanded` 的值是
+`panelExpanded || !factoryDevMode`。因此在 Factory Mode 收起來的面板，一旦
+離開該模式就會自動彈回，不會留下一條看不出怎麼打開的標題列。
 
 ### 關於 Info 對話框
 

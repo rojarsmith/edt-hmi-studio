@@ -249,6 +249,12 @@ const PropertyEditor: React.FC = () => {
   } | null>(null);
   const [radiusLinked, setRadiusLinked] = useState(true);
   const [panelExpanded, setPanelExpanded] = useState(true);
+  // Collapsing the whole panel away is a factory-engineer affordance: the
+  // properties of the selected component are the point of this column for
+  // everyone else. Deriving the flag rather than storing it means a panel
+  // collapsed in factory mode cannot stay stuck when the mode is left.
+  const factoryDevMode = useAppStore((state) => state.factoryDevMode);
+  const expanded = panelExpanded || !factoryDevMode;
   const [query, setQuery] = useState('');
   // Collapsed categories, keyed by header title so the state carries across
   // selection changes and re-renders of the hand-written sections.
@@ -257,12 +263,14 @@ const PropertyEditor: React.FC = () => {
 
   // One delegated handler folds any plain category from its header — the
   // same gesture as the hierarchy tree's members. Sections with their own
-  // header behaviour (Events, Modbus) manage themselves.
+  // header behaviour (Events, Modbus) manage themselves, and the pinned
+  // Id/Type block has nothing worth hiding.
   const handleSectionsClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const header = target.closest('.section-header');
     if (!header || !sectionsRef.current?.contains(header)) return;
     if (header.closest('.pe-events-section') || header.closest('.modbus-binding-section')) return;
+    if (header.closest('[data-pe-pinned]')) return;
     if (target.closest('button, input, select, label')) return;
     const title = header.textContent?.trim();
     if (!title) return;
@@ -287,6 +295,7 @@ const PropertyEditor: React.FC = () => {
     // every render for the same reason as the search filter below.
     root.querySelectorAll<HTMLElement>('.property-section').forEach(section => {
       if (section.classList.contains('pe-events-section') || section.classList.contains('modbus-binding-section')) return;
+      if (section.hasAttribute('data-pe-pinned')) return;
       const title = section.querySelector('.section-header')?.textContent?.trim();
       section.classList.toggle('pe-collapsed', !!title && collapsedSections.has(title));
     });
@@ -442,7 +451,8 @@ const PropertyEditor: React.FC = () => {
       .filter(
         s =>
           !s.classList.contains('pe-events-section') &&
-          !s.classList.contains('modbus-binding-section'),
+          !s.classList.contains('modbus-binding-section') &&
+          !s.hasAttribute('data-pe-pinned'),
       )
       .map(s => s.querySelector('.section-header')?.textContent?.trim())
       .filter((t): t is string => !!t);
@@ -453,11 +463,11 @@ const PropertyEditor: React.FC = () => {
 
   const panelHeader = (
     <div
-      className="pe-header"
-      onClick={() => setPanelExpanded(prev => !prev)}
-      title={panelExpanded ? 'Collapse' : 'Expand'}
+      className={`pe-header ${factoryDevMode ? 'pe-header-collapsible' : ''}`}
+      onClick={factoryDevMode ? () => setPanelExpanded(prev => !prev) : undefined}
+      title={factoryDevMode ? (expanded ? 'Collapse' : 'Expand') : undefined}
     >
-      <PanelChevron open={panelExpanded} className="pe-toggle" />
+      {factoryDevMode && <PanelChevron open={expanded} className="pe-toggle" />}
       <span className="pe-title">Properties</span>
       <div className="pe-header-actions" onClick={e => e.stopPropagation()}>
         <button className="pe-header-btn" onClick={expandAllSections} title="Expand all">
@@ -474,9 +484,9 @@ const PropertyEditor: React.FC = () => {
     const currentScreen = screens.find(s => s.id === currentScreenId);
     if (!currentScreen) {
       return (
-        <div className={`property-editor ${panelExpanded ? '' : 'collapsed'}`}>
+        <div className={`property-editor ${expanded ? '' : 'collapsed'}`}>
           {panelHeader}
-          {panelExpanded && (
+          {expanded && (
             <div className="no-selection">
               <p>No component selected</p>
               <p className="hint">Select a component on the canvas to edit it</p>
@@ -497,21 +507,14 @@ const PropertyEditor: React.FC = () => {
     };
 
     return (
-      <div className={`property-editor ${panelExpanded ? '' : 'collapsed'}`}>
+      <div className={`property-editor ${expanded ? '' : 'collapsed'}`}>
         {panelHeader}
 
-        {panelExpanded && (
+        {expanded && (
         <div className="property-sections" ref={sectionsRef} onClick={handleSectionsClick}>
-          {/* Screen Info — pinned above the search box, never filtered */}
+          {/* Screen Info — pinned above the search box, never filtered or folded */}
           <div className="property-section" data-pe-pinned="true">
             <div className="section-header">Screen</div>
-            <div className="property-row">
-              <label>Type</label>
-              <div className="property-value readonly">
-                <span className="component-type-icon">📄</span>
-                Screen
-              </div>
-            </div>
             <div className="property-row">
               <label>Id</label>
               {/* Uncontrolled while editing; the key remounts it when the
@@ -526,6 +529,13 @@ const PropertyEditor: React.FC = () => {
                   else if (e.key === 'Escape') e.currentTarget.value = currentScreen.name;
                 }}
               />
+            </div>
+            <div className="property-row">
+              <label>Type</label>
+              <div className="property-value readonly">
+                <span className="component-type-icon">📄</span>
+                Screen
+              </div>
             </div>
           </div>
 
@@ -565,21 +575,14 @@ const PropertyEditor: React.FC = () => {
   }
 
   return (
-    <div className={`property-editor ${panelExpanded ? '' : 'collapsed'}`}>
+    <div className={`property-editor ${expanded ? '' : 'collapsed'}`}>
       {panelHeader}
 
-      {panelExpanded && (
+      {expanded && (
       <div className="property-sections" ref={sectionsRef} onClick={handleSectionsClick}>
-        {/* Component Info — pinned above the search box, never filtered */}
+        {/* Component Info — pinned above the search box, never filtered or folded */}
         <div className="property-section" data-pe-pinned="true">
           <div className="section-header">Component</div>
-          <div className="property-row">
-            <label>Type</label>
-            <div className="property-value readonly">
-              <span className="component-type-icon">{definition?.icon}</span>
-              {definition?.name || component.type}
-            </div>
-          </div>
           <div className="property-row">
             <label>Id</label>
             <input
@@ -587,6 +590,13 @@ const PropertyEditor: React.FC = () => {
               value={component.name}
               onChange={(e) => handlePropertyChange('name', e.target.value)}
             />
+          </div>
+          <div className="property-row">
+            <label>Type</label>
+            <div className="property-value readonly">
+              <span className="component-type-icon">{definition?.icon}</span>
+              {definition?.name || component.type}
+            </div>
           </div>
         </div>
 

@@ -27,11 +27,22 @@ describe('PropertyEditor screen properties', () => {
     const { container } = render(<PropertyEditor />);
     const pinned = container.querySelector('[data-pe-pinned]')!;
     expect(pinned.querySelector('.section-header')!.textContent).toBe('Screen');
-    expect(pinned.textContent).toContain('Type');
-    expect(pinned.textContent).toContain('Id');
+    expect([...pinned.querySelectorAll('.property-row > label')].map(l => l.textContent)).toEqual([
+      'Id',
+      'Type',
+    ]);
     expect(pinned.querySelector<HTMLInputElement>('input[type="text"]')!.value).toBe('Screen 1');
     // The search box still sits directly below the pinned block.
     expect(pinned.nextElementSibling).toBe(container.querySelector('.pe-search'));
+  });
+
+  it('gives the pinned screen block no fold behaviour', () => {
+    const { container } = render(<PropertyEditor />);
+    const pinned = container.querySelector('[data-pe-pinned]')!;
+
+    fireEvent.click(pinned.querySelector('.section-header')!);
+
+    expect(pinned.classList.contains('pe-collapsed')).toBe(false);
   });
 
   it('checks and locks the Entry checkbox on the entry screen', () => {

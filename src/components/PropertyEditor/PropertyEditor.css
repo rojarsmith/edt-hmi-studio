@@ -22,12 +22,17 @@
   border-bottom: 1px solid #e0e0e0;
   background: #fff;
   flex-shrink: 0;
-  cursor: pointer;
   user-select: none;
   transition: background 0.15s;
 }
 
-.pe-header:hover {
+/* Only factory dev mode folds this panel away, so only then does the header
+   behave like something you can press. */
+.pe-header-collapsible {
+  cursor: pointer;
+}
+
+.pe-header-collapsible:hover {
   background: #f0f0f0;
 }
 
@@ -144,9 +149,22 @@
   letter-spacing: 0.5px;
 }
 
+/* The pinned block names what is being edited rather than heading a list of
+   properties, so it reads as a tag and keeps no twisty: there is nothing
+   under it worth hiding. */
+.property-section[data-pe-pinned] > .section-header {
+  width: fit-content;
+  padding: 3px 9px;
+  font-size: 10px;
+  letter-spacing: 0.7px;
+  color: #555;
+  background: #ececec;
+  border-radius: 9px;
+}
+
 /* Plain category headers fold their section, with the family's twisty drawn
    as a masked pseudo-element — Events and Modbus bring their own headers. */
-.property-section:not(.pe-events-section):not(.modbus-binding-section) > .section-header {
+.property-section:not(.pe-events-section):not(.modbus-binding-section):not([data-pe-pinned]) > .section-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -154,7 +172,7 @@
   user-select: none;
 }
 
-.property-section:not(.pe-events-section):not(.modbus-binding-section) > .section-header::before {
+.property-section:not(.pe-events-section):not(.modbus-binding-section):not([data-pe-pinned]) > .section-header::before {
   content: '';
   width: 16px;
   height: 16px;

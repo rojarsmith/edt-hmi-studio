@@ -70,8 +70,21 @@ The passphrase itself is exported as `FACTORY_DEV_MODE_PASSPHRASE` from
 | **Event Object** output on the Logic tab's Event Trigger node — generated code still discards the event, so the port feeds nothing yet (see [logic-event-trigger.md](logic-event-trigger.md)); one already wired stays visible in both modes so the connection is never stranded | shown | hidden |
 | **Active on Screens** in the Logic tab's Properties panel — stored per graph but consumed by nothing yet; graphs run globally for now, and normal mode shows a plain **Active** switch instead, which really switches: a graph turned off is absent from generated code entirely | shown | hidden |
 | **Custom** shelf of the Logic palette — Call Function and C Code Block, hand-written C being the factory engineer's realm; nodes already placed in a graph keep rendering and generating in every mode, only the palette offer hides | shown | hidden |
+| **Collapse twisty** on the Properties panel header, which folds the whole panel away to its header bar. Categories inside it still fold in both modes, as do the panel's expand-all and collapse-all buttons | shown | hidden |
 
 More surfaces will be added here as they are decided.
+
+### Notes on the Properties panel
+
+The right column holds nothing but the property editor, so folding it away
+leaves an empty strip — useful when a factory engineer wants the canvas wide,
+confusing for everyone else, who would have to find the same twisty again to
+get their properties back.
+
+Like the Code tab, the collapsed state is *derived* rather than stored:
+`expanded` reads as `panelExpanded || !factoryDevMode`. A panel folded in
+factory dev mode therefore springs back the moment the mode is locked, instead
+of stranding a header bar with no visible way to reopen it.
 
 ### Notes on the Info dialog
 

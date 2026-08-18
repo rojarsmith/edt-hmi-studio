@@ -3,8 +3,9 @@
 // field labels.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, fireEvent, screen } from '@testing-library/react';
+import { render, fireEvent, screen, act } from '@testing-library/react';
 import { useEditorStore } from '../../../store/editorStore';
+import { useAppStore } from '../../../store/appStore';
 import type { LvglComponent } from '../../../types';
 import PropertyEditor from '..';
 
@@ -42,6 +43,9 @@ describe('PropertyEditor search', () => {
       currentScreenId: 'screen-1',
       selection: { selectedIds: ['comp-1'], hoveredId: null },
     });
+    // Factory dev mode is global and memory-only; a test that unlocks it must
+    // not decide what the next one sees.
+    useAppStore.setState({ factoryDevMode: false });
   });
 
   function sectionByTitle(container: HTMLElement, title: string): HTMLElement | null {
@@ -52,15 +56,30 @@ describe('PropertyEditor search', () => {
     );
   }
 
-  it('keeps Type and Id pinned above the search box', () => {
+  it('keeps Id above Type, pinned above the search box', () => {
     const { container } = render(<PropertyEditor />);
     const sections = container.querySelector('.property-sections')!;
     const pinned = sections.querySelector('[data-pe-pinned]')!;
     const search = sections.querySelector('.pe-search')!;
     // Pinned Component block comes first, the search box directly after.
     expect(pinned.nextElementSibling).toBe(search);
-    expect(pinned.textContent).toContain('Type');
-    expect(pinned.textContent).toContain('Id');
+    expect([...pinned.querySelectorAll('.property-row > label')].map(l => l.textContent)).toEqual([
+      'Id',
+      'Type',
+    ]);
+  });
+
+  it('gives the pinned block no fold behaviour', () => {
+    const { container } = render(<PropertyEditor />);
+    const pinned = container.querySelector('[data-pe-pinned]')!;
+
+    fireEvent.click(pinned.querySelector('.section-header')!);
+    expect(pinned.classList.contains('pe-collapsed')).toBe(false);
+
+    // Nor does the sweep reach it — Id and Type stay put.
+    fireEvent.click(screen.getByTitle('Collapse all'));
+    expect(pinned.classList.contains('pe-collapsed')).toBe(false);
+    expect(sectionByTitle(container, 'Position')!.classList.contains('pe-collapsed')).toBe(true);
   });
 
   it('filters sections by title and leaves the pinned block alone', () => {
@@ -129,13 +148,38 @@ describe('PropertyEditor search', () => {
     expect(sectionByTitle(container, 'Size')!.classList.contains('pe-collapsed')).toBe(false);
   });
 
-  it('collapses the whole panel from its header', () => {
+  it('keeps the whole panel open outside factory dev mode', () => {
     const { container } = render(<PropertyEditor />);
+    // No twisty to press, and pressing the header anyway changes nothing.
+    expect(container.querySelector('.pe-toggle')).toBeNull();
+    fireEvent.click(container.querySelector('.pe-header')!);
     expect(container.querySelector('.property-sections')).not.toBeNull();
+    expect(container.querySelector('.property-editor')!.classList.contains('collapsed')).toBe(false);
+  });
+
+  it('collapses the whole panel from its header in factory dev mode', () => {
+    useAppStore.setState({ factoryDevMode: true });
+    const { container } = render(<PropertyEditor />);
+    expect(container.querySelector('.pe-toggle')).not.toBeNull();
+
     fireEvent.click(container.querySelector('.pe-header')!);
     expect(container.querySelector('.property-sections')).toBeNull();
     expect(container.querySelector('.property-editor')!.classList.contains('collapsed')).toBe(true);
+
     fireEvent.click(container.querySelector('.pe-header')!);
     expect(container.querySelector('.property-sections')).not.toBeNull();
+  });
+
+  it('reopens a panel left collapsed when factory dev mode is locked again', () => {
+    useAppStore.setState({ factoryDevMode: true });
+    const { container } = render(<PropertyEditor />);
+    fireEvent.click(container.querySelector('.pe-header')!);
+    expect(container.querySelector('.property-sections')).toBeNull();
+
+    // Locking the mode must not leave the panel folded with no way back.
+    act(() => useAppStore.setState({ factoryDevMode: false }));
+
+    expect(container.querySelector('.property-sections')).not.toBeNull();
+    expect(container.querySelector('.pe-toggle')).toBeNull();
   });
 });
