@@ -52,9 +52,9 @@ const AnimationPanel: React.FC = () => {
       e.preventDefault();
       const startY = e.clientY;
       const startHeight = panelHeight;
-      const rightPanel = e.currentTarget.closest('.right-panel');
-      const maxHeight = rightPanel
-        ? Math.max(MIN_PANEL_HEIGHT, rightPanel.clientHeight - MIN_ABOVE_HEIGHT)
+      const column = e.currentTarget.closest('.left-panel, .right-panel');
+      const maxHeight = column
+        ? Math.max(MIN_PANEL_HEIGHT, column.clientHeight - MIN_ABOVE_HEIGHT)
         : startHeight;
       setResizing(true);
 
@@ -165,9 +165,6 @@ const AnimationPanel: React.FC = () => {
             {animations.length === 0 ? (
               <div className="no-anims">
                 <p>No animations</p>
-                <button className="add-first-anim" onClick={handleAddAnim}>
-                  + Add First Animation
-                </button>
               </div>
             ) : visibleAnimations.length === 0 ? (
               <div className="no-anims">

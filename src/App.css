@@ -207,8 +207,8 @@ body {
   max-height: none;
 }
 
-/* The hierarchy panel manages its own height: a stored value while expanded
-   (drag its top edge), header-only when collapsed. */
+/* The column's bottom panel manages its own height: a stored value while
+   expanded (drag its top edge), header-only when collapsed. */
 .left-panel > *:last-child {
   flex: 0 0 auto;
   min-height: 0;

@@ -11,6 +11,9 @@
   background: #f8f9fa;
   color: #333;
   font-size: 13px;
+  /* Mid-column now, so it draws its own divider instead of relying on the
+     column's last-child rule. */
+  border-top: 1px solid #e0e0e0;
   /* Whatever height the drag stored, the panels above keep their minimum. */
   max-height: calc(100% - 220px);
 }

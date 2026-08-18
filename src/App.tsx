@@ -484,8 +484,9 @@ const EditorView: React.FC<EditorViewProps> = ({
             <div className="app-body">
               <div className="left-panel">
                 <ComponentPanel />
-                <ScreenManager />
                 <HierarchyPanel />
+                <ScreenManager />
+                <AnimationPanel />
               </div>
               <div className="canvas-area">
                 <AlignToolbar />
@@ -494,7 +495,6 @@ const EditorView: React.FC<EditorViewProps> = ({
               </div>
               <div className="right-panel">
                 <PropertyEditor />
-                <AnimationPanel />
               </div>
             </div>
             <DragOverlay dropAnimation={null}>
