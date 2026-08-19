@@ -1442,7 +1442,9 @@ function screenLoadAnimations(
     if (event.eventType !== 'LV_EVENT_SCREEN_LOADED') continue;
     if (event.handlerType !== 'builtin' || event.action?.type !== 'playAnimation') continue;
     const symbol = symbols.find((candidate) => candidate.animation.id === event.action?.animationId);
-    if (symbol) played.push(symbol);
+    // Only what this screen shows: parking a widget that lives elsewhere would
+    // move it out from under whichever screen does show it.
+    if (symbol && symbol.screen.id === screen.id) played.push(symbol);
   }
   return played;
 }

@@ -10,6 +10,8 @@ export interface EventHandlerGroup {
   handlerBase: string;
   eventType: EventBinding['eventType'];
   bindings: EventBinding[];
+  /** Set when the screen itself carries the bindings, rather than a widget. */
+  screen?: Screen;
 }
 import { getLogicFuncNames } from '../utils/nameUtils';
 import {
@@ -145,7 +147,9 @@ function generateBuiltinActionCode(
   options: CodeGenOptions,
   screens: Screen[],
   languages: ProjectLanguage[],
-  animations: Map<string, AnimationSymbol>
+  animations: Map<string, AnimationSymbol>,
+  /** The screen carrying the binding, when a screen rather than a widget does. */
+  ownerScreen?: Screen,
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options, 2);
@@ -342,6 +346,14 @@ function generateBuiltinActionCode(
         );
         break;
       }
+      // A screen can only animate what it shows. Driving a widget on another
+      // screen moves something invisible and looks like nothing happening.
+      if (ownerScreen && symbol.screen.id !== ownerScreen.id) {
+        lines.push(
+          `${indent}// ${play ? 'Play' : 'Stop'} animation skipped: "${symbol.animation.name}" drives a widget on screen "${symbol.screen.name}"`,
+        );
+        break;
+      }
       if (options.generateComments) {
         lines.push(
           `${indent}${generateComment(`${play ? 'Play' : 'Stop'} animation: ${symbol.animation.name}`, options)}`,
@@ -405,17 +417,17 @@ function generateLogicHandlerCode(
 export function groupEventHandlers(screens: Screen[]): EventHandlerGroup[] {
   const groups = new Map<string, EventHandlerGroup>();
 
-  const add = (handlerBase: string, event: EventBinding) => {
+  const add = (handlerBase: string, event: EventBinding, screen?: Screen) => {
     const key = `${handlerBase}::${event.eventType}`;
     const existing = groups.get(key);
     if (existing) existing.bindings.push(event);
-    else groups.set(key, { handlerBase, eventType: event.eventType, bindings: [event] });
+    else groups.set(key, { handlerBase, eventType: event.eventType, bindings: [event], screen });
   };
 
   for (const screen of screens) {
     // A screen's own bindings share the screen variable's base, so the handler
     // reads ui_event_screen_main_screen_loaded.
-    for (const event of screen.events ?? []) add(`screen_${screen.name}`, event);
+    for (const event of screen.events ?? []) add(`screen_${screen.name}`, event, screen);
     const visit = (components: LvglComponent[]) => {
       for (const component of components) {
         for (const event of component.events) add(component.name, event);
@@ -459,7 +471,7 @@ function generateEventHandler(
   // Every binding of this type runs here, in the order the panel lists them.
   for (const event of group.bindings) {
     if (event.handlerType === 'builtin' && event.action) {
-      lines.push(...generateBuiltinActionCode(event.action, options, screens, languages, animations));
+      lines.push(...generateBuiltinActionCode(event.action, options, screens, languages, animations, group.screen));
     } else if (event.handlerType === 'custom' && event.customCode) {
       lines.push(...event.customCode.split('\n').map(line => `${indent2}${line}`));
     } else if (event.handlerType === 'logic') {

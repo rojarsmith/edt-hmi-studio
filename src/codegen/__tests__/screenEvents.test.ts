@@ -113,6 +113,28 @@ describe('screen events', () => {
     expect(handler).toContain('ui_anim_pulse_1_start();');
   });
 
+  it('refuses to animate a widget the screen does not show', () => {
+    // Binding a screen's entry to an animation aimed at another screen's widget
+    // moves something invisible: on the board it looks exactly like nothing
+    // happening, and the parking would drag that widget out from under the
+    // screen that does show it.
+    const { component, animations } = build();
+    const elsewhere = createScreen({
+      name: 'other',
+      components: [],
+      events: [playOnLoad('a1')],
+    });
+    const home = createScreen({ name: 'main', components: [component] });
+
+    const events = generateEventsSource([home, elsewhere], defaultOptions(), [], [], animations);
+    const source = sourceFor([home, elsewhere], animations);
+
+    expect(events).not.toContain('ui_anim_slide_in_1_start();');
+    expect(events).toContain('drives a widget on screen "main"');
+    // And "other" parks nothing, since it shows none of it.
+    expect(source).not.toContain('ui_screen_other_reset_anims');
+  });
+
   it('declares the screen handler in the header', () => {
     const screens = [createScreen({ name: 'main', components: [], events: [playOnLoad('a1')] })];
 

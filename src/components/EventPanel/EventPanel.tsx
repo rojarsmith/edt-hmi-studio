@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useLogicEditorStore } from '../LogicEditor';
-import type { EventBinding, LvglEventType } from '../../types';
+import type { EventBinding, LvglComponent, LvglEventType, Screen } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
 import EventEditDialog from './EventEditDialog';
 import PanelChevron from '../LogicEditor/PanelChevron';
@@ -85,6 +85,19 @@ interface EventPanelProps {
   screenId?: string;
 }
 
+/** Every component id on a screen, children included. */
+function componentIdsOf(screen: Screen): Set<string> {
+  const ids = new Set<string>();
+  const visit = (components: LvglComponent[]) => {
+    for (const component of components) {
+      ids.add(component.id);
+      visit(component.children);
+    }
+  };
+  visit(screen.components);
+  return ids;
+}
+
 const EventPanel: React.FC<EventPanelProps> = ({ screenId }) => {
   const { selection, getComponentById, updateComponent, screens, setScreenEvents, animations } = useEditorStore();
   const logicGraphs = useLogicEditorStore(state => state.graphs);
@@ -139,9 +152,18 @@ const EventPanel: React.FC<EventPanelProps> = ({ screenId }) => {
     const type = event.action?.type;
     if (type !== 'playAnimation' && type !== 'stopAnimation') return null;
     if (!event.action?.animationId) return 'No animation chosen';
-    return animations.some(a => a.id === event.action?.animationId)
-      ? null
-      : 'The animation this played no longer exists';
+    const bound = animations.find(a => a.id === event.action?.animationId);
+    if (!bound) return 'The animation this played no longer exists';
+    // A screen can only animate what it shows: driving a widget that lives on
+    // another screen moves something invisible, and looks like nothing
+    // happening at all.
+    if (screen) {
+      const home = screens.find(s => componentIdsOf(s).has(bound.targetComponentId));
+      if (home && home.id !== screen.id) {
+        return `This animation drives a widget on "${home.name}", which this screen does not show`;
+      }
+    }
+    return null;
   };
 
   const getEventLabel = (eventType: LvglEventType): string => {

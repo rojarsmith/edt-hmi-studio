@@ -126,6 +126,32 @@ describe('screen events', () => {
     expect(badge.getAttribute('title')).toBe('The animation this played no longer exists');
   });
 
+  it('flags a binding whose animation drives another screen', () => {
+    // The commonest way an entry animation silently does nothing: the screen
+    // plays an animation aimed at a widget it does not show.
+    useEditorStore.setState({
+      screens: [
+        {
+          id: 'screen-1', name: 'Screen 1', backgroundColor: '#fff',
+          components: [component('label-1', 'Title')], events: [],
+        },
+        {
+          id: 'screen-2', name: 'Screen 2', backgroundColor: '#fff',
+          components: [], events: [playOnLoad],
+        },
+      ],
+      animations: [animation],
+      currentScreenId: 'screen-2',
+      selection: { selectedIds: [], hoveredId: null },
+      history: [],
+      historyIndex: -1,
+    });
+    const { container } = render(<EventPanel screenId="screen-2" />);
+
+    expect(container.querySelector('.lack-badge')!.getAttribute('title'))
+      .toBe('This animation drives a widget on "Screen 1", which this screen does not show');
+  });
+
   it('leaves a bound event unflagged', () => {
     setUp([playOnLoad]);
     const { container } = render(<EventPanel screenId="screen-1" />);
