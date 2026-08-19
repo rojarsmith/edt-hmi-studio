@@ -10,12 +10,13 @@ This directory holds the detailed design document for every widget in EDT HMI St
 
 ## Overview
 
-The editor supports **19 widgets** in 4 categories:
+The editor supports **20 widgets** in 5 categories:
 
 | Category | Icon | Count | Purpose |
 |------|------|--------|------|
 | Basic (basic) | 📦 | 5 | The building blocks of an interface |
 | Input (input) | ✏️ | 5 | Controls the user interacts with |
+| Shapes (shape) | 🔷 | 1 | Decorative geometry, drawn rather than operated |
 | Container (container) | 📁 | 4 | Layout containers that hold children |
 | Display (display) | 📊 | 5 | Data display and visualisation |
 
@@ -42,6 +43,16 @@ The editor supports **19 widgets** in 4 categories:
 | Checkbox | `checkbox` | ☑️ | 120×28 | ❌ | A checkbox with a tick mark and a text label. The checked state is controlled by `LV_STATE_CHECKED` | [checkbox.md](checkbox.md) |
 | Switch | `switch` | 🔀 | 50×26 | ❌ | A toggle switch with a rounded capsule shape. The on state is controlled by `LV_STATE_CHECKED` | [switch.md](switch.md) |
 | Slider | `slider` | 🎚️ | 150×20 | ❌ | A slider with minimum, maximum and current value | [slider.md](slider.md) |
+
+---
+
+## Shape widgets
+
+Shapes are drawn, not operated: they carry no props of their own, and everything they paint comes from the shared style system.
+
+| Widget | Type | Icon | Default size | Container | Description | Document |
+|------|------|------|----------|------|------|------|
+| Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | A filled, bordered box built on `lv_obj_create`. Square corners and no padding; reported in the property editor as the `Shape` type | [rectangle.md](rectangle.md) |
 
 ---
 
@@ -154,6 +165,7 @@ docs/components/
 ├── checkbox.md        ← Checkbox
 ├── switch.md          ← Switch
 ├── slider.md          ← Slider
+├── rectangle.md       ← Rectangle
 ├── obj.md             ← Container
 ├── tabview.md         ← Tab View
 ├── tileview.md        ← Tile View

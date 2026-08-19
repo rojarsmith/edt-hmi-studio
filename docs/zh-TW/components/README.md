@@ -10,12 +10,13 @@
 
 ## 元件總覽
 
-編輯器共支援 **19 個元件**，分為 4 個類別：
+編輯器共支援 **20 個元件**，分為 5 個類別：
 
 | 類別 | 圖示 | 元件數 | 說明 |
 |------|------|--------|------|
 | 基礎 (basic) | 📦 | 5 | 建構介面的基本元素 |
 | 輸入 (input) | ✏️ | 5 | 供使用者互動的輸入控制項 |
+| 圖形 (shape) | 🔷 | 1 | 裝飾用幾何圖形，只繪製、不操作 |
 | 容器 (container) | 📁 | 4 | 可容納子元件的版面容器 |
 | 顯示 (display) | 📊 | 5 | 資料呈現與視覺化元件 |
 
@@ -42,6 +43,16 @@
 | Checkbox | `checkbox` | ☑️ | 120×28 | ❌ | 核取方塊，包含勾選標記與文字標籤。勾選狀態由 `LV_STATE_CHECKED` 控制 | [checkbox.md](checkbox.md) |
 | Switch | `switch` | 🔀 | 50×26 | ❌ | 切換開關，圓角膠囊造型。開啟狀態由 `LV_STATE_CHECKED` 控制 | [switch.md](switch.md) |
 | Slider | `slider` | 🎚️ | 150×20 | ❌ | 滑桿控制項，可設定最小值、最大值與目前值 | [slider.md](slider.md) |
+
+---
+
+## 圖形元件 (Shape)
+
+圖形是畫出來的，不是拿來操作的：它們沒有自己的 props，所有外觀都來自共用的樣式系統。
+
+| 元件 | 類型 | 圖示 | 預設尺寸 | 容器 | 說明 | 文件 |
+|------|------|------|----------|------|------|------|
+| Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | 以 `lv_obj_create` 實作的填色方框，直角、無內距；屬性面板中的 Type 顯示為 `Shape` | [rectangle.md](rectangle.md) |
 
 ---
 
@@ -154,6 +165,7 @@ docs/components/
 ├── checkbox.md        ← Checkbox 核取方塊
 ├── switch.md          ← Switch 切換開關
 ├── slider.md          ← Slider 滑桿
+├── rectangle.md       ← Rectangle 矩形
 ├── obj.md             ← Container 通用容器
 ├── tabview.md         ← Tab View 分頁檢視
 ├── tileview.md        ← Tile View 圖磚檢視
