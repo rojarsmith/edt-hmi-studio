@@ -9,6 +9,7 @@ import {
   componentsById,
   hasNestedAnimations,
   hoistComponentAnimations,
+  migrateScreenLoadAnimations,
   screenByComponentId,
 } from '../animationAssets';
 
@@ -95,6 +96,62 @@ describe('hoisting animations out of components', () => {
     const screens = [screen('s1', [component('a')])];
 
     expect(hoistComponentAnimations(screens).animations).toEqual([]);
+  });
+});
+
+describe('migrating to screen-load bindings', () => {
+  // Entry animations used to be implied: everything on a screen started once
+  // that screen appeared. They are bindings now, so an older project has to be
+  // handed the ones that reproduce exactly what it used to do.
+  const withAnimations = () => [
+    screen('s1', [component('a'), component('b')]),
+    screen('s2', [component('c')]),
+  ];
+  const animations = [
+    anim('Fade_In_1', { targetComponentId: 'a' }),
+    anim('Slide_Left_1', { targetComponentId: 'b' }),
+    anim('Zoom_In_1', { targetComponentId: 'c' }),
+  ];
+  let counter = 0;
+  const newId = () => `e${(counter += 1)}`;
+
+  it('gives each screen a load binding per animation aimed at it', () => {
+    counter = 0;
+    const migrated = migrateScreenLoadAnimations(withAnimations(), animations, newId);
+
+    expect(migrated[0].events?.map(e => e.action?.animationId)).toEqual(['Fade_In_1', 'Slide_Left_1']);
+    expect(migrated[1].events?.map(e => e.action?.animationId)).toEqual(['Zoom_In_1']);
+    expect(migrated[0].events?.every(e => e.eventType === 'LV_EVENT_SCREEN_LOADED')).toBe(true);
+  });
+
+  it('gives a screen with no animations an empty list, not nothing', () => {
+    counter = 0;
+    // An empty array is what marks the project as migrated; leaving it
+    // undefined would migrate it again on the next open.
+    const migrated = migrateScreenLoadAnimations([screen('s1', [component('a')])], [], newId);
+
+    expect(migrated[0].events).toEqual([]);
+  });
+
+  it('leaves a project that already carries screen events alone', () => {
+    counter = 0;
+    const screens = withAnimations();
+    screens[0] = { ...screens[0], events: [] };
+
+    const migrated = migrateScreenLoadAnimations(screens, animations, newId);
+
+    // The user removing every binding must not have them handed back.
+    expect(migrated[0].events).toEqual([]);
+    expect(migrated[1].events).toBeUndefined();
+  });
+
+  it('ignores an animation whose target is on no screen', () => {
+    counter = 0;
+    const orphan = [anim('Orphan_1', { targetComponentId: 'deleted' })];
+
+    const migrated = migrateScreenLoadAnimations(withAnimations(), orphan, newId);
+
+    expect(migrated.every(s => s.events?.length === 0)).toBe(true);
   });
 });
 

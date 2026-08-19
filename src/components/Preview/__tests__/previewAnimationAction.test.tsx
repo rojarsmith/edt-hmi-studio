@@ -98,6 +98,44 @@ describe('preview animation actions', () => {
     expect(screen.queryByTitle('Pause')).not.toBeNull();
   });
 
+  it('plays a screen entry animation when that screen is entered', () => {
+    // The whole point of a screen-load binding is seeing it without flashing a
+    // board, so the preview has to honour it.
+    useEditorStore.setState({
+      screens: [
+        {
+          id: 'screen-1', name: 'Screen 1', backgroundColor: '#fff',
+          components: [component('label-1', { type: 'label' })],
+          events: [],
+        },
+        {
+          id: 'screen-2', name: 'Screen 2', backgroundColor: '#fff',
+          components: [component('label-2', { type: 'label' })],
+          events: [{
+            id: 'load-1',
+            eventType: 'LV_EVENT_SCREEN_LOADED',
+            handlerType: 'builtin',
+            action: { type: 'playAnimation', animationId: 'anim-1' },
+          }],
+        },
+      ],
+      animations: [{ ...animation, targetComponentId: 'label-2' }],
+      currentScreenId: 'screen-1',
+      openScreenIds: ['screen-1'],
+      selection: { selectedIds: [], hoveredId: null },
+      history: [],
+      historyIndex: -1,
+    });
+    const { container } = render(<PreviewPanel />);
+    expect(screen.queryByTitle('Pause')).toBeNull();
+
+    const toScreen2 = [...container.querySelectorAll('.preview-screen-btn')]
+      .find(b => b.textContent?.startsWith('Screen 2'))!;
+    fireEvent.click(toScreen2);
+
+    expect(screen.queryByTitle('Pause')).not.toBeNull();
+  });
+
   it('leaves playback alone when the binding names a deleted animation', () => {
     setUp([event('playAnimation', 'gone')]);
     render(<PreviewPanel />);

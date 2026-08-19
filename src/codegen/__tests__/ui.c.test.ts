@@ -980,7 +980,18 @@ describe('generateUiSource', () => {
     ) => {
       const built = animatedComponent('btn', { name, ...overrides }, ...animations);
       return {
-        screens: [createScreen({ name: 'main', components: [built.component] })],
+        screens: [createScreen({
+          name: 'main',
+          components: [built.component],
+          // An entry animation is a binding on the screen, not a property of
+          // sitting on it.
+          events: built.animations.map((animation, i) => ({
+            id: `play-${i}`,
+            eventType: 'LV_EVENT_SCREEN_LOADED' as const,
+            handlerType: 'builtin' as const,
+            action: { type: 'playAnimation' as const, animationId: animation.id },
+          })),
+        })],
         animations: built.animations,
       };
     };
@@ -1055,25 +1066,21 @@ describe('generateUiSource', () => {
       expect(result).not.toContain('Animation Helpers');
     });
 
-    it('starts animations from LV_EVENT_SCREEN_LOADED, not from screen init', () => {
-      // Screens appear through lv_scr_load_anim, so anything started during
-      // init burns part of its duration before the screen is even visible and
-      // is only ever seen part-way through.
+    it('binds the screen its own LV_EVENT_SCREEN_LOADED handler', () => {
+      // Screens appear through lv_scr_load_anim, so an entry animation started
+      // during init burns part of its duration before the screen is visible.
+      // It runs from the screen's own event handler instead.
       const { screens, animations } = oneWidget('slider_in', {}, {
         name: 'Slide_1', property: 'x', startValue: -110, endValue: 0,
       });
       const result = sourceFor(screens, animations);
 
-      expect(result).toContain('static void ui_screen_main_start_anims(lv_event_t *event) {');
       expect(result).toContain(
-        'lv_obj_add_event_cb(ui_screen_main, ui_screen_main_start_anims, LV_EVENT_SCREEN_LOADED, NULL);',
+        'lv_obj_add_event_cb(ui_screen_main, ui_event_screen_main_screen_loaded, LV_EVENT_SCREEN_LOADED, NULL);',
       );
-      // The callback must be defined before the init function that binds it.
-      expect(result.indexOf('static void ui_screen_main_start_anims'))
-        .toBeLessThan(result.indexOf('lv_obj_add_event_cb(ui_screen_main,'));
-      // and starting the animation belongs to the callback, not to the init
-      expect(result.indexOf('ui_anim_slide_1_start();'))
-        .toBeLessThan(result.indexOf('static void ui_screen_main_init'));
+      // Nothing starts an animation from the init function any more.
+      const initAt = result.indexOf('static void ui_screen_main_init');
+      expect(result.indexOf('ui_anim_slide_1_start();', initAt)).toBe(-1);
     });
 
     it('parks animated widgets on every screen load, not only the first', () => {
@@ -1097,7 +1104,7 @@ describe('generateUiSource', () => {
       // Parking must be bound to LOAD_START (before the transition draws) and
       // starting to LOADED (after it ends).
       expect(result.indexOf('ui_screen_main_reset_anims, LV_EVENT_SCREEN_LOAD_START'))
-        .toBeLessThan(result.indexOf('ui_screen_main_start_anims, LV_EVENT_SCREEN_LOADED'));
+        .toBeLessThan(result.indexOf('ui_event_screen_main_screen_loaded, LV_EVENT_SCREEN_LOADED'));
       // The start value is no longer applied inline in the init function.
       const initAt = result.indexOf('static void ui_screen_main_init');
       expect(result.indexOf('lv_obj_set_x(ui_slider_in, -110);')).toBeLessThan(initAt);
@@ -1152,8 +1159,10 @@ describe('generateUiSource', () => {
       });
       const result = sourceFor(screens, animations);
 
-      expect(result).toContain('Animation "weird" skipped: property "bg_color" is not animatable');
+      // No function, so nothing can call one — see animationActions for what
+      // the binding that would have played it emits instead.
       expect(result).not.toContain('ui_anim_weird_start');
+      expect(result).not.toContain('reset_anims');
     });
 
     it('omits delay when 0', () => {

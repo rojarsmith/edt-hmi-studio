@@ -5,13 +5,28 @@
 import { describe, it, expect } from 'vitest';
 import { generateUiSource } from '../templates/ui.c';
 import { generateUiHeader } from '../templates/ui.h';
+import { generateEventsSource } from '../templates/ui_events.c';
 import { defaultOptions, createScreen, animatedComponent } from './helpers';
 import type { Animation } from '../../types';
 
-/** One button on one screen, driven by the given animations. */
+/**
+ * One button on one screen, driven by the given animations — each of which the
+ * screen plays once it has loaded, which is how an entry animation is now
+ * expressed.
+ */
 function project(...overrides: Partial<Animation>[]) {
   const { component, animations } = animatedComponent('btn', { name: 'myBtn' }, ...overrides);
-  return { screens: [createScreen({ name: 'main', components: [component] })], animations };
+  const screen = createScreen({
+    name: 'main',
+    components: [component],
+    events: animations.map((animation, i) => ({
+      id: `play-${i}`,
+      eventType: 'LV_EVENT_SCREEN_LOADED' as const,
+      handlerType: 'builtin' as const,
+      action: { type: 'playAnimation' as const, animationId: animation.id },
+    })),
+  });
+  return { screens: [screen], animations };
 }
 
 type Project = ReturnType<typeof project>;
@@ -38,15 +53,18 @@ describe('animation functions', () => {
     expect(header).toContain('void ui_anim_fade_in_1_stop(void);');
   });
 
-  it('starts them from the screen callback rather than inline', () => {
-    const result = generateUiSourceFor(project({ name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 },
-        { name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 },), defaultOptions());
+  it('starts them from the screen event handler rather than inline', () => {
+    const built = project(
+      { name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 },
+      { name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 },
+    );
+    const events = generateEventsSource(built.screens, defaultOptions(), [], [], built.animations);
 
-    const callback = result.slice(result.indexOf('static void ui_screen_main_start_anims'));
-    expect(callback).toContain('ui_anim_fade_in_1_start();');
-    expect(callback).toContain('ui_anim_slide_left_1_start();');
-    // The descriptor is built inside the animation's own function now.
-    expect(callback.slice(0, callback.indexOf('}'))).not.toContain('lv_anim_init');
+    const handler = events.slice(events.indexOf('void ui_event_screen_main_screen_loaded'));
+    expect(handler).toContain('ui_anim_fade_in_1_start();');
+    expect(handler).toContain('ui_anim_slide_left_1_start();');
+    // The descriptor is built inside the animation's own function.
+    expect(handler.slice(0, handler.indexOf('}'))).not.toContain('lv_anim_init');
   });
 
   it('stops an animation where it stands, without restarting it', () => {
@@ -95,11 +113,13 @@ describe('animation functions', () => {
   });
 
   it('generates no function for a property that cannot be animated', () => {
-    const result = generateUiSourceFor(project({ name: 'Weird_1', property: 'bg_color' }), defaultOptions());
+    const built = project({ name: 'Weird_1', property: 'bg_color' });
 
-    expect(result).not.toContain('void ui_anim_weird_1_start(void)');
-    expect(result).toContain(
-      'Animation "Weird_1" skipped: property "bg_color" is not animatable',
-    );
+    expect(generateUiSourceFor(built, defaultOptions()))
+      .not.toContain('void ui_anim_weird_1_start(void)');
+    // The binding that would have played it says so, rather than calling a
+    // symbol that was never defined.
+    expect(generateEventsSource(built.screens, defaultOptions(), [], [], built.animations))
+      .toContain('names no animation the project still has');
   });
 });

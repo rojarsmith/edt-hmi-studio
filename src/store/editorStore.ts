@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type {
   Animation,
+  EventBinding,
   LvglComponent,
   CanvasState,
   SelectionState,
@@ -142,6 +143,8 @@ interface EditorState {
   addScreen: (groupId?: string | null) => string;
   deleteScreen: (screenId: string) => void;
   renameScreen: (screenId: string, name: string) => void;
+  /** Replace the events bound to the screen itself. */
+  setScreenEvents: (screenId: string, events: EventBinding[]) => void;
   /**
    * Make `screenId` the project's entry screen, clearing the flag everywhere
    * else so exactly one screen carries it.
@@ -759,6 +762,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set(state => ({
       screens: state.screens.map(s =>
         s.isEntry || s.id === screenId ? { ...s, isEntry: s.id === screenId } : s
+      ),
+    }));
+  },
+
+  setScreenEvents: (screenId, events) => {
+    set(state => ({
+      screens: state.screens.map(screen =>
+        screen.id === screenId ? { ...screen, events } : screen,
       ),
     }));
   },

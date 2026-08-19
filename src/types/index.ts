@@ -134,7 +134,14 @@ export type LvglEventType =
   | 'LV_EVENT_FOCUSED'
   | 'LV_EVENT_DEFOCUSED'
   | 'LV_EVENT_READY'
-  | 'LV_EVENT_CANCEL';
+  | 'LV_EVENT_CANCEL'
+  // Screen lifecycle. LVGL brackets a transition with these: LOAD_START fires
+  // before the first frame of the incoming screen is drawn, LOADED once the
+  // transition has finished.
+  | 'LV_EVENT_SCREEN_LOAD_START'
+  | 'LV_EVENT_SCREEN_LOADED'
+  | 'LV_EVENT_SCREEN_UNLOAD_START'
+  | 'LV_EVENT_SCREEN_UNLOADED';
 
 // Built-in Action Types
 export type BuiltinActionType =
@@ -201,6 +208,13 @@ export interface Screen {
   backgroundColor?: string;
   /** Owning ScreenGroup, or null/undefined when the screen sits at the root. */
   groupId?: string | null;
+  /**
+   * Events bound to the screen itself, which is how an entry animation is
+   * expressed: "when this screen has finished loading, play that animation".
+   * Undefined means a project written before screens could carry events, and
+   * is what the migration looks for — an empty array is a deliberate none.
+   */
+  events?: EventBinding[];
   /**
    * Marks the project's entry screen — the one the generated firmware boots
    * into. At most one screen carries the flag; when none does (projects saved

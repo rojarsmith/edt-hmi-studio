@@ -140,6 +140,7 @@ const PreviewPanel: React.FC = () => {
   const components = useMemo(() => previewPage?.components || [], [previewPage?.components]);
   const bgColor = previewPage?.backgroundColor || '#ffffff';
 
+
   // Image buttons restart from their configured initial state whenever the
   // previewed components change — the same render-phase adjustment pattern.
   // The null start makes the first render populate the map too.
@@ -250,10 +251,38 @@ const PreviewPanel: React.FC = () => {
     animFrameRef.current = requestAnimationFrame(tick);
   }, []);
 
-  /** The toolbar's play button: everything on the screen, together. */
+  /** What a screen plays once it has finished appearing, in binding order. */
+  const loadAnimationsOf = useCallback((screenId: string) => {
+    const target = screens.find(screen => screen.id === screenId);
+    return (target?.events ?? [])
+      .filter(event => event.eventType === 'LV_EVENT_SCREEN_LOADED'
+        && event.action?.type === 'playAnimation')
+      .map(event => projectAnimations.find(a => a.id === event.action?.animationId))
+      .filter((animation): animation is Animation => !!animation)
+      .map(animation => ({ compId: animation.targetComponentId, anim: animation }));
+  }, [screens, projectAnimations]);
+
+  /**
+   * Show a screen, playing whatever it plays on load — the same thing the
+   * firmware does when lv_scr_load_anim finishes.
+   */
+  const enterScreen = useCallback((screenId: string) => {
+    setPreviewPageId(screenId);
+    const played = loadAnimationsOf(screenId);
+    if (played.length === 0) return;
+    cancelAnimationFrame(animFrameRef.current);
+    runAnimations(played);
+  }, [loadAnimationsOf, runAnimations]);
+
+  /**
+   * The toolbar's play button replays the current screen's entry. A screen
+   * that binds nothing falls back to every animation aimed at it, so one kept
+   * for a button is still previewable.
+   */
   const startAnimation = useCallback(() => {
-    runAnimations(animationsOn(components, projectAnimations));
-  }, [components, projectAnimations, runAnimations]);
+    const played = loadAnimationsOf(previewPageId);
+    runAnimations(played.length > 0 ? played : animationsOn(components, projectAnimations));
+  }, [components, previewPageId, loadAnimationsOf, projectAnimations, runAnimations]);
 
   const pauseAnimation = useCallback(() => {
     if (animPlaying && !animPaused) {
@@ -385,13 +414,13 @@ const PreviewPanel: React.FC = () => {
         if (ev.action?.type === 'navigate' && ev.action.targetPage) {
           const targetPage = screens.find(p => p.name === ev.action!.targetPage || p.id === ev.action!.targetPage);
           if (targetPage) {
-            setPreviewPageId(targetPage.id);
+            enterScreen(targetPage.id);
             return;
           }
         }
       }
     }
-  }, [components, screens, scale, projectAnimations, runAnimations]);
+  }, [components, screens, scale, projectAnimations, runAnimations, enterScreen]);
 
   // Render components to canvas
   useEffect(() => {
@@ -863,7 +892,7 @@ const PreviewPanel: React.FC = () => {
             <button
               key={p.id}
               className={`preview-screen-btn ${p.id === previewPageId ? 'active' : ''}`}
-              onClick={() => setPreviewPageId(p.id)}
+              onClick={() => enterScreen(p.id)}
               title={p.id === entryScreenId ? `${p.name} (entry screen)` : p.name}
             >
               {p.name}

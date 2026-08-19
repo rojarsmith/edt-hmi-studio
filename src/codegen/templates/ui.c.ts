@@ -1316,10 +1316,11 @@ function generateComponentCode(
   const propLines = generatePropsCode(varName, component.type, component.props, options, imageResources, defaultFont, defaultFontSize, Boolean(typographyStyle), componentTags?.get(component.id));
   lines.push(...propLines);
 
-  // Event bindings
-  for (const event of component.events) {
-    const handlerName = getEventHandlerName(component.name, event.eventType, options);
-    lines.push(`${indent}lv_obj_add_event_cb(${varName}, ${handlerName}, ${event.eventType}, NULL);`);
+  // Event bindings. One callback per event type: several bindings of the same
+  // type share a handler, so registering per binding would run them twice over.
+  for (const eventType of new Set(component.events.map((event) => event.eventType))) {
+    const handlerName = getEventHandlerName(component.name, eventType, options);
+    lines.push(`${indent}lv_obj_add_event_cb(${varName}, ${handlerName}, ${eventType}, NULL);`);
   }
 
   // Animations are parked and started from the screen's load callbacks, not
@@ -1390,9 +1391,6 @@ function getScreenAnimResetFuncName(screenName: string, options: CodeGenOptions)
 }
 
 /** Callback that starts a screen's animations once it is fully shown. */
-function getScreenAnimFuncName(screenName: string, options: CodeGenOptions): string {
-  return `${getScreenVarName(screenName, options)}_start_anims`;
-}
 
 /**
  * Emit the two callbacks that drive a screen's animations.
@@ -1412,63 +1410,63 @@ function getScreenAnimFuncName(screenName: string, options: CodeGenOptions): str
  *
  * Returns an empty string when the screen has no animations.
  */
+/**
+ * The animations a screen plays when it has finished loading, in binding
+ * order.
+ *
+ * Which animations those are is no longer implied by where they sit: the
+ * screen says so with a Play Animation binding on LV_EVENT_SCREEN_LOADED. An
+ * animation nothing plays is simply never started, which is what lets one be
+ * reserved for a button.
+ */
+function screenLoadAnimations(
+  screen: Screen,
+  symbols: AnimationSymbol[],
+): AnimationSymbol[] {
+  const played: AnimationSymbol[] = [];
+  for (const event of screen.events ?? []) {
+    if (event.eventType !== 'LV_EVENT_SCREEN_LOADED') continue;
+    if (event.handlerType !== 'builtin' || event.action?.type !== 'playAnimation') continue;
+    const symbol = symbols.find((candidate) => candidate.animation.id === event.action?.animationId);
+    if (symbol) played.push(symbol);
+  }
+  return played;
+}
+
+/**
+ * Park the widgets a screen's entry animations drive, before the transition to
+ * that screen is drawn.
+ *
+ * The start values still have to be applied automatically: a widget keeps
+ * whatever the last run left it at, so on a second visit it would sit at its
+ * end position for the whole transition and then jump back. Only the
+ * animations the screen actually plays on load are parked — one reserved for a
+ * button must stay where the user left it.
+ */
 function generateScreenAnimationFunc(
   screen: Screen,
   options: CodeGenOptions,
   symbols: AnimationSymbol[]
 ): string {
   const indent = getIndent(options);
-  const startBody: string[] = [];
+  const played = screenLoadAnimations(screen, symbols);
+  if (played.length === 0) return '';
+
   const resetBody: string[] = [];
-
-  for (const symbol of symbols) {
-    if (symbol.screen.id !== screen.id) continue;
-    const anim = symbol.animation;
-    startBody.push(
-      symbol.execCb
-        ? `${indent}${animStartFuncName(symbol)}();`
-        : `${indent}// Animation "${anim.name || anim.type}" skipped: property "${anim.property}" is not animatable`,
-    );
-  }
-
-  for (const symbol of symbols) {
-    if (symbol.screen.id !== screen.id) continue;
+  for (const symbol of played) {
     resetBody.push(...generateAnimationInitialState(symbol.targetVar, [symbol.animation], options));
   }
+  if (resetBody.length === 0) return '';
 
-  if (startBody.length === 0) return '';
-
-  const sections: string[] = [];
-  if (resetBody.length > 0) {
-    sections.push([
-      `static void ${getScreenAnimResetFuncName(screen.name, options)}(lv_event_t *event) {`,
-      `${indent}LV_UNUSED(event);`,
-      ...resetBody,
-      '}',
-    ].join('\n'));
-  }
-  sections.push([
-    `static void ${getScreenAnimFuncName(screen.name, options)}(lv_event_t *event) {`,
+  return [
+    `static void ${getScreenAnimResetFuncName(screen.name, options)}(lv_event_t *event) {`,
     `${indent}LV_UNUSED(event);`,
-    ...startBody,
+    ...resetBody,
     '}',
-  ].join('\n'));
-
-  return sections.join('\n\n');
+  ].join('\n');
 }
 
 /** Whether the screen has any animation start value worth parking. */
-function screenHasAnimationResets(
-  screen: Screen,
-  options: CodeGenOptions,
-  symbols: AnimationSymbol[]
-): boolean {
-  return symbols.some(
-    (symbol) =>
-      symbol.screen.id === screen.id &&
-      generateAnimationInitialState(symbol.targetVar, [symbol.animation], options).length > 0,
-  );
-}
 
 function generateScreenInitFunc(
   screen: Screen,
@@ -1532,18 +1530,21 @@ function generateScreenInitFunc(
     lines.push(...generateComponentCode(component, screenVar, options, screen.name, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles, componentTags));
   }
 
-  // Park animated widgets before the transition draws, start them after it ends
+  // Park the widgets this screen's entry animations drive, before the
+  // transition to it is drawn. Starting them is a binding on the screen, so it
+  // comes out of the event table like any other.
   if (generateScreenAnimationFunc(screen, options, animationSymbols) !== '') {
-    if (screenHasAnimationResets(screen, options, animationSymbols)) {
-      lines.push(
-        `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimResetFuncName(screen.name, options)}, LV_EVENT_SCREEN_LOAD_START, NULL);`,
-      );
-    }
     lines.push(
-      `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimFuncName(screen.name, options)}, LV_EVENT_SCREEN_LOADED, NULL);`,
+      `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimResetFuncName(screen.name, options)}, LV_EVENT_SCREEN_LOAD_START, NULL);`,
     );
-    lines.push('');
   }
+
+  // The screen's own event bindings, one callback per event type.
+  for (const eventType of new Set((screen.events ?? []).map((event) => event.eventType))) {
+    const handlerName = getEventHandlerName(`screen_${screen.name}`, eventType, options);
+    lines.push(`${indent}lv_obj_add_event_cb(${screenVar}, ${handlerName}, ${eventType}, NULL);`);
+  }
+  lines.push('');
 
   // User code section
   if (options.userCodeMarkers) {

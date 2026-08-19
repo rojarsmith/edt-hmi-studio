@@ -549,6 +549,8 @@ const PropertyEditor: React.FC = () => {
             />
           </div>
 
+          <EventPanel screenId={currentScreen.id} />
+
           {/* General */}
           <div className="property-section">
             <div className="section-header">General</div>

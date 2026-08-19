@@ -80,3 +80,40 @@ export function animationLack(
   if (!components.has(animation.targetComponentId)) return 'Target component no longer exists';
   return null;
 }
+
+/**
+ * Give a project written before screens carried events the bindings that
+ * reproduce what the generator used to do implicitly: every animation on a
+ * screen started once that screen had finished loading.
+ *
+ * Only runs when no screen carries an events array at all. A project saved
+ * since then has one — empty if the user deliberately removed every binding —
+ * and must not have them handed back.
+ */
+export function migrateScreenLoadAnimations(
+  screens: Screen[],
+  animations: Animation[],
+  newId: () => string,
+): Screen[] {
+  if (screens.some((screen) => screen.events !== undefined)) return screens;
+
+  const screenOf = screenByComponentId(screens);
+  const byScreen = new Map<string, Animation[]>();
+  for (const animation of animations) {
+    const screen = screenOf.get(animation.targetComponentId);
+    if (!screen) continue;
+    const bucket = byScreen.get(screen.id);
+    if (bucket) bucket.push(animation);
+    else byScreen.set(screen.id, [animation]);
+  }
+
+  return screens.map((screen) => ({
+    ...screen,
+    events: (byScreen.get(screen.id) ?? []).map((animation) => ({
+      id: newId(),
+      eventType: 'LV_EVENT_SCREEN_LOADED' as const,
+      handlerType: 'builtin' as const,
+      action: { type: 'playAnimation' as const, animationId: animation.id },
+    })),
+  }));
+}

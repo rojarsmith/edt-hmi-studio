@@ -1,7 +1,7 @@
 // Resource Management Types
 
 import type { LogicGraph } from '../components/LogicEditor/types';
-import type { Animation, LvglComponent, Typography, TypographyGroup, ProjectLanguage, TextResource, TextGroup } from '../types';
+import type { Animation, EventBinding, LvglComponent, Typography, TypographyGroup, ProjectLanguage, TextResource, TextGroup } from '../types';
 import type {
   BoardId,
   CanBusConfig,
@@ -203,6 +203,12 @@ export interface ProjectScreen {
    * every project written before the flag existed expects.
    */
   isEntry?: boolean;
+  /**
+   * Events bound to the screen itself — where an entry animation lives. See
+   * `Screen.events` in `src/types`; absent means a file from before screens
+   * could carry any, which migration fills in.
+   */
+  events?: EventBinding[];
 }
 
 /** Organisational folder for screens. See `ScreenGroup` in `src/types`. */

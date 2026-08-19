@@ -8,7 +8,7 @@ import type { Animation, Screen, ScreenGroup, Typography, TypographyGroup, Proje
 import type { LogicGraph } from '../components/LogicEditor/types';
 import { applyTypographies } from '../codegen/typography';
 import { getEntryScreen } from '../utils/entryScreen';
-import { hoistComponentAnimations } from '../utils/animationAssets';
+import { hoistComponentAnimations, migrateScreenLoadAnimations } from '../utils/animationAssets';
 import { normalizeBuiltinSizes } from '../resources/builtinFonts';
 import { applyTextResources } from '../codegen/textResources';
 import { migrateFontResource } from '../resources/converters/fontConverter';
@@ -585,6 +585,14 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       data = { ...data, screens: hoisted.screens, animations: hoisted.animations };
     }
 
+    // Screens gained events of their own, and an entry animation is now one of
+    // them rather than something the generator did on its own. A project from
+    // before that gets the bindings that reproduce exactly what it used to do.
+    data = {
+      ...data,
+      screens: migrateScreenLoadAnimations(data.screens, data.animations ?? [], uuidv4),
+    };
+
     return { data, images, fonts };
   },
 
@@ -660,6 +668,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         // The firmware build reads its boot screen from here, so dropping the
         // flag would silently start the device on the first screen instead.
         isEntry: s.isEntry,
+        // Likewise these: without them an exported project boots with nothing
+        // animating, because the entry animation is one of these bindings.
+        events: s.events,
       })),
       screenGroups: (data.screenGroups || []).map(g => ({ ...g })),
       typographyGroups: (data.typographyGroups || []).map(g => ({ ...g })),
@@ -731,6 +742,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       backgroundColor: s.backgroundColor ?? '#F5F5F5',
       groupId: s.groupId ?? null,
       isEntry: s.isEntry,
+      events: s.events,
     }));
 
     // Import is its own path into the app, so it has to run the same migrations
@@ -745,7 +757,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
 
     await dbUpdateProjectData({
       projectId: id,
-      screens: migrated.screens,
+      screens: migrateScreenLoadAnimations(migrated.screens, lifted.animations, uuidv4),
       screenGroups: (file.screenGroups || []).map(g => ({ ...g })),
       typographyGroups: (file.typographyGroups || []).map(g => ({ ...g })),
       // Same reason as the read path: a built-in size the build does not

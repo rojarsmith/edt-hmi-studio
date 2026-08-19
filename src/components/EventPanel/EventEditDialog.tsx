@@ -5,11 +5,13 @@ import { componentsById } from '../../utils/animationAssets';
 import { useLogicEditorStore } from '../LogicEditor';
 import type { EventBinding, LvglEventType, BuiltinActionType, BuiltinAction } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
-import { LVGL_EVENTS } from './EventPanel';
+import { LVGL_EVENTS, LVGL_SCREEN_EVENTS } from './EventPanel';
 import CodeEditor from './CodeEditor';
 import './EventEditDialog.css';
 
 interface EventEditDialogProps {
+  /** True when the binding belongs to a screen rather than a widget. */
+  forScreen?: boolean;
   event: EventBinding | null;
   isCreating: boolean;
   onSave: (event: EventBinding) => void;
@@ -44,9 +46,12 @@ const CODE_TEMPLATE = `// Event handler code
 const EventEditDialog: React.FC<EventEditDialogProps> = ({
   event,
   isCreating,
+  forScreen,
   onSave,
   onClose,
 }) => {
+  // A screen reacts to its own lifecycle; a widget to input.
+  const eventCatalog = forScreen ? LVGL_SCREEN_EVENTS : LVGL_EVENTS;
   const { screens, currentScreenId, getAllComponents, languages } = useEditorStore();
   const animations = useEditorStore(s => s.animations);
   const components = useMemo(() => componentsById(screens), [screens]);
@@ -56,7 +61,8 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   
   // Form state
   const [eventType, setEventType] = useState<LvglEventType>(
-    event?.eventType || 'LV_EVENT_CLICKED'
+    // A screen has no Clicked to default to.
+    event?.eventType || (forScreen ? 'LV_EVENT_SCREEN_LOADED' : 'LV_EVENT_CLICKED')
   );
   const [handlerType, setHandlerType] = useState<'builtin' | 'custom' | 'logic'>(
     event?.handlerType || 'builtin'
@@ -473,14 +479,14 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
               onChange={(e) => setEventType(e.target.value as LvglEventType)}
               className="event-type-select"
             >
-              {LVGL_EVENTS.map(evt => (
+              {eventCatalog.map(evt => (
                 <option key={evt.type} value={evt.type}>
                   {evt.label} ({evt.type})
                 </option>
               ))}
             </select>
             <p className="field-hint">
-              {LVGL_EVENTS.find(e => e.type === eventType)?.description}
+              {eventCatalog.find(e => e.type === eventType)?.description}
             </p>
           </div>
 

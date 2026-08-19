@@ -10,9 +10,13 @@ import {
 } from '../types/hmi';
 import { migrateFontResource } from './converters/fontConverter';
 import { applyTypographies } from '../codegen/typography';
-import { hoistComponentAnimations } from '../utils/animationAssets';
+import { hoistComponentAnimations, migrateScreenLoadAnimations } from '../utils/animationAssets';
 
 const PROJECT_VERSION = '1.0.0';
+
+// Ids for bindings the screen-event migration invents. Deterministic so a file
+// parsed twice yields the same project rather than duplicating on re-import.
+let migratedEventId = 0;
 
 /**
  * Create a new project file structure
@@ -45,6 +49,7 @@ export function createProjectFile(
       backgroundColor: screen.backgroundColor,
       groupId: screen.groupId ?? null,
       isEntry: screen.isEntry,
+      events: screen.events,
     })),
     screenGroups: screenGroups.map(group => ({ ...group })),
     animations: animations.map(animation => ({ ...animation })),
@@ -109,7 +114,11 @@ function migrateProject(project: ProjectFile): ProjectFile {
   const lifted = project.animations
     ? { screens: rawScreens, animations: project.animations }
     : hoistComponentAnimations(rawScreens as unknown as Screen[]);
-  const screens = lifted.screens as unknown as ProjectScreen[];
+  const screens = migrateScreenLoadAnimations(
+    lifted.screens as unknown as Screen[],
+    lifted.animations,
+    () => `event-${(migratedEventId += 1)}`,
+  ) as unknown as ProjectScreen[];
 
   // Typographies are derived from the styling already present, so a project
   // written before they existed keeps rendering exactly as it did. Projects

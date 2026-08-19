@@ -3,6 +3,14 @@
 import type { Animation, Screen, LvglComponent, EventBinding, BuiltinAction, ProjectLanguage } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
 import type { LogicGraph } from '../../components/LogicEditor/types';
+
+/** One object's one event type, and every binding the panel listed for it. */
+export interface EventHandlerGroup {
+  /** Component name, or `screen_<name>` for a screen's own events. */
+  handlerBase: string;
+  eventType: EventBinding['eventType'];
+  bindings: EventBinding[];
+}
 import { getLogicFuncNames } from '../utils/nameUtils';
 import {
   animStartFuncName,
@@ -386,9 +394,42 @@ function generateLogicHandlerCode(
 /**
  * Generate event handler function
  */
+/**
+ * Every object that carries events — widgets and the screens themselves —
+ * grouped so one handler serves one object's one event type.
+ *
+ * Emitting a function per binding gave two bindings of the same type the same
+ * symbol, which does not compile; a screen playing several entry animations
+ * has exactly that by construction.
+ */
+export function groupEventHandlers(screens: Screen[]): EventHandlerGroup[] {
+  const groups = new Map<string, EventHandlerGroup>();
+
+  const add = (handlerBase: string, event: EventBinding) => {
+    const key = `${handlerBase}::${event.eventType}`;
+    const existing = groups.get(key);
+    if (existing) existing.bindings.push(event);
+    else groups.set(key, { handlerBase, eventType: event.eventType, bindings: [event] });
+  };
+
+  for (const screen of screens) {
+    // A screen's own bindings share the screen variable's base, so the handler
+    // reads ui_event_screen_main_screen_loaded.
+    for (const event of screen.events ?? []) add(`screen_${screen.name}`, event);
+    const visit = (components: LvglComponent[]) => {
+      for (const component of components) {
+        for (const event of component.events) add(component.name, event);
+        visit(component.children);
+      }
+    };
+    visit(screen.components);
+  }
+
+  return [...groups.values()];
+}
+
 function generateEventHandler(
-  component: LvglComponent,
-  event: EventBinding,
+  group: EventHandlerGroup,
   options: CodeGenOptions,
   screens: Screen[],
   languages: ProjectLanguage[],
@@ -398,35 +439,33 @@ function generateEventHandler(
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
-  const funcName = getEventHandlerName(component.name, event.eventType, options);
+  const indent2 = getIndent(options, 2);
+  const funcName = getEventHandlerName(group.handlerBase, group.eventType, options);
+  const hasAction = group.bindings.some(
+    (event) => event.handlerType === 'builtin' && event.action,
+  );
 
   lines.push(`void ${funcName}(lv_event_t *e) {`);
   lines.push(`${indent}lv_event_code_t code = lv_event_get_code(e);`);
 
   // Suppress unused variable warning if needed
-  if (event.handlerType === 'builtin' && event.action) {
+  if (hasAction) {
     lines.push(`${indent}(void)code; // Suppress unused variable warning`);
   }
 
   lines.push('');
-  lines.push(`${indent}if (code == ${event.eventType}) {`);
+  lines.push(`${indent}if (code == ${group.eventType}) {`);
 
-  if (event.handlerType === 'builtin' && event.action) {
-    // Generate builtin action code
-    const actionLines = generateBuiltinActionCode(event.action, options, screens, languages, animations);
-    lines.push(...actionLines);
-  } else if (event.handlerType === 'custom' && event.customCode) {
-    // Insert custom code
-    const indent2 = getIndent(options, 2);
-    const customLines = event.customCode.split('\n').map(line => `${indent2}${line}`);
-    lines.push(...customLines);
-  } else if (event.handlerType === 'logic') {
-    lines.push(...generateLogicHandlerCode(event, options, logicGraphs, logicFuncNames));
-  } else {
-    // Empty handler with user code marker
-    if (options.userCodeMarkers) {
-      const indent2 = getIndent(options, 2);
-      lines.push(`${indent2}${generateUserCodeSection(`${component.name}_${event.eventType}`, options)}`);
+  // Every binding of this type runs here, in the order the panel lists them.
+  for (const event of group.bindings) {
+    if (event.handlerType === 'builtin' && event.action) {
+      lines.push(...generateBuiltinActionCode(event.action, options, screens, languages, animations));
+    } else if (event.handlerType === 'custom' && event.customCode) {
+      lines.push(...event.customCode.split('\n').map(line => `${indent2}${line}`));
+    } else if (event.handlerType === 'logic') {
+      lines.push(...generateLogicHandlerCode(event, options, logicGraphs, logicFuncNames));
+    } else if (options.userCodeMarkers) {
+      lines.push(`${indent2}${generateUserCodeSection(`${group.handlerBase}_${group.eventType}`, options)}`);
     }
   }
 
@@ -474,15 +513,16 @@ export function generateEventsSource(
 
   // Event handlers
   const allEvents = getAllEvents(screens);
+  const hasScreenEvents = screens.some((screen) => (screen.events ?? []).length > 0);
 
-  if (allEvents.length > 0) {
+  if (allEvents.length > 0 || hasScreenEvents) {
     if (options.generateComments) {
       lines.push(generateSectionHeader('Event Handlers', options));
       lines.push('');
     }
 
-    for (const { component, event } of allEvents) {
-      lines.push(generateEventHandler(component, event, options, screens, languages, logicGraphs, logicFuncNames, animations));
+    for (const group of groupEventHandlers(screens)) {
+      lines.push(generateEventHandler(group, options, screens, languages, logicGraphs, logicFuncNames, animations));
       lines.push('');
     }
   } else {
