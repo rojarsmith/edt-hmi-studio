@@ -44,6 +44,8 @@ A full-featured **visual editor for LVGL user interfaces**, with drag-and-drop d
   - Show / hide a widget
   - Set text or value
   - Switch language — a named one, or cycle through the project's languages. See [docs/language-switching.md](docs/language-switching.md)
+  - Play or stop an animation. See [docs/animation-model.md](docs/animation-model.md)
+- **Screens fire events too**: bind an animation to a screen's Screen Loaded event and it becomes that screen's entry animation, without writing code
 - **Custom C code**: edited in Monaco
 
 ### 🔗 Logic editor

@@ -44,6 +44,8 @@
   - 顯示／隱藏元件
   - 設定文字或數值
   - 切換語系 —— 指定某個語系，或在專案語系之間循環。詳見 [docs/zh-TW/language-switching.md](docs/zh-TW/language-switching.md)
+  - 播放或停止動畫。詳見 [docs/zh-TW/animation-model.md](docs/zh-TW/animation-model.md)
+- **畫面本身也能觸發事件**：把動畫綁到畫面的 Screen Loaded 事件，它就成為該畫面的入場動畫，完全不需要寫程式碼
 - **自訂 C 程式碼**：以 Monaco 編輯
 
 ### 🔗 邏輯編排器
