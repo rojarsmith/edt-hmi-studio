@@ -57,9 +57,10 @@ rather than input:
 | `LV_EVENT_SCREEN_UNLOADED` | The screen has finished leaving |
 
 Two built-in actions drive an animation, available to screens and widgets
-alike: **Play Animation** starts one from its start value however far a
-previous run had reached, and **Stop Animation** leaves the widget wherever it
-had got to. The binding names its animation by id, so renaming one cannot
+alike: **Play Animation** runs one from the beginning however far a previous
+run had reached — from its stated start, or from wherever the widget is if it
+travels a distance — and **Stop Animation** leaves the widget where it had got
+to. The binding names its animation by id, so renaming one cannot
 quietly unbind every button that plays it.
 
 An animation nothing binds simply never runs. That is what lets one be
@@ -67,39 +68,52 @@ reserved for a button while the screen's entry animations play on load.
 
 ### Parking
 
-The start values still have to be applied automatically. A widget keeps
+The starting place still has to be restored automatically. A widget keeps
 whatever the last run left it at, so on a second visit to a screen it would
 sit at its end position for the whole transition and then jump back. The
 generator therefore parks the widgets a screen's entry animations drive, on
 `LV_EVENT_SCREEN_LOAD_START` — before the transition draws.
 
-Only those. An animation kept for a button is left where the user put it: the
-screen has no business moving a widget it does not animate.
+Where it parks depends on how the animation states itself: an absolute one
+goes back to its own start value, an offset one to the component's designed
+position (see below).
+
+Only those animations. One kept for a button is left where the user put it:
+the screen has no business moving a widget it does not animate.
 
 ## Offset and absolute
 
-A position animation's numbers count from where the component sits. "Slide in
-from the left" hands out `x: -100 → 0`, which means *a hundred pixels to the
-left of its place, then home* — not the coordinate `-100`, then the coordinate
-`0`.
+A movement can be stated two ways, and they are different shapes rather than
+different units:
 
-This was a real defect rather than a preference. The generator used to write
-those numbers straight into `lv_obj_set_x`, so a widget designed anywhere but
-`x: 0` slid to the wrong place on the board — while the preview, which drew
-the same numbers as a shift from the component's position, showed it landing
-correctly. The canvas and the firmware disagreed, and the firmware was wrong.
-Both now resolve through `resolvedAnimationValues()` in
-`src/utils/animationValues.ts`.
+- **Absolute** — two coordinates. Start at this x, end at that one.
+- **Offset** — one **distance**, travelled from wherever the widget is when
+  the animation runs. Negative moves left or up.
 
-**Absolute** stays available for an animation that really does mean a
-coordinate. The dialog offers the choice for `x` and `y` only: those are the
-properties with a place to be offset from. A width of 100 is a hundred pixels
-wherever it is measured from, and an opacity has no position at all.
+Offset reads the *live* position, not the designed one. A button that has
+already nudged a widget rightwards nudges it further from there, which is what
+"move by 40 pixels" has to mean if it is to be usable twice.
 
-The base is the **designed** position, not the live one. Counting from
-wherever the widget happens to be at runtime would drift: parking it at its
-start value before each screen load, then reading that parked position as the
-next base, walks it further away on every visit.
+That leaves an entry animation needing somewhere to set off from, and the
+answer is where the author parked the component. To slide a button in from the
+left, place it *outside the screen* on the canvas — the editor shows it there,
+beyond the white panel, rather than clipping it away — and give the distance
+that brings it home. Its designed position **is** the animation's starting
+place.
+
+So a screen restores the designed position before replaying its entry
+animations (see Parking above). Without that, travelling from the live
+position would walk the widget further on every visit. An absolute animation
+states its own start and parks there instead.
+
+The dialog offers the choice for `x` and `y` only: those are the properties
+with somewhere to travel from. A width of 100 is a hundred pixels wherever it
+is measured from, and an opacity has no position at all. An animation carrying
+no mode reads as absolute, which is what the generator always did with one.
+
+The slide presets hand out a distance rather than a pair of coordinates, since
+a slide is a journey. Fades and zooms stay absolute: they are values, not
+places.
 
 ## What gets generated
 
@@ -113,7 +127,8 @@ void ui_anim_slide_in_1_start(void) {
     lv_anim_init(&anim);
     lv_anim_set_var(&anim, ui_title);
     lv_anim_set_exec_cb(&anim, (lv_anim_exec_xcb_t)lv_obj_set_x);
-    lv_anim_set_values(&anim, -70, 40);   /* designed at x: 40, offset -110 */
+    int32_t from = lv_obj_get_x(ui_title);   /* wherever it is right now */
+    lv_anim_set_values(&anim, from, from + (100));
     lv_anim_set_time(&anim, 400);
     lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
     lv_anim_start(&anim);
@@ -171,9 +186,11 @@ An empty `events` array marks a screen as migrated. Removing every binding is
 therefore a decision that survives the next open, rather than something the
 migration undoes.
 
-Position animations in such a project change behaviour on the board: they now
-land where the preview always showed them landing. An animation that really
-did want a coordinate can be switched to Absolute.
+An animation from such a project carries no mode, so it stays absolute — what
+the generator always did with it. A slide-in written before offsets existed is
+therefore worth redoing: park the component where it should set off and give
+the distance, rather than leaving it to state two coordinates that only work
+for a component designed at zero.
 
 ## The preview
 
@@ -192,7 +209,7 @@ still previewable.
 | Animation and binding types | `src/types/index.ts` |
 | Naming rule | `src/utils/animationNames.ts` |
 | Migrations, target resolution, LACK | `src/utils/animationAssets.ts` |
-| Offset and absolute | `src/utils/animationValues.ts` |
+| Distance, absolute, and parking | `src/utils/animationValues.ts` |
 | C symbols and resolved values | `src/codegen/animationSymbols.ts` |
 | Animation functions and parking | `src/codegen/templates/ui.c.ts` |
 | Event handlers and the two actions | `src/codegen/templates/ui_events.c.ts` |
@@ -208,5 +225,5 @@ still previewable.
   "pressed state feels responsive" case at almost no cost, and it is a
   different mechanism from this one rather than a competitor to it: state
   transitions give texture, triggers give choreography.
-- **Offset for size.** `width` and `height` could reasonably be offset from
-  the designed size; the case has not come up.
+- **Offset for size.** `width` and `height` could reasonably travel a
+  distance from their current value; the case has not come up.
