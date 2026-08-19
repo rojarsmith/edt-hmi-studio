@@ -13,7 +13,7 @@ import { toast } from '../Toast';
 import './CodePreview.css';
 
 const CodePreview: React.FC = () => {
-  const { screens } = useEditorStore();
+  const { screens, animations } = useEditorStore();
   const { graphs: logicGraphs } = useLogicEditorStore();
   const { currentTheme } = useThemeStore();
   const imageResources = useResourceStore((s) => s.images);
@@ -49,12 +49,12 @@ const CodePreview: React.FC = () => {
 
   const generatedCode = useMemo(() => {
     try {
-      return generateCode(screens, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, undefined, undefined, undefined, modbusTags);
+      return generateCode(screens, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, undefined, undefined, undefined, modbusTags, animations);
     } catch {
       console.error('Code generation error');
       return null;
     }
-  }, [screens, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, modbusTags]);
+  }, [screens, animations, codeGenOptions, logicGraphs, currentTheme, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, modbusTags]);
 
   const currentCode = generatedCode?.[selectedFile] || '// Code generation failed';
 

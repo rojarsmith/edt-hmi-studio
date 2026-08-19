@@ -1,24 +1,4 @@
-import type { Animation, LvglComponent, Screen } from '../types';
-
-/**
- * Every animation in the project, in screen → component → child order.
- *
- * Animations still live on the component they drive, but they are named as if
- * they were project-level assets: the generated C function is named after the
- * animation alone, so the name has to be unique across the whole project
- * rather than within one component.
- */
-export function projectAnimations(screens: Screen[]): Animation[] {
-  const found: Animation[] = [];
-  const visit = (components: LvglComponent[]) => {
-    for (const component of components) {
-      found.push(...(component.animations || []));
-      visit(component.children);
-    }
-  };
-  for (const screen of screens) visit(screen.components);
-  return found;
-}
+import type { Animation } from '../types';
 
 /** The `Fade_In` half of a default `Fade_In_1` name, derived from the type. */
 export function animationNameBase(type: string): string {
@@ -30,14 +10,18 @@ export function animationNameBase(type: string): string {
 }
 
 /**
- * First unused `${base}_${N}` animation name across the whole project. Same
- * rule as component ids: numbers freed by deletions are reused before the
- * count grows, and N starts at 1.
+ * First unused `${base}_${N}` animation name in the project. Same rule as
+ * component ids: numbers freed by deletions are reused before the count grows,
+ * and N starts at 1.
+ *
+ * The name is unique project-wide because it names the generated C function,
+ * which names the animation alone rather than its target — see
+ * src/codegen/animationSymbols.ts.
  */
-export function nextAnimationName(screens: Screen[], base: string): string {
+export function nextAnimationName(animations: Animation[], base: string): string {
   const prefix = `${base}_`;
   const used = new Set<number>();
-  for (const animation of projectAnimations(screens)) {
+  for (const animation of animations) {
     if (!animation.name.startsWith(prefix)) continue;
     const suffix = animation.name.slice(prefix.length);
     if (/^\d+$/.test(suffix)) used.add(Number(suffix));
@@ -52,11 +36,11 @@ export function nextAnimationName(screens: Screen[], base: string): string {
  * animation being edited, which is allowed to keep its own name.
  */
 export function isAnimationNameTaken(
-  screens: Screen[],
+  animations: Animation[],
   name: string,
   exceptId?: string,
 ): boolean {
-  return projectAnimations(screens).some(
+  return animations.some(
     (animation) => animation.id !== exceptId && animation.name === name,
   );
 }

@@ -4,10 +4,11 @@ import { create } from 'zustand';
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 import { v4 as uuidv4 } from 'uuid';
 import type { ProjectFile, CodeGenOptions, ImageResource, FontResource } from '../resources/types';
-import type { Screen, ScreenGroup, Typography, TypographyGroup, ProjectLanguage, TextResource, TextGroup } from '../types';
+import type { Animation, Screen, ScreenGroup, Typography, TypographyGroup, ProjectLanguage, TextResource, TextGroup } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import { applyTypographies } from '../codegen/typography';
 import { getEntryScreen } from '../utils/entryScreen';
+import { hoistComponentAnimations } from '../utils/animationAssets';
 import { normalizeBuiltinSizes } from '../resources/builtinFonts';
 import { applyTextResources } from '../codegen/textResources';
 import { migrateFontResource } from '../resources/converters/fontConverter';
@@ -91,6 +92,8 @@ export interface ProjectData {
   texts?: TextResource[];
   /** Organisational folders shown in the texts tree. */
   textGroups?: TextGroup[];
+  /** Project-level animations, each naming the widget it drives. */
+  animations?: Animation[];
   logicGraphs: LogicGraph[];
   variables: { id: string; name: string; type: string; defaultValue: string }[];
 }
@@ -418,7 +421,7 @@ interface ProjectStoreState {
   // Load / save project data (screens, logic, resources)
   loadProjectData: (id: string) => Promise<{ data: ProjectData; images: ImageResource[]; fonts: FontResource[] }>;
   /** Omit  to leave the stored list untouched. */
-  saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[], typographies?: Typography[], languages?: ProjectLanguage[], texts?: TextResource[], typographyGroups?: TypographyGroup[], textGroups?: TextGroup[]) => Promise<void>;
+  saveProjectData: (id: string, screens: Screen[], logicGraphs: LogicGraph[], images: ImageResource[], fonts: FontResource[], screenGroups?: ScreenGroup[], typographies?: Typography[], languages?: ProjectLanguage[], texts?: TextResource[], typographyGroups?: TypographyGroup[], textGroups?: TextGroup[], animations?: Animation[]) => Promise<void>;
 
   // Import / export
   exportProject: (id: string) => Promise<ProjectFile>;
@@ -574,15 +577,23 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       data = { ...data, screens: derived.screens, texts: derived.texts, languages };
     }
 
+    // Animations lived inside the component they drove before they became
+    // project-level assets. Hoisting them on open is the same shape of
+    // migration as the two above.
+    if (!data.animations) {
+      const hoisted = hoistComponentAnimations(data.screens);
+      data = { ...data, screens: hoisted.screens, animations: hoisted.animations };
+    }
+
     return { data, images, fonts };
   },
 
-  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = [], typographies, languages, texts, typographyGroups, textGroups) => {
+  saveProjectData: async (id, screens, logicGraphs, images, fonts, screenGroups = [], typographies, languages, texts, typographyGroups, textGroups, animations) => {
     // Omitting typographies means "leave them alone", not "delete them". They
     // are written once by migration and then only by the editor, so defaulting
     // to an empty array let every autosave quietly wipe the list while the
     // widgets kept pointing at ids that no longer resolved.
-    const previous = (typographies && languages && texts) ? undefined : await dbGetProjectData(id);
+    const previous = (typographies && languages && texts && animations) ? undefined : await dbGetProjectData(id);
     const nextTypographies = typographies ?? previous?.typographies ?? [];
     const nextLanguages = languages ?? previous?.languages ?? [];
     const nextTexts = texts ?? previous?.texts ?? [];
@@ -594,7 +605,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     // autosave from a panel that does not know about groups cannot wipe them
     const nextTypographyGroups = typographyGroups ?? previous?.typographyGroups ?? [];
     const nextTextGroups = textGroups ?? previous?.textGroups ?? [];
-    await dbUpdateProjectData({ projectId: id, screens, screenGroups, typographies: nextTypographies, typographyGroups: nextTypographyGroups, languages: nextLanguages, texts: nextTexts, textGroups: nextTextGroups, logicGraphs, variables: [] });
+    // Same rule again: an omitted list means "leave it alone", never "wipe it".
+    const nextAnimations = animations ?? previous?.animations ?? [];
+    await dbUpdateProjectData({ projectId: id, screens, screenGroups, typographies: nextTypographies, typographyGroups: nextTypographyGroups, languages: nextLanguages, texts: nextTexts, textGroups: nextTextGroups, animations: nextAnimations, logicGraphs, variables: [] });
     await get().syncResources(id, images, fonts);
   },
 
@@ -656,6 +669,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       typographies: (data.typographies || []).map(t => ({ ...t })),
       languages: (data.languages || []).map(l => ({ ...l })),
       texts: (data.texts || []).map(t => ({ ...t, values: { ...t.values } })),
+      // Dropping these would leave the firmware with no animations at all —
+      // the same field-by-field trap the entry-screen flag fell into.
+      animations: (data.animations || []).map(a => ({ ...a })),
       resources: { images, fonts },
       variables: data.variables.map(v => ({
         id: v.id,
@@ -720,9 +736,12 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     // Import is its own path into the app, so it has to run the same migrations
     // as opening a file. Without this an imported project would arrive with no
     // typographies at all, however much styling it carries.
+    const lifted = file.animations
+      ? { screens: rawScreens, animations: file.animations.map(a => ({ ...a })) }
+      : hoistComponentAnimations(rawScreens);
     const migrated = file.typographies?.length
-      ? { screens: rawScreens, typographies: file.typographies }
-      : applyTypographies(rawScreens, lvglConfig.defaultFont, lvglConfig.defaultFontSize);
+      ? { screens: lifted.screens, typographies: file.typographies }
+      : applyTypographies(lifted.screens, lvglConfig.defaultFont, lvglConfig.defaultFontSize);
 
     await dbUpdateProjectData({
       projectId: id,
@@ -737,6 +756,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       languages: file.languages || [],
       texts: file.texts || [],
       textGroups: (file.textGroups || []).map(g => ({ ...g })),
+      animations: lifted.animations,
       logicGraphs: file.logicGraphs || [],
       variables: (file.variables || []).map(v => ({ ...v, type: v.type as string })),
     });

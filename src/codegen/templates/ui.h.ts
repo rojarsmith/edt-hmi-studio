@@ -1,6 +1,6 @@
 // ui.h template generator
 
-import type { Screen, LvglComponent, Typography } from '../../types';
+import type { Animation, Screen, LvglComponent, Typography } from '../../types';
 import type { FontResource } from '../../resources/types';
 import type { CodeGenOptions } from '../types';
 import { collectUsedCustomFonts } from '../fontUsage';
@@ -45,7 +45,7 @@ function getAllComponents(screens: Screen[]): { component: LvglComponent; screen
 /**
  * Generate ui.h header file
  */
-export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fonts: FontResource[] = [], defaultFont?: string, defaultFontSize?: number, useBuiltinSymbols?: boolean, typographies: Typography[] = []): string {
+export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fonts: FontResource[] = [], defaultFont?: string, defaultFontSize?: number, useBuiltinSymbols?: boolean, typographies: Typography[] = [], animations: Animation[] = []): string {
   const lines: string[] = [];
   
   // Includes
@@ -170,7 +170,7 @@ export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fon
 
   // Animations. Declared for everything that can trigger one — a screen
   // appearing today, an event or a logic graph next.
-  const animationSymbols = collectAnimationSymbols(screens, options, needsScreenPrefix)
+  const animationSymbols = collectAnimationSymbols(animations, screens, options, needsScreenPrefix)
     .filter((symbol) => symbol.execCb);
   if (animationSymbols.length > 0) {
     lines.push('');

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { Animation, AnimationType, AnimationEasing } from '../../types';
 import { useEditorStore } from '../../store/editorStore';
+import { componentsById } from '../../utils/animationAssets';
 import {
   animationNameBase,
   isAnimationNameTaken,
@@ -70,6 +71,23 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
   onClose,
 }) => {
   const screens = useEditorStore(s => s.screens);
+  const projectAnimations = useEditorStore(s => s.animations);
+  // An animation names its target rather than living inside it, so the target
+  // is picked here — and may be left unset, which shows as LACK in the panel.
+  const [targetId, setTargetId] = useState(animation?.targetComponentId || targetComponentId || '');
+  const targets = useMemo(() => {
+    const rows: { id: string; label: string }[] = [];
+    for (const screen of screens) {
+      const visit = (components: typeof screen.components) => {
+        for (const component of components) {
+          rows.push({ id: component.id, label: `${screen.name} / ${component.name}` });
+          visit(component.children);
+        }
+      };
+      visit(screen.components);
+    }
+    return rows;
+  }, [screens]);
   const [name, setName] = useState(animation?.name || '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [type, setType] = useState<AnimationType>(animation?.type || 'fade_in');
@@ -84,8 +102,8 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
   // The name the animation takes if the field is left blank. Shown as the
   // placeholder so the default is never a surprise.
   const suggestedName = useMemo(
-    () => nextAnimationName(screens, animationNameBase(type)),
-    [screens, type],
+    () => nextAnimationName(projectAnimations, animationNameBase(type)),
+    [projectAnimations, type],
   );
 
   const handleTypeChange = useCallback((newType: AnimationType) => {
@@ -104,14 +122,14 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
     // wired to ui_anim_fade_in_1_start() must have exactly one animation to
     // mean.
     const chosen = name.trim() || suggestedName;
-    if (isAnimationNameTaken(screens, chosen, animation?.id)) {
+    if (isAnimationNameTaken(projectAnimations, chosen, animation?.id)) {
       setNameError(`An animation named "${chosen}" already exists.`);
       return;
     }
     const anim: Animation = {
       id: animation?.id || uuidv4(),
       name: chosen,
-      targetComponentId,
+      targetComponentId: targetId,
       type,
       easing,
       duration,
@@ -122,7 +140,7 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
       endValue,
     };
     onSave(anim);
-  }, [animation, name, suggestedName, screens, targetComponentId, type, easing, duration, delay, repeat, property, startValue, endValue, onSave]);
+  }, [animation, name, suggestedName, projectAnimations, targetId, type, easing, duration, delay, repeat, property, startValue, endValue, onSave]);
 
   return (
     <div className="anim-dialog-overlay" onClick={onClose}>
@@ -146,6 +164,21 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
               aria-label="Animation Name"
             />
             {nameError && <p className="field-error">{nameError}</p>}
+          </div>
+
+          <div className="form-section">
+            <label className="section-label">Target</label>
+            <select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+              <option value="">No target yet</option>
+              {targets.map(target => (
+                <option key={target.id} value={target.id}>{target.label}</option>
+              ))}
+            </select>
+            {!componentsById(screens).has(targetId) && (
+              <p className="field-hint">
+                Without a target this animation drives nothing and generates no code.
+              </p>
+            )}
           </div>
 
           <div className="form-section">

@@ -44,6 +44,7 @@ const CompilePreview: React.FC = () => {
   const [running, setRunning] = useState(false);
 
   const screens = useEditorStore((s) => s.screens);
+  const animations = useEditorStore((s) => s.animations);
   const canvas = useEditorStore((s) => s.canvas);
   const logicGraphs = useLogicEditorStore((s) => s.graphs);
   const typographies = useEditorStore((s) => s.typographies);
@@ -74,8 +75,8 @@ const CompilePreview: React.FC = () => {
 
   // Generate C code from current editor state
   const generateCCode = useCallback(() => {
-    return generateCode(screens, {}, logicGraphs, undefined, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, typographies, projectTexts, projectLanguages, modbusTags);
-  }, [screens, logicGraphs, typographies, projectTexts, projectLanguages, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, modbusTags]);
+    return generateCode(screens, {}, logicGraphs, undefined, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, typographies, projectTexts, projectLanguages, modbusTags, animations);
+  }, [screens, animations, logicGraphs, typographies, projectTexts, projectLanguages, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize, projectUseBuiltinSymbols, projectSymbolFont, modbusTags]);
 
   // Render framebuffer to canvas
   const renderFramebuffer = useCallback((fbData: Uint8Array, width: number, height: number) => {

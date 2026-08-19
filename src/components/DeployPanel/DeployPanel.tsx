@@ -63,6 +63,7 @@ const DeployPanel: React.FC = () => {
     flushProjectConfigWrites,
   } = useProjectStore();
   const screens = useEditorStore((state) => state.screens);
+  const animations = useEditorStore((state) => state.animations);
   const logicGraphs = useLogicEditorStore((state) => state.graphs);
   const images = useResourceStore((state) => state.images);
   const fonts = useResourceStore((state) => state.fonts);
@@ -204,7 +205,7 @@ const DeployPanel: React.FC = () => {
       // Anything the user typed on the Protocol tab has to be on disk before
       // the project is exported, or the firmware is built from stale settings.
       await flushProjectConfigWrites();
-      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts);
+      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, undefined, undefined, undefined, undefined, undefined, undefined, animations);
       const project = await exportProject(currentProjectId);
       const result = await buildHmiProject(project);
       appendLog(result.log);
@@ -243,6 +244,7 @@ const DeployPanel: React.FC = () => {
     factoryDevMode,
     saveProjectData,
     screens,
+    animations,
   ]);
 
   const handleFlash = useCallback(async () => {

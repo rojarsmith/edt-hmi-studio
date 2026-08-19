@@ -1,6 +1,6 @@
 // ui_events.c template generator
 
-import type { Screen, LvglComponent, EventBinding, BuiltinAction, ProjectLanguage } from '../../types';
+import type { Animation, Screen, LvglComponent, EventBinding, BuiltinAction, ProjectLanguage } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
 import type { LogicGraph } from '../../components/LogicEditor/types';
 import { getLogicFuncNames } from '../utils/nameUtils';
@@ -444,6 +444,7 @@ export function generateEventsSource(
   options: CodeGenOptions,
   languages: ProjectLanguage[] = [],
   logicGraphs: LogicGraph[] = [],
+  projectAnimations: Animation[] = [],
 ): string {
   const lines: string[] = [];
   // The same name table ui_logic.h/.c share, computed over the same graph
@@ -451,7 +452,7 @@ export function generateEventsSource(
   const logicFuncNames = getLogicFuncNames(logicGraphs);
   // Resolved once: the same table ui.c named the animation functions from, so
   // a button and the animation it plays cannot disagree about the symbol.
-  const animations = animationSymbolsById(screens, options);
+  const animations = animationSymbolsById(projectAnimations, screens, options);
   const hasLogicHandlers = getAllEvents(screens).some(
     ({ event }) => event.handlerType === 'logic'
   );

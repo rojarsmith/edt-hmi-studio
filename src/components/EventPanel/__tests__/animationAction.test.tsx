@@ -23,7 +23,7 @@ function anim(id: string, name: string, targetComponentId: string): Animation {
   };
 }
 
-function component(id: string, name: string, animations: Animation[] = []): LvglComponent {
+function component(id: string, name: string): LvglComponent {
   return {
     id,
     type: 'btn',
@@ -36,16 +36,17 @@ function component(id: string, name: string, animations: Animation[] = []): Lvgl
     props: {},
     styles: { default: {} },
     events: [],
-    animations,
+    animations: [],
     parentId: null,
     locked: false,
     visible: true,
   };
 }
 
-function setScreens(...components: LvglComponent[]) {
+function setUp(components: LvglComponent[], animations: Animation[] = []) {
   useEditorStore.setState({
     screens: [{ id: 'screen-1', name: 'Screen 1', components, backgroundColor: '#fff' }],
+    animations,
     currentScreenId: 'screen-1',
     selection: { selectedIds: [], hoveredId: null },
     history: [],
@@ -76,9 +77,9 @@ function chooseAction(label: string) {
 
 describe('play animation action', () => {
   beforeEach(() => {
-    setScreens(
-      component('label-1', 'Title', [anim('anim-1', 'Pulse_1', 'label-1')]),
-      component('btn-1', 'Go'),
+    setUp(
+      [component('label-1', 'Title'), component('btn-1', 'Go')],
+      [anim('anim-1', 'Pulse_1', 'label-1')],
     );
   });
 
@@ -112,7 +113,7 @@ describe('play animation action', () => {
   });
 
   it('says where to make one when the project has no animations', () => {
-    setScreens(component('btn-1', 'Go'));
+    setUp([component('btn-1', 'Go')]);
     renderDialog();
     chooseAction('Play Animation');
 

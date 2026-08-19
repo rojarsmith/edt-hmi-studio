@@ -47,20 +47,22 @@ interface AnimState {
   opacity: number;
 }
 
-// Collect all animations from all components
-function collectAnimations(comps: LvglComponent[]): { compId: string; anim: Animation }[] {
-  const result: { compId: string; anim: Animation }[] = [];
-  for (const comp of comps) {
-    if (comp.animations && comp.animations.length > 0) {
-      for (const anim of comp.animations) {
-        result.push({ compId: comp.id, anim });
-      }
+/** The project animations whose target sits on the given components. */
+function animationsOn(
+  comps: LvglComponent[],
+  animations: Animation[],
+): { compId: string; anim: Animation }[] {
+  const onScreen = new Set<string>();
+  const visit = (list: LvglComponent[]) => {
+    for (const comp of list) {
+      onScreen.add(comp.id);
+      visit(comp.children);
     }
-    if (comp.children.length > 0) {
-      result.push(...collectAnimations(comp.children));
-    }
-  }
-  return result;
+  };
+  visit(comps);
+  return animations
+    .filter((anim) => onScreen.has(anim.targetComponentId))
+    .map((anim) => ({ compId: anim.targetComponentId, anim }));
 }
 
 function computeAnimState(anim: Animation, progress: number): Partial<AnimState> {
@@ -106,7 +108,7 @@ function collectInitialImageButtonStates(
 const PreviewPanel: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
-  const { screens, currentScreenId, canvas } = useEditorStore();
+  const { screens, currentScreenId, canvas, animations: projectAnimations } = useEditorStore();
   const { images } = useResourceStore();
   const [scale, setScale] = useState(1);
   const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
@@ -250,8 +252,8 @@ const PreviewPanel: React.FC = () => {
 
   /** The toolbar's play button: everything on the screen, together. */
   const startAnimation = useCallback(() => {
-    runAnimations(collectAnimations(components));
-  }, [components, runAnimations]);
+    runAnimations(animationsOn(components, projectAnimations));
+  }, [components, projectAnimations, runAnimations]);
 
   const pauseAnimation = useCallback(() => {
     if (animPlaying && !animPaused) {
@@ -364,7 +366,7 @@ const PreviewPanel: React.FC = () => {
     if (hit && hit.events) {
       for (const ev of hit.events) {
         if (ev.action?.type === 'playAnimation' && ev.action.animationId) {
-          const target = collectAnimations(components)
+          const target = animationsOn(components, projectAnimations)
             .find(entry => entry.anim.id === ev.action!.animationId);
           // An animation on another screen has nothing to move here.
           if (target) {
@@ -389,7 +391,7 @@ const PreviewPanel: React.FC = () => {
         }
       }
     }
-  }, [components, screens, scale, runAnimations]);
+  }, [components, screens, scale, projectAnimations, runAnimations]);
 
   // Render components to canvas
   useEffect(() => {

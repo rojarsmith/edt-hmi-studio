@@ -1013,19 +1013,13 @@ function generateAnimationInitialState(
  * Emit the wrapper functions needed by the animations in use.
  */
 export function generateAnimationHelpers(
-  screens: Screen[],
+  symbols: AnimationSymbol[],
   options: CodeGenOptions
 ): string[] {
   const used = new Set<string>();
-  const walk = (components: LvglComponent[]) => {
-    for (const component of components) {
-      for (const anim of component.animations || []) {
-        if (ANIM_WRAPPERS[anim.property]) used.add(anim.property);
-      }
-      walk(component.children);
-    }
-  };
-  for (const screen of screens) walk(screen.components);
+  for (const symbol of symbols) {
+    if (ANIM_WRAPPERS[symbol.animation.property]) used.add(symbol.animation.property);
+  }
   if (used.size === 0) return [];
 
   const isV9 = options.lvglVersion === '9';
@@ -1421,7 +1415,6 @@ function getScreenAnimFuncName(screenName: string, options: CodeGenOptions): str
 function generateScreenAnimationFunc(
   screen: Screen,
   options: CodeGenOptions,
-  needsScreenPrefix: Set<string>,
   symbols: AnimationSymbol[]
 ): string {
   const indent = getIndent(options);
@@ -1438,16 +1431,10 @@ function generateScreenAnimationFunc(
     );
   }
 
-  const walk = (components: LvglComponent[]) => {
-    for (const component of components) {
-      const varName = needsScreenPrefix.has(component.id)
-        ? getComponentVarName(`${screen.name}_${component.name}`, options)
-        : getComponentVarName(component.name, options);
-      resetBody.push(...generateAnimationInitialState(varName, component.animations || [], options));
-      walk(component.children);
-    }
-  };
-  walk(screen.components);
+  for (const symbol of symbols) {
+    if (symbol.screen.id !== screen.id) continue;
+    resetBody.push(...generateAnimationInitialState(symbol.targetVar, [symbol.animation], options));
+  }
 
   if (startBody.length === 0) return '';
 
@@ -1474,22 +1461,13 @@ function generateScreenAnimationFunc(
 function screenHasAnimationResets(
   screen: Screen,
   options: CodeGenOptions,
-  needsScreenPrefix: Set<string>
+  symbols: AnimationSymbol[]
 ): boolean {
-  let found = false;
-  const walk = (components: LvglComponent[]) => {
-    for (const component of components) {
-      const varName = needsScreenPrefix.has(component.id)
-        ? getComponentVarName(`${screen.name}_${component.name}`, options)
-        : getComponentVarName(component.name, options);
-      if (generateAnimationInitialState(varName, component.animations || [], options).length > 0) {
-        found = true;
-      }
-      walk(component.children);
-    }
-  };
-  walk(screen.components);
-  return found;
+  return symbols.some(
+    (symbol) =>
+      symbol.screen.id === screen.id &&
+      generateAnimationInitialState(symbol.targetVar, [symbol.animation], options).length > 0,
+  );
 }
 
 function generateScreenInitFunc(
@@ -1555,8 +1533,8 @@ function generateScreenInitFunc(
   }
 
   // Park animated widgets before the transition draws, start them after it ends
-  if (generateScreenAnimationFunc(screen, options, needsScreenPrefix, animationSymbols) !== '') {
-    if (screenHasAnimationResets(screen, options, needsScreenPrefix)) {
+  if (generateScreenAnimationFunc(screen, options, animationSymbols) !== '') {
+    if (screenHasAnimationResets(screen, options, animationSymbols)) {
       lines.push(
         `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimResetFuncName(screen.name, options)}, LV_EVENT_SCREEN_LOAD_START, NULL);`,
       );
@@ -2234,7 +2212,7 @@ function generateTypographyStyles(
 /**
  * Generate ui.c source file
  */
-export function generateUiSource(screens: Screen[], options: CodeGenOptions, theme?: Theme, imageResources: ImageResource[] = [], defaultFont?: string, defaultFontSize?: number, fontResources: FontResource[] = [], useBuiltinSymbols?: boolean, symbolFont?: string, storedTypographies?: Typography[], texts: TextResource[] = [], languages: ProjectLanguage[] = []): string {
+export function generateUiSource(screens: Screen[], options: CodeGenOptions, theme?: Theme, imageResources: ImageResource[] = [], defaultFont?: string, defaultFontSize?: number, fontResources: FontResource[] = [], useBuiltinSymbols?: boolean, symbolFont?: string, storedTypographies?: Typography[], texts: TextResource[] = [], languages: ProjectLanguage[] = [], animations: Animation[] = []): string {
   const lines: string[] = [];
   
   // Includes
@@ -2399,12 +2377,6 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     lines.push(...translationCallbacks);
   }
 
-  // Animation exec-callback wrappers, emitted before any screen init uses them
-  const animationHelpers = generateAnimationHelpers(screens, options);
-  if (animationHelpers.length > 0) {
-    lines.push(...animationHelpers);
-  }
-
   // Screen definitions
   if (options.generateComments) {
     lines.push(generateSectionHeader('Screen Definitions', options));
@@ -2445,8 +2417,6 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     }
   }
 
-  const animationSymbols = collectAnimationSymbols(screens, options, needsScreenPrefix);
-
   const allComponents: { comp: LvglComponent; screenName: string }[] = [];
   for (const [, entries] of componentsByName) {
     allComponents.push(...entries);
@@ -2481,6 +2451,14 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     lines.push(...imageButtonSupport);
   }
   
+  const animationSymbols = collectAnimationSymbols(animations, screens, options, needsScreenPrefix);
+
+  // Animation exec-callback wrappers, emitted before anything calls them
+  const animationHelpers = generateAnimationHelpers(animationSymbols, options);
+  if (animationHelpers.length > 0) {
+    lines.push(...animationHelpers);
+  }
+
   const animFuncs = generateAnimationFunctions(animationSymbols, options);
   if (animFuncs.length > 0) {
     if (options.generateComments) {
@@ -2495,7 +2473,7 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
 
   // Animation start callbacks, defined before the init functions that bind them
   const screenAnimFuncs = screens
-    .map((screen) => generateScreenAnimationFunc(screen, options, needsScreenPrefix, animationSymbols))
+    .map((screen) => generateScreenAnimationFunc(screen, options, animationSymbols))
     .filter((source) => source !== '');
   if (screenAnimFuncs.length > 0) {
     if (options.generateComments) {

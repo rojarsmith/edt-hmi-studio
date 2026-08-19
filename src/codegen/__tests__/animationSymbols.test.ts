@@ -5,31 +5,25 @@
 import { describe, it, expect } from 'vitest';
 import { generateUiSource } from '../templates/ui.c';
 import { generateUiHeader } from '../templates/ui.h';
-import { defaultOptions, createScreen, createComponent, createAnimation } from './helpers';
+import { defaultOptions, createScreen, animatedComponent } from './helpers';
+import type { Animation } from '../../types';
 
-function screensWith(...animations: Parameters<typeof createAnimation>[0][]) {
-  return [
-    createScreen({
-      name: 'main',
-      components: [
-        createComponent('btn', {
-          name: 'myBtn',
-          animations: animations.map((overrides) => createAnimation(overrides)),
-        }),
-      ],
-    }),
-  ];
+/** One button on one screen, driven by the given animations. */
+function project(...overrides: Partial<Animation>[]) {
+  const { component, animations } = animatedComponent('btn', { name: 'myBtn' }, ...overrides);
+  return { screens: [createScreen({ name: 'main', components: [component] })], animations };
 }
+
+type Project = ReturnType<typeof project>;
+const generateUiSourceFor = (p: Project, options: ReturnType<typeof defaultOptions>) =>
+  generateUiSource(p.screens, options, undefined, [], undefined, undefined, [], undefined, undefined, undefined, [], [], p.animations);
+const generateUiHeaderFor = (p: Project, options: ReturnType<typeof defaultOptions>) =>
+  generateUiHeader(p.screens, options, [], undefined, undefined, undefined, [], p.animations);
 
 describe('animation functions', () => {
   it('gives each animation its own start and stop function', () => {
-    const result = generateUiSource(
-      screensWith(
-        { name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 },
-        { name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 },
-      ),
-      defaultOptions(),
-    );
+    const result = generateUiSourceFor(project({ name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 },
+        { name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 },), defaultOptions());
 
     expect(result).toContain('void ui_anim_fade_in_1_start(void) {');
     expect(result).toContain('void ui_anim_fade_in_1_stop(void) {');
@@ -38,23 +32,15 @@ describe('animation functions', () => {
   });
 
   it('declares them in the header, so anything may call one', () => {
-    const header = generateUiHeader(
-      screensWith({ name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 }),
-      defaultOptions(),
-    );
+    const header = generateUiHeaderFor(project({ name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 }), defaultOptions());
 
     expect(header).toContain('void ui_anim_fade_in_1_start(void);');
     expect(header).toContain('void ui_anim_fade_in_1_stop(void);');
   });
 
   it('starts them from the screen callback rather than inline', () => {
-    const result = generateUiSource(
-      screensWith(
-        { name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 },
-        { name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 },
-      ),
-      defaultOptions(),
-    );
+    const result = generateUiSourceFor(project({ name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 },
+        { name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 },), defaultOptions());
 
     const callback = result.slice(result.indexOf('static void ui_screen_main_start_anims'));
     expect(callback).toContain('ui_anim_fade_in_1_start();');
@@ -64,10 +50,7 @@ describe('animation functions', () => {
   });
 
   it('stops an animation where it stands, without restarting it', () => {
-    const result = generateUiSource(
-      screensWith({ name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 }),
-      defaultOptions(),
-    );
+    const result = generateUiSourceFor(project({ name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 }), defaultOptions());
 
     const stop = result.slice(
       result.indexOf('void ui_anim_fade_in_1_stop(void) {'),
@@ -76,27 +59,16 @@ describe('animation functions', () => {
   });
 
   it('uses the v8 spelling of the delete call for LVGL 8', () => {
-    const result = generateUiSource(
-      screensWith({ name: 'Fade_In_1', property: 'x', startValue: 0, endValue: 10 }),
-      { ...defaultOptions(), lvglVersion: '8' },
-    );
+    const result = generateUiSourceFor(project({ name: 'Fade_In_1', property: 'x', startValue: 0, endValue: 10 }), { ...defaultOptions(), lvglVersion: '8' });
 
     expect(result).toContain('lv_anim_del(ui_my_btn, (lv_anim_exec_xcb_t)lv_obj_set_x);');
     expect(result).not.toContain('lv_anim_delete(');
   });
 
   it('keeps a symbol stable when a neighbouring animation is deleted', () => {
-    const both = generateUiSource(
-      screensWith(
-        { name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 },
-        { name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 },
-      ),
-      defaultOptions(),
-    );
-    const survivorOnly = generateUiSource(
-      screensWith({ name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 }),
-      defaultOptions(),
-    );
+    const both = generateUiSourceFor(project({ name: 'Fade_In_1', property: 'opa', startValue: 0, endValue: 255 },
+        { name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 },), defaultOptions());
+    const survivorOnly = generateUiSourceFor(project({ name: 'Slide_Left_1', property: 'x', startValue: -110, endValue: 0 }), defaultOptions());
 
     // Index-based naming would have renamed the survivor to _anim_0.
     expect(both).toContain('void ui_anim_slide_left_1_start(void) {');
@@ -107,25 +79,15 @@ describe('animation functions', () => {
     // Names are unique project-wide from now on, but a project saved before
     // that rule can hold two "Fade In" animations, and two functions of one
     // name would not compile.
-    const result = generateUiSource(
-      screensWith(
-        { name: 'Fade In', property: 'opa', startValue: 0, endValue: 255 },
-        { name: 'Fade In', property: 'x', startValue: 0, endValue: 10 },
-      ),
-      defaultOptions(),
-    );
+    const result = generateUiSourceFor(project({ name: 'Fade In', property: 'opa', startValue: 0, endValue: 255 },
+        { name: 'Fade In', property: 'x', startValue: 0, endValue: 10 },), defaultOptions());
 
     expect(result).toContain('void ui_anim_fade_in_start(void) {');
     expect(result).toContain('void ui_anim_fade_in_2_start(void) {');
   });
 
   it('does not let an animation claim a wrapper helper name', () => {
-    const result = generateUiSource(
-      screensWith(
-        { name: 'set_opa', property: 'opa', startValue: 0, endValue: 255 },
-      ),
-      defaultOptions(),
-    );
+    const result = generateUiSourceFor(project({ name: 'set_opa', property: 'opa', startValue: 0, endValue: 255 },), defaultOptions());
 
     // ui_anim_set_opa is the generated exec-callback wrapper.
     expect(result).toContain('static void ui_anim_set_opa(void *object, int32_t value) {');
@@ -133,10 +95,7 @@ describe('animation functions', () => {
   });
 
   it('generates no function for a property that cannot be animated', () => {
-    const result = generateUiSource(
-      screensWith({ name: 'Weird_1', property: 'bg_color' }),
-      defaultOptions(),
-    );
+    const result = generateUiSourceFor(project({ name: 'Weird_1', property: 'bg_color' }), defaultOptions());
 
     expect(result).not.toContain('void ui_anim_weird_1_start(void)');
     expect(result).toContain(

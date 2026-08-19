@@ -1,6 +1,6 @@
 // Main code generator
 
-import type { Screen, Theme, Typography, TextResource, ProjectLanguage } from '../types';
+import type { Animation, Screen, Theme, Typography, TextResource, ProjectLanguage } from '../types';
 import type { LogicGraph } from '../components/LogicEditor/types';
 import type { ModbusRegisterTag } from '../types/hmi';
 import type { ImageResource, FontResource } from '../resources/types';
@@ -36,7 +36,8 @@ export function generateCode(
   typographies?: Typography[],
   texts: TextResource[] = [],
   languages: ProjectLanguage[] = [],
-  modbusTags: ModbusRegisterTag[] = []
+  modbusTags: ModbusRegisterTag[] = [],
+  animations: Animation[] = []
 ): GeneratedCode {
   // The same stored-or-derived rule ui.c applies internally: ui.h must declare
   // fonts for exactly the typography set ui.c initialises.
@@ -50,10 +51,10 @@ export function generateCode(
   const activeGraphs = logicGraphs.filter(g => g.enabled !== false);
 
   return {
-    'ui.h': generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols, effectiveTypographies),
-    'ui.c': generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont, typographies, texts, languages),
+    'ui.h': generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols, effectiveTypographies, animations),
+    'ui.c': generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont, typographies, texts, languages, animations),
     'ui_events.h': generateEventsHeader(screens, opts),
-    'ui_events.c': generateEventsSource(screens, opts, languages, activeGraphs),
+    'ui_events.c': generateEventsSource(screens, opts, languages, activeGraphs, animations),
     'ui_logic.h': generateLogicHeader(opts, activeGraphs),
     'ui_logic.c': generateLogicSource(opts, activeGraphs, screens, modbusTags),
   };

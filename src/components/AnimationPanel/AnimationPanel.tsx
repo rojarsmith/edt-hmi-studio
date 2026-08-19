@@ -3,6 +3,8 @@ import { useEditorStore } from '../../store/editorStore';
 import type { Animation, AnimationType } from '../../types';
 import AnimationEditDialog from './AnimationEditDialog';
 import PanelChevron from '../LogicEditor/PanelChevron';
+import LackBadge from '../common/LackBadge';
+import { animationLack, componentsById } from '../../utils/animationAssets';
 import { useDockedPanelResize } from '../../hooks/useDockedPanelResize';
 import '../panelBar.css';
 import './AnimationPanel.css';
@@ -37,7 +39,15 @@ const MIN_PANEL_HEIGHT = 120;
 const DEFAULT_PANEL_HEIGHT = 140;
 
 const AnimationPanel: React.FC = () => {
-  const { selection, getComponentById, updateComponent } = useEditorStore();
+  // Animations are project assets: the panel lists all of them and needs no
+  // selection to add one. Each names its target, and says so when the target
+  // is missing rather than hiding the animation along with it.
+  const animations = useEditorStore(s => s.animations);
+  const screens = useEditorStore(s => s.screens);
+  const addAnimation = useEditorStore(s => s.addAnimation);
+  const updateAnimation = useEditorStore(s => s.updateAnimation);
+  const deleteAnimation = useEditorStore(s => s.deleteAnimation);
+  const components = useMemo(() => componentsById(screens), [screens]);
   const [editingAnim, setEditingAnim] = useState<Animation | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -52,10 +62,6 @@ const AnimationPanel: React.FC = () => {
       defaultHeight: DEFAULT_PANEL_HEIGHT,
       expanded: panelExpanded,
     });
-
-  const selectedId = selection.selectedIds[0];
-  const component = selectedId ? getComponentById(selectedId) : undefined;
-  const animations = useMemo(() => component?.animations || [], [component?.animations]);
 
   const visibleAnimations = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -81,22 +87,14 @@ const AnimationPanel: React.FC = () => {
   }, []);
 
   const handleDeleteAnim = useCallback((animId: string) => {
-    if (!selectedId || !component) return;
-    const newAnims = animations.filter(a => a.id !== animId);
-    updateComponent(selectedId, { animations: newAnims });
-  }, [selectedId, component, animations, updateComponent]);
+    deleteAnimation(animId);
+  }, [deleteAnimation]);
 
   const handleSaveAnim = useCallback((anim: Animation) => {
-    if (!selectedId || !component) return;
-    if (isCreating) {
-      updateComponent(selectedId, { animations: [...animations, anim] });
-    } else {
-      updateComponent(selectedId, {
-        animations: animations.map(a => a.id === anim.id ? anim : a),
-      });
-    }
+    if (isCreating) addAnimation(anim);
+    else updateAnimation(anim.id, anim);
     setIsDialogOpen(false);
-  }, [selectedId, component, animations, isCreating, updateComponent]);
+  }, [isCreating, addAnimation, updateAnimation]);
 
   return (
     <div
@@ -118,8 +116,7 @@ const AnimationPanel: React.FC = () => {
         <PanelChevron open={panelExpanded} className="panel-bar-toggle" />
         <span className="panel-bar-title">Animations</span>
         <span className="panel-bar-count">{animations.length}</span>
-        {component && (
-          <div className="panel-bar-actions" onClick={e => e.stopPropagation()}>
+        <div className="panel-bar-actions" onClick={e => e.stopPropagation()}>
             <button
               type="button"
               className="panel-bar-btn"
@@ -128,11 +125,10 @@ const AnimationPanel: React.FC = () => {
             >
               ＋
             </button>
-          </div>
-        )}
+        </div>
       </div>
 
-      {panelExpanded && component && (
+      {panelExpanded && (
         <div className="anim-search">
           <input
             type="text"
@@ -145,12 +141,6 @@ const AnimationPanel: React.FC = () => {
       )}
 
       {panelExpanded && (
-        !component ? (
-          <div className="anim-no-selection">
-            <p>Select a component</p>
-            <p className="hint">Select a component to add animations</p>
-          </div>
-        ) : (
           <div className="anim-list">
             {animations.length === 0 ? (
               <div className="no-anims">
@@ -167,9 +157,14 @@ const AnimationPanel: React.FC = () => {
                     <div className="anim-type">
                       <span className="anim-icon">{ANIM_TYPE_ICONS[anim.type] || '⚙️'}</span>
                       {anim.name || ANIM_TYPE_LABELS[anim.type] || anim.type}
+                      {animationLack(anim, components) && (
+                        <LackBadge reason={animationLack(anim, components)!} />
+                      )}
                     </div>
                     <div className="anim-detail">
-                      {anim.duration}ms · {anim.easing} · {anim.property}: {anim.startValue}→{anim.endValue}
+                      {components.get(anim.targetComponentId)?.name ?? 'no target'}
+                      {' · '}
+                      {anim.duration}ms · {anim.property}: {anim.startValue}→{anim.endValue}
                     </div>
                   </div>
                   <div className="anim-actions">
@@ -180,14 +175,13 @@ const AnimationPanel: React.FC = () => {
               ))
             )}
           </div>
-        )
       )}
 
-      {component && isDialogOpen && (
+      {isDialogOpen && (
         <AnimationEditDialog
           animation={editingAnim}
           isCreating={isCreating}
-          targetComponentId={selectedId}
+          targetComponentId=""
           onSave={handleSaveAnim}
           onClose={() => setIsDialogOpen(false)}
         />

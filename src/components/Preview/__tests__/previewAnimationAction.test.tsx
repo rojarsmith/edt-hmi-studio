@@ -63,10 +63,11 @@ function setUp(buttonEvents: EventBinding[]) {
       name: 'Screen 1',
       backgroundColor: '#fff',
       components: [
-        component('label-1', { type: 'label', x: 200, y: 200, animations: [animation] }),
+        component('label-1', { type: 'label', x: 200, y: 200 }),
         component('btn-1', { events: buttonEvents }),
       ],
     }],
+    animations: [animation],
     currentScreenId: 'screen-1',
     openScreenIds: ['screen-1'],
     selection: { selectedIds: [], hoveredId: null },

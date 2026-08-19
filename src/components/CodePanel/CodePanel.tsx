@@ -15,7 +15,7 @@ import './CodePanel.css';
 type FileName = keyof GeneratedCode;
 
 const CodePanel: React.FC = () => {
-  const { screens } = useEditorStore();
+  const { screens, animations } = useEditorStore();
   const { graphs: logicGraphs } = useLogicEditorStore();
   const imageResources = useResourceStore((s) => s.images);
   const fontResources = useResourceStore((s) => s.fonts);
@@ -50,8 +50,9 @@ const CodePanel: React.FC = () => {
       undefined,
       undefined,
       modbusTags,
+      animations,
     );
-  }, [screens, options, logicGraphs, imageResources, fontResources, modbusTags]);
+  }, [screens, options, logicGraphs, imageResources, fontResources, modbusTags, animations]);
   
   // Current file content
   const currentContent = generatedCode[selectedFile];

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type {
+  Animation,
   LvglComponent,
   CanvasState,
   SelectionState,
@@ -24,6 +25,7 @@ import {
 } from '../types';
 import { languageStylesOf } from '../utils/typographyStyle';
 import { getEntryScreen } from '../utils/entryScreen';
+import { animationNameBase, nextAnimationName } from '../utils/animationNames';
 import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
@@ -97,6 +99,13 @@ interface EditorState {
    * inherits the screen's default font, as an unstyled widget always has.
    */
   typographies: Typography[];
+
+  /**
+   * The project's animations. Each names the widget it drives rather than
+   * being owned by one, so an animation outlives its target being re-picked
+   * and can be triggered from anywhere — see docs/animation-assets.md.
+   */
+  animations: Animation[];
 
   /** Languages the project is translated into. The first is the default. */
   languages: ProjectLanguage[];
@@ -183,6 +192,7 @@ interface EditorState {
     texts?: TextResource[],
     typographyGroups?: TypographyGroup[],
     textGroups?: TextGroup[],
+    animations?: Animation[],
   ) => void;
 
   /**
@@ -229,6 +239,11 @@ interface EditorState {
   moveTextToGroup: (textId: string, groupId: string | null) => void;
 
   /** Create a typography and return its id. Seeded from the project default. */
+  /** Create an animation, naming it if the seed leaves the name blank. */
+  addAnimation: (seed: Omit<Animation, 'id' | 'name'> & { id?: string; name?: string }) => string;
+  updateAnimation: (id: string, updates: Partial<Animation>) => void;
+  deleteAnimation: (id: string) => void;
+
   addTypography: (seed?: Partial<Typography>) => string;
   updateTypography: (id: string, updates: Partial<Typography>) => void;
   /** Removing one leaves its widgets inheriting the screen default again. */
@@ -633,6 +648,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   screens: [initialScreen],
   currentScreenId: initialScreen.id,
   typographies: [],
+  animations: [],
   typographyGroups: [],
   languages: [],
   previewLanguage: null,
@@ -1351,6 +1367,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
+  addAnimation: (seed) => {
+    const id = seed.id ?? uuidv4();
+    const animations = get().animations;
+    const name = seed.name?.trim()
+      || nextAnimationName(animations, animationNameBase(seed.type));
+    set({ animations: [...animations, { ...seed, id, name }] });
+    return id;
+  },
+
+  updateAnimation: (id, updates) => {
+    set({
+      animations: get().animations.map((animation) =>
+        animation.id === id ? { ...animation, ...updates } : animation,
+      ),
+    });
+  },
+
+  deleteAnimation: (id) => {
+    // Events bound to it are deliberately left alone: the binding shows in the
+    // panel flagged as lacking its animation, rather than vanishing with it.
+    set({ animations: get().animations.filter((animation) => animation.id !== id) });
+  },
+
   addTypography: (seed = {}) => {
     const existing = get().typographies;
     const id = `typo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1598,7 +1637,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  setScreens: (screens, screenGroups, typographies, languages, texts, typographyGroups, textGroups) => {
+  setScreens: (screens, screenGroups, typographies, languages, texts, typographyGroups, textGroups, animations) => {
     get().saveToHistory();
     const firstId = getEntryScreen(screens)?.id ?? get().currentScreenId;
     set({
@@ -1610,6 +1649,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       previewLanguage: languages?.[0]?.code ?? null,
       texts: texts ? texts.map(t => ({ ...t, values: { ...t.values } })) : [],
       textGroups: textGroups ? textGroups.map(g => ({ ...g })) : [],
+      animations: animations ? animations.map(a => ({ ...a })) : [],
       // A freshly loaded project starts with just its entry screen open.
       openScreenIds: screens.length > 0 ? [firstId] : [],
       currentScreenId: firstId,

@@ -6,8 +6,9 @@
 // been wired to call. Projects written before that rule can still carry
 // duplicate names, so collisions are broken here rather than trusted away.
 
-import type { Screen, LvglComponent, Animation } from '../types';
+import type { Screen, Animation } from '../types';
 import type { CodeGenOptions } from './types';
+import { componentsById, screenByComponentId } from '../utils/animationAssets';
 import { getComponentVarName, toValidCIdentifier, convertName } from './utils/nameUtils';
 
 /**
@@ -91,11 +92,14 @@ export function animStopFuncName(symbol: AnimationSymbol): string {
 
 /** The project's animations indexed by id, for resolving a binding. */
 export function animationSymbolsById(
+  animations: Animation[],
   screens: Screen[],
   options: CodeGenOptions,
 ): Map<string, AnimationSymbol> {
   return new Map(
-    collectAnimationSymbols(screens, options).map((symbol) => [symbol.animation.id, symbol]),
+    collectAnimationSymbols(animations, screens, options).map(
+      (symbol) => [symbol.animation.id, symbol],
+    ),
   );
 }
 
@@ -117,6 +121,7 @@ function uniqueBase(animation: Animation, options: CodeGenOptions, taken: Set<st
  * naming one to call — can leave the set out.
  */
 export function collectAnimationSymbols(
+  animations: Animation[],
   screens: Screen[],
   options: CodeGenOptions,
   needsScreenPrefix: Set<string> = new Set(),
@@ -124,26 +129,25 @@ export function collectAnimationSymbols(
   const symbols: AnimationSymbol[] = [];
   // An animation named "set_opa" would otherwise claim a wrapper's symbol.
   const taken = new Set(Object.values(ANIM_WRAPPERS).map((wrapper) => wrapper.name));
+  const components = componentsById(screens);
+  const screenOf = screenByComponentId(screens);
 
-  for (const screen of screens) {
-    const visit = (components: LvglComponent[]) => {
-      for (const component of components) {
-        const targetVar = needsScreenPrefix.has(component.id)
-          ? getComponentVarName(`${screen.name}_${component.name}`, options)
-          : getComponentVarName(component.name, options);
-        for (const animation of component.animations || []) {
-          symbols.push({
-            animation,
-            screen,
-            targetVar,
-            base: uniqueBase(animation, options, taken),
-            execCb: getAnimExecCb(animation.property),
-          });
-        }
-        visit(component.children);
-      }
-    };
-    visit(screen.components);
+  for (const animation of animations) {
+    const component = components.get(animation.targetComponentId);
+    const screen = screenOf.get(animation.targetComponentId);
+    // An animation whose target was deleted drives nothing; the editor shows it
+    // as lacking one rather than deleting it, and no code comes of it.
+    if (!component || !screen) continue;
+    const targetVar = needsScreenPrefix.has(component.id)
+      ? getComponentVarName(`${screen.name}_${component.name}`, options)
+      : getComponentVarName(component.name, options);
+    symbols.push({
+      animation,
+      screen,
+      targetVar,
+      base: uniqueBase(animation, options, taken),
+      execCb: getAnimExecCb(animation.property),
+    });
   }
 
   return symbols;

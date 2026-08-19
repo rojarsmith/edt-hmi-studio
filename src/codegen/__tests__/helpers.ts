@@ -240,3 +240,22 @@ export function createLogicGraph(overrides: Partial<LogicGraph> = {}): LogicGrap
     ...overrides,
   };
 }
+
+/**
+ * A component and the project animations aimed at it. Animations are
+ * project-level assets, so a test needs both halves: the widget on a screen,
+ * and the animation naming it from the project list.
+ */
+export function animatedComponent(
+  type: string,
+  overrides: Partial<LvglComponent>,
+  ...animations: (Partial<Animation> | undefined)[]
+): { component: LvglComponent; animations: Animation[] } {
+  const component = createComponent(type, overrides);
+  return {
+    component,
+    animations: animations.map((animation) =>
+      createAnimation({ targetComponentId: component.id, ...animation }),
+    ),
+  };
+}

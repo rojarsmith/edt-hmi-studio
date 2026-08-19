@@ -108,6 +108,88 @@ describe('HMI project file round-trip', () => {
     expect(parsed.screens.map(s => s.isEntry)).toEqual([undefined, true]);
   });
 
+  it('carries the project animations through the file', () => {
+    // Dropping these would flash firmware with nothing animating, the same way
+    // the entry-screen flag once went missing in a field-by-field copy.
+    const screens: Screen[] = [{ id: 'screen-1', name: 'Main', components: [] }];
+    const animations = [{
+      id: 'anim-1',
+      name: 'Pulse_1',
+      targetComponentId: 'button-1',
+      type: 'fade_in' as const,
+      easing: 'linear' as const,
+      duration: 300,
+      delay: 0,
+      repeat: 0,
+      property: 'opa',
+      startValue: 0,
+      endValue: 255,
+    }];
+
+    const parsed = parseProject(
+      serializeProject(
+        createProjectFile('Anim HMI', screens, canvas, [], [], [], 'stm32f746g-disco',
+          createDefaultCommunicationConfig(), [], animations),
+      ),
+    );
+
+    expect(parsed.animations).toEqual(animations);
+  });
+
+  it('lifts animations out of their component when the file predates the move', () => {
+    const parsed = parseProject(JSON.stringify({
+      version: '1.0.0',
+      name: 'Legacy anims',
+      createdAt: 1,
+      updatedAt: 1,
+      canvasSize: { width: 480, height: 272 },
+      screens: [{
+        id: 'screen-1',
+        name: 'Main',
+        components: [{
+          id: 'button-1',
+          type: 'btn',
+          name: 'Go',
+          x: 0, y: 0, width: 10, height: 10,
+          children: [],
+          props: {},
+          styles: { default: {} },
+          events: [],
+          parentId: null,
+          locked: false,
+          visible: true,
+          animations: [{
+            id: 'anim-1',
+            name: 'Pulse_1',
+            targetComponentId: '',
+            type: 'fade_in',
+            easing: 'linear',
+            duration: 300,
+            delay: 0,
+            repeat: 0,
+            property: 'opa',
+            startValue: 0,
+            endValue: 255,
+          }],
+        }],
+      }],
+      resources: { images: [], fonts: [] },
+      variables: [],
+      codeGenOptions: {
+        outputFormat: 'single-file',
+        includeComments: true,
+        useStaticAllocation: true,
+        prefix: 'ui',
+        indentSize: 4,
+        indentStyle: 'spaces',
+      },
+    }));
+
+    expect(parsed.animations).toHaveLength(1);
+    expect(parsed.animations![0].targetComponentId).toBe('button-1');
+    expect(parsed.screens[0].components[0].animations).toEqual([]);
+  });
+
   it('migrates a legacy project to the supported board and default Modbus client config', () => {
     const parsed = parseProject(JSON.stringify({
       version: '1.0.0',

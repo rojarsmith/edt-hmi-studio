@@ -1,7 +1,7 @@
 // Resource Management Types
 
 import type { LogicGraph } from '../components/LogicEditor/types';
-import type { LvglComponent, Typography, TypographyGroup, ProjectLanguage, TextResource, TextGroup } from '../types';
+import type { Animation, LvglComponent, Typography, TypographyGroup, ProjectLanguage, TextResource, TextGroup } from '../types';
 import type {
   BoardId,
   CanBusConfig,
@@ -158,6 +158,12 @@ export interface ProjectFile {
   texts?: TextResource[];
   /** Organisational folders for the texts tree. Purely a UI grouping. */
   textGroups?: TextGroup[];
+  /**
+   * Project-level animations, each naming the widget it drives. Absent in
+   * files written before animations were hoisted out of their component;
+   * migration lifts them on load, so nothing stops animating.
+   */
+  animations?: Animation[];
   variables: ProjectVariable[];
   logicGraphs?: LogicGraph[];
   codeGenOptions: CodeGenOptions;

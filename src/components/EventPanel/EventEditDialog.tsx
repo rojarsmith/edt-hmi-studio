@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useEditorStore } from '../../store/editorStore';
-import { projectAnimations } from '../../utils/animationNames';
+import { componentsById } from '../../utils/animationAssets';
 import { useLogicEditorStore } from '../LogicEditor';
-import type { EventBinding, LvglEventType, BuiltinActionType, BuiltinAction, LvglComponent } from '../../types';
+import type { EventBinding, LvglEventType, BuiltinActionType, BuiltinAction } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
 import { LVGL_EVENTS } from './EventPanel';
 import CodeEditor from './CodeEditor';
@@ -48,18 +48,8 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   onClose,
 }) => {
   const { screens, currentScreenId, getAllComponents, languages } = useEditorStore();
-  const animations = useMemo(() => projectAnimations(screens), [screens]);
-  const componentNameById = useMemo(() => {
-    const names = new Map<string, string>();
-    const visit = (components: LvglComponent[]) => {
-      for (const component of components) {
-        names.set(component.id, component.name);
-        visit(component.children);
-      }
-    };
-    for (const screen of screens) visit(screen.components);
-    return names;
-  }, [screens]);
+  const animations = useEditorStore(s => s.animations);
+  const components = useMemo(() => componentsById(screens), [screens]);
   
   // Suppress unused variable warning - currentScreenId is used for reactivity
   void currentScreenId;
@@ -418,7 +408,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                 <option value="">Select an animation...</option>
                 {animations.map(animation => (
                   <option key={animation.id} value={animation.id}>
-                    {animation.name} → {componentNameById.get(animation.targetComponentId) || 'unknown'}
+                    {animation.name} → {components.get(animation.targetComponentId)?.name || 'no target'}
                   </option>
                 ))}
               </select>

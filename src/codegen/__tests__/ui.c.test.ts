@@ -9,6 +9,7 @@ import {
   createImageResource,
   createEvent,
   createAnimation,
+  animatedComponent,
 } from './helpers';
 
 describe('generateUiSource', () => {
@@ -960,24 +961,43 @@ describe('generateUiSource', () => {
   // ─── Animations ────────────────────────────────────────────────
 
   describe('animations', () => {
+    // Animations are project-level assets, so every case hands the generator
+    // both halves: the widget on its screen, and the animation naming it.
+    const sourceFor = (
+      screens: ReturnType<typeof createScreen>[],
+      animations: ReturnType<typeof createAnimation>[],
+      options = defaultOptions(),
+    ) =>
+      generateUiSource(
+        screens, options, undefined, [], undefined, undefined, [],
+        undefined, undefined, undefined, [], [], animations,
+      );
+
+    const oneWidget = (
+      name: string,
+      overrides: Partial<Parameters<typeof createComponent>[1]>,
+      ...animations: Parameters<typeof createAnimation>[0][]
+    ) => {
+      const built = animatedComponent('btn', { name, ...overrides }, ...animations);
+      return {
+        screens: [createScreen({ name: 'main', components: [built.component] })],
+        animations: built.animations,
+      };
+    };
+
     it('generates animation code', () => {
-      const btn = createComponent('btn', {
-        name: 'myBtn',
-        animations: [
-          createAnimation({
-            name: 'fade_in',
-            property: 'opa',
-            startValue: 0,
-            endValue: 255,
-            duration: 500,
-            delay: 100,
-            easing: 'ease_in_out',
-            repeat: 3,
-          }),
-        ],
+      const { screens, animations } = oneWidget('myBtn', {}, {
+        name: 'fade_in',
+        property: 'opa',
+        startValue: 0,
+        endValue: 255,
+        duration: 500,
+        delay: 100,
+        easing: 'ease_in_out',
+        repeat: 3,
       });
-      const screens = [createScreen({ name: 'main', components: [btn] })];
-      const result = generateUiSource(screens, defaultOptions());
+      const result = sourceFor(screens, animations);
+
       expect(result).toContain('void ui_anim_fade_in_start(void) {');
       expect(result).toContain('lv_anim_t anim;');
       expect(result).toContain('lv_anim_init(&anim);');
@@ -995,14 +1015,10 @@ describe('generateUiSource', () => {
       // lv_obj_set_style_opa takes (obj, value, selector); lv_anim_exec_xcb_t is
       // (void *, int32_t). Passing it directly leaves the selector undefined, so
       // the opacity lands on an arbitrary part and the animation does nothing.
-      const btn = createComponent('btn', {
-        name: 'fader',
-        animations: [createAnimation({ property: 'opa', startValue: 0, endValue: 255 })],
+      const { screens, animations } = oneWidget('fader', {}, {
+        property: 'opa', startValue: 0, endValue: 255,
       });
-      const result = generateUiSource(
-        [createScreen({ name: 'main', components: [btn] })],
-        defaultOptions(),
-      );
+      const result = sourceFor(screens, animations);
 
       expect(result).toContain('static void ui_anim_set_opa(void *object, int32_t value) {');
       expect(result).toContain('lv_obj_set_style_opa(target, (lv_opa_t)value, LV_PART_MAIN);');
@@ -1011,19 +1027,15 @@ describe('generateUiSource', () => {
     });
 
     it('animates transforms through styles so non-image widgets work', () => {
-      // lv_image_set_scale/_rotation only exist on image widgets; used on any
-      // other widget they reinterpret the object, and LV_USE_ASSERT_OBJ is off.
-      const btn = createComponent('btn', {
-        name: 'spinner',
-        animations: [
-          createAnimation({ property: 'transform_zoom', startValue: 128, endValue: 256 }),
-          createAnimation({ property: 'transform_angle', startValue: 0, endValue: 3600 }),
-        ],
-      });
-      const result = generateUiSource(
-        [createScreen({ name: 'main', components: [btn] })],
-        defaultOptions(),
+      // lv_image_set_scale/_rotation only exist on image widgets; applied to a
+      // button they reinterpret the object, and the firmware has asserts off.
+      const { screens, animations } = oneWidget(
+        'spinner',
+        {},
+        { property: 'transform_zoom', startValue: 128, endValue: 256 },
+        { property: 'transform_angle', startValue: 0, endValue: 3600 },
       );
+      const result = sourceFor(screens, animations);
 
       expect(result).toContain('lv_obj_set_style_transform_scale_x(target, value, LV_PART_MAIN);');
       expect(result).toContain('lv_obj_set_style_transform_scale_y(target, value, LV_PART_MAIN);');
@@ -1033,14 +1045,10 @@ describe('generateUiSource', () => {
     });
 
     it('emits a helper only for the properties actually animated', () => {
-      const btn = createComponent('btn', {
-        name: 'mover',
-        animations: [createAnimation({ property: 'x', startValue: 0, endValue: 100 })],
+      const { screens, animations } = oneWidget('mover', {}, {
+        property: 'x', startValue: 0, endValue: 100,
       });
-      const result = generateUiSource(
-        [createScreen({ name: 'main', components: [btn] })],
-        defaultOptions(),
-      );
+      const result = sourceFor(screens, animations);
 
       expect(result).toContain('lv_anim_set_exec_cb(&anim, (lv_anim_exec_xcb_t)lv_obj_set_x);');
       expect(result).not.toContain('ui_anim_set_opa');
@@ -1051,14 +1059,10 @@ describe('generateUiSource', () => {
       // Screens appear through lv_scr_load_anim, so anything started during
       // init burns part of its duration before the screen is even visible and
       // is only ever seen part-way through.
-      const btn = createComponent('btn', {
-        name: 'slider_in',
-        animations: [createAnimation({ property: 'x', startValue: -110, endValue: 0 })],
+      const { screens, animations } = oneWidget('slider_in', {}, {
+        name: 'Slide_1', property: 'x', startValue: -110, endValue: 0,
       });
-      const result = generateUiSource(
-        [createScreen({ name: 'main', components: [btn] })],
-        defaultOptions(),
-      );
+      const result = sourceFor(screens, animations);
 
       expect(result).toContain('static void ui_screen_main_start_anims(lv_event_t *event) {');
       expect(result).toContain(
@@ -1067,8 +1071,8 @@ describe('generateUiSource', () => {
       // The callback must be defined before the init function that binds it.
       expect(result.indexOf('static void ui_screen_main_start_anims'))
         .toBeLessThan(result.indexOf('lv_obj_add_event_cb(ui_screen_main,'));
-      // and lv_anim_start belongs to the callback, not to the init function
-      expect(result.indexOf('ui_anim_fade_in_anim_start();'))
+      // and starting the animation belongs to the callback, not to the init
+      expect(result.indexOf('ui_anim_slide_1_start();'))
         .toBeLessThan(result.indexOf('static void ui_screen_main_init'));
     });
 
@@ -1076,18 +1080,13 @@ describe('generateUiSource', () => {
       // Widgets keep whatever the previous run left them at, so parking only at
       // init means a second visit to the screen shows them at their end position
       // for the whole transition before the animation resets them.
-      const btn = createComponent('btn', {
-        name: 'slider_in',
-        x: 40,
-        animations: [
-          createAnimation({ property: 'x', startValue: -110, endValue: 0 }),
-          createAnimation({ property: 'opa', startValue: 0, endValue: 255 }),
-        ],
-      });
-      const result = generateUiSource(
-        [createScreen({ name: 'main', components: [btn] })],
-        defaultOptions(),
+      const { screens, animations } = oneWidget(
+        'slider_in',
+        { x: 40 },
+        { property: 'x', startValue: -110, endValue: 0 },
+        { property: 'opa', startValue: 0, endValue: 255 },
       );
+      const result = sourceFor(screens, animations);
 
       expect(result).toContain('static void ui_screen_main_reset_anims(lv_event_t *event) {');
       expect(result).toContain('lv_obj_set_x(ui_slider_in, -110);');
@@ -1106,9 +1105,9 @@ describe('generateUiSource', () => {
 
     it('clips every screen instead of letting it scroll', () => {
       // LVGL screens are scrollable by default, so a widget reaching past the
-      // panel — a slide-in starting off-screen, for instance — would turn the
-      // screen into a scrollable area with a scrollbar. The design canvas is a
-      // fixed viewport that clips, and the firmware has to match it.
+      // panel would turn the screen into a scrollable area with a scrollbar.
+      // The design canvas is a fixed viewport that clips, and the firmware has
+      // to match it.
       const offEdge = createComponent('btn', { name: 'off_edge', x: 380, width: 200 });
       const result = generateUiSource(
         [
@@ -1134,38 +1133,37 @@ describe('generateUiSource', () => {
       expect(result).not.toContain('LV_EVENT_SCREEN_LOADED');
     });
 
-    it('skips an unanimatable property instead of animating something else', () => {
-      const btn = createComponent('btn', {
-        name: 'odd',
-        animations: [createAnimation({ name: 'weird', property: 'bg_color' })],
-      });
-      const result = generateUiSource(
-        [createScreen({ name: 'main', components: [btn] })],
-        defaultOptions(),
+    it('drops an animation whose target is gone', () => {
+      // Deleting the widget does not delete the animation — the editor flags it
+      // as lacking a target instead — but nothing can be generated for it.
+      const orphan = createAnimation({ name: 'Orphan_1', targetComponentId: 'deleted' });
+      const result = sourceFor(
+        [createScreen({ name: 'main', components: [createComponent('btn', { name: 'plain' })] })],
+        [orphan],
       );
+
+      expect(result).not.toContain('ui_anim_orphan_1_start');
+      expect(result).not.toContain('start_anims');
+    });
+
+    it('skips an unanimatable property instead of animating something else', () => {
+      const { screens, animations } = oneWidget('odd', {}, {
+        name: 'weird', property: 'bg_color',
+      });
+      const result = sourceFor(screens, animations);
 
       expect(result).toContain('Animation "weird" skipped: property "bg_color" is not animatable');
       expect(result).not.toContain('ui_anim_weird_start');
     });
 
     it('omits delay when 0', () => {
-      const btn = createComponent('btn', {
-        name: 'b',
-        animations: [createAnimation({ delay: 0 })],
-      });
-      const screens = [createScreen({ name: 'main', components: [btn] })];
-      const result = generateUiSource(screens, defaultOptions());
-      expect(result).not.toContain('lv_anim_set_delay');
+      const { screens, animations } = oneWidget('b', {}, { delay: 0 });
+      expect(sourceFor(screens, animations)).not.toContain('lv_anim_set_delay');
     });
 
     it('omits repeat_count when 0', () => {
-      const btn = createComponent('btn', {
-        name: 'b',
-        animations: [createAnimation({ repeat: 0 })],
-      });
-      const screens = [createScreen({ name: 'main', components: [btn] })];
-      const result = generateUiSource(screens, defaultOptions());
-      expect(result).not.toContain('lv_anim_set_repeat_count');
+      const { screens, animations } = oneWidget('b', {}, { repeat: 0 });
+      expect(sourceFor(screens, animations)).not.toContain('lv_anim_set_repeat_count');
     });
   });
 

@@ -2,7 +2,7 @@
 
 import type { ProjectFile, ProjectScreen, ImageResource, FontResource } from './types';
 import type { LogicGraph } from '../components/LogicEditor/types';
-import type { CanvasState, Screen, ScreenGroup } from '../types';
+import type { Animation, CanvasState, Screen, ScreenGroup } from '../types';
 import type { BoardId, CommunicationConfig } from '../types/hmi';
 import {
   DEFAULT_BOARD_ID,
@@ -10,6 +10,7 @@ import {
 } from '../types/hmi';
 import { migrateFontResource } from './converters/fontConverter';
 import { applyTypographies } from '../codegen/typography';
+import { hoistComponentAnimations } from '../utils/animationAssets';
 
 const PROJECT_VERSION = '1.0.0';
 
@@ -26,6 +27,7 @@ export function createProjectFile(
   boardId: BoardId = DEFAULT_BOARD_ID,
   communication: CommunicationConfig = createDefaultCommunicationConfig(),
   screenGroups: ScreenGroup[] = [],
+  animations: Animation[] = [],
 ): ProjectFile {
   return {
     version: PROJECT_VERSION,
@@ -45,6 +47,7 @@ export function createProjectFile(
       isEntry: screen.isEntry,
     })),
     screenGroups: screenGroups.map(group => ({ ...group })),
+    animations: animations.map(animation => ({ ...animation })),
     resources: {
       images,
       fonts,
@@ -99,7 +102,14 @@ function migrateProject(project: ProjectFile): ProjectFile {
     console.warn(`Project version ${project.version} may not be fully compatible`);
   }
   
-  const screens = (project.screens ?? project.pages ?? []) as ProjectScreen[];
+  const rawScreens = (project.screens ?? project.pages ?? []) as ProjectScreen[];
+
+  // Animations were nested in the component they drove before they became
+  // project-level assets; a file written then still carries them that way.
+  const lifted = project.animations
+    ? { screens: rawScreens, animations: project.animations }
+    : hoistComponentAnimations(rawScreens as unknown as Screen[]);
+  const screens = lifted.screens as unknown as ProjectScreen[];
 
   // Typographies are derived from the styling already present, so a project
   // written before they existed keeps rendering exactly as it did. Projects
@@ -118,6 +128,7 @@ function migrateProject(project: ProjectFile): ProjectFile {
   return {
     ...project,
     typographies: typographyMigration.typographies,
+    animations: lifted.animations,
     // `pages` is what this field was called before the Page → Screen rename.
     screens: typographyMigration.screens as ProjectScreen[],
     screenGroups: project.screenGroups || [],

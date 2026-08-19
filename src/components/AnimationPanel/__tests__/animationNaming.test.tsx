@@ -24,7 +24,7 @@ function anim(name: string, id = name): Animation {
   };
 }
 
-function component(id: string, animations: Animation[]): LvglComponent {
+function component(id: string): LvglComponent {
   return {
     id,
     type: 'btn',
@@ -37,16 +37,17 @@ function component(id: string, animations: Animation[]): LvglComponent {
     props: {},
     styles: { default: {} },
     events: [],
-    animations,
+    animations: [],
     parentId: null,
     locked: false,
     visible: true,
   };
 }
 
-function setScreens(...components: LvglComponent[]) {
+function setUp(components: LvglComponent[], animations: Animation[] = []) {
   useEditorStore.setState({
     screens: [{ id: 'screen-1', name: 'Screen 1', components, backgroundColor: '#fff' }],
+    animations,
     currentScreenId: 'screen-1',
     selection: { selectedIds: [], hoveredId: null },
     history: [],
@@ -55,7 +56,7 @@ function setScreens(...components: LvglComponent[]) {
 }
 
 describe('AnimationEditDialog naming', () => {
-  beforeEach(() => setScreens(component('comp-1', [])));
+  beforeEach(() => setUp([component('comp-1')]));
 
   function renderDialog(existing: Animation | null = null) {
     const saved: Animation[] = [];
@@ -78,7 +79,7 @@ describe('AnimationEditDialog naming', () => {
   });
 
   it('counts animations on other components when numbering', () => {
-    setScreens(component('comp-1', []), component('comp-2', [anim('Fade_In_1')]));
+    setUp([component('comp-1'), component('comp-2')], [anim('Fade_In_1')]);
     const saved = renderDialog();
 
     fireEvent.click(screen.getByText('Save'));
@@ -93,7 +94,7 @@ describe('AnimationEditDialog naming', () => {
   });
 
   it('refuses a name another animation already answers to', () => {
-    setScreens(component('comp-1', []), component('comp-2', [anim('Intro')]));
+    setUp([component('comp-1'), component('comp-2')], [anim('Intro')]);
     const saved = renderDialog();
 
     fireEvent.change(screen.getByLabelText('Animation Name'), { target: { value: 'Intro' } });
@@ -105,7 +106,7 @@ describe('AnimationEditDialog naming', () => {
 
   it('lets an animation keep its own name while being edited', () => {
     const existing = anim('Intro', 'id-1');
-    setScreens(component('comp-1', [existing]));
+    setUp([component('comp-1')], [existing]);
     const saved = renderDialog(existing);
 
     fireEvent.click(screen.getByText('Save'));

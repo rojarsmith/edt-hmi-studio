@@ -1,0 +1,14 @@
+/* Purple so it reads as "needs attention" without the alarm of a delete red. */
+.lack-badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  color: #6a1b9a;
+  background: #f3e5f5;
+  border: 1px solid rgba(106, 27, 154, 0.3);
+  border-radius: 7px;
+  padding: 2px 5px;
+  cursor: help;
+}

@@ -202,6 +202,9 @@ export async function writeGeneratedProjectSource(
   const typographies = projectFile.typographies ?? [];
   const projectLanguages = projectFile.languages ?? [];
   const projectTexts = projectFile.texts ?? [];
+  // A build that forgot these would flash firmware with no animations at all,
+  // which is exactly how the entry-screen flag went missing.
+  const projectAnimations = projectFile.animations ?? [];
   const codeOptions = { lvglVersion: '9' as const };
 
   const generatedCode = generateCode(
@@ -219,6 +222,7 @@ export async function writeGeneratedProjectSource(
     projectTexts,
     projectLanguages,
     communication?.tags ?? [],
+    projectAnimations,
   );
   const generatedBindings = generateHmiBindings(
     screens,
