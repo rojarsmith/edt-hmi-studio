@@ -22,10 +22,11 @@ fixes them one-to-one. The values live in `SUPPORTED_BOARDS` in
 
 Current boards:
 
-| Board | Display | `fontLarge` | `defaultFont` | `memSizeKb` |
-| --- | --- | --- | --- | --- |
-| STM32F746G-DISCO | 480×272 RGB565 | `true` | `montserrat_14` | 96 |
-| STM32H747I-DISCO | 800×480 RGB565 | `true` | `montserrat_14` | 256 |
+| Board | Display | `fontLarge` | `defaultFont` | `memSizeKb` | Heap lives in |
+| --- | --- | --- | --- | --- | --- |
+| STM32F746G-DISCO | 480×272 RGB565 | `true` | `montserrat_14` | 4096 | External SDRAM |
+| STM32H747I-DISCO | 800×480 ARGB8888 | `true` | `montserrat_14` | 4096 | External SDRAM |
+| EDT EVK043027B | 480×272 ARGB8888 | `true` | `montserrat_14` | 1024 | Internal SRAM |
 
 `board.lvgl` mirrors `firmware/<board>/include/lv_conf.h`, which is what the
 firmware is actually compiled against. **The two are not generated from one
@@ -81,7 +82,7 @@ it:
   `LV_USE_STDLIB_MALLOC LV_STDLIB_CLIB`, so that build uses the C library
   allocator and ignores `LV_MEM_SIZE` by definition.
 - **Firmware** — each board's checked-in `lv_conf.h` hardcodes the value and
-  nothing rewrites it from the project. Both boards set
+  nothing rewrites it from the project. All three boards set
   `LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN`, so `LV_MEM_SIZE` is the live setting
   there — it just comes from the file.
 
@@ -101,11 +102,71 @@ update `board.lvgl.memSizeKb` to match.**
 - Budget by widget count, not by screen count. Screens that are built but not
   displayed still hold their objects in the pool.
 - 32–64 KB suits a simple UI of a few dozen widgets. Dense screens with tables,
-  charts or tab views want 96–256 KB. The two boards here use 96 KB and 256 KB.
+  charts or tab views want 96–256 KB.
+- **Then check §1.4.** A single transformed widget can want more than all of
+  that together, and it is the number that actually sizes these boards' heaps.
 - Watch for `lv_malloc` failure logs and use `lv_mem_monitor()` to read back
   peak usage rather than guessing.
-- Oversizing is not free: the pool is a static reservation that permanently
-  denies that RAM to the rest of the firmware.
+- Oversizing is not free where the pool sits in internal RAM: it is a static
+  reservation that permanently denies that RAM to the rest of the firmware. A
+  pool in external SDRAM costs almost nothing by comparison, which is why two
+  of the three boards put it there.
+
+### 1.4 Transform layers, and why the heaps are megabytes
+
+A rotated or scaled widget is not drawn in place. LVGL renders it into a
+**transform layer** — `lv_obj_style.c` returns `LV_LAYER_TYPE_TRANSFORM` as
+soon as `transform_rotation` is non-zero or either scale is not 256 — and that
+layer is a single contiguous **ARGB8888** buffer the size of the widget, taken
+from the heap this section is about.
+
+Two properties of it decide everything:
+
+- **It cannot be split.** `lv_refr.c` subdivides only `LV_LAYER_TYPE_SIMPLE`
+  layers, into strips of `LV_DRAW_LAYER_SIMPLE_BUF_SIZE` (8 KB here). That is
+  why a screen-load fade or a container's `opa` costs nothing in comparison: it
+  is a simple layer. A transformed one is allocated whole or not at all.
+- **It is always 4 bytes per pixel**, whatever `LV_COLOR_DEPTH` says. The layer
+  area is the widget plus a 5px margin, and that margin is not covered by the
+  widget, so `alpha_test_area_on_obj()` asks for alpha.
+
+So the worst case is `(w + 10) × (h + 10) × 4` for the widget's own size:
+
+| Board | Full-screen widget | 200×200 widget |
+| --- | --- | --- |
+| STM32F746G-DISCO (480×272) | 553 KB | 179 KB |
+| STM32H747I-DISCO (800×480) | 1.5 MB | 179 KB |
+| EDT EVK043027B (480×272) | 553 KB | 179 KB |
+
+**What happens when it does not fit is the reason this section exists.** The
+allocation failure is not reported and does not degrade: `lv_draw_layer_alloc_buf()`
+returns NULL, the software draw unit answers `LV_DRAW_UNIT_IDLE`, and
+`lv_draw_dispatch()` simply queues the task again — forever. The frame never
+finishes, so the panel never receives another flush and **the whole screen
+stays as it was**, every other widget with it. With `LV_USE_LOG` off it happens
+in complete silence: no log, no assert, no crash, just a display frozen on
+whatever it was showing — usually the blank fill from startup.
+
+That is what a 256 KB heap did to a 200×200 rotated rectangle. The heaps are
+now sized so that any widget on the panel can be transformed:
+
+- **F746G and H747I** — the pool moved out of internal RAM into the board's
+  external SDRAM, through `LV_ATTRIBUTE_LARGE_RAM_ARRAY` and the `.sdram`
+  section. Both linker scripts start their SDRAM region **above** the frame
+  buffers, which the BSPs place at fixed addresses the linker knows nothing
+  about; without that offset the heap would be laid out straight on top of the
+  picture.
+- **EDT EVK043027B** — no external RAM exists on this board, so the pool grew
+  inside internal SRAM to 1 MB of the 1472 KB left after the frame buffers.
+  Overshooting it is a link-time region overflow, not a runtime surprise.
+
+The SDRAM pool is CPU-only memory — no DMA reads it — so it needs no cache
+maintenance; it does share FMC bandwidth with the LTDC, which is the price of
+a transform being possible at all.
+
+`LV_DRAW_TRANSFORM_USE_MATRIX` would avoid the layer entirely, but it needs a
+rendering engine that can do 3×3 matrix transforms and the software renderer
+cannot. All three boards run `LV_USE_DRAW_SW`, so the layer is the only path.
 
 ---
 

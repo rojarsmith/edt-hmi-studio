@@ -20,10 +20,11 @@
 
 目前支援的板子：
 
-| 板子 | 顯示 | `fontLarge` | `defaultFont` | `memSizeKb` |
-| --- | --- | --- | --- | --- |
-| STM32F746G-DISCO | 480×272 RGB565 | `true` | `montserrat_14` | 96 |
-| STM32H747I-DISCO | 800×480 RGB565 | `true` | `montserrat_14` | 256 |
+| 板子 | 顯示 | `fontLarge` | `defaultFont` | `memSizeKb` | 堆積位於 |
+| --- | --- | --- | --- | --- | --- |
+| STM32F746G-DISCO | 480×272 RGB565 | `true` | `montserrat_14` | 4096 | 外部 SDRAM |
+| STM32H747I-DISCO | 800×480 ARGB8888 | `true` | `montserrat_14` | 4096 | 外部 SDRAM |
+| EDT EVK043027B | 480×272 ARGB8888 | `true` | `montserrat_14` | 1024 | 內部 SRAM |
 
 `board.lvgl` 對映 `firmware/<board>/include/lv_conf.h`，後者才是韌體實際編譯時採用
 的設定。**兩者並非由彼此產生 — 任一方變動時請手動保持同步。**
@@ -73,7 +74,7 @@ LVGL v9 取得記憶體的方式有兩種，由 `LV_USE_STDLIB_MALLOC` 決定：
   `LV_USE_STDLIB_MALLOC LV_STDLIB_CLIB`，該建置使用 C 函式庫的配置器，依定義就會
   忽略 `LV_MEM_SIZE`。
 - **韌體** — 每片板子已納入版控的 `lv_conf.h` 把值寫死，沒有任何程式會依專案設定
-  改寫它。兩片板子都設 `LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN`，所以 `LV_MEM_SIZE`
+  改寫它。三片板子都設 `LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN`，所以 `LV_MEM_SIZE`
   在那裡是真正生效的設定 — 只是它來自檔案。
 
 由於專案裡的值與韌體的值現在同樣源自板子定義，兩者內容是一致的；只是專案這份並不是
@@ -89,9 +90,60 @@ LVGL v9 取得記憶體的方式有兩種，由 `LV_USE_STDLIB_MALLOC` 決定：
 
 - 以元件數量而非畫面數量估算。已建立但未顯示的 Screen，其物件仍佔用池子。
 - 數十個元件的簡單 UI，32–64 KB 即可。含 table、chart、tab view 的密集畫面需要
-  96–256 KB。本專案的兩片板子分別使用 96 KB 與 256 KB。
+  96–256 KB。
+- **接著請看 §1.4。** 單一個做了變形的元件，可能就比上面全部加起來還要吃記憶體，
+  而那才是目前這三片板子堆積大小的真正決定因素。
 - 留意 `lv_malloc` 的失敗訊息，並用 `lv_mem_monitor()` 讀回實際尖峰用量，不要用猜的。
-- 開太大並非沒有代價：這是靜態保留，會永久剝奪韌體其餘部分可用的 RAM。
+- 池子放在內部 RAM 時，開太大並非沒有代價：那是靜態保留，會永久剝奪韌體其餘部分
+  可用的 RAM。放在外部 SDRAM 則幾乎沒有代價，這也是三片板子有兩片把它移過去的原因。
+
+### 1.4 Transform layer，以及堆積為何是以 MB 計
+
+旋轉或縮放過的元件不會就地繪製。LVGL 會先把它畫進一塊 **transform layer** —
+只要 `transform_rotation` 不為 0，或任一軸的 scale 不是 256，`lv_obj_style.c`
+就會回傳 `LV_LAYER_TYPE_TRANSFORM` — 而那塊 layer 是**一整塊連續的 ARGB8888**
+緩衝區，大小等同該元件，並且就從本節談的這個堆積配置出來。
+
+它有兩個性質決定了一切：
+
+- **不能被切開。** `lv_refr.c` 只會把 `LV_LAYER_TYPE_SIMPLE` 切成
+  `LV_DRAW_LAYER_SIMPLE_BUF_SIZE`（此處為 8 KB）的橫條。這也是為什麼換頁淡入或
+  容器的 `opa` 幾乎不花記憶體：那些是 simple layer。變形的則是「整塊配置，否則
+  免談」。
+- **一律是每像素 4 bytes**，與 `LV_COLOR_DEPTH` 無關。layer 區域是元件本身再加
+  5px 邊界，那圈邊界不被元件覆蓋，於是 `alpha_test_area_on_obj()` 會要求 alpha。
+
+因此最壞情況是以元件自身尺寸計的 `(w + 10) × (h + 10) × 4`：
+
+| 板子 | 全螢幕大小的元件 | 200×200 的元件 |
+| --- | --- | --- |
+| STM32F746G-DISCO（480×272） | 553 KB | 179 KB |
+| STM32H747I-DISCO（800×480） | 1.5 MB | 179 KB |
+| EDT EVK043027B（480×272） | 553 KB | 179 KB |
+
+**配置不到時會發生什麼事，才是本節存在的理由。** 失敗不會被回報，也不會降級處理：
+`lv_draw_layer_alloc_buf()` 回傳 NULL，軟體繪圖單元回答 `LV_DRAW_UNIT_IDLE`，
+`lv_draw_dispatch()` 就只是把工作再排一次 — 永遠地排下去。這個 frame 從此畫不完，
+面板也就再也收不到 flush，**整個畫面停在原樣**，其他元件一併陪葬。在 `LV_USE_LOG`
+關閉的情況下，這一切安靜無聲：沒有 log、沒有 assert、沒有當機，只有一片凍結在開機
+填色（通常就是全白）的畫面。
+
+那正是 256 KB 的堆積對一個 200×200 旋轉矩形所做的事。現在的堆積大小，已足以讓面板
+上任何尺寸的元件都能被變形：
+
+- **F746G 與 H747I** — 池子透過 `LV_ATTRIBUTE_LARGE_RAM_ARRAY` 與 `.sdram` section
+  搬出內部 RAM，移到板上的外部 SDRAM。兩份 linker script 的 SDRAM 區段起點都設在
+  **frame buffer 之上**；frame buffer 由 BSP 固定在 linker 一無所知的位址，少了這個
+  位移，堆積會被直接安排在畫面上。
+- **EDT EVK043027B** — 這片板子沒有外部 RAM，因此池子改為在內部 SRAM 內長大，取用
+  扣掉 frame buffer 後 1472 KB 中的 1 MB。開過頭會是連結期的 region overflow，而不是
+  執行期才出事。
+
+SDRAM 上的池子是純 CPU 存取的記憶體（沒有 DMA 讀它），所以不需要任何快取維護；它確實
+會與 LTDC 共用 FMC 頻寬，而那正是「變形能夠成立」所付出的代價。
+
+`LV_DRAW_TRANSFORM_USE_MATRIX` 可以完全避開 layer，但它要求繪圖引擎支援 3×3 矩陣變換，
+而軟體渲染器做不到。三片板子都跑 `LV_USE_DRAW_SW`，因此 layer 是唯一的路。
 
 ---
 

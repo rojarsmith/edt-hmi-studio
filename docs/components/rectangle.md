@@ -112,6 +112,8 @@ Rectangle enables every style section that paints a box:
 
 The Scrollbar and Text sections stay hidden: a rectangle neither scrolls nor draws text.
 
+> Transform is the one section with a cost on the device. A rotated or scaled widget is rendered through a layer — one contiguous ARGB8888 buffer the size of the widget, `(w + 10) × (h + 10) × 4` bytes, taken from LVGL's heap and never split into strips. A 200×200 rectangle asks for 179 KB of it. The boards' heaps are sized for this ([LVGL Configuration §1.4](../lvgl-configuration.md)), and the failure mode if one ever does not fit is silent: LVGL cannot finish the frame at all, so the panel freezes on what it was showing rather than dropping the shape.
+
 ## 9. Supported events
 
 | Event | Description |
