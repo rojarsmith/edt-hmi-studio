@@ -18,6 +18,17 @@ Three things are now separate, and that separation is the whole design:
 | **Target** | Which widget it drives | `Animation.targetComponentId` |
 | **Trigger** | When it runs | An event binding — on a screen, or on a widget |
 
+An animation carries a target, one clock — duration, delay, repeat, easing —
+and a list of **tracks**, each naming a property and how far it travels.
+Sliding a card in while fading it up is one animation with two tracks, not two
+animations kept in step by hand.
+
+There is no Animation Type. It said the same thing as the property beside it
+and was free to contradict it: "Slide In from Left" stored against an opacity
+animation, with only the property reaching the firmware. Presets remain in the
+dialog as buttons that add tracks and are then forgotten, which is all a preset
+ever was.
+
 A designer can therefore build a screen's entry animation without writing
 code: place the widgets, define the animation, and bind it to the screen's
 **Screen Loaded** event.
@@ -38,8 +49,10 @@ and refuses a name another animation already answers to.
 
 An animation whose target was deleted, or which never got one, keeps its place
 in the list with a purple **LACK** badge naming what is missing. So does an
-event bound to an animation that has since been deleted. Silently dropping the
-reference would hide work the user still has to redo; nothing is generated for
+event bound to an animation that has since been deleted, and a screen playing
+an animation aimed at a widget it does not show — the commonest way an entry
+animation quietly does nothing, since it moves something invisible. Silently
+dropping the reference would hide work the user still has to redo; nothing is generated for
 either, and the build says so in a comment rather than calling a symbol that
 does not exist.
 
@@ -138,6 +151,10 @@ void ui_anim_slide_in_1_stop(void) {
     lv_anim_delete(ui_title, (lv_anim_exec_xcb_t)lv_obj_set_x);
 }
 ```
+
+The start function sets up one `lv_anim_t` per track and starts them
+together — `lv_anim_start` copies the descriptor, so one local serves them
+all — and stop deletes every one.
 
 Both are declared in `ui.h`, so anything may call one. `lv_anim_start` already
 drops a running animation with the same target and exec callback, so playing
