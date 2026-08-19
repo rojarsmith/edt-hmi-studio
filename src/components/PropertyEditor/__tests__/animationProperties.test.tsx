@@ -3,7 +3,7 @@
 // and the screen. There is no dialog any more.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, fireEvent, screen } from '@testing-library/react';
+import { act, render, fireEvent, screen } from '@testing-library/react';
 import { useEditorStore } from '../../../store/editorStore';
 import type { Animation, LvglComponent } from '../../../types';
 import PropertyEditor from '..';
@@ -78,6 +78,17 @@ describe('animation properties', () => {
   it('falls back to the screen when nothing is selected anywhere', () => {
     setUp([animation], null);
     const { container } = render(<PropertyEditor />);
+
+    expect(container.querySelector('[data-pe-pinned] .section-header')!.textContent).toBe('Screen');
+  });
+
+  it('gives the panel back to the screen when a screen is picked', () => {
+    // The symptom: pick an animation, then click a screen, and the panel stayed
+    // on the animation.
+    const { container } = render(<PropertyEditor />);
+    expect(container.querySelector('[data-pe-pinned] .section-header')!.textContent).toBe('Animation');
+
+    act(() => useEditorStore.getState().openScreen('screen-1'));
 
     expect(container.querySelector('[data-pe-pinned] .section-header')!.textContent).toBe('Screen');
   });

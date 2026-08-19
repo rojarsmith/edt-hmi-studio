@@ -785,9 +785,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setCurrentScreen: (screenId) => {
+    // Changing screen changes what the property editor is looking at, and an
+    // animation selected in the manager is no longer it.
     set({
       currentScreenId: screenId,
       selection: { selectedIds: [], hoveredId: null },
+      selectedAnimationId: null,
     });
   },
 
@@ -800,19 +803,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   openScreen: (screenId) => {
-    const { screens, openScreenIds, currentScreenId } = get();
+    const { screens, openScreenIds } = get();
     if (!screens.some(s => s.id === screenId)) return;
 
-    // Already open — just jump to it.
-    if (openScreenIds.includes(screenId)) {
-      if (screenId !== currentScreenId) get().setCurrentScreen(screenId);
-      return;
-    }
-
+    // Picking a screen is asking to look at it, so it takes the property
+    // editor too — including when it is already the current one. Returning
+    // early there left a component or an animation showing in the panel, which
+    // is why clicking a screen seemed to work only sometimes.
     set(state => ({
-      openScreenIds: [...state.openScreenIds, screenId],
+      openScreenIds: openScreenIds.includes(screenId)
+        ? state.openScreenIds
+        : [...state.openScreenIds, screenId],
       currentScreenId: screenId,
       selection: { selectedIds: [], hoveredId: null },
+      selectedAnimationId: null,
     }));
   },
 
@@ -1812,11 +1816,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   clearSelection: () => {
+    // Clicking empty canvas asks for the screen, so an animation the manager
+    // had pointed the panel at steps aside as well.
     set(state => ({
       selection: {
         ...state.selection,
         selectedIds: [],
       },
+      selectedAnimationId: null,
     }));
   },
   
