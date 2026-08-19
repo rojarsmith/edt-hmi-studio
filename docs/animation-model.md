@@ -26,8 +26,8 @@ animations kept in step by hand.
 There is no Animation Type. It said the same thing as the property beside it
 and was free to contradict it: "Slide In from Left" stored against an opacity
 animation, with only the property reaching the firmware. Presets remain in the
-dialog as buttons that add tracks and are then forgotten, which is all a preset
-ever was.
+property editor as buttons that add tracks and are then forgotten, which is
+all a preset ever was.
 
 A designer can therefore build a screen's entry animation without writing
 code: place the widgets, define the animation, and bind it to the screen's
@@ -41,9 +41,21 @@ drives rather than living inside it, so retargeting an animation does not
 move it, and deleting a widget does not delete the animations aimed at it.
 
 Names are unique across the project because the name becomes the generated C
-function's name (see below). The edit dialog hands out `Fade_In_1`,
-`Slide_Left_1` and so on under the same gap-filling rule component ids use,
-and refuses a name another animation already answers to.
+function's name (see below). Adding one hands out `Anim_1`, `Anim_2` and so
+on under the same gap-filling rule component ids use, and a name another
+animation already answers to is refused rather than taken.
+
+### Where it is edited
+
+Naming happens in the manager, in place: adding an animation creates it and
+puts the cursor in its name, and a double click renames it later — the same
+gesture that names a screen. Selecting a row points the **property editor** at
+it, which is where everything else about it lives: target, the shared clock,
+the property tracks, and the presets that add them.
+
+That panel shows one thing at a time. Picking an animation clears the canvas
+selection, and picking a component clears the animation, so the question "what
+am I looking at" has one answer.
 
 ### Missing dependencies are shown, never repaired
 
@@ -119,7 +131,7 @@ animations (see Parking above). Without that, travelling from the live
 position would walk the widget further on every visit. An absolute animation
 states its own start and parks there instead.
 
-The dialog offers the choice for `x` and `y` only: those are the properties
+The property editor offers the choice for `x` and `y` only: those are the properties
 with somewhere to travel from. A width of 100 is a hundred pixels wherever it
 is measured from, and an opacity has no position at all. An animation carrying
 no mode reads as absolute, which is what the generator always did with one.
@@ -230,7 +242,8 @@ still previewable.
 | C symbols and resolved values | `src/codegen/animationSymbols.ts` |
 | Animation functions and parking | `src/codegen/templates/ui.c.ts` |
 | Event handlers and the two actions | `src/codegen/templates/ui_events.c.ts` |
-| The animation manager | `src/components/AnimationPanel/` |
+| The animation manager, and naming in it | `src/components/AnimationPanel/` |
+| The property editor's animation face | `src/components/PropertyEditor/AnimationProperties.tsx` |
 | The events category | `src/components/EventPanel/` |
 
 ## Not done yet
