@@ -146,7 +146,9 @@ export type BuiltinActionType =
   | 'disable'
   | 'setText'
   | 'setValue'
-  | 'setLanguage';
+  | 'setLanguage'
+  | 'playAnimation'
+  | 'stopAnimation';
 
 /**
  * `BuiltinAction.language` value meaning "advance to the next project language,
@@ -169,6 +171,12 @@ export interface BuiltinAction {
   value?: string | number | boolean;  // For setProperty, setText, setValue
   /** For setLanguage: a ProjectLanguage code, or `NEXT_LANGUAGE` to cycle. */
   language?: string;
+  /**
+   * For playAnimation and stopAnimation: which animation to drive, by id.
+   * By id rather than by name so renaming an animation cannot quietly
+   * unbind every button that plays it.
+   */
+  animationId?: string;
 }
 
 // Event Binding (Phase 3 - Enhanced)

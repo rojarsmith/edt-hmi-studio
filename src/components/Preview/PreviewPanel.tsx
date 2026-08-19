@@ -118,6 +118,8 @@ const PreviewPanel: React.FC = () => {
   const [animPlaying, setAnimPlaying] = useState(false);
   const [animPaused, setAnimPaused] = useState(false);
   const animStartRef = useRef<number>(0);
+  /** The animations the current run covers — everything, or the one an event played. */
+  const runningAnimsRef = useRef<{ compId: string; anim: Animation }[]>([]);
   const animPausedAtRef = useRef<number>(0);
   const [animStates, setAnimStates] = useState<Map<string, Partial<AnimState>>>(new Map());
   const [imageButtonStateIndices, setImageButtonStateIndices] =
@@ -189,9 +191,9 @@ const PreviewPanel: React.FC = () => {
   }, [images]);
 
   // Animation playback
-  const startAnimation = useCallback(() => {
-    const allAnims = collectAnimations(components);
+  const runAnimations = useCallback((allAnims: { compId: string; anim: Animation }[]) => {
     if (allAnims.length === 0) return;
+    runningAnimsRef.current = allAnims;
 
     setAnimPlaying(true);
     setAnimPaused(false);
@@ -244,7 +246,12 @@ const PreviewPanel: React.FC = () => {
     };
 
     animFrameRef.current = requestAnimationFrame(tick);
-  }, [components]);
+  }, []);
+
+  /** The toolbar's play button: everything on the screen, together. */
+  const startAnimation = useCallback(() => {
+    runAnimations(collectAnimations(components));
+  }, [components, runAnimations]);
 
   const pauseAnimation = useCallback(() => {
     if (animPlaying && !animPaused) {
@@ -261,7 +268,7 @@ const PreviewPanel: React.FC = () => {
       setAnimPaused(false);
 
       // Restart the tick loop
-      const allAnims = collectAnimations(components);
+      const allAnims = runningAnimsRef.current;
       const maxEnd = Math.max(...allAnims.map(a => (a.anim.delay || 0) + (a.anim.duration || 300)));
 
       const tick = (now: number) => {
@@ -300,7 +307,7 @@ const PreviewPanel: React.FC = () => {
       };
       animFrameRef.current = requestAnimationFrame(tick);
     }
-  }, [animPlaying, animPaused, components]);
+  }, [animPlaying, animPaused]);
 
   // Reset is a restart of the simulated device: animations and widget states
   // go back to their initial values, and the preview returns to the entry
@@ -356,6 +363,23 @@ const PreviewPanel: React.FC = () => {
     }
     if (hit && hit.events) {
       for (const ev of hit.events) {
+        if (ev.action?.type === 'playAnimation' && ev.action.animationId) {
+          const target = collectAnimations(components)
+            .find(entry => entry.anim.id === ev.action!.animationId);
+          // An animation on another screen has nothing to move here.
+          if (target) {
+            cancelAnimationFrame(animFrameRef.current);
+            runAnimations([target]);
+          }
+          continue;
+        }
+        if (ev.action?.type === 'stopAnimation') {
+          // Stop leaves the widget where it reached, so the states stay put.
+          cancelAnimationFrame(animFrameRef.current);
+          setAnimPlaying(false);
+          setAnimPaused(false);
+          continue;
+        }
         if (ev.action?.type === 'navigate' && ev.action.targetPage) {
           const targetPage = screens.find(p => p.name === ev.action!.targetPage || p.id === ev.action!.targetPage);
           if (targetPage) {
@@ -365,7 +389,7 @@ const PreviewPanel: React.FC = () => {
         }
       }
     }
-  }, [components, screens, scale]);
+  }, [components, screens, scale, runAnimations]);
 
   // Render components to canvas
   useEffect(() => {

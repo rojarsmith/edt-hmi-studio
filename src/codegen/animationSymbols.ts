@@ -89,6 +89,16 @@ export function animStopFuncName(symbol: AnimationSymbol): string {
   return `${symbol.base}_stop`;
 }
 
+/** The project's animations indexed by id, for resolving a binding. */
+export function animationSymbolsById(
+  screens: Screen[],
+  options: CodeGenOptions,
+): Map<string, AnimationSymbol> {
+  return new Map(
+    collectAnimationSymbols(screens, options).map((symbol) => [symbol.animation.id, symbol]),
+  );
+}
+
 function uniqueBase(animation: Animation, options: CodeGenOptions, taken: Set<string>): string {
   const converted = convertName(toValidCIdentifier(animation.name || animation.type), options);
   const wanted = `ui_anim_${converted}`;
@@ -101,11 +111,15 @@ function uniqueBase(animation: Animation, options: CodeGenOptions, taken: Set<st
 /**
  * Every animation in the project, in screen → component → child order, each
  * carrying the symbol its functions are generated under.
+ *
+ * Only `targetVar` depends on `needsScreenPrefix`; `base` and `execCb` do
+ * not, so a caller that only needs to name an animation — the event templates,
+ * naming one to call — can leave the set out.
  */
 export function collectAnimationSymbols(
   screens: Screen[],
   options: CodeGenOptions,
-  needsScreenPrefix: Set<string>,
+  needsScreenPrefix: Set<string> = new Set(),
 ): AnimationSymbol[] {
   const symbols: AnimationSymbol[] = [];
   // An animation named "set_opa" would otherwise claim a wrapper's symbol.

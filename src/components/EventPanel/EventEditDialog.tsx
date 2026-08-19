@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useEditorStore } from '../../store/editorStore';
+import { projectAnimations } from '../../utils/animationNames';
 import { useLogicEditorStore } from '../LogicEditor';
-import type { EventBinding, LvglEventType, BuiltinActionType, BuiltinAction } from '../../types';
+import type { EventBinding, LvglEventType, BuiltinActionType, BuiltinAction, LvglComponent } from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
 import { LVGL_EVENTS } from './EventPanel';
 import CodeEditor from './CodeEditor';
@@ -25,6 +26,8 @@ const BUILTIN_ACTIONS: { type: BuiltinActionType; label: string; description: st
   { type: 'setText', label: 'Set Text', description: 'Set the component text' },
   { type: 'setValue', label: 'Set Value', description: 'Set the component value' },
   { type: 'setLanguage', label: 'Switch Language', description: 'Change the language every translated widget shows' },
+  { type: 'playAnimation', label: 'Play Animation', description: 'Run a project animation from its start value' },
+  { type: 'stopAnimation', label: 'Stop Animation', description: 'Leave an animation wherever it has reached' },
 ];
 
 const CODE_TEMPLATE = `// Event handler code
@@ -45,6 +48,18 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   onClose,
 }) => {
   const { screens, currentScreenId, getAllComponents, languages } = useEditorStore();
+  const animations = useMemo(() => projectAnimations(screens), [screens]);
+  const componentNameById = useMemo(() => {
+    const names = new Map<string, string>();
+    const visit = (components: LvglComponent[]) => {
+      for (const component of components) {
+        names.set(component.id, component.name);
+        visit(component.children);
+      }
+    };
+    for (const screen of screens) visit(screen.components);
+    return names;
+  }, [screens]);
   
   // Suppress unused variable warning - currentScreenId is used for reactivity
   void currentScreenId;
@@ -75,6 +90,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   );
   // Cycling is the default because a language switcher is usually one button
   const [languageCode, setLanguageCode] = useState(event?.action?.language || NEXT_LANGUAGE);
+  const [animationId, setAnimationId] = useState(event?.action?.animationId || '');
   const [customCode, setCustomCode] = useState(event?.customCode || CODE_TEMPLATE);
   const [showCodePreview, setShowCodePreview] = useState(false);
 
@@ -129,6 +145,10 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
         case 'setLanguage':
           action.language = languageCode;
           break;
+        case 'playAnimation':
+        case 'stopAnimation':
+          action.animationId = animationId;
+          break;
       }
 
       newEvent.action = action;
@@ -141,7 +161,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     onSave(newEvent);
   }, [
     event, eventType, handlerType, actionType,
-    targetScreen, targetComponent, property, value, languageCode, customCode,
+    targetScreen, targetComponent, property, value, languageCode, animationId, customCode,
     logicGraphIds, onSave
   ]);
 
@@ -206,6 +226,16 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
         code += `        // Set value\n`;
         code += `        lv_slider_set_value(${targetComponent || 'target'}, ${value || '0'}, LV_ANIM_ON);\n`;
         break;
+      case 'playAnimation':
+      case 'stopAnimation': {
+        const animation = animations.find((candidate) => candidate.id === animationId);
+        const verb = actionType === 'playAnimation' ? 'Play' : 'Stop';
+        code += `        // ${verb} animation: ${animation?.name || '(none selected)'}
+`;
+        code += `        ui_anim_${(animation?.name || 'name').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${actionType === 'playAnimation' ? 'start' : 'stop'}();
+`;
+        break;
+      }
       case 'setLanguage':
         if (languageCode === NEXT_LANGUAGE) {
           code += `        // Switch to the next language\n`;
@@ -371,6 +401,35 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                 placeholder="Enter a value"
               />
             </div>
+          </div>
+        );
+
+      case 'playAnimation':
+      case 'stopAnimation':
+        return (
+          <div className="action-config">
+            <div className="config-row">
+              <label>Animation</label>
+              <select
+                value={animationId}
+                onChange={(e) => setAnimationId(e.target.value)}
+                disabled={animations.length === 0}
+              >
+                <option value="">Select an animation...</option>
+                {animations.map(animation => (
+                  <option key={animation.id} value={animation.id}>
+                    {animation.name} → {componentNameById.get(animation.targetComponentId) || 'unknown'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="field-hint">
+              {animations.length === 0
+                ? 'This project has no animations yet — add one from the Animations panel first.'
+                : actionType === 'playAnimation'
+                  ? 'Runs from its start value every time, however far a previous run had reached.'
+                  : 'Leaves the widget wherever the animation had reached; it does not return to the start.'}
+            </p>
           </div>
         );
 

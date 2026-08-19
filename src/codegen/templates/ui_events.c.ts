@@ -4,6 +4,12 @@ import type { Screen, LvglComponent, EventBinding, BuiltinAction, ProjectLanguag
 import { NEXT_LANGUAGE } from '../../types';
 import type { LogicGraph } from '../../components/LogicEditor/types';
 import { getLogicFuncNames } from '../utils/nameUtils';
+import {
+  animStartFuncName,
+  animStopFuncName,
+  animationSymbolsById,
+  type AnimationSymbol,
+} from '../animationSymbols';
 import type { CodeGenOptions } from '../types';
 import {
   getEventHandlerName,
@@ -130,7 +136,8 @@ function generateBuiltinActionCode(
   action: BuiltinAction,
   options: CodeGenOptions,
   screens: Screen[],
-  languages: ProjectLanguage[]
+  languages: ProjectLanguage[],
+  animations: Map<string, AnimationSymbol>
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options, 2);
@@ -313,6 +320,28 @@ function generateBuiltinActionCode(
       lines.push(`${indent}lv_translation_set_language("${escapeCString(target.code)}");`);
       break;
     }
+
+    case 'playAnimation':
+    case 'stopAnimation': {
+      const play = action.type === 'playAnimation';
+      // An animation deleted after the event was bound, or one whose property
+      // cannot be animated, generates no function at all — calling it would
+      // fail to link rather than merely do nothing.
+      const symbol = action.animationId ? animations.get(action.animationId) : undefined;
+      if (!symbol || !symbol.execCb) {
+        lines.push(
+          `${indent}// ${play ? 'Play' : 'Stop'} animation skipped: this binding names no animation the project still has`,
+        );
+        break;
+      }
+      if (options.generateComments) {
+        lines.push(
+          `${indent}${generateComment(`${play ? 'Play' : 'Stop'} animation: ${symbol.animation.name}`, options)}`,
+        );
+      }
+      lines.push(`${indent}${play ? animStartFuncName(symbol) : animStopFuncName(symbol)}();`);
+      break;
+    }
   }
 
   return lines;
@@ -365,6 +394,7 @@ function generateEventHandler(
   languages: ProjectLanguage[],
   logicGraphs: LogicGraph[],
   logicFuncNames: Map<string, string>,
+  animations: Map<string, AnimationSymbol>,
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -383,7 +413,7 @@ function generateEventHandler(
 
   if (event.handlerType === 'builtin' && event.action) {
     // Generate builtin action code
-    const actionLines = generateBuiltinActionCode(event.action, options, screens, languages);
+    const actionLines = generateBuiltinActionCode(event.action, options, screens, languages, animations);
     lines.push(...actionLines);
   } else if (event.handlerType === 'custom' && event.customCode) {
     // Insert custom code
@@ -419,6 +449,9 @@ export function generateEventsSource(
   // The same name table ui_logic.h/.c share, computed over the same graph
   // list, so an event handler and the function it calls cannot disagree
   const logicFuncNames = getLogicFuncNames(logicGraphs);
+  // Resolved once: the same table ui.c named the animation functions from, so
+  // a button and the animation it plays cannot disagree about the symbol.
+  const animations = animationSymbolsById(screens, options);
   const hasLogicHandlers = getAllEvents(screens).some(
     ({ event }) => event.handlerType === 'logic'
   );
@@ -448,7 +481,7 @@ export function generateEventsSource(
     }
 
     for (const { component, event } of allEvents) {
-      lines.push(generateEventHandler(component, event, options, screens, languages, logicGraphs, logicFuncNames));
+      lines.push(generateEventHandler(component, event, options, screens, languages, logicGraphs, logicFuncNames, animations));
       lines.push('');
     }
   } else {
