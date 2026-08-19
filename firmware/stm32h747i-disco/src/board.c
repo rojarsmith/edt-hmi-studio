@@ -1,6 +1,7 @@
 #include "board.h"
 
 #include "stm32h747i_discovery_qspi.h"
+#include "stm32h747i_discovery_sdram.h"
 
 UART_HandleTypeDef huart1;
 
@@ -229,6 +230,18 @@ bool board_init(void)
     (void)wait_for_domain_d2();
 
     if (!system_clock_config()) {
+        return false;
+    }
+
+    /*
+     * LVGL's heap lives in this SDRAM (see include/lv_conf.h), and main() calls
+     * lv_init() before the display comes up, so the controller has to be
+     * running before anything LVGL does. The BSP would otherwise bring it up
+     * inside BSP_LCD_InitEx, far too late; DATA_IN_ExtSDRAM tells the BSP that
+     * the application has already done it, so it does not repeat the
+     * initialisation sequence underneath a heap that is by then in use.
+     */
+    if (BSP_SDRAM_Init(0) != BSP_ERROR_NONE) {
         return false;
     }
 

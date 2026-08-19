@@ -1,5 +1,7 @@
 #include "board.h"
 
+#include "stm32746g_discovery_sdram.h"
+
 UART_HandleTypeDef huart1;
 
 static bool system_clock_config(void)
@@ -101,6 +103,18 @@ bool board_init(void)
 
     HAL_Init();
     if (!system_clock_config()) {
+        return false;
+    }
+
+    /*
+     * LVGL's heap lives in this SDRAM (see include/lv_conf.h), and main() calls
+     * lv_init() before the display comes up, so the controller has to be
+     * running before anything LVGL does. The BSP would otherwise bring it up
+     * inside BSP_LCD_Init, far too late; DATA_IN_ExtSDRAM tells the BSP that
+     * the application has already done it, so it does not repeat the
+     * initialisation sequence underneath a heap that is by then in use.
+     */
+    if (BSP_SDRAM_Init() != SDRAM_OK) {
         return false;
     }
 

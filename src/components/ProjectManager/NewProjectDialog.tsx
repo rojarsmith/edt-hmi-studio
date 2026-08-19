@@ -5,6 +5,7 @@ import type { BoardId, ProtocolId } from '../../types/hmi';
 import {
   DEFAULT_BOARD_ID,
   SUPPORTED_BOARDS,
+  formatMemSize,
   getBoardDefinition,
   getBoardProtocols,
   getProtocolDefinition,
@@ -116,7 +117,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
             <span className="npd-hint">
               {board.display.width}×{board.display.height} ·{' '}
               {board.display.colorFormat} ({board.display.colorDepth}-bit) ·{' '}
-              LVGL heap {board.lvgl.memSizeKb} KB · default font{' '}
+              LVGL heap {formatMemSize(board.lvgl.memSizeKb)} · default font{' '}
               {board.lvgl.defaultFont}
             </span>
           </label>

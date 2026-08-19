@@ -58,6 +58,10 @@ add_compile_definitions(
     USE_STM32H747I_DISCO
     USE_PWR_DIRECT_SMPS_SUPPLY
     LV_CONF_INCLUDE_SIMPLE
+    # board_init brings the SDRAM up itself, because LVGL's heap lives there
+    # and lv_init runs before the display does. This tells the BSP so, and it
+    # skips the BSP_SDRAM_Init inside BSP_LCD_InitEx. See src/board.c.
+    DATA_IN_ExtSDRAM
     # Moves generated image pixel data into .ext_flash_images, which the linker
     # script places in the QSPI NOR rather than the 1 MB internal flash.
     # See docs/images-external-flash.md.

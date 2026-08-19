@@ -20,7 +20,28 @@
 #define LV_LIMITS_INCLUDE <limits.h>
 #define LV_STDARG_INCLUDE <stdarg.h>
 
-#define LV_MEM_SIZE (256U * 1024U)
+/*
+ * LVGL's heap, and the one allocation that decides how big it has to be.
+ *
+ * A rotated or scaled widget cannot be drawn in place: LVGL renders it into
+ * a transform layer first, and that layer is one contiguous ARGB8888 buffer
+ * the size of the widget - `lv_refr.c` splits only SIMPLE layers into
+ * strips, never a transformed one. A full-screen widget here therefore asks
+ * for 553 KB (490 x 282 x 4) in a single block. When the ask fails, nothing
+ * degrades gracefully: the draw task cannot start, `lv_draw_dispatch`
+ * queues it again forever, the frame never finishes, and the panel never
+ * sees another flush - the whole screen stays as it was, every other widget
+ * with it, and with LV_USE_LOG off it happens in silence.
+ *
+ * This board has no external RAM to move the heap into - the frame buffers
+ * already take 1024 KB of the part's 2496 KB of SRAM - so the heap grows
+ * inside the RAM region instead, to 1 MB of the 1472 KB the application has.
+ * That leaves room for a full-screen transform layer and for the rest of the
+ * firmware, which needs well under 100 KB of static data. Should it ever
+ * stop fitting, the link fails on a region overflow - loudly, at build time,
+ * which is the one way this can be found out cheaply.
+ */
+#define LV_MEM_SIZE (1024U * 1024U)
 #define LV_MEM_POOL_EXPAND_SIZE 0
 #define LV_MEM_ADR 0
 

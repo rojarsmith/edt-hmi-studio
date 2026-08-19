@@ -46,6 +46,10 @@ add_compile_definitions(
     STM32F746xx
     USE_HAL_DRIVER
     LV_CONF_INCLUDE_SIMPLE
+    # board_init brings the SDRAM up itself, because LVGL's heap lives there
+    # and lv_init runs before the display does. This tells the BSP so, and it
+    # skips the BSP_SDRAM_Init inside BSP_LCD_Init. See src/board.c.
+    DATA_IN_ExtSDRAM
 )
 
 # LVGL reads lv_conf.h through this directory-level include path.  Directory

@@ -7,6 +7,7 @@ import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
 import type { ProjectConfig } from '../../store/projectStore';
 import {
+  formatMemSize,
   getBoardDefinition,
   getBoardProtocols,
   getProtocolDefinition,
@@ -101,7 +102,7 @@ const HardwareInfoDialog: React.FC<HardwareInfoDialogProps> = ({ onClose }) => {
               </div>
               <dl className="hwinfo-meta">
                 <dt>LVGL heap</dt>
-                <dd>{board.lvgl.memSizeKb} KB</dd>
+                <dd>{formatMemSize(board.lvgl.memSizeKb)}</dd>
 
                 <dt>Default font</dt>
                 <dd>{board.lvgl.defaultFont}</dd>

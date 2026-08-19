@@ -8,7 +8,9 @@
  * Data lives in AXI SRAM (D1) because it is the largest contiguous block and is
  * reachable by the DMA controllers. The Cortex-M7-only DTCM is reserved for the
  * process stack and C heap. The display frame buffers stay in the board's
- * external SDRAM at 0xD0000000.
+ * external SDRAM at 0xD0000000, and LVGL's heap now shares that SDRAM through
+ * the .sdram section - see include/lv_conf.h for why it cannot stay in
+ * internal RAM.
  */
 
 ENTRY(Reset_Handler)
@@ -25,7 +27,12 @@ MEMORY
     RAM_D1  (xrw) : ORIGIN = 0x24000000, LENGTH = 512K
     RAM_D2  (xrw) : ORIGIN = 0x30000000, LENGTH = 288K
     RAM_D3  (xrw) : ORIGIN = 0x38000000, LENGTH = 64K
-    SDRAM   (xrw) : ORIGIN = 0xD0000000, LENGTH = 32M
+    /* The first 4 MB belongs to the two LTDC frame buffers. The board's
+       discovery_conf header fixes them at LCD_LAYER_0_ADDRESS (0xD0000000)
+       and LCD_LAYER_1_ADDRESS (0xD0200000), 2 MB apart, and 800 x 480 x 4 is
+       1.5 MB each. The linker's region starts above them so nothing it lays
+       out - LVGL's heap above all - can land on a frame buffer. */
+    SDRAM   (xrw) : ORIGIN = 0xD0400000, LENGTH = 28M
     /* MT25TL01G QSPI NOR, readable at 0x90000000 once memory mapped mode is
        enabled. Image resources live here; nothing is executed from it. */
     EXTFLASH (r)  : ORIGIN = 0x90000000, LENGTH = 128M

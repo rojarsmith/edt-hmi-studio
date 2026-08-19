@@ -3,7 +3,9 @@
  *
  * DMA-visible data is deliberately placed in SRAM1/SRAM2 (RAM).  The
  * Cortex-M7-only DTCM is reserved for the process stack and C heap.  The
- * display framebuffer remains in the board's external SDRAM at 0xC0000000.
+ * display framebuffer remains in the board's external SDRAM at 0xC0000000,
+ * and LVGL's heap now shares that SDRAM through the .sdram section - see
+ * include/lv_conf.h for why it cannot stay in internal RAM.
  */
 
 ENTRY(Reset_Handler)
@@ -18,7 +20,12 @@ MEMORY
     FLASH   (rx)  : ORIGIN = 0x08000000, LENGTH = 1024K
     DTCMRAM (xrw) : ORIGIN = 0x20000000, LENGTH = 64K
     RAM     (xrw) : ORIGIN = 0x20010000, LENGTH = 240K
-    SDRAM   (xrw) : ORIGIN = 0xC0000000, LENGTH = 8M
+    /* The first megabyte belongs to the two LTDC frame buffers: the BSP fixes
+       them at LCD_FB_START_ADDRESS (0xC0000000) and board_display.c places
+       them back to back, 2 x 480 x 272 x 2 = 510 KB. The linker's region
+       starts above them so nothing it lays out - LVGL's heap above all - can
+       land on a frame buffer. */
+    SDRAM   (xrw) : ORIGIN = 0xC0100000, LENGTH = 7M
 }
 
 SECTIONS

@@ -145,7 +145,11 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     lvgl: {
       fontLarge: true,
       defaultFont: 'montserrat_14',
-      memSizeKb: 96,
+      // 4 MB, and it lives in the board's external SDRAM rather than in
+      // internal RAM — a rotated widget's transform layer is one contiguous
+      // ARGB8888 block the size of the widget, which internal RAM could never
+      // hold. See docs/lvgl-configuration.md §1.4.
+      memSizeKb: 4096,
     },
   },
   {
@@ -174,7 +178,9 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     lvgl: {
       fontLarge: true,
       defaultFont: 'montserrat_14',
-      memSizeKb: 256,
+      // 4 MB in external SDRAM, above the frame buffers — see the F746 note
+      // and docs/lvgl-configuration.md §1.4.
+      memSizeKb: 4096,
     },
   },
   {
@@ -220,10 +226,25 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     lvgl: {
       fontLarge: true,
       defaultFont: 'montserrat_14',
-      memSizeKb: 256,
+      // 1 MB, out of the 1472 KB of internal SRAM left after the frame
+      // buffers. The only board here with no external RAM to grow into, so
+      // its ceiling for transformed widgets is the lowest of the three.
+      memSizeKb: 1024,
     },
   },
 ] as const;
+
+/**
+ * The LVGL heap as a person reads it: whole megabytes once the number stops
+ * being a comfortable count of kilobytes. These heaps became megabytes when
+ * they moved to external SDRAM, and "4096 KB" is a number nobody says out loud.
+ */
+export function formatMemSize(memSizeKb: number): string {
+  if (memSizeKb >= 1024 && memSizeKb % 1024 === 0) {
+    return `${memSizeKb / 1024} MB`;
+  }
+  return `${memSizeKb} KB`;
+}
 
 export function isSupportedBoardId(value: unknown): value is BoardId {
   return SUPPORTED_BOARDS.some((board) => board.id === value);
