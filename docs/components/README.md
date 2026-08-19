@@ -10,13 +10,13 @@ This directory holds the detailed design document for every widget in EDT HMI St
 
 ## Overview
 
-The editor supports **20 widgets** in 5 categories:
+The editor supports **21 widgets** in 5 categories:
 
 | Category | Icon | Count | Purpose |
 |------|------|--------|------|
 | Basic (basic) | 📦 | 4 | The building blocks of an interface |
 | Input (input) | ✏️ | 5 | Controls the user interacts with |
-| Shapes (shape) | 🔷 | 2 | Decorative geometry, drawn rather than operated |
+| Shapes (shape) | 🔷 | 3 | Decorative geometry, drawn rather than operated |
 | Container (container) | 📁 | 4 | Layout containers that hold children |
 | Display (display) | 📊 | 5 | Data display and visualisation |
 
@@ -53,6 +53,7 @@ Shapes are drawn, not operated. Each one is named for itself in the palette and 
 |------|------|------|----------|------|------|------|
 | Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | A filled, bordered box built on `lv_obj_create`. Square corners and no padding | [rectangle.md](rectangle.md) |
 | Line | `line` | 📏 | 100×2 | ❌ | A line, defined by an array of points. Built on `lv_line_create`; its box is the points' extent, never wider than the stroke | [line.md](line.md) |
+| Circle | `circle` | 🔵 | 100×100 | ❌ | A disc, ring, sector or annular sector. `lv_obj_create` with a circular radius, or `lv_arc_create` for a sector. Circular only — the software renderer has no elliptical primitive | [circle.md](circle.md) |
 
 ---
 
@@ -166,6 +167,7 @@ docs/components/
 ├── slider.md          ← Slider
 ├── rectangle.md       ← Rectangle
 ├── line.md            ← Line
+├── circle.md          ← Circle
 ├── obj.md             ← Container
 ├── tabview.md         ← Tab View
 ├── tileview.md        ← Tile View

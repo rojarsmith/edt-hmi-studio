@@ -10,13 +10,13 @@
 
 ## 元件總覽
 
-編輯器共支援 **20 個元件**，分為 5 個類別：
+編輯器共支援 **21 個元件**，分為 5 個類別：
 
 | 類別 | 圖示 | 元件數 | 說明 |
 |------|------|--------|------|
 | 基礎 (basic) | 📦 | 4 | 建構介面的基本元素 |
 | 輸入 (input) | ✏️ | 5 | 供使用者互動的輸入控制項 |
-| 圖形 (shape) | 🔷 | 2 | 裝飾用幾何圖形，只繪製、不操作 |
+| 圖形 (shape) | 🔷 | 3 | 裝飾用幾何圖形，只繪製、不操作 |
 | 容器 (container) | 📁 | 4 | 可容納子元件的版面容器 |
 | 顯示 (display) | 📊 | 5 | 資料呈現與視覺化元件 |
 
@@ -53,6 +53,7 @@
 |------|------|------|----------|------|------|------|
 | Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | 以 `lv_obj_create` 實作的填色方框，直角、無內距 | [rectangle.md](rectangle.md) |
 | Line | `line` | 📏 | 100×2 | ❌ | 線條，以座標點陣列定義線段，以 `lv_line_create` 實作；外框就是點座標的範圍，不會比筆畫更寬 | [line.md](line.md) |
+| Circle | `circle` | 🔵 | 100×100 | ❌ | 圓盤、圓環、扇形與環狀扇形。以帶圓形半徑的 `lv_obj_create` 或 `lv_arc_create` 實作。只有正圓 — 軟體渲染器沒有橢圓圖元 | [circle.md](circle.md) |
 
 ---
 
@@ -166,6 +167,7 @@ docs/components/
 ├── slider.md          ← Slider 滑桿
 ├── rectangle.md       ← Rectangle 矩形
 ├── line.md            ← Line 線條
+├── circle.md          ← Circle 圓形
 ├── obj.md             ← Container 通用容器
 ├── tabview.md         ← Tab View 分頁檢視
 ├── tileview.md        ← Tile View 圖磚檢視
