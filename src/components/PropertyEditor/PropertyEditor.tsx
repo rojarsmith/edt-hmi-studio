@@ -27,6 +27,7 @@ import {
 import PanelChevron from '../LogicEditor/PanelChevron';
 import EventPanel from '../EventPanel';
 import AnimationProperties from './AnimationProperties';
+import NumberField from './NumberField';
 import './PropertyEditor.css';
 
 // Inline CollapsibleSection component
@@ -636,18 +637,18 @@ const PropertyEditor: React.FC = () => {
           <div className="property-row two-col">
             <div className="property-field">
               <label>X</label>
-              <input
-                type="number"
+              <NumberField
                 value={component.x}
-                onChange={(e) => handlePropertyChange('x', parseInt(e.target.value) || 0)}
+                aria-label="X"
+                onChange={(x) => handlePropertyChange('x', x)}
               />
             </div>
             <div className="property-field">
               <label>Y</label>
-              <input
-                type="number"
+              <NumberField
                 value={component.y}
-                onChange={(e) => handlePropertyChange('y', parseInt(e.target.value) || 0)}
+                aria-label="Y"
+                onChange={(y) => handlePropertyChange('y', y)}
               />
             </div>
           </div>

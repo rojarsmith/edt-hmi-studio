@@ -12,6 +12,7 @@ import { componentsById } from '../../utils/animationAssets';
 import { animationTracks, newTrack } from '../../utils/animationTracks';
 import { supportsOffset, trackValueMode } from '../../utils/animationValues';
 import { isAnimationNameTaken } from '../../utils/animationNames';
+import NumberField from './NumberField';
 
 const EASING_OPTIONS: { type: AnimationEasing; label: string }[] = [
   { type: 'linear', label: 'Linear' },
@@ -169,34 +170,31 @@ const AnimationProperties: React.FC<{
           <label title="How long the movement itself takes, once it has started.">
             Duration
           </label>
-          <input
-            type="number"
+          <NumberField
             min={0}
             value={animation.duration}
             aria-label="Duration"
-            onChange={(e) => updateAnimation(animation.id, { duration: Number(e.target.value) })}
+            onChange={(duration) => updateAnimation(animation.id, { duration })}
           />
         </div>
         <div className="property-row">
           <label title="How long to wait after the animation is triggered before it starts moving. The widget stays where it is for this long.">
             Delay
           </label>
-          <input
-            type="number"
+          <NumberField
             min={0}
             value={animation.delay}
             aria-label="Delay"
-            onChange={(e) => updateAnimation(animation.id, { delay: Number(e.target.value) })}
+            onChange={(delay) => updateAnimation(animation.id, { delay })}
           />
         </div>
         <div className="property-row">
           <label title="0 plays it once.">Repeat</label>
-          <input
-            type="number"
+          <NumberField
             min={0}
             value={animation.repeat}
             aria-label="Repeat"
-            onChange={(e) => updateAnimation(animation.id, { repeat: Number(e.target.value) })}
+            onChange={(repeat) => updateAnimation(animation.id, { repeat })}
           />
         </div>
       </div>
@@ -259,31 +257,28 @@ const AnimationProperties: React.FC<{
                   <label title="How far to travel, in pixels. Negative moves left or up.">
                     Distance
                   </label>
-                  <input
-                    type="number"
+                  <NumberField
                     value={track.distance ?? 0}
                     aria-label="Distance"
-                    onChange={(e) => updateTrack(track.id, { distance: Number(e.target.value) })}
+                    onChange={(distance) => updateTrack(track.id, { distance })}
                   />
                 </div>
               ) : (
                 <div className="property-row two-col">
                   <div className="property-field">
                     <label>Start</label>
-                    <input
-                      type="number"
+                    <NumberField
                       value={track.startValue}
                       aria-label="Start Value"
-                      onChange={(e) => updateTrack(track.id, { startValue: Number(e.target.value) })}
+                      onChange={(startValue) => updateTrack(track.id, { startValue })}
                     />
                   </div>
                   <div className="property-field">
                     <label>End</label>
-                    <input
-                      type="number"
+                    <NumberField
                       value={track.endValue}
                       aria-label="End Value"
-                      onChange={(e) => updateTrack(track.id, { endValue: Number(e.target.value) })}
+                      onChange={(endValue) => updateTrack(track.id, { endValue })}
                     />
                   </div>
                 </div>
