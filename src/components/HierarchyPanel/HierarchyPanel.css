@@ -10,9 +10,6 @@
   background: #f8f9fa;
   color: #333;
   font-size: 13px;
-  /* Mid-column now, so it draws its own divider instead of relying on the
-     column's last-child rule. */
-  border-top: 1px solid #e0e0e0;
   /* Holds exactly the height the drag stored, and clips its own content so a
      short panel never paints over the one below it. */
   flex-shrink: 0;

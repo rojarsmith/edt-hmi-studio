@@ -7,7 +7,6 @@
   background: #f8f9fa;
   color: #333;
   font-size: 13px;
-  border-bottom: 1px solid #e0e0e0;
   /* Height comes from the drag-stored inline value while expanded; the panel
      clips its own content so a short panel never paints over the one below. */
   flex: 0 0 auto;
@@ -18,11 +17,6 @@
 /* Collapsed leaves just the header bar. */
 .screen-manager.collapsed {
   flex: 0 0 auto;
-}
-
-/* The bar and its grip come from panelBar.css; only the collapsed look is ours. */
-.screen-manager.collapsed .sm-header {
-  border-bottom: none;
 }
 
 .sm-search {

@@ -23,6 +23,16 @@
   transition: background 0.15s;
 }
 
+/*
+ * A collapsed panel renders its bar and nothing else, which makes the bar the
+ * panel's own bottom edge. Its underline would then sit directly against the
+ * separator the column draws above the next panel — the seam twice as thick as
+ * every other one.
+ */
+.panel-bar:last-child {
+  border-bottom: none;
+}
+
 .panel-bar:hover {
   background: #f0f0f0;
 }

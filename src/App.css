@@ -217,6 +217,12 @@ body {
 .left-panel > *:last-child {
   flex: 0 0 auto;
   min-height: 0;
+}
+
+/* One separator per boundary, drawn here rather than by the panels. Each of
+   them used to bring its own border-top or border-bottom, so a pair that both
+   had one — Screens and Animations — met in a seam twice as thick as the rest. */
+.left-panel > * + * {
   border-top: 1px solid #e0e0e0;
 }
 
