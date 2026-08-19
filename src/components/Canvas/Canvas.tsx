@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useEffect, useState, useMemo } from 'react'
 import { useDroppable } from '@dnd-kit/core';
 import { useEditorStore } from '../../store/editorStore';
 import type { LvglComponent, ResizeHandle } from '../../types';
+import { resizeBox } from './resizeGeometry';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
 import CanvasComponent from './CanvasComponent';
 import AlignmentGuides from './AlignmentGuides';
@@ -66,6 +67,10 @@ const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStartMousePos = useRef({ x: 0, y: 0 });
   const dragStartCompPos = useRef({ x: 0, y: 0 });
+  // Geometry and pointer position a resize started from. Every frame of the
+  // drag is measured against these rather than against the frame before it, so
+  // the edges the handle does not touch stay exactly where they were.
+  const resizeStartRef = useRef({ box: { x: 0, y: 0, width: 0, height: 0 }, mouseX: 0, mouseY: 0 });
   const [spacePressed, setSpacePressed] = useState(false);
   const rafRef = useRef<number>(0);
 
@@ -229,70 +234,23 @@ const Canvas: React.FC = () => {
     [clearSelection, setBoxSelection]
   );
 
-  // Handle resize logic
+  // Handle resize logic — the geometry rules live in resizeGeometry.ts
   const handleResize = useCallback(
     (componentId: string, handle: ResizeHandle, mouseX: number, mouseY: number) => {
       const state = useEditorStore.getState();
       const comp = state.getComponentById(componentId);
       if (!comp) return;
 
-      const currentDrag = state.drag;
-      let newX = comp.x;
-      let newY = comp.y;
-      let newWidth = comp.width;
-      let newHeight = comp.height;
+      const start = resizeStartRef.current;
+      const box = resizeBox(
+        start.box,
+        handle,
+        mouseX - start.mouseX,
+        mouseY - start.mouseY,
+        state.canvas,
+      );
 
-      const deltaX = mouseX - currentDrag.startX;
-      const deltaY = mouseY - currentDrag.startY;
-
-      switch (handle) {
-        case 'top-left':
-          newX = comp.x + deltaX;
-          newY = comp.y + deltaY;
-          newWidth = comp.width - deltaX;
-          newHeight = comp.height - deltaY;
-          break;
-        case 'top':
-          newY = comp.y + deltaY;
-          newHeight = comp.height - deltaY;
-          break;
-        case 'top-right':
-          newY = comp.y + deltaY;
-          newWidth = comp.width + deltaX;
-          newHeight = comp.height - deltaY;
-          break;
-        case 'left':
-          newX = comp.x + deltaX;
-          newWidth = comp.width - deltaX;
-          break;
-        case 'right':
-          newWidth = comp.width + deltaX;
-          break;
-        case 'bottom-left':
-          newX = comp.x + deltaX;
-          newWidth = comp.width - deltaX;
-          newHeight = comp.height + deltaY;
-          break;
-        case 'bottom':
-          newHeight = comp.height + deltaY;
-          break;
-        case 'bottom-right':
-          newWidth = comp.width + deltaX;
-          newHeight = comp.height + deltaY;
-          break;
-      }
-
-      // Ensure minimum size
-      if (newWidth < 10) {
-        newWidth = 10;
-        if (handle.includes('left')) newX = comp.x + comp.width - 10;
-      }
-      if (newHeight < 10) {
-        newHeight = 10;
-        if (handle.includes('top')) newY = comp.y + comp.height - 10;
-      }
-
-      resizeComponentAndUpdateDrag(componentId, newWidth, newHeight, mouseX, mouseY, newX, newY);
+      resizeComponentAndUpdateDrag(componentId, box.width, box.height, mouseX, mouseY, box.x, box.y);
     },
     [resizeComponentAndUpdateDrag]
   );
@@ -660,9 +618,15 @@ const Canvas: React.FC = () => {
       if (comp?.locked) return;
 
       const rect = canvasRef.current?.getBoundingClientRect();
-      if (rect) {
+      if (rect && comp) {
         const x = (e.clientX - rect.left) / state.canvas.zoom;
         const y = (e.clientY - rect.top) / state.canvas.zoom;
+
+        resizeStartRef.current = {
+          box: { x: comp.x, y: comp.y, width: comp.width, height: comp.height },
+          mouseX: x,
+          mouseY: y,
+        };
 
         startDrag('resize', {
           draggedComponentId: componentId,

@@ -1935,25 +1935,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   // Combined resize + drag update in a single set call
+  // The geometry arrives finished: the canvas has already snapped the dragged
+  // edges and held the anchored ones (see resizeGeometry.ts). Rounding again
+  // here would round position and size apart and walk the edge the author is
+  // not touching, which is the defect that module exists to prevent.
   resizeComponentAndUpdateDrag: (id, width, height, dragStartX, dragStartY, x, y) => {
-    const { canvas, currentScreenId } = get();
-    let finalWidth = Math.max(10, width);
-    let finalHeight = Math.max(10, height);
-    
-    if (canvas.snapToGrid) {
-      finalWidth = Math.round(width / canvas.gridSize) * canvas.gridSize;
-      finalHeight = Math.round(height / canvas.gridSize) * canvas.gridSize;
-      finalWidth = Math.max(canvas.gridSize, finalWidth);
-      finalHeight = Math.max(canvas.gridSize, finalHeight);
-    }
-    
-    const updates: Partial<LvglComponent> = { width: finalWidth, height: finalHeight };
-    if (x !== undefined) {
-      updates.x = canvas.snapToGrid ? Math.round(x / canvas.gridSize) * canvas.gridSize : x;
-    }
-    if (y !== undefined) {
-      updates.y = canvas.snapToGrid ? Math.round(y / canvas.gridSize) * canvas.gridSize : y;
-    }
+    const { currentScreenId } = get();
+    const updates: Partial<LvglComponent> = {
+      width: Math.max(1, width),
+      height: Math.max(1, height),
+    };
+    if (x !== undefined) updates.x = x;
+    if (y !== undefined) updates.y = y;
     
     set(state => ({
       screens: state.screens.map(screen => {
