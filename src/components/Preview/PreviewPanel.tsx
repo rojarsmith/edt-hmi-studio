@@ -478,8 +478,10 @@ const PreviewPanel: React.FC = () => {
       const styles = comp.styles.default;
       const bgColorStyle = styles.bgColor || '#e0e0e0';
       const borderColor = styles.borderColor || '#cccccc';
-      const borderWidth = styles.borderWidth || 1;
-      const borderRadius = styles.borderRadius || 4;
+      // Nullish, not falsy: a widget that asks for no border or square corners
+      // — which is every shape — means 0, and the canvas already honours it.
+      const borderWidth = styles.borderWidth ?? 1;
+      const borderRadius = styles.borderRadius ?? 4;
       const textColor = styles.textColor || '#333333';
 
       // --- Transform support ---
@@ -659,6 +661,9 @@ const PreviewPanel: React.FC = () => {
           break;
         }
 
+        // A rectangle is the same box a panel draws: fill, gradient, border,
+        // border side and corner radius, all straight from its styles.
+        case 'rectangle':
         case 'obj':
         case 'panel':
         case 'container':

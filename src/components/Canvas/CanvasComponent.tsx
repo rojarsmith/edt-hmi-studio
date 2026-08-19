@@ -539,6 +539,12 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
           </div>
         );
       
+      // A rectangle is nothing but its frame: the wrapper below already paints
+      // the fill, border, radius, gradient and shadow from its styles, so
+      // there is no inner content to draw.
+      case 'rectangle':
+        return null;
+
       case 'obj': {
         // Build layout styles for the container based on props.layout
         const layoutStyle: React.CSSProperties = {};

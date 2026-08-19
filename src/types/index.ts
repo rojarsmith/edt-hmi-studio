@@ -608,6 +608,16 @@ export interface ComponentCategory {
 export interface ComponentDefinition {
   type: string;
   name: string;
+  /**
+   * The widget family shown in the property editor's Type row, when the
+   * palette name is narrower than the family it belongs to. A Rectangle is
+   * one Shape among the several the category will hold, so it is named
+   * `Rectangle` in the palette and reported as a `Shape`.
+   *
+   * Absent means the palette name is the type name, which is what every
+   * widget named after its own LVGL widget does.
+   */
+  typeName?: string;
   icon: string;
   category: string;
   defaultWidth: number;

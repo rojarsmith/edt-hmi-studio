@@ -4,6 +4,7 @@ import type { ComponentDefinition, ComponentCategory } from '../types';
 export const componentCategories: ComponentCategory[] = [
   { id: 'basic', name: 'Basic', icon: '📦', collapsed: false },
   { id: 'input', name: 'Input', icon: '✏️', collapsed: false },
+  { id: 'shape', name: 'Shapes', icon: '🔷', collapsed: false },
   { id: 'container', name: 'Containers', icon: '📁', collapsed: false },
   { id: 'display', name: 'Display', icon: '📊', collapsed: false },
 ];
@@ -246,6 +247,39 @@ export const componentDefinitions: ComponentDefinition[] = [
         borderColor: 'transparent',
         borderWidth: 0,
         borderRadius: 9999,
+        textColor: '#212121',
+        opacity: 1,
+        padding: 0,
+      },
+    },
+    isContainer: false,
+  },
+
+  // Shape Components
+  {
+    type: 'rectangle',
+    name: 'Rectangle',
+    // One shape among the several this category will hold, so the property
+    // editor reports the family rather than repeating the palette name.
+    typeName: 'Shape',
+    icon: '🟦',
+    category: 'shape',
+    defaultWidth: 120,
+    defaultHeight: 80,
+    // No props of its own: everything a rectangle draws — fill, border,
+    // radius, gradient, shadow — is already a style, and the Style section
+    // edits all of them. Line carries lineWidth/lineColor only because LVGL's
+    // line_* styles are reachable no other way.
+    defaultProps: {},
+    defaultStyles: {
+      default: {
+        // No LVGL widget to inherit a theme style from — a shape is drawn,
+        // not themed. Grey fill (color_grey) under a color_text hairline, and
+        // square corners so the default really is a rectangle.
+        bgColor: '#E0E0E0',
+        borderColor: '#212121',
+        borderWidth: 1,
+        borderRadius: 0,
         textColor: '#212121',
         opacity: 1,
         padding: 0,

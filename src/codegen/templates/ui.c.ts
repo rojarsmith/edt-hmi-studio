@@ -122,6 +122,9 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
     checkbox: 'lv_checkbox_create',
     switch: 'lv_switch_create',
     slider: 'lv_slider_create',
+    // A shape has no widget of its own in LVGL: a plain object with the
+    // shape's fill, border and radius styles is exactly a rectangle.
+    rectangle: 'lv_obj_create',
     obj: 'lv_obj_create',
     tabview: 'lv_tabview_create',
     tileview: 'lv_tileview_create',

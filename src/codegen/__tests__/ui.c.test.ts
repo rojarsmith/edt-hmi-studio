@@ -381,6 +381,18 @@ describe('generateUiSource', () => {
       const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_divider = lv_line_create(ui_screen_main);');
     });
+
+    it('creates rectangle as a plain object wearing its shape styles', () => {
+      const rect = createComponent('rectangle', {
+        name: 'frame',
+        styles: { default: { bgColor: '#E0E0E0', borderWidth: 1, borderRadius: 0 } },
+      });
+      const screens = [createScreen({ name: 'main', components: [rect] })];
+      const result = generateUiSource(screens, defaultOptions());
+      expect(result).toContain('ui_frame = lv_obj_create(ui_screen_main);');
+      expect(result).toContain('lv_obj_set_style_bg_color(ui_frame, lv_color_hex(0xE0E0E0), 0);');
+      expect(result).toContain('lv_obj_set_style_radius(ui_frame, 0, 0);');
+    });
   });
 
   // ─── Style Generation ─────────────────────────────────────────

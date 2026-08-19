@@ -68,6 +68,14 @@ describe('componentDefinitions', () => {
       expect(inputs.every(c => c.category === 'input')).toBe(true);
     });
 
+    it('should return shape components', () => {
+      const shapes = getComponentsByCategory('shape');
+      expect(shapes.length).toBeGreaterThan(0);
+      expect(shapes.every(c => c.category === 'shape')).toBe(true);
+      // Shapes are drawn, not filled with children
+      expect(shapes.every(c => !c.isContainer)).toBe(true);
+    });
+
     it('should return container components', () => {
       const containers = getComponentsByCategory('container');
       expect(containers.length).toBeGreaterThan(0);
@@ -93,6 +101,7 @@ describe('componentDefinitions', () => {
     const expectedTypes = [
       'btn', 'label', 'img', 'image-button', 'line',
       'textarea', 'dropdown', 'checkbox', 'switch', 'slider',
+      'rectangle',
       'obj', 'tabview', 'tileview', 'win',
       'bar', 'arc', 'spinner', 'chart', 'table', 'calendar',
     ];
@@ -157,18 +166,41 @@ describe('componentDefinitions', () => {
     });
   });
 
+  describe('rectangle definition', () => {
+    it('is a style-only shape reported as a Shape', () => {
+      const def = getComponentDefinition('rectangle');
+
+      expect(def).toBeDefined();
+      expect(def!.name).toBe('Rectangle');
+      expect(def!.typeName).toBe('Shape');
+      expect(def!.category).toBe('shape');
+      expect(def!.isContainer).toBe(false);
+      // Everything a rectangle draws is a style, so it carries no props
+      expect(def!.defaultProps).toEqual({});
+      // Square corners, or it would not be the rectangle it is named after
+      expect(def!.defaultStyles.default.borderRadius).toBe(0);
+    });
+  });
+
   // --- componentCategories ---
   describe('componentCategories', () => {
-    it('should have 4 categories', () => {
-      expect(componentCategories).toHaveLength(4);
+    it('should have 5 categories', () => {
+      expect(componentCategories).toHaveLength(5);
     });
 
-    it('should have basic, input, container, display categories', () => {
+    it('should have basic, input, shape, container, display categories', () => {
       const ids = componentCategories.map(c => c.id);
       expect(ids).toContain('basic');
       expect(ids).toContain('input');
+      expect(ids).toContain('shape');
       expect(ids).toContain('container');
       expect(ids).toContain('display');
+    });
+
+    it('lists Shapes between Input and Containers, as the palette shows them', () => {
+      const ids = componentCategories.map(c => c.id);
+      expect(ids.indexOf('shape')).toBe(ids.indexOf('input') + 1);
+      expect(ids.indexOf('container')).toBe(ids.indexOf('shape') + 1);
     });
   });
 });

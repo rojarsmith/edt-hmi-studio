@@ -88,13 +88,13 @@ function GridTemplatePreview({ value }: { value: string }) {
 
 // Style section visibility per component type (Task 2)
 const STYLE_SECTION_VISIBILITY: Record<string, Set<string>> = {
-  shadow: new Set(['btn', 'image-button', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'table', 'chart', 'calendar', 'bar', 'arc']),
-  transform: new Set(['btn', 'label', 'img', 'image-button', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'checkbox', 'switch', 'slider', 'bar', 'arc', 'spinner', 'chart', 'table', 'calendar']),
-  gradient: new Set(['btn', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'bar', 'slider']),
-  outline: new Set(['btn', 'image-button', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'checkbox', 'switch', 'slider', 'bar', 'arc', 'table', 'chart', 'calendar']),
+  shadow: new Set(['btn', 'image-button', 'rectangle', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'table', 'chart', 'calendar', 'bar', 'arc']),
+  transform: new Set(['btn', 'label', 'img', 'image-button', 'rectangle', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'checkbox', 'switch', 'slider', 'bar', 'arc', 'spinner', 'chart', 'table', 'calendar']),
+  gradient: new Set(['btn', 'rectangle', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'bar', 'slider']),
+  outline: new Set(['btn', 'image-button', 'rectangle', 'obj', 'tabview', 'tileview', 'win', 'textarea', 'dropdown', 'checkbox', 'switch', 'slider', 'bar', 'arc', 'table', 'chart', 'calendar']),
   scrollbar: new Set(['obj', 'tabview', 'tileview', 'win', 'textarea']),
   textStyle: new Set(['btn', 'label', 'textarea', 'dropdown', 'checkbox', 'table', 'calendar']),
-  blendMode: new Set(['btn', 'label', 'img', 'image-button', 'obj', 'chart']),
+  blendMode: new Set(['btn', 'label', 'img', 'image-button', 'rectangle', 'obj', 'chart']),
 };
 
 // Flags that only apply to container-like components
@@ -624,7 +624,7 @@ const PropertyEditor: React.FC = () => {
             <label>Type</label>
             <div className="property-value readonly">
               <span className="component-type-icon">{definition?.icon}</span>
-              {definition?.name || component.type}
+              {definition?.typeName || definition?.name || component.type}
             </div>
           </div>
         </div>

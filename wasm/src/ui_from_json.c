@@ -502,6 +502,8 @@ static const type_entry_t type_table[] = {
     { "obj",       create_obj },
     { "panel",     create_obj },
     { "container", create_obj },
+    /* A rectangle is a plain object wearing the shape's styles. */
+    { "rectangle", create_obj },
     { "btn",       create_btn },
     { "label",     create_label },
     { "slider",    create_slider },

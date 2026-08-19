@@ -25,6 +25,9 @@ export function resolveFallbackBackground(type: string): string | undefined {
     case 'img': return 'transparent';
     case 'image-button': return 'transparent';
     case 'label': return 'transparent';
+    // A rectangle ships with a fill; clearing it to transparent is how an
+    // outline-only shape is drawn, so it must not be filled back in.
+    case 'rectangle': return 'transparent';
     case 'arc': return 'transparent';
     case 'spinner': return 'transparent';
     case 'checkbox': return 'transparent';
