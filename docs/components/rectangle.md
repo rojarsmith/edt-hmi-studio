@@ -6,7 +6,7 @@
 
 ## 1. Name and summary
 
-Rectangle draws a filled, bordered box. It is the first member of the **Shapes** category — decorative geometry rather than a control — and is used for panels behind a group of widgets, frames, dividers, colour swatches and status blocks whose fill is repainted at runtime.
+Rectangle draws a filled, bordered box. It belongs to the **Shapes** category — decorative geometry rather than a control, beside [Line](line.md) — and is used for panels behind a group of widgets, frames, dividers, colour swatches and status blocks whose fill is repainted at runtime.
 
 LVGL has no rectangle widget: a rectangle *is* a plain object wearing a fill, a border and a corner radius, which is exactly what `lv_obj_create` produces. Rectangle is not a container (`isContainer = false`) and cannot hold children — the Container (`obj`) widget is what holds children.
 
@@ -16,7 +16,7 @@ LVGL has no rectangle widget: a rectangle *is* a plain object wearing a fill, a 
 type: 'rectangle'
 ```
 
-The palette lists it as **Rectangle**, but the property editor reports its **Type** as `Shape`: the widget is one shape among the several this category will hold, and the definition names that family through the optional `typeName` field. A new instance is named `Rectangle_1`, `Rectangle_2`, … by the shared `nextComponentName` rule, which reuses numbers freed by deletions.
+The palette lists it as **Rectangle**, but the property editor reports its **Type** as `Shape`: the widget is one shape among those this category holds, and the definition names that family through the optional `typeName` field — Line carries the same one. A new instance is named `Rectangle_1`, `Rectangle_2`, … by the shared `nextComponentName` rule, which reuses numbers freed by deletions.
 
 ## 3. Category
 
@@ -251,6 +251,6 @@ lv_obj_set_style_pad_all(ui_frame, 0, 0);
 
 4. **Clickable by default.** LVGL's base object carries `LV_OBJ_FLAG_CLICKABLE`, so events bind to a rectangle without ceremony — unlike Line, whose 4px hit area makes event binding impractical. Clear the Clickable flag to let touches pass through to whatever sits underneath.
 
-5. **A family, not a one-off.** `typeName: 'Shape'` exists so the property editor can report the family while the palette names the specific shape. A future Circle or Triangle is a new definition in the same category with the same `typeName`, not a variant prop on this one.
+5. **A family, not a one-off.** `typeName: 'Shape'` exists so the property editor can report the family while the palette names the specific shape. Line carries it too, and a future Circle or Triangle is a new definition in the same category with the same `typeName`, not a variant prop on this one.
 
 6. **No Modbus binding.** The binding editor lists widgets that hold a value. A shape does not, so it is deliberately absent; drive a rectangle's appearance from a logic graph instead.

@@ -14,9 +14,9 @@
 
 | 類別 | 圖示 | 元件數 | 說明 |
 |------|------|--------|------|
-| 基礎 (basic) | 📦 | 5 | 建構介面的基本元素 |
+| 基礎 (basic) | 📦 | 4 | 建構介面的基本元素 |
 | 輸入 (input) | ✏️ | 5 | 供使用者互動的輸入控制項 |
-| 圖形 (shape) | 🔷 | 1 | 裝飾用幾何圖形，只繪製、不操作 |
+| 圖形 (shape) | 🔷 | 2 | 裝飾用幾何圖形，只繪製、不操作 |
 | 容器 (container) | 📁 | 4 | 可容納子元件的版面容器 |
 | 顯示 (display) | 📊 | 5 | 資料呈現與視覺化元件 |
 
@@ -29,7 +29,6 @@
 | Button | `btn` | 🔘 | 100×40 | ✅ | 按鈕，內部會自動建立 Label 子元件顯示文字。支援點擊互動，是唯一 `isContainer=true` 的基礎元件 | [btn.md](btn.md) |
 | Label | `label` | 🏷️ | 80×24 | ❌ | 文字標籤，用於顯示靜態或動態文字。背景透明，繼承父層的文字顏色 | [label.md](label.md) |
 | Image | `img` | 🖼️ | 100×100 | ❌ | 圖片顯示元件。v9 使用 `lv_image_create`，v8 使用 `lv_img_create` | [img.md](img.md) |
-| Line | `line` | 📏 | 100×4 | ❌ | 線條繪製元件，以座標點陣列定義線段 | [line.md](line.md) |
 | Spinner | `spinner` | ⏳ | 50×50 | ❌ | 旋轉載入動畫，以 Arc 元件為基礎實作，可自訂轉速 | [spinner.md](spinner.md) |
 
 ---
@@ -48,11 +47,12 @@
 
 ## 圖形元件 (Shape)
 
-圖形是畫出來的，不是拿來操作的：它們沒有自己的 props，所有外觀都來自共用的樣式系統。
+圖形是畫出來的，不是拿來操作的。每個圖形在元件面板中以自己的名稱呈現，屬性面板的 Type 則統一顯示為所屬家族 `Shape`。
 
 | 元件 | 類型 | 圖示 | 預設尺寸 | 容器 | 說明 | 文件 |
 |------|------|------|----------|------|------|------|
-| Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | 以 `lv_obj_create` 實作的填色方框，直角、無內距；屬性面板中的 Type 顯示為 `Shape` | [rectangle.md](rectangle.md) |
+| Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | 以 `lv_obj_create` 實作的填色方框，直角、無內距 | [rectangle.md](rectangle.md) |
+| Line | `line` | 📏 | 100×2 | ❌ | 線條，以座標點陣列定義線段，以 `lv_line_create` 實作；外框就是點座標的範圍，不會比筆畫更寬 | [line.md](line.md) |
 
 ---
 
@@ -158,7 +158,6 @@ docs/components/
 ├── btn.md             ← Button 按鈕
 ├── label.md           ← Label 標籤
 ├── img.md             ← Image 圖片
-├── line.md            ← Line 線條
 ├── spinner.md         ← Spinner 載入動畫
 ├── textarea.md        ← Textarea 文字輸入
 ├── dropdown.md        ← Dropdown 下拉選單
@@ -166,6 +165,7 @@ docs/components/
 ├── switch.md          ← Switch 切換開關
 ├── slider.md          ← Slider 滑桿
 ├── rectangle.md       ← Rectangle 矩形
+├── line.md            ← Line 線條
 ├── obj.md             ← Container 通用容器
 ├── tabview.md         ← Tab View 分頁檢視
 ├── tileview.md        ← Tile View 圖磚檢視

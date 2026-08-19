@@ -14,9 +14,9 @@ The editor supports **20 widgets** in 5 categories:
 
 | Category | Icon | Count | Purpose |
 |------|------|--------|------|
-| Basic (basic) | 📦 | 5 | The building blocks of an interface |
+| Basic (basic) | 📦 | 4 | The building blocks of an interface |
 | Input (input) | ✏️ | 5 | Controls the user interacts with |
-| Shapes (shape) | 🔷 | 1 | Decorative geometry, drawn rather than operated |
+| Shapes (shape) | 🔷 | 2 | Decorative geometry, drawn rather than operated |
 | Container (container) | 📁 | 4 | Layout containers that hold children |
 | Display (display) | 📊 | 5 | Data display and visualisation |
 
@@ -29,7 +29,6 @@ The editor supports **20 widgets** in 5 categories:
 | Button | `btn` | 🔘 | 100×40 | ✅ | A button; a Label child is created inside it automatically to show the text. Supports click interaction, and is the only basic widget with `isContainer=true` | [btn.md](btn.md) |
 | Label | `label` | 🏷️ | 80×24 | ❌ | A text label for static or dynamic text. Transparent background, inherits the parent's text colour | [label.md](label.md) |
 | Image | `img` | 🖼️ | 100×100 | ❌ | Displays an image. v9 uses `lv_image_create`, v8 uses `lv_img_create` | [img.md](img.md) |
-| Line | `line` | 📏 | 100×4 | ❌ | Draws a line, defined by an array of points | [line.md](line.md) |
 | Spinner | `spinner` | ⏳ | 50×50 | ❌ | A spinning loading indicator built on the Arc widget, with configurable speed | [spinner.md](spinner.md) |
 
 ---
@@ -48,11 +47,12 @@ The editor supports **20 widgets** in 5 categories:
 
 ## Shape widgets
 
-Shapes are drawn, not operated: they carry no props of their own, and everything they paint comes from the shared style system.
+Shapes are drawn, not operated. Each one is named for itself in the palette and reported in the property editor as the `Shape` type, which is the family they belong to.
 
 | Widget | Type | Icon | Default size | Container | Description | Document |
 |------|------|------|----------|------|------|------|
-| Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | A filled, bordered box built on `lv_obj_create`. Square corners and no padding; reported in the property editor as the `Shape` type | [rectangle.md](rectangle.md) |
+| Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | A filled, bordered box built on `lv_obj_create`. Square corners and no padding | [rectangle.md](rectangle.md) |
+| Line | `line` | 📏 | 100×2 | ❌ | A line, defined by an array of points. Built on `lv_line_create`; its box is the points' extent, never wider than the stroke | [line.md](line.md) |
 
 ---
 
@@ -158,7 +158,6 @@ docs/components/
 ├── btn.md             ← Button
 ├── label.md           ← Label
 ├── img.md             ← Image
-├── line.md            ← Line
 ├── spinner.md         ← Spinner
 ├── textarea.md        ← Textarea
 ├── dropdown.md        ← Dropdown
@@ -166,6 +165,7 @@ docs/components/
 ├── switch.md          ← Switch
 ├── slider.md          ← Slider
 ├── rectangle.md       ← Rectangle
+├── line.md            ← Line
 ├── obj.md             ← Container
 ├── tabview.md         ← Tab View
 ├── tileview.md        ← Tile View
