@@ -65,11 +65,14 @@ export interface Animation {
   startValue: number;
   endValue: number;
   /**
-   * How startValue and endValue are read: as coordinates, or as a distance
-   * from where the component sits. Absent means the default for the property —
-   * see animationValueMode() in src/utils/animationValues.ts.
+   * How the movement is stated. `absolute` uses startValue and endValue as
+   * coordinates; `offset` uses `distance`, travelled from wherever the widget
+   * is when the animation runs. Absent means absolute — see
+   * animationValueMode() in src/utils/animationValues.ts.
    */
   valueMode?: 'absolute' | 'offset';
+  /** How far an offset animation travels. Negative moves left or up. */
+  distance?: number;
 }
 
 // LVGL Component Types

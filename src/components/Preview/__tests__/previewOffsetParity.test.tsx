@@ -3,17 +3,17 @@
 // They did not: the canvas drew an x animation as a shift from where the
 // component sits, while the generator wrote the value straight into
 // lv_obj_set_x. A slide-in on a widget placed anywhere but x: 0 therefore
-// looked right in the preview and landed somewhere else on the board. Both now
-// resolve through the same helper.
+// looked right in the preview and landed somewhere else on the board.
 
 import { describe, it, expect } from 'vitest';
 import { generateUiSource } from '../../../codegen/templates/ui.c';
-import type { Animation, LvglComponent, Screen } from '../../../types';
-import { resolvedAnimationValues } from '../../../utils/animationValues';
+import type { Animation, EventBinding, LvglComponent, Screen } from '../../../types';
+import { previewValues } from '../../../utils/animationValues';
 
-const placed: Pick<LvglComponent, 'x' | 'y'> = { x: 40, y: 25 };
+/** Parked off the left edge — where a slide-in sets off. */
+const placed: Pick<LvglComponent, 'x' | 'y'> = { x: -100, y: 25 };
 
-function slideIn(overrides: Partial<Animation> = {}): Animation {
+function animation(overrides: Partial<Animation> = {}): Animation {
   return {
     id: 'a1',
     name: 'Slide_In_1',
@@ -24,7 +24,7 @@ function slideIn(overrides: Partial<Animation> = {}): Animation {
     delay: 0,
     repeat: 0,
     property: 'x',
-    startValue: -110,
+    startValue: 0,
     endValue: 0,
     ...overrides,
   };
@@ -50,34 +50,45 @@ function component(): LvglComponent {
   };
 }
 
-/** The x the firmware would set at the animation's first and last frame. */
-function firmwareValues(animation: Animation): [number, number] {
-  const screens: Screen[] = [{ id: 's1', name: 'main', components: [component()] }];
-  const source = generateUiSource(
+const playOnLoad: EventBinding = {
+  id: 'e1',
+  eventType: 'LV_EVENT_SCREEN_LOADED',
+  handlerType: 'builtin',
+  action: { type: 'playAnimation', animationId: 'a1' },
+};
+
+function generate(anim: Animation): string {
+  const screens: Screen[] = [{
+    id: 's1', name: 'main', components: [component()], events: [playOnLoad],
+  }];
+  return generateUiSource(
     screens, { lvglVersion: '9', generateComments: false } as never,
-    undefined, [], undefined, undefined, [], undefined, undefined, undefined, [], [], [animation],
+    undefined, [], undefined, undefined, [], undefined, undefined, undefined, [], [], [anim],
   );
-  const match = source.match(/lv_anim_set_values\(&anim, (-?\d+), (-?\d+)\);/)!;
-  return [Number(match[1]), Number(match[2])];
 }
 
 describe('preview and firmware agree on position', () => {
-  it('both end the slide where the component was designed', () => {
-    const animation = slideIn();
+  it('both set off from where the component was parked', () => {
+    const travelling = animation({ valueMode: 'offset', distance: 100 });
 
-    const preview = resolvedAnimationValues(animation, placed);
+    const preview = previewValues(travelling, placed);
+    const source = generate(travelling);
 
-    expect(firmwareValues(animation)).toEqual([preview.startValue, preview.endValue]);
-    // And that place is where the designer put it.
-    expect(preview.endValue).toBe(placed.x);
+    // The firmware restores that same place before replaying the entry, then
+    // travels the distance from it — which is the journey the canvas draws.
+    expect(source).toContain(`lv_obj_set_x(ui_title, ${preview.startValue});`);
+    expect(source).toContain('lv_anim_set_values(&anim, from, from + (100));');
+    expect(preview).toEqual({ startValue: -100, endValue: 0 });
   });
 
   it('both take an absolute animation literally', () => {
-    const animation = slideIn({ valueMode: 'absolute' });
+    const fixed = animation({ valueMode: 'absolute', startValue: -110, endValue: 0 });
 
-    const preview = resolvedAnimationValues(animation, placed);
+    const preview = previewValues(fixed, placed);
+    const source = generate(fixed);
 
-    expect(firmwareValues(animation)).toEqual([preview.startValue, preview.endValue]);
-    expect(preview.endValue).toBe(0);
+    expect(source).toContain('lv_anim_set_values(&anim, -110, 0);');
+    expect(source).toContain(`lv_obj_set_x(ui_title, ${preview.startValue});`);
+    expect(preview).toEqual({ startValue: -110, endValue: 0 });
   });
 });

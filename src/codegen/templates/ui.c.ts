@@ -17,6 +17,11 @@ import {
   type AnimationSymbol,
 } from '../animationSymbols';
 import {
+  animationDistance,
+  animationParkValue,
+  animationValueMode,
+} from '../../utils/animationValues';
+import {
   languageDifferences,
   overriddenLanguages,
   resolveTypographyStyle,
@@ -1003,7 +1008,9 @@ function generateAnimationInitialState(
     const wrapper = ANIM_WRAPPERS[property];
     const setter = wrapper ? wrapper.name : ANIM_DIRECT_SETTERS[property];
     if (!setter) continue;
-    lines.push(`${indent}${setter}(${symbol.targetVar}, ${symbol.startValue});`);
+    lines.push(
+      `${indent}${setter}(${symbol.targetVar}, ${animationParkValue(symbol.animation, symbol.component)});`,
+    );
   }
 
   return lines;
@@ -1064,7 +1071,14 @@ function generateAnimationFunction(
   lines.push(`${indent}lv_anim_init(&${animVar});`);
   lines.push(`${indent}lv_anim_set_var(&${animVar}, ${symbol.targetVar});`);
   lines.push(`${indent}lv_anim_set_exec_cb(&${animVar}, ${symbol.execCb});`);
-  lines.push(`${indent}lv_anim_set_values(&${animVar}, ${symbol.startValue}, ${symbol.endValue});`);
+  if (animationValueMode(anim) === 'offset') {
+    const getter = anim.property === 'x' ? 'lv_obj_get_x' : 'lv_obj_get_y';
+    const distance = animationDistance(anim);
+    lines.push(`${indent}int32_t from = ${getter}(${symbol.targetVar});`);
+    lines.push(`${indent}lv_anim_set_values(&${animVar}, from, from + (${distance}));`);
+  } else {
+    lines.push(`${indent}lv_anim_set_values(&${animVar}, ${anim.startValue}, ${anim.endValue});`);
+  }
   lines.push(`${indent}lv_anim_set_time(&${animVar}, ${anim.duration});`);
 
   if (anim.delay > 0) {

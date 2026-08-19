@@ -1,13 +1,13 @@
-// A position animation's numbers count from where the component sits, which
-// is the only reading under which "slide in from the left" lands the widget
-// back in its place.
+// An offset animation states one distance and travels it from wherever the
+// widget is; an absolute one states two coordinates.
 
 import { describe, it, expect } from 'vitest';
 import type { Animation } from '../../types';
 import {
-  animationBase,
+  animationDistance,
+  animationParkValue,
   animationValueMode,
-  resolvedAnimationValues,
+  previewValues,
   supportsOffset,
 } from '../animationValues';
 
@@ -22,62 +22,81 @@ function anim(overrides: Partial<Animation> = {}): Animation {
     delay: 0,
     repeat: 0,
     property: 'x',
-    startValue: -100,
+    startValue: 0,
     endValue: 0,
     ...overrides,
   };
 }
 
-const placed = { x: 40, y: 25 };
+/** Parked off the left edge, which is where a slide-in sets off. */
+const placed = { x: -100, y: 25 };
 
 describe('animation value mode', () => {
   it('offers the choice for position only', () => {
     expect(supportsOffset('x')).toBe(true);
     expect(supportsOffset('y')).toBe(true);
-    // A width of 100 is 100 pixels wherever it is measured from.
+    // A width of 100 is a hundred pixels wherever it is measured from.
     expect(supportsOffset('width')).toBe(false);
     expect(supportsOffset('opa')).toBe(false);
   });
 
-  it('defaults position to offset and everything else to absolute', () => {
-    expect(animationValueMode(anim({ property: 'x' }))).toBe('offset');
-    expect(animationValueMode(anim({ property: 'y' }))).toBe('offset');
-    expect(animationValueMode(anim({ property: 'opa' }))).toBe('absolute');
+  it('reads an animation with no mode as absolute', () => {
+    // What every animation written before the choice existed meant.
+    expect(animationValueMode(anim())).toBe('absolute');
   });
 
   it('respects an explicit choice', () => {
-    expect(animationValueMode(anim({ property: 'x', valueMode: 'absolute' }))).toBe('absolute');
-    expect(animationValueMode(anim({ property: 'opa', valueMode: 'offset' }))).toBe('offset');
+    expect(animationValueMode(anim({ valueMode: 'offset' }))).toBe('offset');
+    expect(animationValueMode(anim({ valueMode: 'absolute' }))).toBe('absolute');
+  });
+
+  it('has a distance only in offset mode', () => {
+    expect(animationDistance(anim({ valueMode: 'offset', distance: 100 }))).toBe(100);
+    expect(animationDistance(anim({ valueMode: 'offset' }))).toBe(0);
+    expect(animationDistance(anim({ valueMode: 'absolute', distance: 100 }))).toBe(0);
   });
 });
 
-describe('resolving values against the component', () => {
-  it('counts an offset animation from where the component sits', () => {
-    // Designed at x: 40, sliding in from 100px to its left: -60 → 40, so it
-    // ends where the designer put it rather than at the coordinate 0.
-    expect(resolvedAnimationValues(anim(), placed)).toEqual({ startValue: -60, endValue: 40 });
+describe('where a screen parks the widget before replaying', () => {
+  it('puts an offset animation back where the component was designed', () => {
+    // Travelling from wherever it is means replaying without restoring would
+    // walk it further on every visit to the screen.
+    const travelling = anim({ valueMode: 'offset', distance: 100 });
+
+    expect(animationParkValue(travelling, placed)).toBe(-100);
   });
 
-  it('uses the y coordinate for a vertical slide', () => {
-    const vertical = anim({ property: 'y', startValue: -100, endValue: 0 });
+  it('uses the y coordinate for a vertical travel', () => {
+    const vertical = anim({ property: 'y', valueMode: 'offset', distance: 100 });
 
-    expect(resolvedAnimationValues(vertical, placed)).toEqual({ startValue: -75, endValue: 25 });
+    expect(animationParkValue(vertical, placed)).toBe(25);
   });
 
-  it('leaves an absolute animation alone', () => {
-    const absolute = anim({ valueMode: 'absolute' });
+  it('parks an absolute animation at the start it states', () => {
+    const absolute = anim({ startValue: -110, endValue: 0 });
 
-    expect(resolvedAnimationValues(absolute, placed)).toEqual({ startValue: -100, endValue: 0 });
+    expect(animationParkValue(absolute, placed)).toBe(-110);
+  });
+});
+
+describe('what the preview draws between', () => {
+  it('travels the distance from the designed position', () => {
+    const travelling = anim({ valueMode: 'offset', distance: 100 });
+
+    // The canvas has no running widget to read, so it shows the first play:
+    // parked at -100, arriving at 0.
+    expect(previewValues(travelling, placed)).toEqual({ startValue: -100, endValue: 0 });
   });
 
-  it('leaves a non-positional property alone whatever the component', () => {
-    const fade = anim({ property: 'opa', startValue: 0, endValue: 255 });
+  it('takes an absolute animation literally', () => {
+    const absolute = anim({ startValue: -110, endValue: 0 });
 
-    expect(resolvedAnimationValues(fade, placed)).toEqual({ startValue: 0, endValue: 255 });
+    expect(previewValues(absolute, placed)).toEqual({ startValue: -110, endValue: 0 });
   });
 
   it('falls back to zero when the target is gone', () => {
-    expect(animationBase(anim(), undefined)).toBe(0);
-    expect(resolvedAnimationValues(anim(), undefined)).toEqual({ startValue: -100, endValue: 0 });
+    const travelling = anim({ valueMode: 'offset', distance: 100 });
+
+    expect(previewValues(travelling, undefined)).toEqual({ startValue: 0, endValue: 100 });
   });
 });

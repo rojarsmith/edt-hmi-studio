@@ -6,10 +6,9 @@
 // been wired to call. Projects written before that rule can still carry
 // duplicate names, so collisions are broken here rather than trusted away.
 
-import type { Screen, Animation } from '../types';
+import type { Screen, Animation, LvglComponent } from '../types';
 import type { CodeGenOptions } from './types';
 import { componentsById, screenByComponentId } from '../utils/animationAssets';
-import { resolvedAnimationValues } from '../utils/animationValues';
 import { getComponentVarName, toValidCIdentifier, convertName } from './utils/nameUtils';
 
 /**
@@ -79,12 +78,8 @@ export interface AnimationSymbol {
    * cannot be animated — such an animation generates no function at all.
    */
   execCb?: string;
-  /**
-   * The values a setter is finally given, with an offset animation already
-   * counted from the component's designed position.
-   */
-  startValue: number;
-  endValue: number;
+  /** The widget the animation drives, for its designed position. */
+  component: LvglComponent;
 }
 
 /** `${base}_start`: starts (or restarts) the animation. */
@@ -152,9 +147,9 @@ export function collectAnimationSymbols(
       animation,
       screen,
       targetVar,
+      component,
       base: uniqueBase(animation, options, taken),
       execCb: getAnimExecCb(animation.property),
-      ...resolvedAnimationValues(animation, component),
     });
   }
 

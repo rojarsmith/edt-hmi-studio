@@ -32,7 +32,10 @@
   background: #ffffff;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   position: relative;
-  overflow: hidden;
+  /* Deliberately not clipped. A component parked outside the screen — the
+     starting place of a slide-in, say — is off the display, not gone, and
+     hiding it would leave the author with nothing to select or drag. The white
+     panel is what marks the visible area; the firmware does the real clipping. */
 }
 
 .canvas-grid {

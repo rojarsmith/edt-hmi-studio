@@ -50,17 +50,33 @@ const PROPERTY_OPTIONS = [
   { value: 'transform_angle', label: 'Rotation Angle (transform_angle)' },
 ];
 
-function getDefaultsForType(type: AnimationType): { property: string; startValue: number; endValue: number } {
+interface TypeDefaults {
+  property: string;
+  startValue: number;
+  endValue: number;
+  valueMode: 'absolute' | 'offset';
+  distance: number;
+}
+
+function getDefaultsForType(type: AnimationType): TypeDefaults {
+  const values = (property: string, startValue: number, endValue: number): TypeDefaults =>
+    ({ property, startValue, endValue, valueMode: 'absolute', distance: 0 });
+  // A slide is a journey rather than a pair of coordinates: park the component
+  // where it should set off — outside the screen, for an entrance — and give
+  // the distance it travels.
+  const travel = (property: string, distance: number): TypeDefaults =>
+    ({ property, startValue: 0, endValue: 0, valueMode: 'offset', distance });
+
   switch (type) {
-    case 'fade_in': return { property: 'opa', startValue: 0, endValue: 255 };
-    case 'fade_out': return { property: 'opa', startValue: 255, endValue: 0 };
-    case 'slide_left': return { property: 'x', startValue: -100, endValue: 0 };
-    case 'slide_right': return { property: 'x', startValue: 100, endValue: 0 };
-    case 'slide_up': return { property: 'y', startValue: -100, endValue: 0 };
-    case 'slide_down': return { property: 'y', startValue: 100, endValue: 0 };
-    case 'zoom_in': return { property: 'transform_zoom', startValue: 128, endValue: 256 };
-    case 'zoom_out': return { property: 'transform_zoom', startValue: 256, endValue: 128 };
-    case 'custom': return { property: 'opa', startValue: 0, endValue: 255 };
+    case 'fade_in': return values('opa', 0, 255);
+    case 'fade_out': return values('opa', 255, 0);
+    case 'slide_left': return travel('x', 100);
+    case 'slide_right': return travel('x', -100);
+    case 'slide_up': return travel('y', 100);
+    case 'slide_down': return travel('y', -100);
+    case 'zoom_in': return values('transform_zoom', 128, 256);
+    case 'zoom_out': return values('transform_zoom', 256, 128);
+    case 'custom': return values('opa', 0, 255);
   }
 }
 
@@ -99,8 +115,9 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
   const [property, setProperty] = useState(animation?.property || 'opa');
   const [startValue, setStartValue] = useState(animation?.startValue ?? 0);
   const [valueMode, setValueMode] = useState<'absolute' | 'offset'>(
-    animation ? animationValueMode(animation) : 'offset',
+    animation ? animationValueMode(animation) : 'absolute',
   );
+  const [distance, setDistance] = useState(animation?.distance ?? 0);
   const [endValue, setEndValue] = useState(animation?.endValue ?? 255);
 
   // The name the animation takes if the field is left blank. Shown as the
@@ -117,6 +134,8 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
       setProperty(defaults.property);
       setStartValue(defaults.startValue);
       setEndValue(defaults.endValue);
+      setValueMode(defaults.valueMode);
+      setDistance(defaults.distance);
     }
   }, []);
 
@@ -142,10 +161,11 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
       property,
       startValue,
       valueMode: supportsOffset(property) ? valueMode : 'absolute',
+      distance,
       endValue,
     };
     onSave(anim);
-  }, [animation, name, suggestedName, projectAnimations, targetId, type, easing, duration, delay, repeat, property, valueMode, startValue, endValue, onSave]);
+  }, [animation, name, suggestedName, projectAnimations, targetId, type, easing, duration, delay, repeat, property, valueMode, distance, startValue, endValue, onSave]);
 
   return (
     <div className="anim-dialog-overlay" onClick={onClose}>
@@ -206,11 +226,21 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
 
           <div className="form-row">
             <div className="form-section">
-              <label className="section-label">Duration (ms)</label>
+              <label
+                className="section-label"
+                title="How long the movement itself takes, once it has started."
+              >
+                Duration (ms)
+              </label>
               <input type="number" value={duration} min={0} onChange={(e) => setDuration(Number(e.target.value))} />
             </div>
             <div className="form-section">
-              <label className="section-label">Delay (ms)</label>
+              <label
+                className="section-label"
+                title="How long to wait after the animation is triggered before it starts moving. The widget stays where it is for this long."
+              >
+                Delay (ms)
+              </label>
               <input type="number" value={delay} min={0} onChange={(e) => setDelay(Number(e.target.value))} />
             </div>
             <div className="form-section">
@@ -246,22 +276,42 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
               </div>
               <p className="field-hint">
                 {valueMode === 'offset'
-                  ? 'Counted from where the component sits, so −100 is a hundred pixels to its left. Move the component and the animation moves with it.'
-                  : 'Coordinates on the screen, whatever the component position is.'}
+                  ? 'One distance, travelled from wherever the component is when this runs — not necessarily where it was designed.'
+                  : 'Two coordinates on the screen, whatever the component position is.'}
               </p>
             </div>
           )}
 
-          <div className="form-row">
+          {supportsOffset(property) && valueMode === 'offset' ? (
             <div className="form-section">
-              <label className="section-label">Start Value</label>
-              <input type="number" value={startValue} onChange={(e) => setStartValue(Number(e.target.value))} />
+              <label
+                className="section-label"
+                title="How far to travel, in pixels. Negative moves left or up."
+              >
+                Distance (px)
+              </label>
+              <input
+                type="number"
+                value={distance}
+                onChange={(e) => setDistance(Number(e.target.value))}
+              />
+              <p className="field-hint">
+                Park the component where the movement should begin — outside the
+                screen for a slide-in — and travel from there.
+              </p>
             </div>
-            <div className="form-section">
-              <label className="section-label">End Value</label>
-              <input type="number" value={endValue} onChange={(e) => setEndValue(Number(e.target.value))} />
+          ) : (
+            <div className="form-row">
+              <div className="form-section">
+                <label className="section-label">Start Value</label>
+                <input type="number" value={startValue} onChange={(e) => setStartValue(Number(e.target.value))} />
+              </div>
+              <div className="form-section">
+                <label className="section-label">End Value</label>
+                <input type="number" value={endValue} onChange={(e) => setEndValue(Number(e.target.value))} />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="dialog-footer">

@@ -4,7 +4,7 @@ import { useResourceStore } from '../../resources/resourceStore';
 import type { LvglComponent, Animation } from '../../types';
 import { getEntryScreen } from '../../utils/entryScreen';
 import { componentsById } from '../../utils/animationAssets';
-import { resolvedAnimationValues } from '../../utils/animationValues';
+import { previewValues } from '../../utils/animationValues';
 import {
   getImageButtonState,
   getNextImageButtonStateIndex,
@@ -74,7 +74,7 @@ function computeAnimState(
 ): Partial<AnimState> {
   const easeFn = getEasingFn(anim.easing);
   const t = easeFn(Math.max(0, Math.min(1, progress)));
-  const resolved = resolvedAnimationValues(anim, component);
+  const resolved = previewValues(anim, component);
   const start = Number(resolved.startValue) || 0;
   const end = Number(resolved.endValue) || 0;
   const val = start + (end - start) * t;

@@ -1096,9 +1096,7 @@ describe('generateUiSource', () => {
       const result = sourceFor(screens, animations);
 
       expect(result).toContain('static void ui_screen_main_reset_anims(lv_event_t *event) {');
-      // The widget is designed at x: 40 and slides in from 110px to its left,
-      // so it parks at -70 — not at the raw offset.
-      expect(result).toContain('lv_obj_set_x(ui_slider_in, -70);');
+      expect(result).toContain('lv_obj_set_x(ui_slider_in, -110);');
       expect(result).toContain('ui_anim_set_opa(ui_slider_in, 0);');
       expect(result).toContain(
         'lv_obj_add_event_cb(ui_screen_main, ui_screen_main_reset_anims, LV_EVENT_SCREEN_LOAD_START, NULL);',
@@ -1109,7 +1107,7 @@ describe('generateUiSource', () => {
         .toBeLessThan(result.indexOf('ui_event_screen_main_screen_loaded, LV_EVENT_SCREEN_LOADED'));
       // The start value is no longer applied inline in the init function.
       const initAt = result.indexOf('static void ui_screen_main_init');
-      expect(result.indexOf('lv_obj_set_x(ui_slider_in, -70);')).toBeLessThan(initAt);
+      expect(result.indexOf('lv_obj_set_x(ui_slider_in, -110);')).toBeLessThan(initAt);
     });
 
     it('clips every screen instead of letting it scroll', () => {

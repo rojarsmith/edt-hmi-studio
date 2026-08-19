@@ -112,13 +112,13 @@ describe('animation functions', () => {
     expect(result).toContain('void ui_anim_set_opa_2_start(void) {');
   });
 
-  it('slides a widget back to where it was designed, not to the raw offset', () => {
-    // "Slide in from the left" on a widget placed at x: 40 has to end at 40.
-    // Reading -110 as a coordinate would land every such animation at the same
-    // spot regardless of where the designer put the widget.
+  it('travels an offset animation from wherever the widget is', () => {
+    // The author parks the widget where the movement should begin and gives
+    // the distance; the firmware reads the live position so the same binding
+    // can nudge it again from wherever a previous run left it.
     const { component, animations } = animatedComponent(
-      'btn', { name: 'myBtn', x: 40 },
-      { name: 'Slide_In_1', property: 'x', startValue: -110, endValue: 0 },
+      'btn', { name: 'myBtn', x: -100 },
+      { name: 'Slide_In_1', property: 'x', valueMode: 'offset', distance: 100 },
     );
     const screens = [createScreen({ name: 'main', components: [component] })];
 
@@ -127,7 +127,8 @@ describe('animation functions', () => {
       undefined, undefined, undefined, [], [], animations,
     );
 
-    expect(result).toContain('lv_anim_set_values(&anim, -70, 40);');
+    expect(result).toContain('int32_t from = lv_obj_get_x(ui_my_btn);');
+    expect(result).toContain('lv_anim_set_values(&anim, from, from + (100));');
   });
 
   it('takes the coordinates literally when told they are absolute', () => {
@@ -143,6 +144,7 @@ describe('animation functions', () => {
     );
 
     expect(result).toContain('lv_anim_set_values(&anim, -110, 0);');
+    expect(result).not.toContain('lv_obj_get_x');
   });
 
   it('generates no function for a property that cannot be animated', () => {
