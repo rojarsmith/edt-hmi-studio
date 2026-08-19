@@ -30,6 +30,7 @@ import { nextAnimationName } from '../utils/animationNames';
 import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
+import { applyLineGeometry } from '../utils/lineGeometry';
 import { keyFromText, literalOf, resolveText } from '../codegen/textResources';
 
 // Maximum history entries for undo/redo
@@ -346,6 +347,42 @@ function flattenComponents(components: LvglComponent[]): LvglComponent[] {
     result.push(...flattenComponents(comp.children));
   }
   return result;
+}
+
+/**
+ * A line's box is its stroke, never more: whichever half of the geometry an
+ * edit touched, this brings the other half along. Every path that changes a
+ * line — the resize drag, the size fields, the Line section — goes through it,
+ * so the box and the points can never disagree. See utils/lineGeometry.ts.
+ */
+function withLineGeometry(
+  component: LvglComponent,
+  updates: Partial<LvglComponent>,
+): Partial<LvglComponent> {
+  if (component.type !== 'line') return updates;
+
+  const next = { ...component, ...updates };
+  const geometry = applyLineGeometry(
+    {
+      width: component.width,
+      height: component.height,
+      points: component.props?.points,
+      lineWidth: component.props?.lineWidth,
+    },
+    {
+      width: next.width,
+      height: next.height,
+      points: next.props?.points,
+      lineWidth: next.props?.lineWidth,
+    },
+  );
+
+  return {
+    ...updates,
+    width: geometry.width,
+    height: geometry.height,
+    props: { ...next.props, points: geometry.points },
+  };
 }
 
 // Helper to update component in tree (reference-stable: unchanged subtrees keep original references)
@@ -990,13 +1027,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   updateComponent: (id, updates) => {
     const { currentScreenId } = get();
+    const component = get().getComponentById(id);
+    const finalUpdates = component ? withLineGeometry(component, updates) : updates;
     get().saveToHistory();
     set(state => ({
       screens: state.screens.map(screen => {
         if (screen.id === currentScreenId) {
           return {
             ...screen,
-            components: updateComponentInTree(screen.components, id, updates),
+            components: updateComponentInTree(screen.components, id, finalUpdates),
           };
         }
         return screen;
@@ -1941,12 +1980,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // not touching, which is the defect that module exists to prevent.
   resizeComponentAndUpdateDrag: (id, width, height, dragStartX, dragStartY, x, y) => {
     const { currentScreenId } = get();
-    const updates: Partial<LvglComponent> = {
+    let updates: Partial<LvglComponent> = {
       width: Math.max(1, width),
       height: Math.max(1, height),
     };
     if (x !== undefined) updates.x = x;
     if (y !== undefined) updates.y = y;
+
+    const component = get().getComponentById(id);
+    if (component) updates = withLineGeometry(component, updates);
     
     set(state => ({
       screens: state.screens.map(screen => {

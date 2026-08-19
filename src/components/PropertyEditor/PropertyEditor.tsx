@@ -17,6 +17,14 @@ import { resolveText } from '../../codegen/textResources';
 import { effectiveTypographyId, standInProp } from '../../utils/componentText';
 import { getEntryScreen } from '../../utils/entryScreen';
 import { glyphCoverageGaps } from '../../utils/glyphCoverage';
+import {
+  DEFAULT_LINE_WIDTH,
+  MIN_LINE_LENGTH,
+  lineLength,
+  lineOrientation,
+  normalizeLinePoints,
+  orientedLinePoints,
+} from '../../utils/lineGeometry';
 import ModbusBindingEditor from './ModbusBindingEditor';
 import {
   clampImageButtonStateIndex,
@@ -383,6 +391,10 @@ const PropertyEditor: React.FC = () => {
 
   // Whether the active state has its own overrides
   const hasStateOverride = component ? !!component.styles[activeStyleState] : false;
+  // A line draws no box, so the styles that paint one have nothing to act on:
+  // a fill, a radius or a border would be a rectangle around the stroke. What
+  // a line does draw is edited in its own section — see utils/lineGeometry.ts.
+  const drawsBox = component?.type !== 'line';
 
   const handlePropertyChange = useCallback(
     (property: keyof LvglComponent, value: LvglComponent[keyof LvglComponent]) => {
@@ -827,6 +839,7 @@ const PropertyEditor: React.FC = () => {
             </div>
           )}
           
+          {drawsBox && (<>
           <div className="property-row">
             <label>Background Color</label>
             <div className="color-input-wrapper">
@@ -943,6 +956,8 @@ const PropertyEditor: React.FC = () => {
             </div>
           </div>
           
+          </>)}
+
           <div className="property-row">
             <label>Opacity</label>
             <input
@@ -956,6 +971,7 @@ const PropertyEditor: React.FC = () => {
             <span className="range-value">{((currentStyles.opacity ?? 1) * 100).toFixed(0)}%</span>
           </div>
 
+          {drawsBox && (<>
           <div className="property-row">
             <label>Text Color</label>
             <div className="color-input-wrapper">
@@ -1025,6 +1041,7 @@ const PropertyEditor: React.FC = () => {
               </div>
             </div>
           )}
+          </>)}
 
           {/* Shadow */}
           {isSectionVisible('shadow', component.type) && <CollapsibleSection title="Shadow">
@@ -3825,7 +3842,12 @@ function LineEditor({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onChange: (key: string, value: any) => void;
 }): React.ReactNode {
-  const points: number[][] = props.points || [[0, 0], [100, 0]];
+  const points = normalizeLinePoints(props.points);
+  const orientation = lineOrientation(points);
+  const length = lineLength(points);
+  const lineWidth = props.lineWidth ?? DEFAULT_LINE_WIDTH;
+  const dashWidth = props.lineDashWidth ?? 0;
+  const dashGap = props.lineDashGap ?? 0;
 
   const updatePoint = (index: number, axis: 0 | 1, value: number) => {
     const newPoints = points.map((p, i) =>
@@ -3847,14 +3869,42 @@ function LineEditor({
   return (
     <div className="property-section">
       <div className="section-header">Line</div>
+      <div className="property-row">
+        <label>Direction</label>
+        <select
+          value={orientation}
+          onChange={(e) =>
+            onChange(
+              'points',
+              orientedLinePoints(e.target.value as 'horizontal' | 'vertical', length),
+            )
+          }
+        >
+          <option value="horizontal">Horizontal</option>
+          <option value="vertical">Vertical</option>
+          {/* Reachable by editing the points, not by picking it */}
+          {orientation === 'custom' && <option value="custom">Custom</option>}
+        </select>
+      </div>
+      {orientation !== 'custom' && (
+        <div className="property-row">
+          <label>Length</label>
+          <NumberField
+            value={length}
+            min={MIN_LINE_LENGTH}
+            aria-label="Length"
+            onChange={(value) => onChange('points', orientedLinePoints(orientation, value))}
+          />
+        </div>
+      )}
       <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
-        <label>Line Width: {props.lineWidth || 2}px</label>
+        <label>Line Width: {lineWidth}px</label>
         <input
           type="range"
           min={1}
           max={20}
-          value={props.lineWidth || 2}
-          onChange={(e) => onChange('lineWidth', parseInt(e.target.value) || 2)}
+          value={lineWidth}
+          onChange={(e) => onChange('lineWidth', parseInt(e.target.value) || 1)}
         />
       </div>
       <div className="property-row">
@@ -3870,6 +3920,37 @@ function LineEditor({
             value={props.lineColor || '#333333'}
             onChange={(e) => onChange('lineColor', e.target.value)}
             className="color-text"
+          />
+        </div>
+      </div>
+      <div className="property-row">
+        <label title="Rounds both ends by half the line width, as lv_obj_set_style_line_rounded does">
+          Rounded Ends
+        </label>
+        <input
+          type="checkbox"
+          checked={!!props.lineRounded}
+          onChange={(e) => onChange('lineRounded', e.target.checked)}
+          aria-label="Rounded Ends"
+        />
+      </div>
+      <div className="property-row two-col">
+        <div className="property-field">
+          <label title="0 draws a solid line">Dash Length</label>
+          <NumberField
+            value={dashWidth}
+            min={0}
+            aria-label="Dash Length"
+            onChange={(value) => onChange('lineDashWidth', value)}
+          />
+        </div>
+        <div className="property-field">
+          <label>Dash Gap</label>
+          <NumberField
+            value={dashGap}
+            min={0}
+            aria-label="Dash Gap"
+            onChange={(value) => onChange('lineDashGap', value)}
           />
         </div>
       </div>

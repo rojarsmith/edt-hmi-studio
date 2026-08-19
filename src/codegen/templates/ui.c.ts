@@ -9,6 +9,12 @@ import { resolveText } from '../textResources';
 import { effectiveTypographyId, standInProp } from '../../utils/componentText';
 import { getEntryScreen } from '../../utils/entryScreen';
 import {
+  DEFAULT_LINE_WIDTH,
+  lineBox,
+  normalizeLinePoints,
+  pointsInBox,
+} from '../../utils/lineGeometry';
+import {
   ANIM_WRAPPERS,
   ANIM_DIRECT_SETTERS,
   animStartFuncName,
@@ -169,6 +175,56 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
   }
   
   return `${func}(${parentVar})`;
+}
+
+/**
+ * A widget's default styles, minus the ones that would paint a box it does not
+ * have. Only a line qualifies: LVGL would happily draw a border and a fill
+ * around the stroke, which is the area the editor refuses to give it. Older
+ * projects carry those styles from when a line was a Basic widget, so this
+ * drops them at generation rather than migrating anyone's file.
+ */
+function withoutBoxStyles(component: LvglComponent): StyleProps {
+  const styles = component.styles.default;
+  if (component.type !== 'line') return styles;
+  const {
+    bgColor: _bgColor,
+    bgGradColor: _bgGradColor,
+    bgGradDir: _bgGradDir,
+    borderColor: _borderColor,
+    borderWidth: _borderWidth,
+    borderSide: _borderSide,
+    borderRadius: _borderRadius,
+    padding: _padding,
+    ...rest
+  } = styles;
+  return { ...rest, bgColor: 'transparent', borderWidth: 0 };
+}
+
+/**
+ * The points a line is drawn from, placed in its box the way the editor places
+ * them, so the panel draws what the canvas showed.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function generatedLinePoints(props: Record<string, any>): number[][] {
+  const points = normalizeLinePoints(props?.points);
+  const width = props?.lineWidth ?? DEFAULT_LINE_WIDTH;
+  return pointsInBox(points, lineBox(points, width)).map(([x, y]) => [
+    Math.round(x),
+    Math.round(y),
+  ]);
+}
+
+/** The file-scope array `lv_line_set_points` will hold a pointer to. */
+function linePointsDeclaration(
+  varName: string,
+  comp: LvglComponent,
+  options: CodeGenOptions,
+): string {
+  const pointType = options.lvglVersion === '9' ? 'lv_point_precise_t' : 'lv_point_t';
+  const points = generatedLinePoints(comp.props || {});
+  const values = points.map(([x, y]) => `{${x}, ${y}}`).join(', ');
+  return `static ${pointType} ${varName}_points[${points.length}] = {${values}};`;
 }
 
 /**
@@ -678,14 +734,28 @@ function generatePropsCode(
       );
       break;
       
-    case 'line':
-      if (props.lineWidth && props.lineWidth !== 2) {
+    case 'line': {
+      const linePoints = generatedLinePoints(props);
+      lines.push(
+        `${indent}lv_line_set_points(${varName}, ${varName}_points, ${linePoints.length});`,
+      );
+      if (props.lineWidth !== undefined && props.lineWidth !== DEFAULT_LINE_WIDTH) {
         lines.push(`${indent}lv_obj_set_style_line_width(${varName}, ${props.lineWidth}, 0);`);
       }
       if (props.lineColor) {
         lines.push(`${indent}lv_obj_set_style_line_color(${varName}, ${colorToLvgl(props.lineColor)}, 0);`);
       }
+      if (props.lineRounded) {
+        lines.push(`${indent}lv_obj_set_style_line_rounded(${varName}, true, 0);`);
+      }
+      if (props.lineDashWidth > 0) {
+        lines.push(`${indent}lv_obj_set_style_line_dash_width(${varName}, ${props.lineDashWidth}, 0);`);
+        lines.push(
+          `${indent}lv_obj_set_style_line_dash_gap(${varName}, ${props.lineDashGap || props.lineDashWidth}, 0);`,
+        );
+      }
       break;
+    }
       
     case 'table':
       if (props.rows !== undefined) {
@@ -1304,7 +1374,7 @@ function generateComponentCode(
 
   // Styles. Only the default state defers to the typography — the other states
   // are not covered by one and keep emitting their own text properties.
-  const styleLines = generateStyleCode(varName, component.styles.default, options, '0', defaultFont, defaultFontSize, Boolean(typographyStyle));
+  const styleLines = generateStyleCode(varName, withoutBoxStyles(component), options, '0', defaultFont, defaultFontSize, Boolean(typographyStyle));
   lines.push(...styleLines);
 
   // Ellipsis truncation, emitted after every style so the first measurement
@@ -2469,6 +2539,11 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
         ? getComponentVarName(`${screenName}_${comp.name}`, options)
         : getComponentVarName(comp.name, options);
       lines.push(`lv_obj_t *${varName};`);
+      // lv_line_set_points keeps the pointer it is given rather than copying,
+      // so the array has to outlive the widget: file scope, beside it.
+      if (comp.type === 'line') {
+        lines.push(linePointsDeclaration(varName, comp, options));
+      }
     }
     lines.push('');
   }

@@ -23,6 +23,55 @@ describe('editorStore', () => {
     resetStore();
   });
 
+  // --- a line's box is its stroke, never more ---
+  describe('line geometry', () => {
+    const addLine = () => {
+      const id = useEditorStore.getState().addComponent('line', 0, 0);
+      return { id, get: () => useEditorStore.getState().getComponentById(id)! };
+    };
+
+    it('drops a line no taller than its stroke', () => {
+      const { get } = addLine();
+      expect(get().height).toBe(2);
+      expect(get().width).toBe(100);
+    });
+
+    it('refuses the empty area a vertical drag would give it', () => {
+      const { id, get } = addLine();
+      useEditorStore.getState().updateComponent(id, { height: 60 });
+      expect(get().height).toBe(2);
+    });
+
+    it('stretches the points when it is dragged longer', () => {
+      const { id, get } = addLine();
+      useEditorStore.getState().updateComponent(id, { width: 200 });
+      expect(get().width).toBe(200);
+      expect(get().props.points).toEqual([[0, 0], [200, 0]]);
+    });
+
+    it('thickens with the stroke, and only by the stroke', () => {
+      const { id, get } = addLine();
+      const props = { ...get().props, lineWidth: 8 };
+      useEditorStore.getState().updateComponent(id, { props });
+      expect(get().height).toBe(8);
+      expect(get().width).toBe(100);
+    });
+
+    it('turns the box on its side when the points go vertical', () => {
+      const { id, get } = addLine();
+      const props = { ...get().props, points: [[0, 0], [0, 60]] };
+      useEditorStore.getState().updateComponent(id, { props });
+      expect(get().width).toBe(2);
+      expect(get().height).toBe(60);
+    });
+
+    it('leaves the geometry of other widgets alone', () => {
+      const id = useEditorStore.getState().addComponent('rectangle', 0, 0);
+      useEditorStore.getState().updateComponent(id, { height: 60 });
+      expect(useEditorStore.getState().getComponentById(id)!.height).toBe(60);
+    });
+  });
+
   // --- addComponent ---
   describe('addComponent', () => {
     it('should add a button component to the current screen', () => {

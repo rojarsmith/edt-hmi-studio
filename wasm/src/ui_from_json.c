@@ -454,29 +454,70 @@ static lv_obj_t *create_spinner(lv_obj_t *parent, const cJSON *comp) {
     return lv_spinner_create(parent);
 }
 
+/*
+ * lv_line_set_points keeps the pointer it is given rather than copying, so the
+ * points have to outlive the widget. One shared array would make every line on
+ * the screen draw the last one's points, so each takes a slot from this pool,
+ * which is emptied with the rest of the UI on every load.
+ */
+#define LINE_POOL_LINES 32
+#define LINE_POOL_POINTS 8
+static lv_point_precise_t line_point_pool[LINE_POOL_LINES][LINE_POOL_POINTS];
+static int line_pool_used;
+
+static void line_pool_reset(void) { line_pool_used = 0; }
+
 static lv_obj_t *create_line(lv_obj_t *parent, const cJSON *comp) {
     lv_obj_t *line = lv_line_create(parent);
-    /* Default horizontal line */
-    static lv_point_precise_t line_points[2];
     const cJSON *props = cJSON_GetObjectItemCaseSensitive(comp, "props");
+    int slot = line_pool_used < LINE_POOL_LINES ? line_pool_used++ : LINE_POOL_LINES - 1;
+    lv_point_precise_t *points = line_point_pool[slot];
     int w = cjson_get_int(comp, "width", 100);
-    line_points[0].x = 0; line_points[0].y = 0;
-    line_points[1].x = w; line_points[1].y = 0;
+    int count = 0;
 
     if (props) {
         cJSON *pts = cJSON_GetObjectItemCaseSensitive(props, "points");
-        if (cJSON_IsArray(pts) && cJSON_GetArraySize(pts) >= 2) {
-            cJSON *p0 = cJSON_GetArrayItem(pts, 0);
-            cJSON *p1 = cJSON_GetArrayItem(pts, 1);
-            if (cJSON_IsArray(p0) && cJSON_IsArray(p1)) {
-                line_points[0].x = cJSON_GetArrayItem(p0, 0)->valueint;
-                line_points[0].y = cJSON_GetArrayItem(p0, 1)->valueint;
-                line_points[1].x = cJSON_GetArrayItem(p1, 0)->valueint;
-                line_points[1].y = cJSON_GetArrayItem(p1, 1)->valueint;
+        if (cJSON_IsArray(pts)) {
+            cJSON *pt;
+            cJSON_ArrayForEach(pt, pts) {
+                if (count >= LINE_POOL_POINTS) break;
+                if (!cJSON_IsArray(pt) || cJSON_GetArraySize(pt) < 2) continue;
+                points[count].x = cJSON_GetArrayItem(pt, 0)->valueint;
+                points[count].y = cJSON_GetArrayItem(pt, 1)->valueint;
+                count++;
             }
         }
     }
-    lv_line_set_points(line, line_points, 2);
+
+    /* Fall back to the horizontal line the widget's own width describes */
+    if (count < 2) {
+        points[0].x = 0; points[0].y = 0;
+        points[1].x = w; points[1].y = 0;
+        count = 2;
+    }
+    lv_line_set_points(line, points, count);
+
+    /* The line_* styles are the whole of a line's appearance, and apply_styles
+       does not touch them, so they are set here. */
+    if (props) {
+        const cJSON *item = cJSON_GetObjectItemCaseSensitive(props, "lineWidth");
+        if (cJSON_IsNumber(item))
+            lv_obj_set_style_line_width(line, item->valueint, LV_PART_MAIN);
+        const char *color = cjson_get_string(props, "lineColor");
+        if (color)
+            lv_obj_set_style_line_color(line, hex_to_color(color), LV_PART_MAIN);
+        if (cjson_get_bool(props, "lineRounded", 0))
+            lv_obj_set_style_line_rounded(line, true, LV_PART_MAIN);
+        item = cJSON_GetObjectItemCaseSensitive(props, "lineDashWidth");
+        if (cJSON_IsNumber(item) && item->valueint > 0) {
+            const cJSON *gap = cJSON_GetObjectItemCaseSensitive(props, "lineDashGap");
+            lv_obj_set_style_line_dash_width(line, item->valueint, LV_PART_MAIN);
+            lv_obj_set_style_line_dash_gap(
+                line,
+                cJSON_IsNumber(gap) && gap->valueint > 0 ? gap->valueint : item->valueint,
+                LV_PART_MAIN);
+        }
+    }
     return line;
 }
 
@@ -545,6 +586,7 @@ void ui_from_json(const char *json_str) {
 
     lv_obj_t *screen = lv_screen_active();
     id_map_reset();
+    line_pool_reset();
 
     /* Apply screen settings */
     cJSON *scr_cfg = cJSON_GetObjectItemCaseSensitive(root, "screen");

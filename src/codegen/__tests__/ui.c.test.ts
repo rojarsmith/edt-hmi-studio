@@ -375,11 +375,54 @@ describe('generateUiSource', () => {
       expect(result).toContain('lv_calendar_set_showed_date(ui_cal, 2025, 6);');
     });
 
-    it('creates line', () => {
-      const line = createComponent('line', { name: 'divider' });
+    it('creates line with the points array it draws from', () => {
+      const line = createComponent('line', {
+        name: 'divider',
+        width: 120,
+        height: 2,
+        props: { points: [[0, 0], [120, 0]], lineWidth: 2 },
+      });
       const screens = [createScreen({ name: 'main', components: [line] })];
       const result = generateUiSource(screens, defaultOptions());
       expect(result).toContain('ui_divider = lv_line_create(ui_screen_main);');
+      // The array is file scope: lv_line_set_points keeps the pointer
+      expect(result).toContain('static lv_point_precise_t ui_divider_points[2] = {{0, 1}, {120, 1}};');
+      expect(result).toContain('lv_line_set_points(ui_divider, ui_divider_points, 2);');
+    });
+
+    it('emits v8 point type for an LVGL v8 build', () => {
+      const line = createComponent('line', { name: 'divider', props: { points: [[0, 0], [60, 0]] } });
+      const screens = [createScreen({ name: 'main', components: [line] })];
+      const result = generateUiSource(screens, { ...defaultOptions(), lvglVersion: '8' });
+      expect(result).toContain('static lv_point_t ui_divider_points[2]');
+    });
+
+    it('gives a line its line styles and no box', () => {
+      const line = createComponent('line', {
+        name: 'divider',
+        props: {
+          points: [[0, 0], [80, 0]],
+          lineWidth: 6,
+          lineColor: '#FF0000',
+          lineRounded: true,
+          lineDashWidth: 8,
+          lineDashGap: 4,
+        },
+        // What an older project carries from when a line was a Basic widget
+        styles: { default: { bgColor: '#ffffff', borderColor: '#212121', borderWidth: 1, borderRadius: 4, padding: 6 } },
+      });
+      const screens = [createScreen({ name: 'main', components: [line] })];
+      const result = generateUiSource(screens, defaultOptions());
+      expect(result).toContain('lv_obj_set_style_line_width(ui_divider, 6, 0);');
+      expect(result).toContain('lv_obj_set_style_line_color(ui_divider, lv_color_hex(0xFF0000), 0);');
+      expect(result).toContain('lv_obj_set_style_line_rounded(ui_divider, true, 0);');
+      expect(result).toContain('lv_obj_set_style_line_dash_width(ui_divider, 8, 0);');
+      expect(result).toContain('lv_obj_set_style_line_dash_gap(ui_divider, 4, 0);');
+      // A line has no box, so nothing may draw one around the stroke
+      expect(result).toContain('lv_obj_set_style_border_width(ui_divider, 0, 0);');
+      expect(result).not.toContain('lv_obj_set_style_bg_color(ui_divider');
+      expect(result).not.toContain('lv_obj_set_style_radius(ui_divider');
+      expect(result).not.toContain('lv_obj_set_style_pad_all(ui_divider');
     });
 
     it('creates rectangle as a plain object wearing its shape styles', () => {

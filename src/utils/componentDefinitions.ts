@@ -120,29 +120,6 @@ export const componentDefinitions: ComponentDefinition[] = [
     },
     isContainer: false,
   },
-  {
-    type: 'line',
-    name: 'Line',
-    icon: '📏',
-    category: 'basic',
-    defaultWidth: 100,
-    defaultHeight: 4,
-    defaultProps: { points: [[0, 0], [100, 0]] },
-    defaultStyles: {
-      default: {
-        // line: line_color = color_text, line_width = 1
-        bgColor: 'transparent',
-        borderColor: '#212121',
-        borderWidth: 1,
-        borderRadius: 0,
-        textColor: '#212121',
-        opacity: 1,
-        padding: 0,
-      },
-    },
-    isContainer: false,
-  },
-
   // Input Components
   {
     type: 'textarea',
@@ -279,6 +256,45 @@ export const componentDefinitions: ComponentDefinition[] = [
         bgColor: '#E0E0E0',
         borderColor: '#212121',
         borderWidth: 1,
+        borderRadius: 0,
+        textColor: '#212121',
+        opacity: 1,
+        padding: 0,
+      },
+    },
+    isContainer: false,
+  },
+  {
+    type: 'line',
+    name: 'Line',
+    // The other shape: drawn geometry, not a control. Reported as the family
+    // for the same reason Rectangle is.
+    typeName: 'Shape',
+    icon: '📏',
+    category: 'shape',
+    // 2px tall because the stroke is 2px: a line has no area beyond the line,
+    // so its box is the points' extent and never a pixel more. See
+    // utils/lineGeometry.ts.
+    defaultWidth: 100,
+    defaultHeight: 2,
+    defaultProps: {
+      points: [[0, 0], [100, 0]],
+      lineWidth: 2,
+      lineColor: '#212121',
+      // LVGL's own defaults: square ends, no dash.
+      lineRounded: false,
+      lineDashWidth: 0,
+      lineDashGap: 0,
+    },
+    defaultStyles: {
+      default: {
+        // Everything a line draws is a line_* style, edited in the Line
+        // section. The box styles are all transparent because there is no box:
+        // a border here would draw a rectangle around the stroke, which is
+        // exactly the area a line must not have.
+        bgColor: 'transparent',
+        borderColor: 'transparent',
+        borderWidth: 0,
         borderRadius: 0,
         textColor: '#212121',
         opacity: 1,

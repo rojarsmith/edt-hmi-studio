@@ -7,6 +7,11 @@ import { componentsById } from '../../utils/animationAssets';
 import { trackPreviewValues } from '../../utils/animationValues';
 import { animationTracks } from '../../utils/animationTracks';
 import {
+  DEFAULT_LINE_WIDTH,
+  normalizeLinePoints,
+  pointsInBox,
+} from '../../utils/lineGeometry';
+import {
   getImageButtonState,
   getNextImageButtonStateIndex,
   normalizeImageButtonProps,
@@ -679,8 +684,12 @@ const PreviewPanel: React.FC = () => {
 
         case 'line':
           drawLine(ctx, x, y, w, h, {
-            lineColor: comp.props.lineColor || bgColorStyle,
-            lineWidth: comp.props.lineWidth || 2,
+            points: comp.props.points,
+            lineColor: comp.props.lineColor || styles.borderColor || '#333333',
+            lineWidth: comp.props.lineWidth ?? DEFAULT_LINE_WIDTH,
+            rounded: !!comp.props.lineRounded,
+            dashWidth: comp.props.lineDashWidth || 0,
+            dashGap: comp.props.lineDashGap || 0,
           });
           break;
 
@@ -1327,18 +1336,36 @@ function lightenColor(color: string, percent: number): string {
   return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
 }
 
+// Draws the widget's own points, placed in its box exactly as the editor
+// canvas places them, so a vertical or dashed line previews as itself rather
+// than as a horizontal rule. See utils/lineGeometry.ts.
 function drawLine(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  opts: { lineColor: string; lineWidth: number }
+  opts: {
+    points: unknown;
+    lineColor: string;
+    lineWidth: number;
+    rounded: boolean;
+    dashWidth: number;
+    dashGap: number;
+  }
 ) {
+  const placed = pointsInBox(normalizeLinePoints(opts.points), { width: w, height: h });
+  ctx.save();
   ctx.strokeStyle = opts.lineColor;
-  ctx.lineWidth = opts.lineWidth;
-  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(1, opts.lineWidth);
+  ctx.lineCap = opts.rounded ? 'round' : 'butt';
+  ctx.setLineDash(
+    opts.dashWidth > 0 ? [opts.dashWidth, opts.dashGap || opts.dashWidth] : [],
+  );
   ctx.beginPath();
-  ctx.moveTo(x, y + h / 2);
-  ctx.lineTo(x + w, y + h / 2);
+  placed.forEach(([px, py], i) => {
+    if (i === 0) ctx.moveTo(x + px, y + py);
+    else ctx.lineTo(x + px, y + py);
+  });
   ctx.stroke();
+  ctx.restore();
 }
 
 function drawSpinner(

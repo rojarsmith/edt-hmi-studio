@@ -70,10 +70,12 @@ describe('componentDefinitions', () => {
 
     it('should return shape components', () => {
       const shapes = getComponentsByCategory('shape');
-      expect(shapes.length).toBeGreaterThan(0);
+      expect(shapes.map(c => c.type)).toEqual(['rectangle', 'line']);
       expect(shapes.every(c => c.category === 'shape')).toBe(true);
       // Shapes are drawn, not filled with children
       expect(shapes.every(c => !c.isContainer)).toBe(true);
+      // And every one of them reports the family, not its own name
+      expect(shapes.every(c => c.typeName === 'Shape')).toBe(true);
     });
 
     it('should return container components', () => {
@@ -163,6 +165,20 @@ describe('componentDefinitions', () => {
         value: 0,
         cycleOnClick: true,
       });
+    });
+  });
+
+  describe('line definition', () => {
+    it('is a shape, drawn rather than operated', () => {
+      const def = getComponentDefinition('line');
+
+      expect(def).toBeDefined();
+      expect(def!.name).toBe('Line');
+      expect(def!.typeName).toBe('Shape');
+      expect(def!.category).toBe('shape');
+      expect(def!.isContainer).toBe(false);
+      // Its points survived the move out of the basic category
+      expect(def!.defaultProps.points).toEqual([[0, 0], [100, 0]]);
     });
   });
 

@@ -10,6 +10,13 @@ import {
   normalizeImageButtonProps,
 } from '../PropertyEditor/imageButtonModel';
 import { resolveFallbackBackground } from './widgetBackground';
+import {
+  DEFAULT_LINE_WIDTH,
+  lineBox,
+  lineExtent,
+  normalizeLinePoints,
+  pointsInBox,
+} from '../../utils/lineGeometry';
 import './CanvasComponent.css';
 
 interface CanvasComponentProps {
@@ -32,6 +39,18 @@ const resizeHandles: ResizeHandle[] = [
   'left', 'right',
   'bottom-left', 'bottom', 'bottom-right',
 ];
+
+/**
+ * The handles worth offering. A line only has length: dragging it across its
+ * own stroke can do nothing — the geometry rule puts the box straight back —
+ * so the handles that would try are not drawn at all.
+ */
+function handlesFor(component: LvglComponent): ResizeHandle[] {
+  if (component.type !== 'line') return resizeHandles;
+  const extent = lineExtent(normalizeLinePoints(component.props?.points));
+  if (extent.width > 0 && extent.height > 0) return resizeHandles;
+  return extent.height > 0 ? ['top', 'bottom'] : ['left', 'right'];
+}
 
 const CanvasComponent: React.FC<CanvasComponentProps> = ({
   component,
@@ -303,19 +322,24 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   // Determine if this component is inside a layout container (flex/grid)
   const isInLayout = parentLayout === 'flex' || parentLayout === 'grid';
 
+  // A line has no box: no fill, no border, no radius, no padding. Painting any
+  // of them would put a rectangle around the stroke, which is the one thing a
+  // line must not have — see utils/lineGeometry.ts.
+  const drawsBox = type !== 'line';
+
   // Build inline styles from component styles
   const componentStyle: React.CSSProperties = {
     position: isInLayout ? 'relative' : 'absolute',
     ...(isInLayout ? {} : { left: alignedPos.left, top: alignedPos.top }),
     width: buildDimension(component.width, (component as unknown as Record<string, unknown>).widthMode as string | undefined),
     height: buildDimension(component.height, (component as unknown as Record<string, unknown>).heightMode as string | undefined),
-    backgroundColor: background ? undefined : resolvedBgColor,
-    ...(background ? { background } : {}),
-    ...borderStyles,
-    borderRadius: buildBorderRadius(),
+    backgroundColor: drawsBox ? (background ? undefined : resolvedBgColor) : undefined,
+    ...(background && drawsBox ? { background } : {}),
+    ...(drawsBox ? borderStyles : {}),
+    borderRadius: drawsBox ? buildBorderRadius() : undefined,
     color: defaultStyle.textColor,
     opacity: component.visible === false ? 0.3 : (defaultStyle.opacity !== undefined ? defaultStyle.opacity : 1),
-    ...paddingStyles,
+    ...(drawsBox ? paddingStyles : {}),
     boxSizing: 'border-box',
     pointerEvents: component.visible === false ? 'none' : undefined,
     // Shadow
@@ -405,17 +429,51 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
         );
       }
       
-      case 'line':
+      case 'line': {
+        // The line is drawn from its own points, so a vertical or diagonal one
+        // looks like what LVGL will draw rather than always like a rule. The
+        // widget's box is the points' extent (utils/lineGeometry.ts), so the
+        // drawing fills it exactly.
+        const points = normalizeLinePoints(props.points);
+        const stroke = Math.max(1, props.lineWidth ?? DEFAULT_LINE_WIDTH);
+        const box = lineBox(points, stroke);
+        const placed = pointsInBox(points, box);
+        const path = placed.map(([x, y]) => `${x},${y}`).join(' ');
+        const color =
+          props.lineColor || defaultStyle.borderColor || defaultStyle.textColor || '#333333';
+        const dash =
+          props.lineDashWidth > 0
+            ? `${props.lineDashWidth} ${props.lineDashGap || props.lineDashWidth}`
+            : undefined;
+
         return (
-          <div className="lvgl-line" style={{
-            width: '100%',
-            height: '2px',
-            backgroundColor: defaultStyle.borderColor || defaultStyle.textColor || '#333',
-            position: 'absolute',
-            top: '50%',
-            transform: 'translateY(-50%)',
-          }} />
+          <svg
+            className="lvgl-line"
+            viewBox={`0 0 ${box.width} ${box.height}`}
+            preserveAspectRatio="none"
+            style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+          >
+            {/* A 2px line is 2px to click. This widens the target without
+                widening the widget — editor chrome, never drawn on the panel. */}
+            <polyline
+              points={path}
+              fill="none"
+              stroke="transparent"
+              strokeWidth={Math.max(stroke, 10)}
+              vectorEffect="non-scaling-stroke"
+            />
+            <polyline
+              points={path}
+              fill="none"
+              stroke={color}
+              strokeWidth={stroke}
+              strokeLinecap={props.lineRounded ? 'round' : 'butt'}
+              strokeDasharray={dash}
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
         );
+      }
       
       case 'textarea':
         return (
@@ -858,7 +916,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
       {/* Selection overlay with resize handles */}
       {isSelected && (
         <div className="selection-overlay">
-          {resizeHandles.map(handle => (
+          {handlesFor(component).map(handle => (
             <div
               key={handle}
               className={`resize-handle ${handle}`}
