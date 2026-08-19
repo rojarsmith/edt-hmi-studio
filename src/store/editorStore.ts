@@ -108,6 +108,13 @@ interface EditorState {
    */
   animations: Animation[];
 
+  /**
+   * The animation the property editor is editing, or null when it is showing
+   * a component or the screen. Only one thing is edited at a time, so picking
+   * an animation clears the canvas selection and vice versa.
+   */
+  selectedAnimationId: string | null;
+
   /** Languages the project is translated into. The first is the default. */
   languages: ProjectLanguage[];
 
@@ -244,6 +251,8 @@ interface EditorState {
   /** Create a typography and return its id. Seeded from the project default. */
   /** Create an animation, naming it if the seed leaves the name blank. */
   addAnimation: (seed: Omit<Animation, 'id' | 'name'> & { id?: string; name?: string }) => string;
+  /** Point the property editor at this animation, or at nothing. */
+  selectAnimation: (id: string | null) => void;
   updateAnimation: (id: string, updates: Partial<Animation>) => void;
   deleteAnimation: (id: string) => void;
 
@@ -652,6 +661,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   currentScreenId: initialScreen.id,
   typographies: [],
   animations: [],
+  selectedAnimationId: null,
   typographyGroups: [],
   languages: [],
   previewLanguage: null,
@@ -1386,6 +1396,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return id;
   },
 
+  selectAnimation: (id) => {
+    // The property editor shows one thing at a time.
+    set(state => ({
+      selectedAnimationId: id,
+      selection: id ? { ...state.selection, selectedIds: [] } : state.selection,
+    }));
+  },
+
   updateAnimation: (id, updates) => {
     set({
       animations: get().animations.map((animation) =>
@@ -1397,7 +1415,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   deleteAnimation: (id) => {
     // Events bound to it are deliberately left alone: the binding shows in the
     // panel flagged as lacking its animation, rather than vanishing with it.
-    set({ animations: get().animations.filter((animation) => animation.id !== id) });
+    set(state => ({
+      animations: state.animations.filter((animation) => animation.id !== id),
+      selectedAnimationId: state.selectedAnimationId === id ? null : state.selectedAnimationId,
+    }));
   },
 
   addTypography: (seed = {}) => {
@@ -1758,6 +1779,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   // Selection Actions
   selectComponent: (id, addToSelection = false) => {
+    set({ selectedAnimationId: null });
     set(state => {
       if (addToSelection) {
         const isSelected = state.selection.selectedIds.includes(id);
@@ -1780,6 +1802,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   selectComponents: (ids) => {
+    set({ selectedAnimationId: null });
     set(state => ({
       selection: {
         ...state.selection,

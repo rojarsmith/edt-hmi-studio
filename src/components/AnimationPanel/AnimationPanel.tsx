@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useEditorStore } from '../../store/editorStore';
-import type { Animation } from '../../types';
-import AnimationEditDialog from './AnimationEditDialog';
 import PanelChevron from '../LogicEditor/PanelChevron';
 import LackBadge from '../common/LackBadge';
 import { animationLack, componentsById } from '../../utils/animationAssets';
-import { describeTracks } from '../../utils/animationTracks';
+import { describeTracks, newTrack } from '../../utils/animationTracks';
+import { isAnimationNameTaken } from '../../utils/animationNames';
 import { useDockedPanelResize } from '../../hooks/useDockedPanelResize';
 import '../panelBar.css';
 import './AnimationPanel.css';
@@ -25,9 +25,10 @@ const AnimationPanel: React.FC = () => {
   const updateAnimation = useEditorStore(s => s.updateAnimation);
   const deleteAnimation = useEditorStore(s => s.deleteAnimation);
   const components = useMemo(() => componentsById(screens), [screens]);
-  const [editingAnim, setEditingAnim] = useState<Animation | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const selectedAnimationId = useEditorStore(s => s.selectedAnimationId);
+  const selectAnimation = useEditorStore(s => s.selectAnimation);
+  /** The animation being named in place, and the text so far. */
+  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [panelExpanded, setPanelExpanded] = useState(true);
   const [query, setQuery] = useState('');
 
@@ -50,27 +51,33 @@ const AnimationPanel: React.FC = () => {
     );
   }, [animations, query]);
 
+  // A new animation exists immediately, named in the list and then edited in
+  // the property panel — no modal round trip to get either done.
   const handleAddAnim = useCallback(() => {
-    setEditingAnim(null);
-    setIsCreating(true);
-    setIsDialogOpen(true);
-  }, []);
+    const id = addAnimation({
+      targetComponentId: '',
+      easing: 'ease_out',
+      duration: 300,
+      delay: 0,
+      repeat: 0,
+      tracks: [newTrack(uuidv4(), 'x')],
+    });
+    selectAnimation(id);
+    const created = useEditorStore.getState().animations.find(a => a.id === id);
+    if (created) setRenaming({ id, value: created.name });
+  }, [addAnimation, selectAnimation]);
 
-  const handleEditAnim = useCallback((anim: Animation) => {
-    setEditingAnim(anim);
-    setIsCreating(false);
-    setIsDialogOpen(true);
-  }, []);
+  const commitRename = useCallback(() => {
+    if (!renaming) return;
+    const name = renaming.value.trim();
+    const clashes = name && isAnimationNameTaken(animations, name, renaming.id);
+    if (name && !clashes) updateAnimation(renaming.id, { name });
+    setRenaming(null);
+  }, [renaming, animations, updateAnimation]);
 
   const handleDeleteAnim = useCallback((animId: string) => {
     deleteAnimation(animId);
   }, [deleteAnimation]);
-
-  const handleSaveAnim = useCallback((anim: Animation) => {
-    if (isCreating) addAnimation(anim);
-    else updateAnimation(anim.id, anim);
-    setIsDialogOpen(false);
-  }, [isCreating, addAnimation, updateAnimation]);
 
   return (
     <div
@@ -128,11 +135,34 @@ const AnimationPanel: React.FC = () => {
               </div>
             ) : (
               visibleAnimations.map(anim => (
-                <div key={anim.id} className="anim-item">
-                  <div className="anim-info" onClick={() => handleEditAnim(anim)}>
+                <div
+                  key={anim.id}
+                  className={`anim-item ${selectedAnimationId === anim.id ? 'selected' : ''}`}
+                  onClick={() => selectAnimation(anim.id)}
+                  onDoubleClick={() => setRenaming({ id: anim.id, value: anim.name })}
+                  title={anim.name}
+                >
+                  <div className="anim-info">
                     <div className="anim-type">
                       <span className="anim-icon">🎞️</span>
-                      {anim.name}
+                      {renaming?.id === anim.id ? (
+                        <input
+                          type="text"
+                          className="anim-rename-input"
+                          value={renaming.value}
+                          aria-label="Animation name"
+                          autoFocus
+                          onChange={e => setRenaming({ id: anim.id, value: e.target.value })}
+                          onBlur={commitRename}
+                          onClick={e => e.stopPropagation()}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') commitRename();
+                            else if (e.key === 'Escape') setRenaming(null);
+                          }}
+                        />
+                      ) : (
+                        anim.name
+                      )}
                       {animationLack(anim, components) && (
                         <LackBadge reason={animationLack(anim, components)!} />
                       )}
@@ -144,8 +174,16 @@ const AnimationPanel: React.FC = () => {
                     </div>
                   </div>
                   <div className="anim-actions">
-                    <button className="anim-edit-btn" onClick={() => handleEditAnim(anim)} title="Edit">✏️</button>
-                    <button className="anim-delete-btn" onClick={() => handleDeleteAnim(anim.id)} title="Delete">🗑️</button>
+                    <button
+                      className="anim-delete-btn"
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleDeleteAnim(anim.id);
+                      }}
+                      title="Delete"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 </div>
               ))
@@ -153,15 +191,6 @@ const AnimationPanel: React.FC = () => {
           </div>
       )}
 
-      {isDialogOpen && (
-        <AnimationEditDialog
-          animation={editingAnim}
-          isCreating={isCreating}
-          targetComponentId=""
-          onSave={handleSaveAnim}
-          onClose={() => setIsDialogOpen(false)}
-        />
-      )}
     </div>
   );
 };

@@ -73,12 +73,23 @@ describe('AnimationPanel', () => {
     expect(screen.queryByText('Select a component')).toBeNull();
   });
 
-  it('offers the add button with nothing selected', () => {
+  it('adds one with nothing selected on the canvas', () => {
     render(<AnimationPanel />);
 
     fireEvent.click(screen.getByTitle('Add animation'));
 
-    expect(screen.getByText('Add Animation')).toBeTruthy();
+    expect(useEditorStore.getState().animations).toHaveLength(1);
+  });
+
+  it('points the property panel at a row that is clicked', () => {
+    setUp([anim('Pulse_1', 'label-1')]);
+    render(<AnimationPanel />);
+
+    fireEvent.click(screen.getByText('Pulse_1'));
+
+    expect(useEditorStore.getState().selectedAnimationId).toBe('Pulse_1');
+    // Editing an animation is not editing a component.
+    expect(useEditorStore.getState().selection.selectedIds).toEqual([]);
   });
 
   it('names the widget each animation drives', () => {

@@ -405,3 +405,19 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* The row the property panel is currently editing. */
+.anim-item.selected {
+  border-color: #2196F3;
+  background: #f3f9ff;
+}
+
+.anim-rename-input {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid #2196F3;
+  border-radius: 3px;
+  font-size: 13px;
+  outline: none;
+}

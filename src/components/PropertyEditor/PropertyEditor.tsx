@@ -26,6 +26,7 @@ import {
 } from './imageButtonModel';
 import PanelChevron from '../LogicEditor/PanelChevron';
 import EventPanel from '../EventPanel';
+import AnimationProperties from './AnimationProperties';
 import './PropertyEditor.css';
 
 // Inline CollapsibleSection component
@@ -236,6 +237,8 @@ const PropertyEditor: React.FC = () => {
     currentScreenId,
     renameScreen,
     setEntryScreen,
+    animations,
+    selectedAnimationId,
   } = useEditorStore();
   const currentProjectId = useAppStore((state) => state.currentProjectId);
   const projectList = useProjectStore((state) => state.projects);
@@ -461,6 +464,18 @@ const PropertyEditor: React.FC = () => {
 
   const expandAllSections = () => setCollapsedSections(new Set());
 
+  const searchBox = (
+    <div className="pe-search">
+      <input
+        type="text"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="Search properties..."
+        aria-label="Search properties"
+      />
+    </div>
+  );
+
   const panelHeader = (
     <div
       className={`pe-header ${factoryDevMode ? 'pe-header-collapsible' : ''}`}
@@ -479,6 +494,25 @@ const PropertyEditor: React.FC = () => {
       </div>
     </div>
   );
+
+  // The panel shows one thing at a time, and the animation manager points it
+  // here rather than opening a dialog of its own.
+  const selectedAnimation = selectedAnimationId
+    ? animations.find(a => a.id === selectedAnimationId)
+    : undefined;
+
+  if (selectedAnimation) {
+    return (
+      <div className={`property-editor ${expanded ? '' : 'collapsed'}`}>
+        {panelHeader}
+        {expanded && (
+          <div className="property-sections" ref={sectionsRef} onClick={handleSectionsClick}>
+            <AnimationProperties animation={selectedAnimation} searchBox={searchBox} />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (!component) {
     const currentScreen = screens.find(s => s.id === currentScreenId);
@@ -539,15 +573,7 @@ const PropertyEditor: React.FC = () => {
             </div>
           </div>
 
-          <div className="pe-search">
-            <input
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search properties..."
-              aria-label="Search properties"
-            />
-          </div>
+          {searchBox}
 
           <EventPanel screenId={currentScreen.id} />
 
@@ -602,15 +628,7 @@ const PropertyEditor: React.FC = () => {
           </div>
         </div>
 
-        <div className="pe-search">
-          <input
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search properties..."
-            aria-label="Search properties"
-          />
-        </div>
+        {searchBox}
 
         {/* Position */}
         <div className="property-section">
