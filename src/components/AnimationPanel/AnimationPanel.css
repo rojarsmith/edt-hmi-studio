@@ -299,3 +299,10 @@
 .anim-dialog .save-btn:hover {
   background: #1976D2;
 }
+
+/* Rejected save: the name collides with another animation in the project. */
+.anim-dialog .field-error {
+  font-size: 11px;
+  color: #d32f2f;
+  margin: 4px 0 0 0;
+}

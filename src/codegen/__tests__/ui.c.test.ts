@@ -978,16 +978,17 @@ describe('generateUiSource', () => {
       });
       const screens = [createScreen({ name: 'main', components: [btn] })];
       const result = generateUiSource(screens, defaultOptions());
-      expect(result).toContain('lv_anim_t ui_my_btn_anim_0;');
-      expect(result).toContain('lv_anim_init(&ui_my_btn_anim_0);');
-      expect(result).toContain('lv_anim_set_var(&ui_my_btn_anim_0, ui_my_btn);');
-      expect(result).toContain('lv_anim_set_exec_cb(&ui_my_btn_anim_0,');
-      expect(result).toContain('lv_anim_set_values(&ui_my_btn_anim_0, 0, 255);');
-      expect(result).toContain('lv_anim_set_time(&ui_my_btn_anim_0, 500);');
-      expect(result).toContain('lv_anim_set_delay(&ui_my_btn_anim_0, 100);');
-      expect(result).toContain('lv_anim_set_path_cb(&ui_my_btn_anim_0, lv_anim_path_ease_in_out);');
-      expect(result).toContain('lv_anim_set_repeat_count(&ui_my_btn_anim_0, 3);');
-      expect(result).toContain('lv_anim_start(&ui_my_btn_anim_0);');
+      expect(result).toContain('void ui_anim_fade_in_start(void) {');
+      expect(result).toContain('lv_anim_t anim;');
+      expect(result).toContain('lv_anim_init(&anim);');
+      expect(result).toContain('lv_anim_set_var(&anim, ui_my_btn);');
+      expect(result).toContain('lv_anim_set_exec_cb(&anim,');
+      expect(result).toContain('lv_anim_set_values(&anim, 0, 255);');
+      expect(result).toContain('lv_anim_set_time(&anim, 500);');
+      expect(result).toContain('lv_anim_set_delay(&anim, 100);');
+      expect(result).toContain('lv_anim_set_path_cb(&anim, lv_anim_path_ease_in_out);');
+      expect(result).toContain('lv_anim_set_repeat_count(&anim, 3);');
+      expect(result).toContain('lv_anim_start(&anim);');
     });
 
     it('routes selector-taking setters through a wrapper of the right signature', () => {
@@ -1005,7 +1006,7 @@ describe('generateUiSource', () => {
 
       expect(result).toContain('static void ui_anim_set_opa(void *object, int32_t value) {');
       expect(result).toContain('lv_obj_set_style_opa(target, (lv_opa_t)value, LV_PART_MAIN);');
-      expect(result).toContain('lv_anim_set_exec_cb(&ui_fader_anim_0, ui_anim_set_opa);');
+      expect(result).toContain('lv_anim_set_exec_cb(&anim, ui_anim_set_opa);');
       expect(result).not.toContain('(lv_anim_exec_xcb_t)lv_obj_set_style_opa');
     });
 
@@ -1041,7 +1042,7 @@ describe('generateUiSource', () => {
         defaultOptions(),
       );
 
-      expect(result).toContain('lv_anim_set_exec_cb(&ui_mover_anim_0, (lv_anim_exec_xcb_t)lv_obj_set_x);');
+      expect(result).toContain('lv_anim_set_exec_cb(&anim, (lv_anim_exec_xcb_t)lv_obj_set_x);');
       expect(result).not.toContain('ui_anim_set_opa');
       expect(result).not.toContain('Animation Helpers');
     });
@@ -1067,7 +1068,7 @@ describe('generateUiSource', () => {
       expect(result.indexOf('static void ui_screen_main_start_anims'))
         .toBeLessThan(result.indexOf('lv_obj_add_event_cb(ui_screen_main,'));
       // and lv_anim_start belongs to the callback, not to the init function
-      expect(result.indexOf('lv_anim_start(&ui_slider_in_anim_0);'))
+      expect(result.indexOf('ui_anim_fade_in_anim_start();'))
         .toBeLessThan(result.indexOf('static void ui_screen_main_init'));
     });
 
@@ -1144,7 +1145,7 @@ describe('generateUiSource', () => {
       );
 
       expect(result).toContain('Animation "weird" skipped: property "bg_color" is not animatable');
-      expect(result).not.toContain('ui_odd_anim_0');
+      expect(result).not.toContain('ui_anim_weird_start');
     });
 
     it('omits delay when 0', () => {

@@ -9,6 +9,14 @@ import { resolveText } from '../textResources';
 import { effectiveTypographyId, standInProp } from '../../utils/componentText';
 import { getEntryScreen } from '../../utils/entryScreen';
 import {
+  ANIM_WRAPPERS,
+  ANIM_DIRECT_SETTERS,
+  animStartFuncName,
+  animStopFuncName,
+  collectAnimationSymbols,
+  type AnimationSymbol,
+} from '../animationSymbols';
+import {
   languageDifferences,
   overriddenLanguages,
   resolveTypographyStyle,
@@ -978,59 +986,6 @@ function getEasingPath(easing: AnimationEasing): string {
 }
 
 /**
- * Animated properties whose LVGL setter takes a style selector, so it cannot be
- * used as an `lv_anim_exec_xcb_t` (`void (*)(void *, int32_t)`) directly —
- * calling a three-parameter function through a two-parameter pointer leaves the
- * selector as whatever happens to be in the register, and the value lands on an
- * arbitrary part/state. Each needs a generated wrapper instead.
- *
- * These use style transforms rather than `lv_image_set_scale`/`_rotation`, which
- * only exist on image widgets: applied to any other widget they reinterpret the
- * object, and LV_USE_ASSERT_OBJ is off in the firmware so nothing catches it.
- */
-const ANIM_WRAPPERS: Record<string, { name: string; setter: (isV9: boolean) => string[] }> = {
-  opa: {
-    name: 'ui_anim_set_opa',
-    setter: () => ['lv_obj_set_style_opa(target, (lv_opa_t)value, LV_PART_MAIN);'],
-  },
-  transform_zoom: {
-    name: 'ui_anim_set_zoom',
-    setter: (isV9) => isV9
-      ? [
-        'lv_obj_set_style_transform_scale_x(target, value, LV_PART_MAIN);',
-        'lv_obj_set_style_transform_scale_y(target, value, LV_PART_MAIN);',
-      ]
-      : ['lv_obj_set_style_transform_zoom(target, value, LV_PART_MAIN);'],
-  },
-  transform_angle: {
-    name: 'ui_anim_set_angle',
-    setter: (isV9) => isV9
-      ? ['lv_obj_set_style_transform_rotation(target, value, LV_PART_MAIN);']
-      : ['lv_obj_set_style_transform_angle(target, value, LV_PART_MAIN);'],
-  },
-};
-
-/** Properties whose setter already matches lv_anim_exec_xcb_t exactly. */
-const ANIM_DIRECT_SETTERS: Record<string, string> = {
-  x: 'lv_obj_set_x',
-  y: 'lv_obj_set_y',
-  width: 'lv_obj_set_width',
-  height: 'lv_obj_set_height',
-};
-
-/**
- * Map animation property to LVGL exec callback, or undefined when the property
- * cannot be animated — emitting a wrong-but-plausible callback would silently
- * animate something the user never asked for.
- */
-function getAnimExecCb(property: string): string | undefined {
-  const wrapper = ANIM_WRAPPERS[property];
-  if (wrapper) return wrapper.name;
-  const direct = ANIM_DIRECT_SETTERS[property];
-  return direct ? `(lv_anim_exec_xcb_t)${direct}` : undefined;
-}
-
-/**
  * Statements that put an animated widget at its start value.
  *
  * Uses the same setter the animation drives, so the parked state is identical
@@ -1097,53 +1052,72 @@ export function generateAnimationHelpers(
 /**
  * Generate animation code for a component
  */
-function generateAnimationCode(
-  varName: string,
-  animations: Animation[],
+function generateAnimationFunction(
+  symbol: AnimationSymbol,
   options: CodeGenOptions
-): string[] {
-  const lines: string[] = [];
-  if (!animations || animations.length === 0) return lines;
-
+): string {
+  const anim = symbol.animation;
   const indent = getIndent(options);
+  const animVar = 'anim';
+  const lines: string[] = [];
 
-  for (let i = 0; i < animations.length; i++) {
-    const anim = animations[i];
-    const animVar = `${varName}_anim_${i}`;
-    const execCb = getAnimExecCb(anim.property);
-
-    if (!execCb) {
-      lines.push(
-        `${indent}// Animation "${anim.name || anim.type}" skipped: property "${anim.property}" is not animatable`,
-      );
-      continue;
-    }
-
-    if (options.generateComments) {
-      lines.push(`${indent}${generateComment(`Animation: ${anim.name || anim.type}`, options)}`);
-    }
-
-    lines.push(`${indent}lv_anim_t ${animVar};`);
-    lines.push(`${indent}lv_anim_init(&${animVar});`);
-    lines.push(`${indent}lv_anim_set_var(&${animVar}, ${varName});`);
-    lines.push(`${indent}lv_anim_set_exec_cb(&${animVar}, ${execCb});`);
-    lines.push(`${indent}lv_anim_set_values(&${animVar}, ${anim.startValue}, ${anim.endValue});`);
-    lines.push(`${indent}lv_anim_set_time(&${animVar}, ${anim.duration});`);
-
-    if (anim.delay > 0) {
-      lines.push(`${indent}lv_anim_set_delay(&${animVar}, ${anim.delay});`);
-    }
-
-    lines.push(`${indent}lv_anim_set_path_cb(&${animVar}, ${getEasingPath(anim.easing)});`);
-
-    if (anim.repeat > 0) {
-      lines.push(`${indent}lv_anim_set_repeat_count(&${animVar}, ${anim.repeat});`);
-    }
-
-    lines.push(`${indent}lv_anim_start(&${animVar});`);
+  if (options.generateComments) {
+    lines.push(generateComment(`Animation: ${anim.name || anim.type} on ${symbol.targetVar}`, options));
   }
 
-  return lines;
+  lines.push(`void ${animStartFuncName(symbol)}(void) {`);
+  lines.push(`${indent}lv_anim_t ${animVar};`);
+  lines.push(`${indent}lv_anim_init(&${animVar});`);
+  lines.push(`${indent}lv_anim_set_var(&${animVar}, ${symbol.targetVar});`);
+  lines.push(`${indent}lv_anim_set_exec_cb(&${animVar}, ${symbol.execCb});`);
+  lines.push(`${indent}lv_anim_set_values(&${animVar}, ${anim.startValue}, ${anim.endValue});`);
+  lines.push(`${indent}lv_anim_set_time(&${animVar}, ${anim.duration});`);
+
+  if (anim.delay > 0) {
+    lines.push(`${indent}lv_anim_set_delay(&${animVar}, ${anim.delay});`);
+  }
+
+  lines.push(`${indent}lv_anim_set_path_cb(&${animVar}, ${getEasingPath(anim.easing)});`);
+
+  if (anim.repeat > 0) {
+    lines.push(`${indent}lv_anim_set_repeat_count(&${animVar}, ${anim.repeat});`);
+  }
+
+  // lv_anim_start drops any running animation with the same var and exec_cb,
+  // so triggering this twice restarts it rather than stacking two.
+  lines.push(`${indent}lv_anim_start(&${animVar});`);
+  lines.push('}');
+  lines.push('');
+  lines.push(`void ${animStopFuncName(symbol)}(void) {`);
+  lines.push(
+    `${indent}${animDeleteFunc(options)}(${symbol.targetVar}, ${symbol.execCb});`,
+  );
+  lines.push('}');
+
+  return lines.join('\n');
+}
+
+/** v9 renamed lv_anim_del; both take (var, exec_cb). */
+function animDeleteFunc(options: CodeGenOptions): string {
+  return options.lvglVersion === '9' ? 'lv_anim_delete' : 'lv_anim_del';
+}
+
+/**
+ * Emit a start/stop pair for every animation the project can actually run.
+ *
+ * One named function each, rather than a block buried in the screen's load
+ * callback: an animation nothing can name is an animation nothing can trigger,
+ * and every trigger beyond "the screen appeared" has to call exactly one of
+ * them. An unanimatable property gets no function — see the comment left in
+ * its place by generateScreenAnimationFunc.
+ */
+export function generateAnimationFunctions(
+  symbols: AnimationSymbol[],
+  options: CodeGenOptions
+): string[] {
+  return symbols
+    .filter((symbol) => symbol.execCb)
+    .map((symbol) => generateAnimationFunction(symbol, options));
 }
 
 /**
@@ -1447,20 +1421,29 @@ function getScreenAnimFuncName(screenName: string, options: CodeGenOptions): str
 function generateScreenAnimationFunc(
   screen: Screen,
   options: CodeGenOptions,
-  needsScreenPrefix: Set<string>
+  needsScreenPrefix: Set<string>,
+  symbols: AnimationSymbol[]
 ): string {
   const indent = getIndent(options);
   const startBody: string[] = [];
   const resetBody: string[] = [];
+
+  for (const symbol of symbols) {
+    if (symbol.screen.id !== screen.id) continue;
+    const anim = symbol.animation;
+    startBody.push(
+      symbol.execCb
+        ? `${indent}${animStartFuncName(symbol)}();`
+        : `${indent}// Animation "${anim.name || anim.type}" skipped: property "${anim.property}" is not animatable`,
+    );
+  }
 
   const walk = (components: LvglComponent[]) => {
     for (const component of components) {
       const varName = needsScreenPrefix.has(component.id)
         ? getComponentVarName(`${screen.name}_${component.name}`, options)
         : getComponentVarName(component.name, options);
-      const animations = component.animations || [];
-      startBody.push(...generateAnimationCode(varName, animations, options));
-      resetBody.push(...generateAnimationInitialState(varName, animations, options));
+      resetBody.push(...generateAnimationInitialState(varName, component.animations || [], options));
       walk(component.children);
     }
   };
@@ -1513,6 +1496,7 @@ function generateScreenInitFunc(
   screen: Screen,
   options: CodeGenOptions,
   needsScreenPrefix: Set<string>,
+  animationSymbols: AnimationSymbol[],
   imageResources: ImageResource[] = [],
   defaultFont?: string,
   defaultFontSize?: number,
@@ -1571,7 +1555,7 @@ function generateScreenInitFunc(
   }
 
   // Park animated widgets before the transition draws, start them after it ends
-  if (generateScreenAnimationFunc(screen, options, needsScreenPrefix) !== '') {
+  if (generateScreenAnimationFunc(screen, options, needsScreenPrefix, animationSymbols) !== '') {
     if (screenHasAnimationResets(screen, options, needsScreenPrefix)) {
       lines.push(
         `${indent}lv_obj_add_event_cb(${screenVar}, ${getScreenAnimResetFuncName(screen.name, options)}, LV_EVENT_SCREEN_LOAD_START, NULL);`,
@@ -2461,6 +2445,8 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     }
   }
 
+  const animationSymbols = collectAnimationSymbols(screens, options, needsScreenPrefix);
+
   const allComponents: { comp: LvglComponent; screenName: string }[] = [];
   for (const [, entries] of componentsByName) {
     allComponents.push(...entries);
@@ -2495,9 +2481,21 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     lines.push(...imageButtonSupport);
   }
   
+  const animFuncs = generateAnimationFunctions(animationSymbols, options);
+  if (animFuncs.length > 0) {
+    if (options.generateComments) {
+      lines.push(generateSectionHeader('Animations', options));
+      lines.push('');
+    }
+    for (const source of animFuncs) {
+      lines.push(source);
+      lines.push('');
+    }
+  }
+
   // Animation start callbacks, defined before the init functions that bind them
   const screenAnimFuncs = screens
-    .map((screen) => generateScreenAnimationFunc(screen, options, needsScreenPrefix))
+    .map((screen) => generateScreenAnimationFunc(screen, options, needsScreenPrefix, animationSymbols))
     .filter((source) => source !== '');
   if (screenAnimFuncs.length > 0) {
     if (options.generateComments) {
@@ -2517,7 +2515,7 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   }
 
   for (const screen of screens) {
-    lines.push(generateScreenInitFunc(screen, options, needsScreenPrefix, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles, componentTags));
+    lines.push(generateScreenInitFunc(screen, options, needsScreenPrefix, animationSymbols, imageResources, defaultFont, defaultFontSize, useBuiltinSymbols, symbolFont, componentStyles, componentTags));
     lines.push('');
   }
   

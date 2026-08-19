@@ -1,6 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { Animation, AnimationType, AnimationEasing } from '../../types';
+import { useEditorStore } from '../../store/editorStore';
+import {
+  animationNameBase,
+  isAnimationNameTaken,
+  nextAnimationName,
+} from '../../utils/animationNames';
 import './AnimationPanel.css';
 
 interface AnimationEditDialogProps {
@@ -63,7 +69,9 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
   onSave,
   onClose,
 }) => {
+  const screens = useEditorStore(s => s.screens);
   const [name, setName] = useState(animation?.name || '');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [type, setType] = useState<AnimationType>(animation?.type || 'fade_in');
   const [easing, setEasing] = useState<AnimationEasing>(animation?.easing || 'ease_in_out');
   const [duration, setDuration] = useState(animation?.duration ?? 300);
@@ -72,6 +80,13 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
   const [property, setProperty] = useState(animation?.property || 'opa');
   const [startValue, setStartValue] = useState(animation?.startValue ?? 0);
   const [endValue, setEndValue] = useState(animation?.endValue ?? 255);
+
+  // The name the animation takes if the field is left blank. Shown as the
+  // placeholder so the default is never a surprise.
+  const suggestedName = useMemo(
+    () => nextAnimationName(screens, animationNameBase(type)),
+    [screens, type],
+  );
 
   const handleTypeChange = useCallback((newType: AnimationType) => {
     setType(newType);
@@ -84,9 +99,18 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
   }, []);
 
   const handleSave = useCallback(() => {
+    // The name becomes the generated C function's name, so it has to be unique
+    // across the whole project rather than within this component: a button
+    // wired to ui_anim_fade_in_1_start() must have exactly one animation to
+    // mean.
+    const chosen = name.trim() || suggestedName;
+    if (isAnimationNameTaken(screens, chosen, animation?.id)) {
+      setNameError(`An animation named "${chosen}" already exists.`);
+      return;
+    }
     const anim: Animation = {
       id: animation?.id || uuidv4(),
-      name: name || ANIMATION_TYPES.find(t => t.type === type)?.label || type,
+      name: chosen,
       targetComponentId,
       type,
       easing,
@@ -98,7 +122,7 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
       endValue,
     };
     onSave(anim);
-  }, [animation, name, targetComponentId, type, easing, duration, delay, repeat, property, startValue, endValue, onSave]);
+  }, [animation, name, suggestedName, screens, targetComponentId, type, easing, duration, delay, repeat, property, startValue, endValue, onSave]);
 
   return (
     <div className="anim-dialog-overlay" onClick={onClose}>
@@ -114,9 +138,14 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Optional; leave blank to use the default name"
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameError(null);
+              }}
+              placeholder={`Optional; leave blank for ${suggestedName}`}
+              aria-label="Animation Name"
             />
+            {nameError && <p className="field-error">{nameError}</p>}
           </div>
 
           <div className="form-section">

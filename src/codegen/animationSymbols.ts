@@ -1,0 +1,136 @@
+// Which animations a project holds, and the C symbols they generate.
+//
+// A symbol names the animation alone — never its target. Animation names are
+// unique project-wide (see nextAnimationName in src/utils/animationNames.ts),
+// so retargeting an animation must not rename the function some button has
+// been wired to call. Projects written before that rule can still carry
+// duplicate names, so collisions are broken here rather than trusted away.
+
+import type { Screen, LvglComponent, Animation } from '../types';
+import type { CodeGenOptions } from './types';
+import { getComponentVarName, toValidCIdentifier, convertName } from './utils/nameUtils';
+
+/**
+ * Animated properties whose LVGL setter takes a style selector, so it cannot be
+ * used as an `lv_anim_exec_xcb_t` (`void (*)(void *, int32_t)`) directly —
+ * calling a three-parameter function through a two-parameter pointer leaves the
+ * selector as whatever happens to be in the register, and the value lands on an
+ * arbitrary part/state. Each needs a generated wrapper instead.
+ *
+ * These use style transforms rather than `lv_image_set_scale`/`_rotation`, which
+ * only exist on image widgets: applied to any other widget they reinterpret the
+ * object, and LV_USE_ASSERT_OBJ is off in the firmware so nothing catches it.
+ */
+export const ANIM_WRAPPERS: Record<string, { name: string; setter: (isV9: boolean) => string[] }> = {
+  opa: {
+    name: 'ui_anim_set_opa',
+    setter: () => ['lv_obj_set_style_opa(target, (lv_opa_t)value, LV_PART_MAIN);'],
+  },
+  transform_zoom: {
+    name: 'ui_anim_set_zoom',
+    setter: (isV9) => isV9
+      ? [
+        'lv_obj_set_style_transform_scale_x(target, value, LV_PART_MAIN);',
+        'lv_obj_set_style_transform_scale_y(target, value, LV_PART_MAIN);',
+      ]
+      : ['lv_obj_set_style_transform_zoom(target, value, LV_PART_MAIN);'],
+  },
+  transform_angle: {
+    name: 'ui_anim_set_angle',
+    setter: (isV9) => isV9
+      ? ['lv_obj_set_style_transform_rotation(target, value, LV_PART_MAIN);']
+      : ['lv_obj_set_style_transform_angle(target, value, LV_PART_MAIN);'],
+  },
+};
+
+/** Properties whose setter already matches lv_anim_exec_xcb_t exactly. */
+export const ANIM_DIRECT_SETTERS: Record<string, string> = {
+  x: 'lv_obj_set_x',
+  y: 'lv_obj_set_y',
+  width: 'lv_obj_set_width',
+  height: 'lv_obj_set_height',
+};
+
+/**
+ * Map animation property to LVGL exec callback, or undefined when the property
+ * cannot be animated — emitting a wrong-but-plausible callback would silently
+ * animate something the user never asked for.
+ */
+export function getAnimExecCb(property: string): string | undefined {
+  const wrapper = ANIM_WRAPPERS[property];
+  if (wrapper) return wrapper.name;
+  const direct = ANIM_DIRECT_SETTERS[property];
+  return direct ? `(lv_anim_exec_xcb_t)${direct}` : undefined;
+}
+
+/** One animation, resolved to everything the templates need to emit it. */
+export interface AnimationSymbol {
+  animation: Animation;
+  /** The screen the animated widget lives on. */
+  screen: Screen;
+  /** C variable of the widget the animation drives. */
+  targetVar: string;
+  /** `ui_anim_<name>`, unique across the project. */
+  base: string;
+  /**
+   * Exec callback for the animated property, or undefined when the property
+   * cannot be animated — such an animation generates no function at all.
+   */
+  execCb?: string;
+}
+
+/** `${base}_start`: starts (or restarts) the animation. */
+export function animStartFuncName(symbol: AnimationSymbol): string {
+  return `${symbol.base}_start`;
+}
+
+/** `${base}_stop`: leaves the widget wherever the animation had reached. */
+export function animStopFuncName(symbol: AnimationSymbol): string {
+  return `${symbol.base}_stop`;
+}
+
+function uniqueBase(animation: Animation, options: CodeGenOptions, taken: Set<string>): string {
+  const converted = convertName(toValidCIdentifier(animation.name || animation.type), options);
+  const wanted = `ui_anim_${converted}`;
+  let base = wanted;
+  for (let n = 2; taken.has(base); n += 1) base = `${wanted}_${n}`;
+  taken.add(base);
+  return base;
+}
+
+/**
+ * Every animation in the project, in screen → component → child order, each
+ * carrying the symbol its functions are generated under.
+ */
+export function collectAnimationSymbols(
+  screens: Screen[],
+  options: CodeGenOptions,
+  needsScreenPrefix: Set<string>,
+): AnimationSymbol[] {
+  const symbols: AnimationSymbol[] = [];
+  // An animation named "set_opa" would otherwise claim a wrapper's symbol.
+  const taken = new Set(Object.values(ANIM_WRAPPERS).map((wrapper) => wrapper.name));
+
+  for (const screen of screens) {
+    const visit = (components: LvglComponent[]) => {
+      for (const component of components) {
+        const targetVar = needsScreenPrefix.has(component.id)
+          ? getComponentVarName(`${screen.name}_${component.name}`, options)
+          : getComponentVarName(component.name, options);
+        for (const animation of component.animations || []) {
+          symbols.push({
+            animation,
+            screen,
+            targetVar,
+            base: uniqueBase(animation, options, taken),
+            execCb: getAnimExecCb(animation.property),
+          });
+        }
+        visit(component.children);
+      }
+    };
+    visit(screen.components);
+  }
+
+  return symbols;
+}
