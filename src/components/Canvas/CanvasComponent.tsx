@@ -17,6 +17,11 @@ import {
   normalizeLinePoints,
   pointsInBox,
 } from '../../utils/lineGeometry';
+import {
+  DEFAULT_END_ANGLE,
+  DEFAULT_START_ANGLE,
+  sectorPath,
+} from '../../utils/circleGeometry';
 import './CanvasComponent.css';
 
 interface CanvasComponentProps {
@@ -322,10 +327,13 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   // Determine if this component is inside a layout container (flex/grid)
   const isInLayout = parentLayout === 'flex' || parentLayout === 'grid';
 
-  // A line has no box: no fill, no border, no radius, no padding. Painting any
-  // of them would put a rectangle around the stroke, which is the one thing a
-  // line must not have — see utils/lineGeometry.ts.
-  const drawsBox = type !== 'line';
+  // What the wrapper is allowed to paint. A line has no box at all — a border
+  // would be a rectangle around the stroke — and a sector is drawn as a path,
+  // so the box behind it must stay out of the way. A circle keeps the box and
+  // simply rounds it all the way.
+  const circleShape: 'circle' | 'sector' | undefined =
+    type === 'circle' ? (props.shape === 'sector' ? 'sector' : 'circle') : undefined;
+  const drawsBox = type !== 'line' && circleShape !== 'sector';
 
   // Build inline styles from component styles
   const componentStyle: React.CSSProperties = {
@@ -336,7 +344,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
     backgroundColor: drawsBox ? (background ? undefined : resolvedBgColor) : undefined,
     ...(background && drawsBox ? { background } : {}),
     ...(drawsBox ? borderStyles : {}),
-    borderRadius: drawsBox ? buildBorderRadius() : undefined,
+    borderRadius: circleShape === 'circle' ? '50%' : drawsBox ? buildBorderRadius() : undefined,
     color: defaultStyle.textColor,
     opacity: component.visible === false ? 0.3 : (defaultStyle.opacity !== undefined ? defaultStyle.opacity : 1),
     ...(drawsBox ? paddingStyles : {}),
@@ -602,6 +610,33 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
       // there is no inner content to draw.
       case 'rectangle':
         return null;
+
+      case 'circle': {
+        // A full disc is the wrapper again, rounded all the way. A sector is a
+        // path, drawn from the same geometry the preview and the generated arc
+        // use — see utils/circleGeometry.ts.
+        if (circleShape !== 'sector') return null;
+        const size = Math.min(component.width, component.height);
+        return (
+          <svg
+            className="lvgl-circle"
+            viewBox={`0 0 ${size} ${size}`}
+            preserveAspectRatio="none"
+            style={{ position: 'absolute', inset: 0 }}
+          >
+            <path
+              d={sectorPath(
+                size,
+                props.thickness ?? 0,
+                props.startAngle ?? DEFAULT_START_ANGLE,
+                props.endAngle ?? DEFAULT_END_ANGLE,
+              )}
+              fill={resolvedBgColor}
+              fillRule="evenodd"
+            />
+          </svg>
+        );
+      }
 
       case 'obj': {
         // Build layout styles for the container based on props.layout

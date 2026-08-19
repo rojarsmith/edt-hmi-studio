@@ -70,7 +70,7 @@ describe('componentDefinitions', () => {
 
     it('should return shape components', () => {
       const shapes = getComponentsByCategory('shape');
-      expect(shapes.map(c => c.type)).toEqual(['rectangle', 'line']);
+      expect(shapes.map(c => c.type)).toEqual(['rectangle', 'line', 'circle']);
       expect(shapes.every(c => c.category === 'shape')).toBe(true);
       // Shapes are drawn, not filled with children
       expect(shapes.every(c => !c.isContainer)).toBe(true);
@@ -103,7 +103,7 @@ describe('componentDefinitions', () => {
     const expectedTypes = [
       'btn', 'label', 'img', 'image-button', 'line',
       'textarea', 'dropdown', 'checkbox', 'switch', 'slider',
-      'rectangle',
+      'rectangle', 'circle',
       'obj', 'tabview', 'tileview', 'win',
       'bar', 'arc', 'spinner', 'chart', 'table', 'calendar',
     ];
@@ -179,6 +179,21 @@ describe('componentDefinitions', () => {
       expect(def!.isContainer).toBe(false);
       // Its points survived the move out of the basic category
       expect(def!.defaultProps.points).toEqual([[0, 0], [100, 0]]);
+    });
+  });
+
+  describe('circle definition', () => {
+    it('is a circular shape with a square box', () => {
+      const def = getComponentDefinition('circle');
+
+      expect(def).toBeDefined();
+      expect(def!.name).toBe('Circle');
+      expect(def!.typeName).toBe('Shape');
+      expect(def!.category).toBe('shape');
+      expect(def!.isContainer).toBe(false);
+      // Square, because everything it draws is circular
+      expect(def!.defaultWidth).toBe(def!.defaultHeight);
+      expect(def!.defaultProps.shape).toBe('circle');
     });
   });
 

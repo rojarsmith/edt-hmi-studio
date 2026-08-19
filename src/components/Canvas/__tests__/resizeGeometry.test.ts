@@ -75,6 +75,40 @@ describe('resizeBox', () => {
     });
   });
 
+  describe('a square resize', () => {
+    const disc = { x: 50, y: 20, width: 100, height: 100 };
+
+    it('follows the handle it is given, not the side that happens to differ', () => {
+      expect(resizeBox(disc, 'right', 40, 0, grid, { square: true })).toMatchObject({
+        width: 140,
+        height: 140,
+      });
+      expect(resizeBox(disc, 'bottom', 0, 40, grid, { square: true })).toMatchObject({
+        width: 140,
+        height: 140,
+      });
+      // A corner takes the larger of the two
+      expect(resizeBox(disc, 'bottom-right', 40, 10, grid, { square: true })).toMatchObject({
+        width: 140,
+        height: 140,
+      });
+    });
+
+    it('gives one answer per pointer position, so a drag cannot oscillate', () => {
+      // The same frame computed twice, and the frame after a pause: all equal
+      const once = resizeBox(disc, 'right', 36, 0, grid, { square: true });
+      const twice = resizeBox(disc, 'right', 36, 0, grid, { square: true });
+      expect(twice).toEqual(once);
+      expect(resizeBox(disc, 'right', 36, 12, grid, { square: true })).toEqual(once);
+    });
+
+    it('holds the edges the handle is not dragging', () => {
+      const box = resizeBox(disc, 'top-left', -40, 0, grid, { square: true });
+      expect(box.x + box.width).toBe(150);
+      expect(box.y + box.height).toBe(120);
+    });
+  });
+
   describe('minimum size', () => {
     it('stops the dragged edge and keeps the anchored one', () => {
       const result = edges(resizeBox(box, 'left', 300, 0, grid));

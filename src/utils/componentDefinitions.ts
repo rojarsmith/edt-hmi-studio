@@ -303,6 +303,42 @@ export const componentDefinitions: ComponentDefinition[] = [
     },
     isContainer: false,
   },
+  {
+    type: 'circle',
+    name: 'Circle',
+    // Third shape in the category, and the family name is the same one.
+    typeName: 'Shape',
+    icon: '🔵',
+    category: 'shape',
+    // Square, because everything it draws is circular: LVGL's software
+    // renderer has no elliptical primitive. See utils/circleGeometry.ts.
+    defaultWidth: 100,
+    defaultHeight: 100,
+    defaultProps: {
+      // 'circle' is a plain object with a circular radius, so it keeps a fill
+      // and a border; 'sector' is an arc, which has neither — only its colour,
+      // its angles and its thickness.
+      shape: 'circle',
+      startAngle: 0,
+      endAngle: 270,
+      // 0 fills the wedge to the centre; anything smaller leaves a ring.
+      thickness: 0,
+    },
+    defaultStyles: {
+      default: {
+        // The same drawn-not-themed palette Rectangle uses, so the shapes look
+        // like a set. No corner radius: the shape is the radius.
+        bgColor: '#E0E0E0',
+        borderColor: '#212121',
+        borderWidth: 1,
+        borderRadius: 0,
+        textColor: '#212121',
+        opacity: 1,
+        padding: 0,
+      },
+    },
+    isContainer: false,
+  },
 
   // Container Components
   {

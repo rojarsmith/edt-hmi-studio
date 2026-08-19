@@ -25,6 +25,11 @@ import {
   normalizeLinePoints,
   orientedLinePoints,
 } from '../../utils/lineGeometry';
+import type { CircleShape } from '../../utils/circleGeometry';
+import {
+  DEFAULT_END_ANGLE,
+  DEFAULT_START_ANGLE,
+} from '../../utils/circleGeometry';
 import ModbusBindingEditor from './ModbusBindingEditor';
 import {
   clampImageButtonStateIndex,
@@ -391,10 +396,19 @@ const PropertyEditor: React.FC = () => {
 
   // Whether the active state has its own overrides
   const hasStateOverride = component ? !!component.styles[activeStyleState] : false;
-  // A line draws no box, so the styles that paint one have nothing to act on:
-  // a fill, a radius or a border would be a rectangle around the stroke. What
-  // a line does draw is edited in its own section — see utils/lineGeometry.ts.
-  const drawsBox = component?.type !== 'line';
+  // Which shared Style rows the widget can actually act on. A line draws no box
+  // at all; an circle's disc has a fill and a border but its radius is the
+  // shape itself, and its sector is an arc, which has only a colour. Offering
+  // a control that changes nothing on the panel is the thing to avoid.
+  const styleRow = (row: 'fill' | 'border' | 'radius' | 'borderSide' | 'text' | 'padding') => {
+    if (!component) return true;
+    if (component.type === 'line') return false;
+    if (component.type === 'circle') {
+      if (component.props?.shape === 'sector') return row === 'fill';
+      return row === 'fill' || row === 'border';
+    }
+    return true;
+  };
 
   const handlePropertyChange = useCallback(
     (property: keyof LvglComponent, value: LvglComponent[keyof LvglComponent]) => {
@@ -839,7 +853,7 @@ const PropertyEditor: React.FC = () => {
             </div>
           )}
           
-          {drawsBox && (<>
+          {styleRow('fill') && (
           <div className="property-row">
             <label>Background Color</label>
             <div className="color-input-wrapper">
@@ -856,7 +870,9 @@ const PropertyEditor: React.FC = () => {
               />
             </div>
           </div>
-          
+          )}
+
+          {styleRow('border') && (
           <div className="property-row">
             <label>Border Color</label>
             <div className="color-input-wrapper">
@@ -873,8 +889,11 @@ const PropertyEditor: React.FC = () => {
               />
             </div>
           </div>
-          
+          )}
+
+          {(styleRow('border') || styleRow('radius')) && (
           <div className="property-row two-col">
+            {styleRow('border') && (
             <div className="property-field">
               <label>Border Width</label>
               <input
@@ -884,6 +903,8 @@ const PropertyEditor: React.FC = () => {
                 onChange={(e) => handleStyleChange('borderWidth', parseInt(e.target.value) || 0)}
               />
             </div>
+            )}
+            {styleRow('radius') && (
             <div className="property-field">
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <label>Corner Radius</label>
@@ -913,8 +934,10 @@ const PropertyEditor: React.FC = () => {
                 />
               )}
             </div>
+            )}
           </div>
-          {!radiusLinked && (
+          )}
+          {styleRow('radius') && !radiusLinked && (
             <div className="four-dir-grid">
               <div className="property-field">
                 <label>Top Left</label>
@@ -940,6 +963,7 @@ const PropertyEditor: React.FC = () => {
           )}
 
           {/* Border side selector */}
+          {styleRow('borderSide') && (
           <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
             <label style={{ width: 'auto' }}>Border Sides</label>
             <div className="border-side-group">
@@ -955,8 +979,7 @@ const PropertyEditor: React.FC = () => {
               ))}
             </div>
           </div>
-          
-          </>)}
+          )}
 
           <div className="property-row">
             <label>Opacity</label>
@@ -971,7 +994,7 @@ const PropertyEditor: React.FC = () => {
             <span className="range-value">{((currentStyles.opacity ?? 1) * 100).toFixed(0)}%</span>
           </div>
 
-          {drawsBox && (<>
+          {styleRow('text') && (
           <div className="property-row">
             <label>Text Color</label>
             <div className="color-input-wrapper">
@@ -988,7 +1011,9 @@ const PropertyEditor: React.FC = () => {
               />
             </div>
           </div>
+          )}
 
+          {styleRow('padding') && (<>
           <div className="property-row">
             <label>Padding</label>
             {paddingLinked ? (
@@ -2462,6 +2487,9 @@ function renderComponentProps(
     case 'line':
       return <LineEditor props={props} onChange={onChange} />;
 
+    case 'circle':
+      return <CircleEditor props={props} onChange={onChange} />;
+
     case 'dropdown':
       return (
         <div className="property-section">
@@ -3833,6 +3861,83 @@ export function FontSizeInput({ value, onChange }: { value: number; onChange: (v
 }
 
 // Line editor with points list
+/**
+ * Everything the Circle can be. A disc is a plain object with a circular
+ * radius, so it keeps its fill and border; a sector is an arc, which has
+ * angles, a thickness and nothing else. Both are circular, because the
+ * software renderer has no elliptical primitive — see utils/circleGeometry.ts.
+ */
+function CircleEditor({
+  props,
+  onChange,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  props: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+}): React.ReactNode {
+  const shape: CircleShape = props.shape === 'sector' ? 'sector' : 'circle';
+  const startAngle = props.startAngle ?? DEFAULT_START_ANGLE;
+  const endAngle = props.endAngle ?? DEFAULT_END_ANGLE;
+  const thickness = props.thickness ?? 0;
+
+  return (
+    <div className="property-section">
+      <div className="section-header">Circle</div>
+      <div className="property-row">
+        <label>Shape</label>
+        <select value={shape} onChange={(e) => onChange('shape', e.target.value)}>
+          <option value="circle">Circle</option>
+          <option value="sector">Sector</option>
+        </select>
+      </div>
+      {shape === 'sector' && (
+        <>
+          <div className="property-row two-col">
+            <div className="property-field">
+              <label title="0° is 3 o'clock, growing clockwise — LVGL's own convention">
+                Start Angle
+              </label>
+              <NumberField
+                value={startAngle}
+                aria-label="Start Angle"
+                onChange={(value) => onChange('startAngle', value)}
+              />
+            </div>
+            <div className="property-field">
+              <label>End Angle</label>
+              <NumberField
+                value={endAngle}
+                aria-label="End Angle"
+                onChange={(value) => onChange('endAngle', value)}
+              />
+            </div>
+          </div>
+          <div className="property-row">
+            <label title="0 fills the wedge to the centre; a smaller value leaves a ring">
+              Thickness
+            </label>
+            <NumberField
+              value={thickness}
+              min={0}
+              aria-label="Thickness"
+              onChange={(value) => onChange('thickness', value)}
+            />
+          </div>
+          {/* A sector is an arc, and LVGL's arc has no outline. Saying where
+              the border went is more use than a control that does nothing. */}
+          <div className="property-row">
+            <span className="inherit-hint">
+              A sector has no border — an arc draws none. For a ring with an
+              outline, use Circle with no fill and a thick border.
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function LineEditor({
   props,
   onChange,

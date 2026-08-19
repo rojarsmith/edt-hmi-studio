@@ -149,6 +149,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
       dropdown: '📋',
       rectangle: '🟦',
       line: '📏',
+      circle: '🔵',
       panel: '📦',
       container: '📦',
       tabview: '📑',

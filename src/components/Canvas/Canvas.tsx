@@ -248,6 +248,9 @@ const Canvas: React.FC = () => {
         mouseX - start.mouseX,
         mouseY - start.mouseY,
         state.canvas,
+        // An circle is round, so it resizes square — decided here, where the
+        // handle is known, rather than by the store guessing afterwards.
+        { square: comp.type === 'circle' },
       );
 
       resizeComponentAndUpdateDrag(componentId, box.width, box.height, mouseX, mouseY, box.x, box.y);

@@ -375,6 +375,60 @@ describe('generateUiSource', () => {
       expect(result).toContain('lv_calendar_set_showed_date(ui_cal, 2025, 6);');
     });
 
+    it('creates an circle disc as an object with a circular radius', () => {
+      const disc = createComponent('circle', {
+        name: 'dot',
+        width: 60,
+        height: 60,
+        props: { shape: 'circle' },
+        styles: { default: { bgColor: '#E0E0E0', borderColor: '#212121', borderWidth: 1, borderRadius: 8 } },
+      });
+      const screens = [createScreen({ name: 'main', components: [disc] })];
+      const result = generateUiSource(screens, defaultOptions());
+      expect(result).toContain('ui_dot = lv_obj_create(ui_screen_main);');
+      expect(result).toContain('lv_obj_set_style_radius(ui_dot, LV_RADIUS_CIRCLE, 0);');
+      // The disc keeps its fill and border; the stored radius is the shape's
+      expect(result).toContain('lv_obj_set_style_bg_color(ui_dot, lv_color_hex(0xE0E0E0), 0);');
+      expect(result).toContain('lv_obj_set_style_border_width(ui_dot, 1, 0);');
+      expect(result).not.toContain('lv_obj_set_style_radius(ui_dot, 8, 0);');
+    });
+
+    it('creates an circle sector as a decorative arc', () => {
+      const pie = createComponent('circle', {
+        name: 'gauge',
+        width: 80,
+        height: 80,
+        props: { shape: 'sector', startAngle: 135, endAngle: 45, thickness: 12 },
+        styles: { default: { bgColor: '#2196F3', borderColor: '#212121', borderWidth: 1 } },
+      });
+      const screens = [createScreen({ name: 'main', components: [pie] })];
+      const result = generateUiSource(screens, defaultOptions());
+      expect(result).toContain('ui_gauge = lv_arc_create(ui_screen_main);');
+      // 135° clockwise by 270° ends at 45°, wrapped the way LVGL wants it
+      expect(result).toContain('lv_arc_set_bg_angles(ui_gauge, 135, 45);');
+      expect(result).toContain('lv_obj_set_style_arc_width(ui_gauge, 12, LV_PART_MAIN);');
+      expect(result).toContain('lv_obj_set_style_arc_color(ui_gauge, lv_color_hex(0x2196F3), LV_PART_MAIN);');
+      // A decoration, not a control
+      expect(result).toContain('lv_obj_remove_style(ui_gauge, NULL, LV_PART_KNOB);');
+      expect(result).toContain('lv_obj_set_style_arc_opa(ui_gauge, LV_OPA_TRANSP, LV_PART_INDICATOR);');
+      // An arc draws no box, so nothing may paint one behind the wedge
+      expect(result).not.toContain('lv_obj_set_style_bg_color(ui_gauge');
+      expect(result).toContain('lv_obj_set_style_border_width(ui_gauge, 0, 0);');
+    });
+
+    it('fills a sector to the centre when no ring is asked for', () => {
+      const pie = createComponent('circle', {
+        name: 'pie',
+        width: 100,
+        height: 100,
+        props: { shape: 'sector', startAngle: 0, endAngle: 360, thickness: 0 },
+      });
+      const screens = [createScreen({ name: 'main', components: [pie] })];
+      const result = generateUiSource(screens, defaultOptions());
+      expect(result).toContain('lv_arc_set_bg_angles(ui_pie, 0, 360);');
+      expect(result).toContain('lv_obj_set_style_arc_width(ui_pie, 50, LV_PART_MAIN);');
+    });
+
     it('creates line with the points array it draws from', () => {
       const line = createComponent('line', {
         name: 'divider',

@@ -65,6 +65,26 @@ describe('editorStore', () => {
       expect(get().height).toBe(60);
     });
 
+    it('numbers circle ids the way every widget does', () => {
+      const first = useEditorStore.getState().addComponent('circle', 0, 0);
+      const second = useEditorStore.getState().addComponent('circle', 0, 0);
+      const nameOf = (id: string) => useEditorStore.getState().getComponentById(id)!.name;
+      expect(nameOf(first)).toBe('Circle_1');
+      expect(nameOf(second)).toBe('Circle_2');
+    });
+
+    it('keeps an circle square whichever side is dragged', () => {
+      const id = useEditorStore.getState().addComponent('circle', 0, 0);
+      const get = () => useEditorStore.getState().getComponentById(id)!;
+      expect(get().width).toBe(get().height);
+
+      useEditorStore.getState().updateComponent(id, { width: 160 });
+      expect(get()).toMatchObject({ width: 160, height: 160 });
+
+      useEditorStore.getState().updateComponent(id, { height: 40 });
+      expect(get()).toMatchObject({ width: 40, height: 40 });
+    });
+
     it('leaves the geometry of other widgets alone', () => {
       const id = useEditorStore.getState().addComponent('rectangle', 0, 0);
       useEditorStore.getState().updateComponent(id, { height: 60 });

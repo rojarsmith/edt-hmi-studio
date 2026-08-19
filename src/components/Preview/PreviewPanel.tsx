@@ -12,6 +12,11 @@ import {
   pointsInBox,
 } from '../../utils/lineGeometry';
 import {
+  DEFAULT_END_ANGLE,
+  DEFAULT_START_ANGLE,
+  sectorPath,
+} from '../../utils/circleGeometry';
+import {
   getImageButtonState,
   getNextImageButtonStateIndex,
   normalizeImageButtonProps,
@@ -665,6 +670,19 @@ const PreviewPanel: React.FC = () => {
           }
           break;
         }
+
+        case 'circle':
+          drawCircle(ctx, x, y, w, h, {
+            shape: comp.props.shape === 'sector' ? 'sector' : 'circle',
+            startAngle: comp.props.startAngle ?? DEFAULT_START_ANGLE,
+            endAngle: comp.props.endAngle ?? DEFAULT_END_ANGLE,
+            thickness: comp.props.thickness ?? 0,
+            bgColor: bgColorStyle,
+            borderColor,
+            borderWidth,
+            gradientFill: getGradientFill(),
+          });
+          break;
 
         // A rectangle is the same box a panel draws: fill, gradient, border,
         // border side and corner radius, all straight from its styles.
@@ -1334,6 +1352,50 @@ function lightenColor(color: string, percent: number): string {
   const G = Math.min(255, ((num >> 8) & 0x00ff) + amt);
   const B = Math.min(255, (num & 0x0000ff) + amt);
   return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
+}
+
+// A disc keeps its fill and border, the way the canvas draws it with a 50%
+// radius; a sector is the same path the canvas draws and the generated arc
+// reproduces. See utils/circleGeometry.ts.
+function drawCircle(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  opts: {
+    shape: 'circle' | 'sector';
+    startAngle: number;
+    endAngle: number;
+    thickness: number;
+    bgColor: string;
+    borderColor: string;
+    borderWidth: number;
+    gradientFill?: string | CanvasGradient;
+  }
+) {
+  const size = Math.min(w, h);
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+
+  if (opts.shape === 'circle') {
+    ctx.beginPath();
+    ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+    ctx.fillStyle = opts.gradientFill || opts.bgColor;
+    ctx.fill();
+    if (opts.borderWidth > 0) {
+      ctx.strokeStyle = opts.borderColor;
+      ctx.lineWidth = opts.borderWidth;
+      ctx.stroke();
+    }
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(cx - size / 2, cy - size / 2);
+  ctx.fillStyle = opts.gradientFill || opts.bgColor;
+  ctx.fill(
+    new Path2D(sectorPath(size, opts.thickness, opts.startAngle, opts.endAngle)),
+    'evenodd',
+  );
+  ctx.restore();
 }
 
 // Draws the widget's own points, placed in its box exactly as the editor

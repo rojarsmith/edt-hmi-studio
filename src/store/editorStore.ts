@@ -31,6 +31,7 @@ import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
 import { applyLineGeometry } from '../utils/lineGeometry';
+import { squareBox } from '../utils/circleGeometry';
 import { keyFromText, literalOf, resolveText } from '../codegen/textResources';
 
 // Maximum history entries for undo/redo
@@ -350,15 +351,25 @@ function flattenComponents(components: LvglComponent[]): LvglComponent[] {
 }
 
 /**
- * A line's box is its stroke, never more: whichever half of the geometry an
- * edit touched, this brings the other half along. Every path that changes a
- * line — the resize drag, the size fields, the Line section — goes through it,
- * so the box and the points can never disagree. See utils/lineGeometry.ts.
+ * A shape's box is the shape, never more. Whichever half of the geometry an
+ * edit touched, this brings the other half along: a line's box is its stroke
+ * and its points follow the box, an circle's box stays square. Every path
+ * that changes one — the resize drag, the size fields, the shape's own
+ * property section — goes through it, so the two can never disagree.
  */
-function withLineGeometry(
+function withShapeGeometry(
   component: LvglComponent,
   updates: Partial<LvglComponent>,
 ): Partial<LvglComponent> {
+  // An circle is circular whatever it draws, so its box stays square: one
+  // side follows the other rather than leaving a disc in a rectangle of empty
+  // space. See utils/circleGeometry.ts.
+  if (component.type === 'circle') {
+    const next = { ...component, ...updates };
+    if (next.width === component.width && next.height === component.height) return updates;
+    return { ...updates, ...squareBox(component, next) };
+  }
+
   if (component.type !== 'line') return updates;
 
   const next = { ...component, ...updates };
@@ -1028,7 +1039,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateComponent: (id, updates) => {
     const { currentScreenId } = get();
     const component = get().getComponentById(id);
-    const finalUpdates = component ? withLineGeometry(component, updates) : updates;
+    const finalUpdates = component ? withShapeGeometry(component, updates) : updates;
     get().saveToHistory();
     set(state => ({
       screens: state.screens.map(screen => {
@@ -1988,7 +1999,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (y !== undefined) updates.y = y;
 
     const component = get().getComponentById(id);
-    if (component) updates = withLineGeometry(component, updates);
+    if (component) updates = withShapeGeometry(component, updates);
     
     set(state => ({
       screens: state.screens.map(screen => {

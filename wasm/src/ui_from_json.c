@@ -521,6 +521,56 @@ static lv_obj_t *create_line(lv_obj_t *parent, const cJSON *comp) {
     return line;
 }
 
+/*
+ * The Circle widget. Everything it draws is circular: a disc is a plain
+ * object with a circular radius, a sector is an arc's background part with a
+ * width thick enough to close the wedge. The software renderer has no
+ * elliptical primitive, which is why the widget keeps a square box.
+ */
+static lv_obj_t *create_circle(lv_obj_t *parent, const cJSON *comp) {
+    const cJSON *props = cJSON_GetObjectItemCaseSensitive(comp, "props");
+    const char *shape = props ? cjson_get_string(props, "shape") : NULL;
+
+    if (shape == NULL || strcmp(shape, "sector") != 0) {
+        lv_obj_t *disc = lv_obj_create(parent);
+        lv_obj_set_style_radius(disc, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+        return disc;
+    }
+
+    lv_obj_t *arc = lv_arc_create(parent);
+    int w = cjson_get_int(comp, "width", 100);
+    int h = cjson_get_int(comp, "height", 100);
+    int radius = (w < h ? w : h) / 2;
+    int start = cjson_get_int(props, "startAngle", 0);
+    int end = cjson_get_int(props, "endAngle", 270);
+    int thickness = cjson_get_int(props, "thickness", 0);
+    int sweep = end - start;
+
+    while (sweep < 0) sweep += 360;
+    if (sweep == 0 || sweep >= 360) { start = 0; sweep = 360; }
+    if (thickness <= 0 || thickness >= radius) thickness = radius;
+
+    /* An arc is a control; this one is a decoration. */
+    lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
+    lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_INDICATOR);
+    lv_arc_set_bg_angles(arc, start, sweep >= 360 ? 360 : (start + sweep) % 360);
+    lv_obj_set_style_arc_width(arc, thickness, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(arc, false, LV_PART_MAIN);
+
+    /* The fill colour reaches an arc as arc_color; apply_styles would only put
+       it behind the wedge as a background. */
+    {
+        const cJSON *styles = cJSON_GetObjectItemCaseSensitive(comp, "styles");
+        const cJSON *dflt = styles
+            ? cJSON_GetObjectItemCaseSensitive(styles, "default")
+            : NULL;
+        const char *bg = dflt ? cjson_get_string(dflt, "bgColor") : NULL;
+        if (bg && strcmp(bg, "transparent") != 0)
+            lv_obj_set_style_arc_color(arc, hex_to_color(bg), LV_PART_MAIN);
+    }
+    return arc;
+}
+
 static lv_obj_t *create_img(lv_obj_t *parent, const cJSON *comp) {
     (void)comp;
     /* Image source handling would require asset management;
@@ -545,6 +595,7 @@ static const type_entry_t type_table[] = {
     { "container", create_obj },
     /* A rectangle is a plain object wearing the shape's styles. */
     { "rectangle", create_obj },
+    { "circle",   create_circle },
     { "btn",       create_btn },
     { "label",     create_label },
     { "slider",    create_slider },

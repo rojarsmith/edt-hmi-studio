@@ -15,6 +15,11 @@ import {
   pointsInBox,
 } from '../../utils/lineGeometry';
 import {
+  DEFAULT_END_ANGLE,
+  DEFAULT_START_ANGLE,
+  normalizeSweep,
+} from '../../utils/circleGeometry';
+import {
   ANIM_WRAPPERS,
   ANIM_DIRECT_SETTERS,
   animStartFuncName,
@@ -129,8 +134,10 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
     switch: 'lv_switch_create',
     slider: 'lv_slider_create',
     // A shape has no widget of its own in LVGL: a plain object with the
-    // shape's fill, border and radius styles is exactly a rectangle.
+    // shape's fill, border and radius styles is exactly a rectangle, and one
+    // with a circular radius is a disc.
     rectangle: 'lv_obj_create',
+    circle: props?.shape === 'sector' ? 'lv_arc_create' : 'lv_obj_create',
     obj: 'lv_obj_create',
     tabview: 'lv_tabview_create',
     tileview: 'lv_tileview_create',
@@ -186,6 +193,22 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
  */
 function withoutBoxStyles(component: LvglComponent): StyleProps {
   const styles = component.styles.default;
+  if (component.type === 'circle') {
+    // The disc's radius is the shape, set from the props; a sector is an arc,
+    // which draws its colour through arc_color and has no box at all.
+    const { borderRadius: _r, ...rest } = styles;
+    if (component.props?.shape !== 'sector') return rest;
+    const {
+      bgColor: _bg,
+      bgGradColor: _grad,
+      bgGradDir: _dir,
+      borderColor: _bc,
+      borderWidth: _bw,
+      padding: _pad,
+      ...arcRest
+    } = rest;
+    return { ...arcRest, bgColor: 'transparent', borderWidth: 0 };
+  }
   if (component.type !== 'line') return styles;
   const {
     bgColor: _bgColor,
@@ -464,7 +487,9 @@ function generatePropsCode(
   defaultFontSize?: number,
   suppressText: boolean = false,
   /** Translation tag for this widget, and which prop it stands in for. */
-  translation?: { tag: string; prop: TranslatableProp }
+  translation?: { tag: string; prop: TranslatableProp },
+  /** The widget itself, for the few props that need its box or its styles. */
+  component?: LvglComponent
 ): string[] {
   const lines: string[] = [];
   const indent = getIndent(options);
@@ -734,6 +759,43 @@ function generatePropsCode(
       );
       break;
       
+    case 'circle': {
+      if (props.shape === 'sector') {
+        const { start, sweep } = normalizeSweep(
+          props.startAngle ?? DEFAULT_START_ANGLE,
+          props.endAngle ?? DEFAULT_END_ANGLE,
+        );
+        // The shape is drawn by the arc's background part: its angles, and a
+        // width thick enough to close the wedge to the centre when no ring is
+        // asked for. The indicator and the knob are what make an arc a
+        // control, and this one is a decoration.
+        const radius = Math.floor(Math.min(component?.width ?? 100, component?.height ?? 100) / 2);
+        const thickness = props.thickness > 0 && props.thickness < radius
+          ? props.thickness
+          : radius;
+        lines.push(`${indent}lv_obj_remove_style(${varName}, NULL, LV_PART_KNOB);`);
+        lines.push(`${indent}lv_obj_set_style_arc_opa(${varName}, LV_OPA_TRANSP, LV_PART_INDICATOR);`);
+        // LVGL subtracts a single turn from an angle over 360, so the end is
+        // wrapped here rather than handed over as start + sweep. A full turn
+        // stays 0..360, which is how an arc says "all the way round".
+        const [from, to] = sweep >= 360 ? [0, 360] : [start, (start + sweep) % 360];
+        lines.push(`${indent}lv_arc_set_bg_angles(${varName}, ${from}, ${to});`);
+        lines.push(`${indent}lv_obj_set_style_arc_width(${varName}, ${thickness}, LV_PART_MAIN);`);
+        lines.push(`${indent}lv_obj_set_style_arc_rounded(${varName}, false, LV_PART_MAIN);`);
+        const arcColor = component?.styles.default.bgColor;
+        if (arcColor && arcColor !== 'transparent') {
+          lines.push(
+            `${indent}lv_obj_set_style_arc_color(${varName}, ${colorToLvgl(arcColor)}, LV_PART_MAIN);`,
+          );
+        }
+      } else {
+        // LV_RADIUS_CIRCLE is clamped to half the shorter side, so a square
+        // box gives a circle. The widget keeps its box square for that reason.
+        lines.push(`${indent}lv_obj_set_style_radius(${varName}, LV_RADIUS_CIRCLE, 0);`);
+      }
+      break;
+    }
+
     case 'line': {
       const linePoints = generatedLinePoints(props);
       lines.push(
@@ -1416,7 +1478,7 @@ function generateComponentCode(
   }
 
   // Component-specific properties
-  const propLines = generatePropsCode(varName, component.type, component.props, options, imageResources, defaultFont, defaultFontSize, Boolean(typographyStyle), componentTags?.get(component.id));
+  const propLines = generatePropsCode(varName, component.type, component.props, options, imageResources, defaultFont, defaultFontSize, Boolean(typographyStyle), componentTags?.get(component.id), component);
   lines.push(...propLines);
 
   // Event bindings. One callback per event type: several bindings of the same

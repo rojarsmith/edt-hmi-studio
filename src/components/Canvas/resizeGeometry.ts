@@ -37,6 +37,19 @@ export interface ResizeGrid {
   gridSize: number;
 }
 
+export interface ResizeOptions {
+  /**
+   * Keep the box square, for a widget that is only ever round. The dragged
+   * handle decides which side leads — a side handle its own axis, a corner the
+   * larger of the two — and the edges it does not touch still hold, so the
+   * result is the same for a given pointer position however it was reached.
+   * A rule that instead asked "which side changed?" would answer differently
+   * on the frame after it had squared the box, and the widget would flicker
+   * between two sizes for as long as the drag lasted.
+   */
+  square?: boolean;
+}
+
 /** Smallest side a drag may leave a widget with, so it stays grabbable. */
 export const MIN_RESIZE_SIZE = 10;
 
@@ -50,6 +63,7 @@ export function resizeBox(
   deltaX: number,
   deltaY: number,
   grid: ResizeGrid,
+  options: ResizeOptions = {},
 ): ResizeBox {
   const snap = (value: number) =>
     grid.snapToGrid && grid.gridSize > 0
@@ -76,6 +90,22 @@ export function resizeBox(
   if (bottom - top < min) {
     if (handle.includes('top')) top = bottom - min;
     else bottom = top + min;
+  }
+
+  if (options.square) {
+    const width = right - left;
+    const height = bottom - top;
+    const size =
+      handle === 'top' || handle === 'bottom'
+        ? height
+        : handle === 'left' || handle === 'right'
+          ? width
+          : Math.max(width, height);
+    // The edges the handle is not holding are the ones that move
+    if (handle.includes('left')) left = right - size;
+    right = left + size;
+    if (handle.includes('top')) top = bottom - size;
+    bottom = top + size;
   }
 
   return { x: left, y: top, width: right - left, height: bottom - top };
