@@ -7,6 +7,7 @@ import PanelChevron from '../LogicEditor/PanelChevron';
 import { useDockedPanelResize } from '../../hooks/useDockedPanelResize';
 import '../panelBar.css';
 import './HierarchyPanel.css';
+import { sanitizeComponentId } from '../../utils/componentId';
 
 // Resize limits, mirroring the logic editor's GraphManager: the panel keeps
 // room for its own header, whether it is being dragged or lending height to a
@@ -91,8 +92,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   };
   
   const handleRenameSubmit = () => {
-    if (editName.trim() && editName !== component.name) {
-      onRename(component.id, editName.trim());
+    const name = sanitizeComponentId(editName);
+    if (name && name !== component.name) {
+      onRename(component.id, name);
     }
     setIsEditing(false);
   };
@@ -200,7 +202,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             type="text"
             className="rename-input"
             value={editName}
-            onChange={(e) => setEditName(e.target.value)}
+            onChange={(e) => setEditName(sanitizeComponentId(e.target.value))}
             onBlur={handleRenameSubmit}
             onKeyDown={handleKeyDown}
             autoFocus

@@ -16,6 +16,7 @@ import { getComponentDefinition } from '../../utils/componentDefinitions';
 import { resolveText } from '../../codegen/textResources';
 import { effectiveTypographyId, standInProp } from '../../utils/componentText';
 import { getEntryScreen } from '../../utils/entryScreen';
+import { commitComponentId, sanitizeComponentId } from '../../utils/componentId';
 import { glyphCoverageGaps } from '../../utils/glyphCoverage';
 import {
   DEFAULT_LINE_WIDTH,
@@ -562,7 +563,9 @@ const PropertyEditor: React.FC = () => {
     // Commits on blur/Enter so a rename lands on the undo stack once, not per
     // keystroke; anything blank rolls back to the current name.
     const commitScreenName = (input: HTMLInputElement) => {
-      const name = input.value.trim();
+      // A screen's id becomes a C variable too, so it follows the same
+      // no-whitespace rule a component's does.
+      const name = sanitizeComponentId(input.value);
       if (name && name !== currentScreen.name) renameScreen(currentScreen.id, name);
       else input.value = currentScreen.name;
     };
@@ -643,7 +646,12 @@ const PropertyEditor: React.FC = () => {
             <input
               type="text"
               value={component.name}
-              onChange={(e) => handlePropertyChange('name', e.target.value)}
+              // An id is an identifier, not a label: whitespace is taken out
+              // as it is typed rather than left to surprise the C generator.
+              // See utils/componentId.ts.
+              onChange={(e) =>
+                handlePropertyChange('name', commitComponentId(e.target.value, component.name))
+              }
             />
           </div>
           <div className="property-row">
