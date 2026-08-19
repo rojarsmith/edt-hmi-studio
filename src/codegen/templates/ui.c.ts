@@ -992,18 +992,18 @@ function getEasingPath(easing: AnimationEasing): string {
  * to the animation's first frame.
  */
 function generateAnimationInitialState(
-  varName: string,
-  animations: Animation[],
+  symbols: AnimationSymbol[],
   options: CodeGenOptions
 ): string[] {
   const indent = getIndent(options);
   const lines: string[] = [];
 
-  for (const anim of animations) {
-    const wrapper = ANIM_WRAPPERS[anim.property];
-    const setter = wrapper ? wrapper.name : ANIM_DIRECT_SETTERS[anim.property];
+  for (const symbol of symbols) {
+    const property = symbol.animation.property;
+    const wrapper = ANIM_WRAPPERS[property];
+    const setter = wrapper ? wrapper.name : ANIM_DIRECT_SETTERS[property];
     if (!setter) continue;
-    lines.push(`${indent}${setter}(${varName}, ${anim.startValue});`);
+    lines.push(`${indent}${setter}(${symbol.targetVar}, ${symbol.startValue});`);
   }
 
   return lines;
@@ -1064,7 +1064,7 @@ function generateAnimationFunction(
   lines.push(`${indent}lv_anim_init(&${animVar});`);
   lines.push(`${indent}lv_anim_set_var(&${animVar}, ${symbol.targetVar});`);
   lines.push(`${indent}lv_anim_set_exec_cb(&${animVar}, ${symbol.execCb});`);
-  lines.push(`${indent}lv_anim_set_values(&${animVar}, ${anim.startValue}, ${anim.endValue});`);
+  lines.push(`${indent}lv_anim_set_values(&${animVar}, ${symbol.startValue}, ${symbol.endValue});`);
   lines.push(`${indent}lv_anim_set_time(&${animVar}, ${anim.duration});`);
 
   if (anim.delay > 0) {
@@ -1454,7 +1454,7 @@ function generateScreenAnimationFunc(
 
   const resetBody: string[] = [];
   for (const symbol of played) {
-    resetBody.push(...generateAnimationInitialState(symbol.targetVar, [symbol.animation], options));
+    resetBody.push(...generateAnimationInitialState([symbol], options));
   }
   if (resetBody.length === 0) return '';
 

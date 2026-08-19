@@ -9,6 +9,7 @@
 import type { Screen, Animation } from '../types';
 import type { CodeGenOptions } from './types';
 import { componentsById, screenByComponentId } from '../utils/animationAssets';
+import { resolvedAnimationValues } from '../utils/animationValues';
 import { getComponentVarName, toValidCIdentifier, convertName } from './utils/nameUtils';
 
 /**
@@ -78,6 +79,12 @@ export interface AnimationSymbol {
    * cannot be animated — such an animation generates no function at all.
    */
   execCb?: string;
+  /**
+   * The values a setter is finally given, with an offset animation already
+   * counted from the component's designed position.
+   */
+  startValue: number;
+  endValue: number;
 }
 
 /** `${base}_start`: starts (or restarts) the animation. */
@@ -147,6 +154,7 @@ export function collectAnimationSymbols(
       targetVar,
       base: uniqueBase(animation, options, taken),
       execCb: getAnimExecCb(animation.property),
+      ...resolvedAnimationValues(animation, component),
     });
   }
 

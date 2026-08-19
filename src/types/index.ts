@@ -64,6 +64,12 @@ export interface Animation {
   property: string;
   startValue: number;
   endValue: number;
+  /**
+   * How startValue and endValue are read: as coordinates, or as a distance
+   * from where the component sits. Absent means the default for the property —
+   * see animationValueMode() in src/utils/animationValues.ts.
+   */
+  valueMode?: 'absolute' | 'offset';
 }
 
 // LVGL Component Types

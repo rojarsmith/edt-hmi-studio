@@ -306,3 +306,31 @@
   color: #d32f2f;
   margin: 4px 0 0 0;
 }
+
+/* Absolute / Offset switch, in the size-mode switcher's language. */
+.anim-mode-switch {
+  display: flex;
+  gap: 4px;
+}
+
+.anim-mode-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.anim-mode-btn:hover {
+  background: #f0f0f0;
+}
+
+.anim-mode-btn.active {
+  background: #2196F3;
+  border-color: #2196F3;
+  color: #fff;
+}

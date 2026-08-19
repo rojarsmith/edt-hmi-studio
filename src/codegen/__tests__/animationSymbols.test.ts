@@ -112,6 +112,39 @@ describe('animation functions', () => {
     expect(result).toContain('void ui_anim_set_opa_2_start(void) {');
   });
 
+  it('slides a widget back to where it was designed, not to the raw offset', () => {
+    // "Slide in from the left" on a widget placed at x: 40 has to end at 40.
+    // Reading -110 as a coordinate would land every such animation at the same
+    // spot regardless of where the designer put the widget.
+    const { component, animations } = animatedComponent(
+      'btn', { name: 'myBtn', x: 40 },
+      { name: 'Slide_In_1', property: 'x', startValue: -110, endValue: 0 },
+    );
+    const screens = [createScreen({ name: 'main', components: [component] })];
+
+    const result = generateUiSource(
+      screens, defaultOptions(), undefined, [], undefined, undefined, [],
+      undefined, undefined, undefined, [], [], animations,
+    );
+
+    expect(result).toContain('lv_anim_set_values(&anim, -70, 40);');
+  });
+
+  it('takes the coordinates literally when told they are absolute', () => {
+    const { component, animations } = animatedComponent(
+      'btn', { name: 'myBtn', x: 40 },
+      { name: 'Slide_In_1', property: 'x', startValue: -110, endValue: 0, valueMode: 'absolute' },
+    );
+    const screens = [createScreen({ name: 'main', components: [component] })];
+
+    const result = generateUiSource(
+      screens, defaultOptions(), undefined, [], undefined, undefined, [],
+      undefined, undefined, undefined, [], [], animations,
+    );
+
+    expect(result).toContain('lv_anim_set_values(&anim, -110, 0);');
+  });
+
   it('generates no function for a property that cannot be animated', () => {
     const built = project({ name: 'Weird_1', property: 'bg_color' });
 

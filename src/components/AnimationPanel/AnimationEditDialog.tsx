@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Animation, AnimationType, AnimationEasing } from '../../types';
 import { useEditorStore } from '../../store/editorStore';
 import { componentsById } from '../../utils/animationAssets';
+import { animationValueMode, supportsOffset } from '../../utils/animationValues';
 import {
   animationNameBase,
   isAnimationNameTaken,
@@ -97,6 +98,9 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
   const [repeat, setRepeat] = useState(animation?.repeat ?? 0);
   const [property, setProperty] = useState(animation?.property || 'opa');
   const [startValue, setStartValue] = useState(animation?.startValue ?? 0);
+  const [valueMode, setValueMode] = useState<'absolute' | 'offset'>(
+    animation ? animationValueMode(animation) : 'offset',
+  );
   const [endValue, setEndValue] = useState(animation?.endValue ?? 255);
 
   // The name the animation takes if the field is left blank. Shown as the
@@ -137,10 +141,11 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
       repeat,
       property,
       startValue,
+      valueMode: supportsOffset(property) ? valueMode : 'absolute',
       endValue,
     };
     onSave(anim);
-  }, [animation, name, suggestedName, projectAnimations, targetId, type, easing, duration, delay, repeat, property, startValue, endValue, onSave]);
+  }, [animation, name, suggestedName, projectAnimations, targetId, type, easing, duration, delay, repeat, property, valueMode, startValue, endValue, onSave]);
 
   return (
     <div className="anim-dialog-overlay" onClick={onClose}>
@@ -223,6 +228,29 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
               ))}
             </select>
           </div>
+
+          {supportsOffset(property) && (
+            <div className="form-section">
+              <label className="section-label">Values Are</label>
+              <div className="anim-mode-switch">
+                {(['offset', 'absolute'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`anim-mode-btn ${valueMode === mode ? 'active' : ''}`}
+                    onClick={() => setValueMode(mode)}
+                  >
+                    {mode === 'offset' ? 'Offset' : 'Absolute'}
+                  </button>
+                ))}
+              </div>
+              <p className="field-hint">
+                {valueMode === 'offset'
+                  ? 'Counted from where the component sits, so −100 is a hundred pixels to its left. Move the component and the animation moves with it.'
+                  : 'Coordinates on the screen, whatever the component position is.'}
+              </p>
+            </div>
+          )}
 
           <div className="form-row">
             <div className="form-section">

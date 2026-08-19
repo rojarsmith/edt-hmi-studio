@@ -3,6 +3,8 @@ import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
 import type { LvglComponent, Animation } from '../../types';
 import { getEntryScreen } from '../../utils/entryScreen';
+import { componentsById } from '../../utils/animationAssets';
+import { resolvedAnimationValues } from '../../utils/animationValues';
 import {
   getImageButtonState,
   getNextImageButtonStateIndex,
@@ -65,12 +67,21 @@ function animationsOn(
     .map((anim) => ({ compId: anim.targetComponentId, anim }));
 }
 
-function computeAnimState(anim: Animation, progress: number): Partial<AnimState> {
+function computeAnimState(
+  anim: Animation,
+  progress: number,
+  component?: Pick<LvglComponent, 'x' | 'y'>,
+): Partial<AnimState> {
   const easeFn = getEasingFn(anim.easing);
   const t = easeFn(Math.max(0, Math.min(1, progress)));
-  const start = Number(anim.startValue) || 0;
-  const end = Number(anim.endValue) || 0;
+  const resolved = resolvedAnimationValues(anim, component);
+  const start = Number(resolved.startValue) || 0;
+  const end = Number(resolved.endValue) || 0;
   const val = start + (end - start) * t;
+  // x and y below are drawn as a shift from the component's own position.
+  const origin = component
+    ? (anim.property === 'x' ? component.x : anim.property === 'y' ? component.y : 0)
+    : 0;
 
   // Interpret the animation exactly as the code generator does: by property and
   // start/end value. Every animation type sets those when it is picked, so the
@@ -80,8 +91,8 @@ function computeAnimState(anim: Animation, progress: number): Partial<AnimState>
   // already-negative default ("Slide In from Left" stores -100), so left slides
   // came in from the right and top slides from the bottom.
   switch (anim.property) {
-    case 'x': return { offsetX: val };
-    case 'y': return { offsetY: val };
+    case 'x': return { offsetX: val - origin };
+    case 'y': return { offsetY: val - origin };
     case 'opa': return { opacity: val / 255 };
     case 'width': return { scaleX: val / 100 };
     case 'height': return { scaleY: val / 100 };
@@ -194,6 +205,8 @@ const PreviewPanel: React.FC = () => {
   }, [images]);
 
   // Animation playback
+  const componentIndex = useMemo(() => componentsById(screens), [screens]);
+
   const runAnimations = useCallback((allAnims: { compId: string; anim: Animation }[]) => {
     if (allAnims.length === 0) return;
     runningAnimsRef.current = allAnims;
@@ -227,7 +240,7 @@ const PreviewPanel: React.FC = () => {
           }
         }
 
-        const state = computeAnimState(anim, progress);
+        const state = computeAnimState(anim, progress, componentIndex.get(compId));
         const existing = newStates.get(compId) || {};
         newStates.set(compId, {
           offsetX: (existing.offsetX || 0) + (state.offsetX || 0),
@@ -249,7 +262,7 @@ const PreviewPanel: React.FC = () => {
     };
 
     animFrameRef.current = requestAnimationFrame(tick);
-  }, []);
+  }, [componentIndex]);
 
   /** What a screen plays once it has finished appearing, in binding order. */
   const loadAnimationsOf = useCallback((screenId: string) => {
@@ -318,7 +331,7 @@ const PreviewPanel: React.FC = () => {
               progress = (totalLocal % duration) / duration;
             }
           }
-          const state = computeAnimState(anim, progress);
+          const state = computeAnimState(anim, progress, componentIndex.get(compId));
           const existing = newStates.get(compId) || {};
           newStates.set(compId, {
             offsetX: (existing.offsetX || 0) + (state.offsetX || 0),
@@ -338,7 +351,7 @@ const PreviewPanel: React.FC = () => {
       };
       animFrameRef.current = requestAnimationFrame(tick);
     }
-  }, [animPlaying, animPaused]);
+  }, [animPlaying, animPaused, componentIndex]);
 
   // Reset is a restart of the simulated device: animations and widget states
   // go back to their initial values, and the preview returns to the entry
