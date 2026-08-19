@@ -17,9 +17,9 @@ import {
   type AnimationSymbol,
 } from '../animationSymbols';
 import {
-  animationDistance,
-  animationParkValue,
-  animationValueMode,
+  trackDistance,
+  trackParkValue,
+  trackValueMode,
 } from '../../utils/animationValues';
 import {
   languageDifferences,
@@ -991,9 +991,9 @@ function getEasingPath(easing: AnimationEasing): string {
 }
 
 /**
- * Statements that put an animated widget at its start value.
+ * Statements that put an animated widget where its tracks begin.
  *
- * Uses the same setter the animation drives, so the parked state is identical
+ * Uses the same setters the animation drives, so the parked state is identical
  * to the animation's first frame.
  */
 function generateAnimationInitialState(
@@ -1004,13 +1004,14 @@ function generateAnimationInitialState(
   const lines: string[] = [];
 
   for (const symbol of symbols) {
-    const property = symbol.animation.property;
-    const wrapper = ANIM_WRAPPERS[property];
-    const setter = wrapper ? wrapper.name : ANIM_DIRECT_SETTERS[property];
-    if (!setter) continue;
-    lines.push(
-      `${indent}${setter}(${symbol.targetVar}, ${animationParkValue(symbol.animation, symbol.component)});`,
-    );
+    for (const { track } of symbol.tracks) {
+      const wrapper = ANIM_WRAPPERS[track.property];
+      const setter = wrapper ? wrapper.name : ANIM_DIRECT_SETTERS[track.property];
+      if (!setter) continue;
+      lines.push(
+        `${indent}${setter}(${symbol.targetVar}, ${trackParkValue(track, symbol.component)});`,
+      );
+    }
   }
 
   return lines;
@@ -1025,7 +1026,9 @@ export function generateAnimationHelpers(
 ): string[] {
   const used = new Set<string>();
   for (const symbol of symbols) {
-    if (ANIM_WRAPPERS[symbol.animation.property]) used.add(symbol.animation.property);
+    for (const { track } of symbol.tracks) {
+      if (ANIM_WRAPPERS[track.property]) used.add(track.property);
+    }
   }
   if (used.size === 0) return [];
 
@@ -1051,7 +1054,12 @@ export function generateAnimationHelpers(
 }
 
 /**
- * Generate animation code for a component
+ * Emit the start/stop pair for one animation.
+ *
+ * An animation drives one or more properties at once — sliding in while
+ * fading up is one animation with two tracks — so the start function sets up
+ * an lv_anim_t per track. lv_anim_start copies the descriptor, so one local
+ * serves them all.
  */
 function generateAnimationFunction(
   symbol: AnimationSymbol,
@@ -1063,43 +1071,51 @@ function generateAnimationFunction(
   const lines: string[] = [];
 
   if (options.generateComments) {
-    lines.push(generateComment(`Animation: ${anim.name || anim.type} on ${symbol.targetVar}`, options));
+    lines.push(generateComment(`Animation: ${anim.name} on ${symbol.targetVar}`, options));
   }
 
   lines.push(`void ${animStartFuncName(symbol)}(void) {`);
   lines.push(`${indent}lv_anim_t ${animVar};`);
-  lines.push(`${indent}lv_anim_init(&${animVar});`);
-  lines.push(`${indent}lv_anim_set_var(&${animVar}, ${symbol.targetVar});`);
-  lines.push(`${indent}lv_anim_set_exec_cb(&${animVar}, ${symbol.execCb});`);
-  if (animationValueMode(anim) === 'offset') {
-    const getter = anim.property === 'x' ? 'lv_obj_get_x' : 'lv_obj_get_y';
-    const distance = animationDistance(anim);
-    lines.push(`${indent}int32_t from = ${getter}(${symbol.targetVar});`);
-    lines.push(`${indent}lv_anim_set_values(&${animVar}, from, from + (${distance}));`);
-  } else {
-    lines.push(`${indent}lv_anim_set_values(&${animVar}, ${anim.startValue}, ${anim.endValue});`);
-  }
-  lines.push(`${indent}lv_anim_set_time(&${animVar}, ${anim.duration});`);
 
-  if (anim.delay > 0) {
-    lines.push(`${indent}lv_anim_set_delay(&${animVar}, ${anim.delay});`);
-  }
+  symbol.tracks.forEach(({ track, execCb }, index) => {
+    if (index > 0) lines.push('');
+    if (options.generateComments) {
+      lines.push(`${indent}${generateComment(track.property, options)}`);
+    }
+    lines.push(`${indent}lv_anim_init(&${animVar});`);
+    lines.push(`${indent}lv_anim_set_var(&${animVar}, ${symbol.targetVar});`);
+    lines.push(`${indent}lv_anim_set_exec_cb(&${animVar}, ${execCb});`);
 
-  lines.push(`${indent}lv_anim_set_path_cb(&${animVar}, ${getEasingPath(anim.easing)});`);
+    if (trackValueMode(track) === 'offset') {
+      const getter = track.property === 'x' ? 'lv_obj_get_x' : 'lv_obj_get_y';
+      const from = `from_${track.property}`;
+      lines.push(`${indent}int32_t ${from} = ${getter}(${symbol.targetVar});`);
+      lines.push(
+        `${indent}lv_anim_set_values(&${animVar}, ${from}, ${from} + (${trackDistance(track)}));`,
+      );
+    } else {
+      lines.push(`${indent}lv_anim_set_values(&${animVar}, ${track.startValue}, ${track.endValue});`);
+    }
 
-  if (anim.repeat > 0) {
-    lines.push(`${indent}lv_anim_set_repeat_count(&${animVar}, ${anim.repeat});`);
-  }
+    lines.push(`${indent}lv_anim_set_time(&${animVar}, ${anim.duration});`);
+    if (anim.delay > 0) {
+      lines.push(`${indent}lv_anim_set_delay(&${animVar}, ${anim.delay});`);
+    }
+    lines.push(`${indent}lv_anim_set_path_cb(&${animVar}, ${getEasingPath(anim.easing)});`);
+    if (anim.repeat > 0) {
+      lines.push(`${indent}lv_anim_set_repeat_count(&${animVar}, ${anim.repeat});`);
+    }
+    // lv_anim_start drops any running animation with the same var and exec_cb,
+    // so triggering this twice restarts it rather than stacking two.
+    lines.push(`${indent}lv_anim_start(&${animVar});`);
+  });
 
-  // lv_anim_start drops any running animation with the same var and exec_cb,
-  // so triggering this twice restarts it rather than stacking two.
-  lines.push(`${indent}lv_anim_start(&${animVar});`);
   lines.push('}');
   lines.push('');
   lines.push(`void ${animStopFuncName(symbol)}(void) {`);
-  lines.push(
-    `${indent}${animDeleteFunc(options)}(${symbol.targetVar}, ${symbol.execCb});`,
-  );
+  for (const { execCb } of symbol.tracks) {
+    lines.push(`${indent}${animDeleteFunc(options)}(${symbol.targetVar}, ${execCb});`);
+  }
   lines.push('}');
 
   return lines.join('\n');
@@ -1116,15 +1132,15 @@ function animDeleteFunc(options: CodeGenOptions): string {
  * One named function each, rather than a block buried in the screen's load
  * callback: an animation nothing can name is an animation nothing can trigger,
  * and every trigger beyond "the screen appeared" has to call exactly one of
- * them. An unanimatable property gets no function — see the comment left in
- * its place by generateScreenAnimationFunc.
+ * them. An animation with no generatable track gets none — see the comment
+ * left in its place by generateScreenAnimationFunc.
  */
 export function generateAnimationFunctions(
   symbols: AnimationSymbol[],
   options: CodeGenOptions
 ): string[] {
   return symbols
-    .filter((symbol) => symbol.execCb)
+    .filter((symbol) => symbol.tracks.length > 0)
     .map((symbol) => generateAnimationFunction(symbol, options));
 }
 

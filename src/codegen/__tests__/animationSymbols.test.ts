@@ -127,8 +127,9 @@ describe('animation functions', () => {
       undefined, undefined, undefined, [], [], animations,
     );
 
-    expect(result).toContain('int32_t from = lv_obj_get_x(ui_my_btn);');
-    expect(result).toContain('lv_anim_set_values(&anim, from, from + (100));');
+    // Named per property, so two tracks of one animation cannot collide.
+    expect(result).toContain('int32_t from_x = lv_obj_get_x(ui_my_btn);');
+    expect(result).toContain('lv_anim_set_values(&anim, from_x, from_x + (100));');
   });
 
   it('takes the coordinates literally when told they are absolute', () => {

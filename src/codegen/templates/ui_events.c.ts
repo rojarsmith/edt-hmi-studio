@@ -340,7 +340,7 @@ function generateBuiltinActionCode(
       // cannot be animated, generates no function at all — calling it would
       // fail to link rather than merely do nothing.
       const symbol = action.animationId ? animations.get(action.animationId) : undefined;
-      if (!symbol || !symbol.execCb) {
+      if (!symbol || symbol.tracks.length === 0) {
         lines.push(
           `${indent}// ${play ? 'Play' : 'Stop'} animation skipped: this binding names no animation the project still has`,
         );

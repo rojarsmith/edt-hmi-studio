@@ -1,14 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { Animation, AnimationType, AnimationEasing } from '../../types';
+import type { Animation, AnimationEasing, AnimationTrack } from '../../types';
 import { useEditorStore } from '../../store/editorStore';
 import { componentsById } from '../../utils/animationAssets';
-import { animationValueMode, supportsOffset } from '../../utils/animationValues';
-import {
-  animationNameBase,
-  isAnimationNameTaken,
-  nextAnimationName,
-} from '../../utils/animationNames';
+import { animationTracks, newTrack } from '../../utils/animationTracks';
+import { supportsOffset, trackValueMode } from '../../utils/animationValues';
+import { isAnimationNameTaken, nextAnimationName } from '../../utils/animationNames';
 import './AnimationPanel.css';
 
 interface AnimationEditDialogProps {
@@ -18,18 +15,6 @@ interface AnimationEditDialogProps {
   onSave: (animation: Animation) => void;
   onClose: () => void;
 }
-
-const ANIMATION_TYPES: { type: AnimationType; label: string }[] = [
-  { type: 'fade_in', label: 'Fade In' },
-  { type: 'fade_out', label: 'Fade Out' },
-  { type: 'slide_left', label: 'Slide In from Left' },
-  { type: 'slide_right', label: 'Slide In from Right' },
-  { type: 'slide_up', label: 'Slide In from Bottom' },
-  { type: 'slide_down', label: 'Slide In from Top' },
-  { type: 'zoom_in', label: 'Zoom In' },
-  { type: 'zoom_out', label: 'Zoom Out' },
-  { type: 'custom', label: 'Custom' },
-];
 
 const EASING_OPTIONS: { type: AnimationEasing; label: string }[] = [
   { type: 'linear', label: 'Linear' },
@@ -41,44 +26,51 @@ const EASING_OPTIONS: { type: AnimationEasing; label: string }[] = [
 ];
 
 const PROPERTY_OPTIONS = [
-  { value: 'opa', label: 'Opacity (opa)' },
   { value: 'x', label: 'X Coordinate' },
   { value: 'y', label: 'Y Coordinate' },
+  { value: 'opa', label: 'Opacity (opa)' },
   { value: 'width', label: 'Width' },
   { value: 'height', label: 'Height' },
   { value: 'transform_zoom', label: 'Zoom (transform_zoom)' },
   { value: 'transform_angle', label: 'Rotation Angle (transform_angle)' },
 ];
 
-interface TypeDefaults {
-  property: string;
-  startValue: number;
-  endValue: number;
-  valueMode: 'absolute' | 'offset';
-  distance: number;
-}
-
-function getDefaultsForType(type: AnimationType): TypeDefaults {
-  const values = (property: string, startValue: number, endValue: number): TypeDefaults =>
-    ({ property, startValue, endValue, valueMode: 'absolute', distance: 0 });
-  // A slide is a journey rather than a pair of coordinates: park the component
-  // where it should set off — outside the screen, for an entrance — and give
-  // the distance it travels.
-  const travel = (property: string, distance: number): TypeDefaults =>
-    ({ property, startValue: 0, endValue: 0, valueMode: 'offset', distance });
-
-  switch (type) {
-    case 'fade_in': return values('opa', 0, 255);
-    case 'fade_out': return values('opa', 255, 0);
-    case 'slide_left': return travel('x', 100);
-    case 'slide_right': return travel('x', -100);
-    case 'slide_up': return travel('y', 100);
-    case 'slide_down': return travel('y', -100);
-    case 'zoom_in': return values('transform_zoom', 128, 256);
-    case 'zoom_out': return values('transform_zoom', 256, 128);
-    case 'custom': return values('opa', 0, 255);
-  }
-}
+/**
+ * Ready-made journeys, kept as buttons rather than as a field on the
+ * animation. A preset used to be an Animation Type stored beside the property
+ * it duplicated, free to contradict it — "Slide In from Left" on an opacity
+ * animation. It adds tracks now and is forgotten.
+ */
+const PRESETS: { label: string; tracks: (id: () => string) => AnimationTrack[] }[] = [
+  {
+    label: 'Slide in from left',
+    tracks: (id) => [{ id: id(), property: 'x', valueMode: 'offset', startValue: 0, endValue: 0, distance: 100 }],
+  },
+  {
+    label: 'Slide in from right',
+    tracks: (id) => [{ id: id(), property: 'x', valueMode: 'offset', startValue: 0, endValue: 0, distance: -100 }],
+  },
+  {
+    label: 'Slide in from top',
+    tracks: (id) => [{ id: id(), property: 'y', valueMode: 'offset', startValue: 0, endValue: 0, distance: 100 }],
+  },
+  {
+    label: 'Slide in from bottom',
+    tracks: (id) => [{ id: id(), property: 'y', valueMode: 'offset', startValue: 0, endValue: 0, distance: -100 }],
+  },
+  {
+    label: 'Fade in',
+    tracks: (id) => [{ id: id(), property: 'opa', valueMode: 'absolute', startValue: 0, endValue: 255 }],
+  },
+  {
+    label: 'Fade out',
+    tracks: (id) => [{ id: id(), property: 'opa', valueMode: 'absolute', startValue: 255, endValue: 0 }],
+  },
+  {
+    label: 'Zoom in',
+    tracks: (id) => [{ id: id(), property: 'transform_zoom', valueMode: 'absolute', startValue: 128, endValue: 256 }],
+  },
+];
 
 const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
   animation,
@@ -89,9 +81,22 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
 }) => {
   const screens = useEditorStore(s => s.screens);
   const projectAnimations = useEditorStore(s => s.animations);
+  const [name, setName] = useState(animation?.name || '');
+  const [nameError, setNameError] = useState<string | null>(null);
   // An animation names its target rather than living inside it, so the target
   // is picked here — and may be left unset, which shows as LACK in the panel.
   const [targetId, setTargetId] = useState(animation?.targetComponentId || targetComponentId || '');
+  const [easing, setEasing] = useState<AnimationEasing>(animation?.easing || 'ease_out');
+  const [duration, setDuration] = useState(animation?.duration ?? 300);
+  const [delay, setDelay] = useState(animation?.delay ?? 0);
+  const [repeat, setRepeat] = useState(animation?.repeat ?? 0);
+  // What moves. An animation may drive several properties at once, on one
+  // shared clock — sliding in while fading up is one animation, not two that
+  // have to be kept in step by hand.
+  const [tracks, setTracks] = useState<AnimationTrack[]>(
+    () => (animation ? animationTracks(animation) : [newTrack(uuidv4(), 'x')]),
+  );
+
   const targets = useMemo(() => {
     const rows: { id: string; label: string }[] = [];
     for (const screen of screens) {
@@ -105,38 +110,16 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
     }
     return rows;
   }, [screens]);
-  const [name, setName] = useState(animation?.name || '');
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [type, setType] = useState<AnimationType>(animation?.type || 'fade_in');
-  const [easing, setEasing] = useState<AnimationEasing>(animation?.easing || 'ease_in_out');
-  const [duration, setDuration] = useState(animation?.duration ?? 300);
-  const [delay, setDelay] = useState(animation?.delay ?? 0);
-  const [repeat, setRepeat] = useState(animation?.repeat ?? 0);
-  const [property, setProperty] = useState(animation?.property || 'opa');
-  const [startValue, setStartValue] = useState(animation?.startValue ?? 0);
-  const [valueMode, setValueMode] = useState<'absolute' | 'offset'>(
-    animation ? animationValueMode(animation) : 'absolute',
-  );
-  const [distance, setDistance] = useState(animation?.distance ?? 0);
-  const [endValue, setEndValue] = useState(animation?.endValue ?? 255);
 
   // The name the animation takes if the field is left blank. Shown as the
   // placeholder so the default is never a surprise.
   const suggestedName = useMemo(
-    () => nextAnimationName(projectAnimations, animationNameBase(type)),
-    [projectAnimations, type],
+    () => nextAnimationName(projectAnimations, 'Anim'),
+    [projectAnimations],
   );
 
-  const handleTypeChange = useCallback((newType: AnimationType) => {
-    setType(newType);
-    if (newType !== 'custom') {
-      const defaults = getDefaultsForType(newType);
-      setProperty(defaults.property);
-      setStartValue(defaults.startValue);
-      setEndValue(defaults.endValue);
-      setValueMode(defaults.valueMode);
-      setDistance(defaults.distance);
-    }
+  const updateTrack = useCallback((id: string, updates: Partial<AnimationTrack>) => {
+    setTracks(previous => previous.map(track => (track.id === id ? { ...track, ...updates } : track)));
   }, []);
 
   const handleSave = useCallback(() => {
@@ -149,23 +132,17 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
       setNameError(`An animation named "${chosen}" already exists.`);
       return;
     }
-    const anim: Animation = {
+    onSave({
       id: animation?.id || uuidv4(),
       name: chosen,
       targetComponentId: targetId,
-      type,
       easing,
       duration,
       delay,
       repeat,
-      property,
-      startValue,
-      valueMode: supportsOffset(property) ? valueMode : 'absolute',
-      distance,
-      endValue,
-    };
-    onSave(anim);
-  }, [animation, name, suggestedName, projectAnimations, targetId, type, easing, duration, delay, repeat, property, valueMode, distance, startValue, endValue, onSave]);
+      tracks,
+    });
+  }, [animation, name, suggestedName, projectAnimations, targetId, easing, duration, delay, repeat, tracks, onSave]);
 
   return (
     <div className="anim-dialog-overlay" onClick={onClose}>
@@ -193,7 +170,7 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
 
           <div className="form-section">
             <label className="section-label">Target</label>
-            <select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+            <select value={targetId} onChange={(e) => setTargetId(e.target.value)} aria-label="Target">
               <option value="">No target yet</option>
               {targets.map(target => (
                 <option key={target.id} value={target.id}>{target.label}</option>
@@ -207,16 +184,12 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
           </div>
 
           <div className="form-section">
-            <label className="section-label">Animation Type</label>
-            <select value={type} onChange={(e) => handleTypeChange(e.target.value as AnimationType)}>
-              {ANIMATION_TYPES.map(t => (
-                <option key={t.type} value={t.type}>{t.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-section">
-            <label className="section-label">Easing</label>
+            <label
+              className="section-label"
+              title="Applies to every property below — they move together on one clock."
+            >
+              Easing
+            </label>
             <select value={easing} onChange={(e) => setEasing(e.target.value as AnimationEasing)}>
               {EASING_OPTIONS.map(e => (
                 <option key={e.type} value={e.type}>{e.label}</option>
@@ -251,67 +224,131 @@ const AnimationEditDialog: React.FC<AnimationEditDialogProps> = ({
           </div>
 
           <div className="form-section">
-            <label className="section-label">Animated Property</label>
-            <select value={property} onChange={(e) => setProperty(e.target.value)}>
-              {PROPERTY_OPTIONS.map(p => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
+            <div className="anim-tracks-header">
+              <label className="section-label">Animated Properties</label>
+              <button
+                type="button"
+                className="anim-track-add"
+                onClick={() => setTracks(previous => [...previous, newTrack(uuidv4(), 'opa')])}
+                title="Drive another property with this same animation"
+              >
+                ＋ Property
+              </button>
+            </div>
+
+            {tracks.length === 0 ? (
+              <p className="field-hint">
+                This animation drives nothing yet. Add a property, or pick a preset below.
+              </p>
+            ) : (
+              tracks.map(track => (
+                <div key={track.id} className="anim-track">
+                  <div className="anim-track-top">
+                    <select
+                      value={track.property}
+                      aria-label="Animated Property"
+                      onChange={(e) => {
+                        const property = e.target.value;
+                        // Carrying an offset onto a property with nowhere to
+                        // travel from would keep a distance nothing can use.
+                        updateTrack(track.id, supportsOffset(property)
+                          ? { property }
+                          : { property, valueMode: 'absolute' });
+                      }}
+                    >
+                      {PROPERTY_OPTIONS.map(p => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="anim-track-remove"
+                      onClick={() => setTracks(previous => previous.filter(t => t.id !== track.id))}
+                      title="Remove this property"
+                      aria-label={`Remove ${track.property}`}
+                    >
+                      🗑
+                    </button>
+                  </div>
+
+                  {supportsOffset(track.property) && (
+                    <div className="anim-mode-switch">
+                      {(['offset', 'absolute'] as const).map(mode => (
+                        <button
+                          key={mode}
+                          type="button"
+                          className={`anim-mode-btn ${trackValueMode(track) === mode ? 'active' : ''}`}
+                          onClick={() => updateTrack(track.id, { valueMode: mode })}
+                        >
+                          {mode === 'offset' ? 'Offset' : 'Absolute'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {trackValueMode(track) === 'offset' && supportsOffset(track.property) ? (
+                    <div className="form-section">
+                      <label
+                        className="section-label"
+                        title="How far to travel, in pixels. Negative moves left or up."
+                      >
+                        Distance (px)
+                      </label>
+                      <input
+                        type="number"
+                        value={track.distance ?? 0}
+                        onChange={(e) => updateTrack(track.id, { distance: Number(e.target.value) })}
+                      />
+                      <p className="field-hint">
+                        Travelled from wherever the component is when this runs. Park
+                        it where the movement should begin — outside the screen for a
+                        slide-in.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="form-row">
+                      <div className="form-section">
+                        <label className="section-label">Start Value</label>
+                        <input
+                          type="number"
+                          value={track.startValue}
+                          onChange={(e) => updateTrack(track.id, { startValue: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="form-section">
+                        <label className="section-label">End Value</label>
+                        <input
+                          type="number"
+                          value={track.endValue}
+                          onChange={(e) => updateTrack(track.id, { endValue: Number(e.target.value) })}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
 
-          {supportsOffset(property) && (
-            <div className="form-section">
-              <label className="section-label">Values Are</label>
-              <div className="anim-mode-switch">
-                {(['offset', 'absolute'] as const).map(mode => (
-                  <button
-                    key={mode}
-                    type="button"
-                    className={`anim-mode-btn ${valueMode === mode ? 'active' : ''}`}
-                    onClick={() => setValueMode(mode)}
-                  >
-                    {mode === 'offset' ? 'Offset' : 'Absolute'}
-                  </button>
-                ))}
-              </div>
-              <p className="field-hint">
-                {valueMode === 'offset'
-                  ? 'One distance, travelled from wherever the component is when this runs — not necessarily where it was designed.'
-                  : 'Two coordinates on the screen, whatever the component position is.'}
-              </p>
+          <div className="form-section">
+            <label className="section-label">Presets</label>
+            <div className="anim-presets">
+              {PRESETS.map(preset => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className="anim-preset-btn"
+                  onClick={() => setTracks(previous => [...previous, ...preset.tracks(() => uuidv4())])}
+                >
+                  {preset.label}
+                </button>
+              ))}
             </div>
-          )}
-
-          {supportsOffset(property) && valueMode === 'offset' ? (
-            <div className="form-section">
-              <label
-                className="section-label"
-                title="How far to travel, in pixels. Negative moves left or up."
-              >
-                Distance (px)
-              </label>
-              <input
-                type="number"
-                value={distance}
-                onChange={(e) => setDistance(Number(e.target.value))}
-              />
-              <p className="field-hint">
-                Park the component where the movement should begin — outside the
-                screen for a slide-in — and travel from there.
-              </p>
-            </div>
-          ) : (
-            <div className="form-row">
-              <div className="form-section">
-                <label className="section-label">Start Value</label>
-                <input type="number" value={startValue} onChange={(e) => setStartValue(Number(e.target.value))} />
-              </div>
-              <div className="form-section">
-                <label className="section-label">End Value</label>
-                <input type="number" value={endValue} onChange={(e) => setEndValue(Number(e.target.value))} />
-              </div>
-            </div>
-          )}
+            <p className="field-hint">
+              A preset adds properties to the list above; it is not remembered as
+              a setting of its own.
+            </p>
+          </div>
         </div>
 
         <div className="dialog-footer">

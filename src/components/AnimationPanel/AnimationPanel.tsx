@@ -1,37 +1,14 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import type { Animation, AnimationType } from '../../types';
+import type { Animation } from '../../types';
 import AnimationEditDialog from './AnimationEditDialog';
 import PanelChevron from '../LogicEditor/PanelChevron';
 import LackBadge from '../common/LackBadge';
 import { animationLack, componentsById } from '../../utils/animationAssets';
+import { describeTracks } from '../../utils/animationTracks';
 import { useDockedPanelResize } from '../../hooks/useDockedPanelResize';
 import '../panelBar.css';
 import './AnimationPanel.css';
-
-const ANIM_TYPE_LABELS: Record<AnimationType, string> = {
-  fade_in: 'Fade In',
-  fade_out: 'Fade Out',
-  slide_left: 'Slide In from Left',
-  slide_right: 'Slide In from Right',
-  slide_up: 'Slide In from Bottom',
-  slide_down: 'Slide In from Top',
-  zoom_in: 'Zoom In',
-  zoom_out: 'Zoom Out',
-  custom: 'Custom',
-};
-
-const ANIM_TYPE_ICONS: Record<AnimationType, string> = {
-  fade_in: '🌅',
-  fade_out: '🌇',
-  slide_left: '⬅️',
-  slide_right: '➡️',
-  slide_up: '⬆️',
-  slide_down: '⬇️',
-  zoom_in: '🔍',
-  zoom_out: '🔎',
-  custom: '⚙️',
-};
 
 // Resize limits, mirroring the hierarchy panel: the panel keeps room for its
 // own header, whether it is being dragged or lending height to a panel below.
@@ -69,8 +46,7 @@ const AnimationPanel: React.FC = () => {
     return animations.filter(
       anim =>
         (anim.name || '').toLowerCase().includes(q) ||
-        (ANIM_TYPE_LABELS[anim.type] || anim.type).toLowerCase().includes(q) ||
-        anim.property.toLowerCase().includes(q),
+        describeTracks(anim).toLowerCase().includes(q),
     );
   }, [animations, query]);
 
@@ -155,8 +131,8 @@ const AnimationPanel: React.FC = () => {
                 <div key={anim.id} className="anim-item">
                   <div className="anim-info" onClick={() => handleEditAnim(anim)}>
                     <div className="anim-type">
-                      <span className="anim-icon">{ANIM_TYPE_ICONS[anim.type] || '⚙️'}</span>
-                      {anim.name || ANIM_TYPE_LABELS[anim.type] || anim.type}
+                      <span className="anim-icon">🎞️</span>
+                      {anim.name}
                       {animationLack(anim, components) && (
                         <LackBadge reason={animationLack(anim, components)!} />
                       )}
@@ -164,7 +140,7 @@ const AnimationPanel: React.FC = () => {
                     <div className="anim-detail">
                       {components.get(anim.targetComponentId)?.name ?? 'no target'}
                       {' · '}
-                      {anim.duration}ms · {anim.property}: {anim.startValue}→{anim.endValue}
+                      {anim.duration}ms · {describeTracks(anim)}
                     </div>
                   </div>
                   <div className="anim-actions">

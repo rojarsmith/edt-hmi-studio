@@ -334,3 +334,74 @@
   border-color: #2196F3;
   color: #fff;
 }
+
+/* One track: which property, how it is stated, and its values. */
+.anim-tracks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.anim-tracks-header .section-label {
+  margin-bottom: 0;
+}
+
+.anim-track-add,
+.anim-preset-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.anim-track-add:hover,
+.anim-preset-btn:hover {
+  background: #f0f0f0;
+  color: #222;
+}
+
+.anim-track {
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #fafafa;
+}
+
+.anim-track-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.anim-track-top select {
+  flex: 1;
+}
+
+.anim-track-remove {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: #999;
+}
+
+.anim-track-remove:hover {
+  background: #ffebee;
+  color: #d32f2f;
+}
+
+.anim-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

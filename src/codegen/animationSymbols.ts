@@ -6,9 +6,10 @@
 // been wired to call. Projects written before that rule can still carry
 // duplicate names, so collisions are broken here rather than trusted away.
 
-import type { Screen, Animation, LvglComponent } from '../types';
+import type { Screen, Animation, AnimationTrack, LvglComponent } from '../types';
 import type { CodeGenOptions } from './types';
 import { componentsById, screenByComponentId } from '../utils/animationAssets';
+import { animationTracks } from '../utils/animationTracks';
 import { getComponentVarName, toValidCIdentifier, convertName } from './utils/nameUtils';
 
 /**
@@ -73,13 +74,22 @@ export interface AnimationSymbol {
   targetVar: string;
   /** `ui_anim_<name>`, unique across the project. */
   base: string;
-  /**
-   * Exec callback for the animated property, or undefined when the property
-   * cannot be animated — such an animation generates no function at all.
-   */
-  execCb?: string;
   /** The widget the animation drives, for its designed position. */
   component: LvglComponent;
+  /**
+   * The tracks that can actually be generated, each with its exec callback.
+   * A track whose property cannot be animated is left out; an animation with
+   * no generatable track produces no function at all.
+   */
+  tracks: ResolvedTrack[];
+  /** Tracks whose property cannot be animated, for the honest comment. */
+  unanimatable: AnimationTrack[];
+}
+
+/** One track of an animation, paired with the callback that drives it. */
+export interface ResolvedTrack {
+  track: AnimationTrack;
+  execCb: string;
 }
 
 /** `${base}_start`: starts (or restarts) the animation. */
@@ -106,7 +116,7 @@ export function animationSymbolsById(
 }
 
 function uniqueBase(animation: Animation, options: CodeGenOptions, taken: Set<string>): string {
-  const converted = convertName(toValidCIdentifier(animation.name || animation.type), options);
+  const converted = convertName(toValidCIdentifier(animation.name || animation.id), options);
   const wanted = `ui_anim_${converted}`;
   let base = wanted;
   for (let n = 2; taken.has(base); n += 1) base = `${wanted}_${n}`;
@@ -143,13 +153,22 @@ export function collectAnimationSymbols(
     const targetVar = needsScreenPrefix.has(component.id)
       ? getComponentVarName(`${screen.name}_${component.name}`, options)
       : getComponentVarName(component.name, options);
+    const tracks: ResolvedTrack[] = [];
+    const unanimatable: AnimationTrack[] = [];
+    for (const track of animationTracks(animation)) {
+      const execCb = getAnimExecCb(track.property);
+      if (execCb) tracks.push({ track, execCb });
+      else unanimatable.push(track);
+    }
+
     symbols.push({
       animation,
       screen,
       targetVar,
       component,
       base: uniqueBase(animation, options, taken),
-      execCb: getAnimExecCb(animation.property),
+      tracks,
+      unanimatable,
     });
   }
 

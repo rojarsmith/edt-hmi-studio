@@ -171,7 +171,7 @@ export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fon
   // Animations. Declared for everything that can trigger one — a screen
   // appearing today, an event or a logic graph next.
   const animationSymbols = collectAnimationSymbols(animations, screens, options, needsScreenPrefix)
-    .filter((symbol) => symbol.execCb);
+    .filter((symbol) => symbol.tracks.length > 0);
   if (animationSymbols.length > 0) {
     lines.push('');
     for (const symbol of animationSymbols) {

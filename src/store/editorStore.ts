@@ -26,7 +26,7 @@ import {
 } from '../types';
 import { languageStylesOf } from '../utils/typographyStyle';
 import { getEntryScreen } from '../utils/entryScreen';
-import { animationNameBase, nextAnimationName } from '../utils/animationNames';
+import { nextAnimationName } from '../utils/animationNames';
 import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
@@ -1381,8 +1381,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addAnimation: (seed) => {
     const id = seed.id ?? uuidv4();
     const animations = get().animations;
-    const name = seed.name?.trim()
-      || nextAnimationName(animations, animationNameBase(seed.type));
+    const name = seed.name?.trim() || nextAnimationName(animations, 'Anim');
     set({ animations: [...animations, { ...seed, id, name }] });
     return id;
   },

@@ -4,7 +4,8 @@ import { useResourceStore } from '../../resources/resourceStore';
 import type { LvglComponent, Animation } from '../../types';
 import { getEntryScreen } from '../../utils/entryScreen';
 import { componentsById } from '../../utils/animationAssets';
-import { previewValues } from '../../utils/animationValues';
+import { trackPreviewValues } from '../../utils/animationValues';
+import { animationTracks } from '../../utils/animationTracks';
 import {
   getImageButtonState,
   getNextImageButtonStateIndex,
@@ -74,32 +75,32 @@ function computeAnimState(
 ): Partial<AnimState> {
   const easeFn = getEasingFn(anim.easing);
   const t = easeFn(Math.max(0, Math.min(1, progress)));
-  const resolved = previewValues(anim, component);
-  const start = Number(resolved.startValue) || 0;
-  const end = Number(resolved.endValue) || 0;
-  const val = start + (end - start) * t;
-  // x and y below are drawn as a shift from the component's own position.
-  const origin = component
-    ? (anim.property === 'x' ? component.x : anim.property === 'y' ? component.y : 0)
-    : 0;
+  const state: Partial<AnimState> = {};
 
-  // Interpret the animation exactly as the code generator does: by property and
-  // start/end value. Every animation type sets those when it is picked, so the
-  // preview and the generated firmware can no longer disagree.
-  //
-  // The type-keyed formulas this replaces negated the start value on top of the
-  // already-negative default ("Slide In from Left" stores -100), so left slides
-  // came in from the right and top slides from the bottom.
-  switch (anim.property) {
-    case 'x': return { offsetX: val - origin };
-    case 'y': return { offsetY: val - origin };
-    case 'opa': return { opacity: val / 255 };
-    case 'width': return { scaleX: val / 100 };
-    case 'height': return { scaleY: val / 100 };
-    // LVGL scale units: 256 is 1:1, which is what the editor stores.
-    case 'transform_zoom': return { scaleX: val / 256, scaleY: val / 256 };
-    default: return {};
+  // Every track of the animation contributes, so sliding in while fading up
+  // draws as one movement rather than two that have to be kept in step.
+  for (const track of animationTracks(anim)) {
+    const resolved = trackPreviewValues(track, component);
+    const start = Number(resolved.startValue) || 0;
+    const end = Number(resolved.endValue) || 0;
+    const val = start + (end - start) * t;
+    // x and y are drawn as a shift from the component's own position.
+    const origin = component
+      ? (track.property === 'x' ? component.x : track.property === 'y' ? component.y : 0)
+      : 0;
+
+    switch (track.property) {
+      case 'x': state.offsetX = val - origin; break;
+      case 'y': state.offsetY = val - origin; break;
+      case 'opa': state.opacity = val / 255; break;
+      case 'width': state.scaleX = val / 100; break;
+      case 'height': state.scaleY = val / 100; break;
+      // LVGL scale units: 256 is 1:1, which is what the editor stores.
+      case 'transform_zoom': state.scaleX = val / 256; state.scaleY = val / 256; break;
+    }
   }
+
+  return state;
 }
 
 function collectInitialImageButtonStates(

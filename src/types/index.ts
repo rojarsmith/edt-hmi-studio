@@ -52,18 +52,53 @@ export type AnimationEasing =
   | 'overshoot'
   | 'bounce';
 
+/**
+ * One property an animation drives. An animation may drive several at once —
+ * sliding in while fading up is one animation with two tracks, not two
+ * animations that have to be kept in step by hand.
+ */
+export interface AnimationTrack {
+  id: string;
+  property: string;
+  /**
+   * How the movement is stated. `absolute` uses startValue and endValue as
+   * coordinates; `offset` uses `distance`, travelled from wherever the widget
+   * is when the animation runs. Absent means absolute.
+   */
+  valueMode?: 'absolute' | 'offset';
+  startValue: number;
+  endValue: number;
+  /** How far an offset track travels. Negative moves left or up. */
+  distance?: number;
+}
+
 export interface Animation {
   id: string;
   name: string;
   targetComponentId: string;
-  type: AnimationType;
   easing: AnimationEasing;
   duration: number;
   delay: number;
   repeat: number;
-  property: string;
-  startValue: number;
-  endValue: number;
+  /**
+   * What moves. Read it through animationTracks() in
+   * src/utils/animationTracks.ts, which derives a single track from the
+   * fields below for animations written before this existed.
+   */
+  tracks?: AnimationTrack[];
+
+  /**
+   * @deprecated A preset picker rather than a property of the animation: it
+   * said the same thing as `property` and could contradict it. The dialog now
+   * offers presets that add tracks instead.
+   */
+  type?: AnimationType;
+  /** @deprecated Pre-tracks single property. See `tracks`. */
+  property?: string;
+  /** @deprecated Pre-tracks single property. See `tracks`. */
+  startValue?: number;
+  /** @deprecated Pre-tracks single property. See `tracks`. */
+  endValue?: number;
   /**
    * How the movement is stated. `absolute` uses startValue and endValue as
    * coordinates; `offset` uses `distance`, travelled from wherever the widget

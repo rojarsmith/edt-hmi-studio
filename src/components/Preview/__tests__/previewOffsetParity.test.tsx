@@ -8,7 +8,8 @@
 import { describe, it, expect } from 'vitest';
 import { generateUiSource } from '../../../codegen/templates/ui.c';
 import type { Animation, EventBinding, LvglComponent, Screen } from '../../../types';
-import { previewValues } from '../../../utils/animationValues';
+import { animationTracks } from '../../../utils/animationTracks';
+import { trackPreviewValues } from '../../../utils/animationValues';
 
 /** Parked off the left edge — where a slide-in sets off. */
 const placed: Pick<LvglComponent, 'x' | 'y'> = { x: -100, y: 25 };
@@ -71,20 +72,20 @@ describe('preview and firmware agree on position', () => {
   it('both set off from where the component was parked', () => {
     const travelling = animation({ valueMode: 'offset', distance: 100 });
 
-    const preview = previewValues(travelling, placed);
+    const preview = trackPreviewValues(animationTracks(travelling)[0], placed);
     const source = generate(travelling);
 
     // The firmware restores that same place before replaying the entry, then
     // travels the distance from it — which is the journey the canvas draws.
     expect(source).toContain(`lv_obj_set_x(ui_title, ${preview.startValue});`);
-    expect(source).toContain('lv_anim_set_values(&anim, from, from + (100));');
+    expect(source).toContain('lv_anim_set_values(&anim, from_x, from_x + (100));');
     expect(preview).toEqual({ startValue: -100, endValue: 0 });
   });
 
   it('both take an absolute animation literally', () => {
     const fixed = animation({ valueMode: 'absolute', startValue: -110, endValue: 0 });
 
-    const preview = previewValues(fixed, placed);
+    const preview = trackPreviewValues(animationTracks(fixed)[0], placed);
     const source = generate(fixed);
 
     expect(source).toContain('lv_anim_set_values(&anim, -110, 0);');

@@ -72,25 +72,27 @@ describe('AnimationEditDialog naming', () => {
     return saved;
   }
 
-  it('names a blank animation after its type, numbered from 1', () => {
+  it('names a blank animation from a neutral base, numbered from 1', () => {
+    // There is no Animation Type to name it after any more, and the first
+    // property it drives would give "X_1"; the row already says what it moves.
     const saved = renderDialog();
     fireEvent.click(screen.getByText('Save'));
-    expect(saved[0].name).toBe('Fade_In_1');
+    expect(saved[0].name).toBe('Anim_1');
   });
 
   it('counts animations on other components when numbering', () => {
-    setUp([component('comp-1'), component('comp-2')], [anim('Fade_In_1')]);
+    setUp([component('comp-1'), component('comp-2')], [anim('Anim_1')]);
     const saved = renderDialog();
 
     fireEvent.click(screen.getByText('Save'));
 
-    expect(saved[0].name).toBe('Fade_In_2');
+    expect(saved[0].name).toBe('Anim_2');
   });
 
   it('offers the name it would take as the placeholder', () => {
     renderDialog();
     expect(screen.getByLabelText('Animation Name').getAttribute('placeholder'))
-      .toContain('Fade_In_1');
+      .toContain('Anim_1');
   });
 
   it('refuses a name another animation already answers to', () => {
