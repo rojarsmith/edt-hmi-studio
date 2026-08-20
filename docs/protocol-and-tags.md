@@ -8,12 +8,20 @@ Status: **analysis only. Nothing here has been implemented.** It records what
 the code does today, answers three questions asked of it, and lists what would
 have to change and in what order.
 
-The three questions:
+The questions, in the order they were asked:
 
 1. Is it good design to let a project change its **Protocol** after creation?
-2. Will the **communication tags** get scrambled when it does?
+   (§2, §3)
+2. Will the **communication tags** get scrambled when it does? (§3)
 3. What happens when a third protocol arrives — specifically a **custom UART
-   command architecture**, which is neither Modbus nor CAN in shape?
+   command architecture**, which is neither Modbus nor CAN in shape? (§4)
+4. Can such a command protocol be made **addressable** at all? (§8)
+5. Does today's abstraction hold for **all three at once**? (§9)
+6. Should the abstraction live in the editor while the firmware stays native —
+   and how do the established HMI vendors actually do this? (§10)
+
+If only one section is read, make it **§10**: it contains the one idea that
+changes the shape of every other answer here.
 
 ## 1. What the code does today
 
@@ -608,3 +616,307 @@ Applied to today's fields, that test puts `scale`, `offset`, `access`,
 locator in the source. It also explains the one field that is currently in the
 wrong place: `pollIntervalMs` on a CAN signal, which cannot be answered without
 knowing that CAN does not poll.
+
+## 10. Where the abstraction belongs, and how the industry does it
+
+The proposal on the table — **abstract in the editor, keep each protocol
+native once compiled** — is right. It is also incomplete in one specific way,
+and it turns out the industry answer changes the question rather than answering
+it.
+
+### 10.1 Right instinct, one layer short
+
+"Abstract in the editor, native in the firmware" is two layers. It needs three,
+because *native* must not be allowed to mean *unrelated*:
+
+| Layer | Knows the protocol? | What lives here |
+|---|---|---|
+| **Application** — screens, bindings, logic, alarms, trends | **No** | Tags by name. Nothing else |
+| **Runtime** — scheduler, value cache, write queue, retry, widget update | **No** | One implementation, shared by every protocol |
+| **Driver** — encode a request, decode a response, transaction rules | **Yes, entirely** | One per protocol, sharing nothing |
+
+Two layers rather than three is the trap: three protocols become three code
+generators emitting three unrelated firmware shapes, and then scaling, retry,
+staleness and write-queue bugs exist in three places and behave differently in
+each. The editor would be promising the author "these are all just tags" while
+the firmware quietly disagrees — the same class of lie this tool works hard to
+avoid between the canvas and the panel.
+
+The good news is that `hmi_runtime.c` is **already** mostly the middle layer.
+The scheduler, the cache, the retry counter, the write queue and the widget
+update are all protocol-blind; what is Modbus is the client global and the
+encode/decode inside it.
+
+One property worth naming, because it answers the cost objection before it is
+raised: **the abstraction is editor-time and link-time, not run-time.** The tag
+table is generated as a `static const` array, so a project that uses one driver
+links one driver. Abstracting costs zero bytes on the panel.
+
+### 10.2 The two promises the neutral layer has to make
+
+This is where an abstraction stops being a naming exercise. Two questions have
+three different answers per protocol, and the neutral layer must pick one
+answer and hold it:
+
+**1. What does "the write succeeded" mean?**
+
+| | Modbus | CAN | UART command |
+|---|---|---|---|
+| Write is | a request with a response | a frame sent, unacknowledged at signal level | a command, usually with `OK` / `ERR` |
+| Can the runtime confirm it? | Yes | **No** | Usually |
+
+If the neutral layer promises *confirmed*, CAN cannot keep the promise. If it
+promises *queued*, a Modbus project loses information it already has. The
+honest resolution is to promise **queued**, and let a driver optionally report
+confirmation as a per-tag quality flag — so a screen can show "sent" everywhere
+and "acknowledged" where the bus can say so. Today's `writeBehavior` quietly
+assumes the Modbus answer.
+
+**2. What does a value's age mean?**
+
+| | Modbus | CAN | UART command |
+|---|---|---|---|
+| A value arrives | when polled | when the frame happens to arrive | when the command is answered |
+| "Never arrived" looks like | a timeout | silence, indefinitely | a timeout |
+
+A polled protocol has an error; a receive-driven one just has nothing. So the
+neutral layer needs **staleness** as a first-class property of every tag —
+*valid*, *stale beyond N ms*, *never received* — not an error code borrowed
+from Modbus. The runtime already has half of it: `cached_value_valid`.
+
+Get these two right and the rest of the abstraction follows. Get them wrong and
+every protocol added afterwards bends them further.
+
+### 10.3 How the established HMI vendors do it
+
+The pattern is remarkably uniform across the industry — Siemens WinCC / TIA
+Portal, Weintek EasyBuilder Pro, Rockwell FactoryTalk View, Mitsubishi GT
+Designer, Pro-face GP-Pro EX, Advantech WebAccess, Ignition. Described at the
+level of observable behaviour:
+
+| | What it is called | Shape |
+|---|---|---|
+| **Siemens WinCC** | *Connections* + *Tags* | A tag names a connection, a data type, an address in the driver's own notation (`DB1.DBW20`, `4x0001`), an acquisition cycle and a linear conversion |
+| **Weintek EasyBuilder Pro** | *Device list* + address picker | An object's address is *device · address-type · number*; the address-type dropdown changes to whatever the selected driver offers. Internal memory (`LW`, `LB`, `RW`) belongs to no device |
+| **Rockwell FactoryTalk View** | *Data servers* | Tags resolve through an OPC or direct server; the address is the PLC's own tag name |
+| **Ignition** | *OPC-UA in the middle* | Everything above is an OPC tag; every driver is an OPC server. The extreme form of the same idea |
+
+Five things every one of them shares:
+
+1. **The device (connection) is a first-class object, not a project setting.**
+   You do not set "the project's protocol". You add devices, and each device
+   names its driver.
+2. **The tag is the abstraction; the address stays native.** Nobody attempts to
+   make addresses portable between drivers. The tag carries name, type, scale,
+   deadband and cycle; the address is spelled in the driver's dialect.
+3. **Internal tags exist, belonging to no device.** HMI-local state is a
+   first-class citizen — see §10.7.
+4. **Everything above tags is protocol-blind**: screens, alarms, trends,
+   recipes, scripts, schedulers.
+5. **There is always an escape hatch**: a macro language, a "free protocol"
+   editor, or a driver SDK. No vendor claims the table covers every device.
+
+And one thing none of them does: **none makes the protocol a project-level
+choice that can be switched.** Not because switching is dangerous, but because
+in their model there is nothing to switch — the protocol is an attribute of a
+device, and a project has as many devices as it has.
+
+### 10.4 The idea that dissolves the question
+
+Move `protocol` from the **project** to a **device**, and every question in
+this document changes shape:
+
+| Question, today | Same question, with devices |
+|---|---|
+| "Is a changeable protocol good design?" | Does not arise. You edit or add a device |
+| "Will my tags get scrambled?" | No — tags belong to a device and go where it goes |
+| "Should creation lock the protocol?" | Does not arise |
+| "What does this switch strand?" | Visible: the device's own tag list |
+| "Can we support Modbus *and* UART?" | Yes, by construction |
+
+That last row is not hypothetical for this product. A panel reading a PLC over
+Modbus while talking to a barcode scanner or a weighing head over a UART
+command protocol is an ordinary industrial arrangement. And the board model
+already admits it: `BoardDefinition.protocols` is an **array**, and
+`edt-evk043027b` declares `['modbus-rtu', 'can-bus']` — the hardware carries
+the wiring for two. The single-protocol constraint is in the project model
+alone.
+
+```ts
+interface Device {
+  id: string;
+  name: string;              // "PLC 1", "Scanner"
+  protocol: ProtocolId;
+  link: LinkConfig;          // per-protocol: serial params / bit timing / framing
+  enabled: boolean;
+}
+
+interface Tag {
+  id: string;
+  name: string;
+  deviceId: string | null;   // null = internal, see §10.7
+  value: { dataType; access; scale; offset; unit? };
+  source: TagSource;
+}
+```
+
+The project's `protocol` field becomes derived — `devices[0].protocol` — until
+the cap of one device is lifted, at which point it stops existing.
+
+### 10.5 So should creation lock the protocol?
+
+**No — and locking would be worse than what exists today.**
+
+- It does not prevent the mess; it converts "my bindings are stranded" into
+  "I have to rebuild the project from scratch", which is the same loss with
+  more work.
+- Real projects change device mid-life. The customer swaps the meter, the PLC
+  vendor changes, the prototype talks Modbus and the product talks CAN.
+- This board already supports two protocols, so locking would forbid something
+  the hardware can do.
+
+The right sequence is: **disclose now, devices later.** Before the device model
+exists, the switch should say what it will strand (§6 step 1). After it exists,
+the question disappears.
+
+### 10.6 Two ways to spell an address
+
+There is a real fork here, and both branches are used in industry:
+
+| | **A. Structured union** | **B. Driver dialect string** |
+|---|---|---|
+| Storage | `{ kind: 'modbus'; area; address }` | `address: "4x0001"`, parsed by the driver |
+| Editor | Proper fields — an area dropdown, a numeric address | One text box plus a driver-supplied validator |
+| Validation | Compile-time, in TypeScript | Runtime, in the driver |
+| Adding a driver | Editor code for its fields | **No editor code at all** |
+| Used by | Tools with a handful of protocols | Weintek, Siemens — hundreds of drivers |
+
+For this product, **A now, with one escape variant**:
+
+```ts
+| { kind: 'raw'; address: string }   // for a driver not worth an editor
+```
+
+The rationale is scale. With two or three protocols and a high bar for editing
+experience, structured fields are better: a Modbus area belongs in a dropdown,
+not in a string someone has to spell correctly. B wins at Weintek's scale — a
+catalogue of hundreds of PLCs — which is not the position this product is in
+and may never be. The `raw` variant means the choice is not irreversible.
+
+### 10.7 Internal tags — the cheapest proof the abstraction holds
+
+Every vendor has them: Weintek's `LW`/`LB`, Siemens' internal tags. A tag with
+no device behind it, living in HMI memory. For this product they are worth more
+than they look:
+
+1. **They prove the abstraction is protocol-free without a second protocol.**
+   If `TagSource` has an `internal` variant with no wire at all, and screens,
+   bindings and logic still work unchanged, then the neutral layer really is
+   neutral. That is a test that can be run *today*, with one protocol
+   implemented, and it is far cheaper than discovering the answer while
+   implementing CAN.
+2. **They give the previews something to simulate.** Neither preview models a
+   tag today, so a bound widget shows its design-time value. An internal tag
+   has no device to emulate — the preview can just hold the value and let a
+   Write Tag node change it. Suddenly a logic graph is testable without
+   hardware.
+3. **They give HMI-local state a home**: an operator's setpoint before it is
+   sent, a screen-brightness setting, a "confirm" flag between two screens.
+   Today that state has nowhere to live — `LogicVariable` is graph-local, and
+   the project-level `variables: []` array is dormant, written as `[]`
+   everywhere and read by nothing.
+4. **They are the natural landing place for retained values** — the ones that
+   should survive a reboot in flash.
+
+### 10.8 What else a mature tag layer carries
+
+Breadth, for calibration. These are all standard in the products above and none
+exists here yet:
+
+| Feature | What it buys | Cost here |
+|---|---|---|
+| **Deadband** | Do not update the screen unless the value moved by X | A field and a comparison |
+| **Block reads** | Coalesce adjacent registers into one request | Real work, big win at 9600 baud |
+| **Per-device status tags** | "Is device 1 online", error counters, bindable to a widget | Nearly free — `hmi_runtime_status_t` already tracks them |
+| **Value staleness** | A widget can show last-known versus unknown | §10.2; half-present as `cached_value_valid` |
+| **Scaling with offset** | `raw × scale + offset` | One field — and already missing for Modbus (§9.3) |
+| **Engineering unit** | Label text follows the tag | One field |
+| **Simulation mode** | Drive tags from a pattern with no device attached | Falls out of internal tags |
+
+The third row is the sharpest: the runtime already counts successful and failed
+transactions and knows whether communication is up. Exposing that as read-only
+tags makes a "device offline" banner a binding rather than a feature.
+
+### 10.9 What the firmware split actually looks like
+
+The driver interface is small, because everything else stays in the shared
+runtime:
+
+```c
+typedef struct {
+    bool     (*begin)(const void *link_config);
+    /* Build the next request. Returns false for a receive-driven driver. */
+    bool     (*encode)(const hmi_request_t *request, uint8_t *out, size_t *len);
+    /* Feed received bytes; yields values for zero or more tags. */
+    size_t   (*decode)(const uint8_t *in, size_t len, hmi_value_t *out, size_t max);
+    void     (*poll)(void);
+} hmi_driver_t;
+```
+
+What stays shared: the poll scheduler, the value cache and staleness, deadband,
+the write queue, retry and timeout, and the widget update path. That is most of
+`hmi_runtime.c` as it stands — the file is already the middle layer, with one
+driver hard-wired into it.
+
+Two consequences worth stating:
+
+- **`encode` returning false is how CAN fits.** A receive-driven driver never
+  builds a request; the scheduler simply has nothing to send for it and the
+  decode path does all the work. The same door lets a UART device push
+  unsolicited lines.
+- **One driver per device, not per project.** Once devices exist, the runtime
+  holds an array of `{ driver, link_config, transport }`, and the tag table
+  says which one each tag belongs to.
+
+### 10.10 A staged path
+
+Each stage is shippable on its own and useful on its own:
+
+| Stage | What changes | What it buys | When |
+|---|---|---|---|
+| **0** | `offset` on Modbus tags; one `TagDataType`; gate the binding editor on the protocol; disclose what a switch strands | Fixes things wrong with the one protocol that exists | Now |
+| **1** | Introduce `Device`, **capped at one**. `protocol` becomes `devices[0].protocol`. Tags gain `deviceId`. Migrate the existing config into a device | The pivotal rename; no UI change needed while the cap holds | Before a second protocol |
+| **2** | One `Tag` table with `source`; internal tags; the Protocol tab becomes a Devices tab | Proves the abstraction with no second protocol implemented; makes the preview useful | With, or just before, the second protocol |
+| **3** | Lift the cap: several devices, possibly different protocols. Driver interface in the runtime | Modbus *and* UART on one panel | When a project needs two buses |
+
+Stage 1 is the one that matters most and is mostly mechanical: wrapping today's
+single configuration in a one-element list. Everything after it becomes an
+addition rather than a rewrite.
+
+### 10.11 What to decide now
+
+**Decide now:**
+
+- That `protocol` belongs to a device, not to a project — even if the device
+  list is capped at one for a year. It is the decision that makes every later
+  step additive.
+- The two promises in §10.2: writes are **queued**, with confirmation as an
+  optional per-tag quality; values carry **staleness**, not a Modbus error
+  code.
+- That the tag's neutral half and its source are separate, with the semantic
+  type on the value and the width on the source (§9.4).
+
+**Do not decide now:**
+
+- The UART locator vocabulary — it needs a real device (§8.8).
+- Whether addresses are structured or dialect strings for *future* drivers.
+  Start structured, keep the `raw` variant as the exit.
+- Anything about multiple simultaneous devices beyond leaving room for them.
+
+**Do not do:**
+
+- Lock the protocol at project creation. It trades a recoverable problem for an
+  unrecoverable one.
+- Abstract the link layer. Serial parameters, CAN bit timing and UART framing
+  have nothing in common, and a union of them is two-thirds noise whichever is
+  selected (§9.6).
