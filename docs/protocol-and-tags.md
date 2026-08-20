@@ -23,6 +23,15 @@ The questions, in the order they were asked:
 If only one section is read, make it **§10**: it contains the one idea that
 changes the shape of every other answer here.
 
+Two sequels take §10's conclusion further:
+[protocol-coexistence.md](./protocol-coexistence.md) works out what happens when
+two of these protocols share **one physical link**, and what that costs the
+component bindings and the logic graphs.
+[uart-command-protocol.md](./uart-command-protocol.md) picks up §8 and asks what
+the author has to see — the command model as a UI, and what the Protocol tab has
+to become before a command protocol is usable by someone without a protocol
+manual in hand.
+
 ## 1. What the code does today
 
 Verified against the source, not from memory.

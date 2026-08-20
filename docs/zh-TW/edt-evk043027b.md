@@ -149,11 +149,19 @@ CRC —— 跟 UART 板子完全一樣，這也是為什麼 `consume_rx_byte` �
 
 ### RS-485 收發器
 
-還在板上，接在 USART2、driver-enable 在 PD4，只是這份韌體已經不再驅動它。
-`board.c` 裡的 `board_uart1_apply` 還在，也仍然會透過 `HAL_RS485Ex_Init` 正確地
-設定它，只是沒有人呼叫。如果哪個專案需要的是現場彙流排而不是 PC 連線，
-要接回去的就是那個函式與 `modbus_rtu_async_client.c` 開頭那幾個傳輸原語 ——
-本次變更之前的 git 歷史裡就是接好的狀態。
+還在板上，接在 USART2、driver-enable 在 PD4，而且**開機時仍然會被帶起來**：
+`board_init` 會呼叫 `board_uart1_apply(115200, 8N1)`，它用的是 `HAL_RS485Ex_Init`
+而不是 `HAL_UART_Init` —— 於是 DE 由 USART 自己在每個送出的訊框前後拉起與放掉 ——
+接著關掉 FIFO，讓 client 看到的訊框間隔就是它實際發生的樣子。`USART2_IRQHandler`
+也一併接到了 `HAL_UART_IRQHandler(&huart1)`。
+
+這個埠缺的是**協定 client**。這塊板子上 `g_modbus_client` 的傳輸是 USB CDC 的
+環形緩衝，韌體裡沒有別的東西讀寫 `huart1`。所以一個需要現場彙流排而不是 PC 連線的
+專案，差的是一次綁定，不是一次硬體帶起來：要接回去的地方是那幾個傳輸原語 ——
+宣告在 `modbus_rtu_async_client.c` 開頭、定義在檔尾，也正好就是這份 client 與
+Discovery 板那兩份之間的全部差異 —— 本次變更之前的 git 歷史裡，它們就是接在
+UART 上的。這個區別為什麼會決定「第二條連線要怎麼加」，見
+[protocol-coexistence.md](./protocol-coexistence.md) §12.2。
 
 ## 6. 驅動從哪裡來
 

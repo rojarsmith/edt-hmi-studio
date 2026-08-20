@@ -175,12 +175,22 @@ behaviour as an RS-485 bus with nothing on the other end.
 
 ### The RS-485 transceiver
 
-Still fitted, on USART2 with its driver-enable on PD4, and no longer driven by
-this firmware. `board_uart1_apply` in `board.c` remains and still configures it
-correctly through `HAL_RS485Ex_Init`; nothing calls it. If a project needs the
-field bus rather than a PC link, that function and the transport primitives at
-the head of `modbus_rtu_async_client.c` are the two places to reconnect — and
-git history before this change has them wired up.
+Still fitted, on USART2 with its driver-enable on PD4, and **still brought up at
+boot**: `board_init` calls `board_uart1_apply(115200, 8N1)`, which opens the port
+through `HAL_RS485Ex_Init` rather than `HAL_UART_Init` — so the USART raises DE
+around each transmitted frame itself — and then disables the FIFOs, so the
+client sees inter-frame gaps as they actually fall. `USART2_IRQHandler` is
+vectored into `HAL_UART_IRQHandler(&huart1)` alongside it.
+
+What the port does not have is a **protocol client**. `g_modbus_client`'s
+transport on this board is the USB CDC ring, and nothing else in the firmware
+reads or writes `huart1`. So a project that needs the field bus rather than a PC
+link is one binding away rather than a bring-up away: the transport primitives —
+declared at the head of `modbus_rtu_async_client.c` and defined at its foot,
+which is the whole of what differs from the Discovery boards' copies — are the
+place to reconnect, and git history before this change has them wired to the
+UART. Why that distinction decides how a second link gets added is
+[protocol-coexistence.md](./protocol-coexistence.md) §12.2.
 
 ## 6. Where the drivers come from
 
