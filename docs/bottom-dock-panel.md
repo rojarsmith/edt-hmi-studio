@@ -176,20 +176,20 @@ the tab. It does not auto-close when the operation ends off-tab: the moment a
 build finishes is the moment its last lines matter most, so the dock stays until
 the author leaves Deploy again with nothing running.
 
-**There are three states, not two, and only one of them is stored.**
-`dockStore.expanded` is the author's choice — expanded versus collapsed to its
-tab strip. The third is *inert*: off the Deploy tab the band stays exactly where
-it is, empties of panes, and its chevron goes dark and dead. That is derived by
-`App` from the tab and the busy flag, never stored, so leaving the tab cannot
-spend the author's expansion — coming back restores it.
+**The visibility rule was replaced, twice, and the second answer is simpler
+than either draft.** §6's rule tied the dock to the Deploy tab; the first
+revision kept the band in place as an inert strip rather than removing it. Both
+are gone: the dock is now available on **every** tab, because the Work pane it
+gained lists operations that outlive the tab they were started from, so hiding
+it anywhere hides the one view that is never tab-specific
+([work-progress.md](./work-progress.md) §5). Expansion is the author's choice
+alone, and a red lamp on the tab strip covers the case the auto-show existed
+for: something is running while the dock sits collapsed.
 
-Keeping the band rather than removing it is what stops the workspace jumping by
-the strip's height every time a tab changes, and the dead chevron says *the
-panel is still there, just not now* rather than *the panel is gone*. The strip's
-height is pinned in CSS rather than derived from its contents, because emptying
-it would otherwise shrink it: measured at 29 px collapsed and 29 px inert, 220 px
-expanded, with `.app-body` absorbing every difference and the status bar never
-moving.
+What survives from the drafts is the measurement discipline. The strip's height
+is pinned in CSS rather than derived from its contents, so it cannot shift when
+its panes change; measured at 29 px collapsed and 220 px expanded, with
+`.app-body` absorbing the difference and the status bar never moving.
 
 **§7's max-height clamp was wrong the first time, in a way worth keeping.** The
 first attempt clamped against `window.innerHeight - 240`, which quietly ignores

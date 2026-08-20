@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 
-export type DockPaneId = 'build' | 'flash';
+export type DockPaneId = 'work' | 'build' | 'flash';
 
 const HEIGHT_KEY = 'dockPanelHeight';
 export const DOCK_MIN_HEIGHT = 120;
@@ -48,7 +48,7 @@ interface DockState {
 
 export const useDockStore = create<DockState>((set) => ({
   expanded: true,
-  activePane: 'build',
+  activePane: 'work',
   height: readStoredHeight(),
 
   setExpanded: (expanded) => set({ expanded }),

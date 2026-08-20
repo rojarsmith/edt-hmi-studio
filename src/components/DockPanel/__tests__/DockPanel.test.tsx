@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import DockPanel from '../DockPanel';
 import { useDeployStore } from '../../../store/deployStore';
 import { useDockStore, DOCK_DEFAULT_HEIGHT } from '../../../store/dockStore';
+import { useWorkStore } from '../../../store/workStore';
 
 vi.mock('../../../services/hmiApi', () => ({
   getHmiCapabilities: vi.fn(),
@@ -10,15 +11,16 @@ vi.mock('../../../services/hmiApi', () => ({
   listHmiPorts: vi.fn(),
   buildHmiProject: vi.fn(),
   flashHmiBuild: vi.fn(),
+  cancelHmiBuild: vi.fn(),
   subscribeBuildLog: () => () => {},
 }));
 
-const toggle = () => screen.getByTitle(/panel/i);
+const toggle = () => screen.getByTitle(/the panel/i);
 
 beforeEach(() => {
   useDockStore.setState({
     expanded: true,
-    activePane: 'build',
+    activePane: 'work',
     height: DOCK_DEFAULT_HEIGHT,
   });
   useDeployStore.setState({
@@ -29,73 +31,69 @@ beforeEach(() => {
     ports: [],
     capabilities: { success: true, canBuild: true, canFlash: true },
   });
+  useWorkStore.setState({ items: [], nextId: 1 });
 });
 
-describe('DockPanel states', () => {
-  it('shows its panes and body when it is in use', () => {
-    render(<DockPanel visible />);
+describe('DockPanel', () => {
+  it('offers all three panes, with Work first', () => {
+    render(<DockPanel />);
 
-    expect(screen.getByRole('tab', { name: 'Build Firmware' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Flash & Reset' })).toBeInTheDocument();
-    expect(screen.getByRole('tabpanel')).toBeInTheDocument();
-    expect(toggle()).toBeEnabled();
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
+    expect(tabs).toEqual(['Work', 'Build Firmware', 'Flash & Reset']);
   });
 
-  it('keeps its panes but drops the body when collapsed', () => {
+  it('is available whatever the workspace is showing', () => {
+    // Work lists operations that outlive the tab they were started from, so
+    // the dock is never tab-specific and its chevron is never dead.
+    render(<DockPanel />);
+
+    expect(toggle()).toBeEnabled();
+    expect(screen.getByRole('tabpanel')).toBeInTheDocument();
+  });
+
+  it('keeps its strip but drops the body when collapsed', () => {
     useDockStore.setState({ expanded: false });
 
-    render(<DockPanel visible />);
+    const { container } = render(<DockPanel />);
 
-    expect(screen.getByRole('tab', { name: 'Build Firmware' })).toBeInTheDocument();
-    expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
-    expect(toggle()).toBeEnabled();
-  });
-
-  it('stays in the layout as an empty strip when it is not in use', () => {
-    const { container } = render(<DockPanel visible={false} />);
-
-    // The band remains so the workspace does not jump by its height, but there
-    // is nothing in it and nothing to open.
-    const panel = container.querySelector('.dock-panel');
-    expect(panel).toBeInTheDocument();
-    expect(panel).toHaveClass('inert');
-    expect(screen.queryAllByRole('tab')).toHaveLength(0);
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(container.querySelector('.dock-panel')).toHaveClass('collapsed');
+    expect(screen.getAllByRole('tab')).toHaveLength(3);
     expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
   });
 
-  it('will not expand from the inert strip', () => {
-    useDockStore.setState({ expanded: true });
+  it('expands and collapses from the chevron', () => {
+    useDockStore.setState({ expanded: false });
+    render(<DockPanel />);
 
-    render(<DockPanel visible={false} />);
-
-    const button = toggle();
-    expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('aria-expanded', 'false');
-
-    fireEvent.click(button);
-
-    expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
-  });
-
-  it('gives the expanded state back when it is in use again', () => {
-    // Expansion belongs to the author and is not spent by leaving the tab.
-    useDockStore.setState({ expanded: true });
-    const { rerender } = render(<DockPanel visible={false} />);
-    expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
-
-    rerender(<DockPanel visible />);
-
+    fireEvent.click(toggle());
     expect(screen.getByRole('tabpanel')).toBeInTheDocument();
+
+    fireEvent.click(toggle());
+    expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
   });
 
-  it('marks the pane whose operation is running', () => {
+  it('lights the lamp only while something is running', () => {
+    const { container, rerender } = render(<DockPanel />);
+    expect(container.querySelector('.dock-running-lamp')).not.toBeInTheDocument();
+
+    useDeployStore.setState({ busy: 'building' });
+    rerender(<DockPanel />);
+    const lamp = container.querySelector('.dock-running-lamp');
+    expect(lamp).toBeInTheDocument();
+    expect(lamp).toHaveAttribute('aria-label', 'Build Firmware is running');
+
+    useDeployStore.setState({ busy: null });
+    rerender(<DockPanel />);
+    expect(container.querySelector('.dock-running-lamp')).not.toBeInTheDocument();
+  });
+
+  it('shows the lamp while collapsed, which is the case it exists for', () => {
+    useDockStore.setState({ expanded: false });
     useDeployStore.setState({ busy: 'flashing' });
 
-    const { container } = render(<DockPanel visible />);
+    const { container } = render(<DockPanel />);
 
-    const flashTab = screen.getByRole('tab', { name: /Flash & Reset/ });
-    expect(flashTab.querySelector('.dock-tab-busy')).toBeInTheDocument();
-    expect(container.querySelectorAll('.dock-tab-busy')).toHaveLength(1);
+    expect(container.querySelector('.dock-running-lamp')).toBeInTheDocument();
+    expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
   });
 });

@@ -19,6 +19,12 @@ export interface CommandOptions {
    * and still read the whole output at the end.
    */
   onLine?: (line: string, stream: 'stdout' | 'stderr') => void;
+  /**
+   * Aborting kills the child and resolves with what it said before it died.
+   * Only the streaming path honours it: the buffered callers are short enough
+   * that there is nothing to interrupt.
+   */
+  signal?: AbortSignal;
 }
 
 export function runExecutable(
@@ -76,9 +82,22 @@ function runStreaming(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      options.signal?.removeEventListener('abort', onAbort);
       flush();
       resolve({ stdout, stderr, exitCode });
     };
+
+    const onAbort = () => {
+      child.kill();
+      settle(1);
+    };
+    if (options.signal) {
+      if (options.signal.aborted) {
+        onAbort();
+        return;
+      }
+      options.signal.addEventListener('abort', onAbort, { once: true });
+    }
 
     // spawn has no `timeout` option in the form execFile offers, so the budget
     // is enforced here. The output collected so far is still returned, which is

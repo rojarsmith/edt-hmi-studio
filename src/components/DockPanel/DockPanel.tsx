@@ -15,19 +15,23 @@ import {
   type DockPaneId,
 } from '../../store/dockStore';
 import DeployLogPane from './DeployLogPane';
+import WorkPane from './WorkPane';
 import './DockPanel.css';
 
 const PANES: { id: DockPaneId; label: string }[] = [
+  // Work first: it is the one pane that says something about every operation,
+  // and the two log panes are candidates for factory mode later.
+  { id: 'work', label: 'Work' },
   { id: 'build', label: 'Build Firmware' },
   { id: 'flash', label: 'Flash & Reset' },
 ];
 
-interface DockPanelProps {
-  /** False keeps the dock out of the layout entirely, height and all. */
-  visible: boolean;
-}
-
-const DockPanel: React.FC<DockPanelProps> = ({ visible }) => {
+/**
+ * The dock is available on every tab: Work lists operations that outlive the
+ * tab they were started from, so hiding it somewhere would hide the one view
+ * that is never tab-specific. Expansion is the author's choice alone.
+ */
+const DockPanel: React.FC = () => {
   const expanded = useDockStore((state) => state.expanded);
   const activePane = useDockStore((state) => state.activePane);
   const height = useDockStore((state) => state.height);
@@ -72,20 +76,16 @@ const DockPanel: React.FC<DockPanelProps> = ({ visible }) => {
     [height, setHeight],
   );
 
-  const busyPane: DockPaneId | null =
-    busy === 'building' ? 'build' : busy === 'flashing' ? 'flash' : null;
-
-  // Three states, not two. The strip is always in the layout, so the workspace
-  // never jumps by its height when a tab changes; what varies is whether it
-  // carries anything. Inert is the strip with no panes and a dead chevron.
-  const open = visible && expanded;
+  const runningName = busy === 'building'
+    ? 'Build Firmware'
+    : busy === 'flashing' ? 'Flash & Reset' : null;
 
   return (
     <div
-      className={`dock-panel ${visible ? (expanded ? 'expanded' : 'collapsed') : 'inert'}`}
-      style={open ? { height } : undefined}
+      className={`dock-panel ${expanded ? 'expanded' : 'collapsed'}`}
+      style={expanded ? { height } : undefined}
     >
-      {open && (
+      {expanded && (
         <div
           className={`dock-grip ${resizing ? 'resizing' : ''}`}
           onPointerDown={handleResizeStart}
@@ -95,8 +95,8 @@ const DockPanel: React.FC<DockPanelProps> = ({ visible }) => {
         />
       )}
 
-      <div className="dock-tabs" role={visible ? 'tablist' : undefined}>
-        {visible && PANES.map((pane) => (
+      <div className="dock-tabs" role="tablist">
+        {PANES.map((pane) => (
           <button
             key={pane.id}
             type="button"
@@ -105,32 +105,39 @@ const DockPanel: React.FC<DockPanelProps> = ({ visible }) => {
             className={`dock-tab ${activePane === pane.id ? 'active' : ''}`}
             onClick={() => setActivePane(pane.id)}
           >
-            {busyPane === pane.id && <span className="dock-tab-busy" aria-hidden="true" />}
             {pane.label}
           </button>
         ))}
 
         <div className="dock-tabs-end">
+          {/* One lamp for the whole dock rather than a mark per tab: what a
+              reader needs from a collapsed strip is "something is running",
+              and the Work pane says which. */}
+          {runningName && (
+            <span
+              className="dock-running-lamp"
+              role="status"
+              aria-label={`${runningName} is running`}
+              title={`${runningName} is running`}
+            />
+          )}
           <button
             type="button"
             className="dock-toggle"
             onClick={toggleExpanded}
-            disabled={!visible}
-            aria-expanded={open}
-            title={
-              visible
-                ? expanded ? 'Collapse the panel' : 'Expand the panel'
-                : 'Open the Deploy tab to use this panel'
-            }
+            aria-expanded={expanded}
+            title={expanded ? 'Collapse the panel' : 'Expand the panel'}
           >
-            <PanelChevron open={open} className="dock-chevron" />
+            <PanelChevron open={expanded} className="dock-chevron" />
           </button>
         </div>
       </div>
 
-      {open && (
+      {expanded && (
         <div className="dock-body" role="tabpanel">
-          <DeployLogPane pane={activePane} />
+          {activePane === 'work'
+            ? <WorkPane />
+            : <DeployLogPane pane={activePane} />}
         </div>
       )}
     </div>

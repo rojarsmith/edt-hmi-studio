@@ -206,6 +206,23 @@ export function subscribeBuildLog(
   return () => source.close();
 }
 
+/**
+ * Stops a build that is still running. Returns whether there was one to stop —
+ * losing the race to a build that just finished is not an error.
+ */
+export async function cancelHmiBuild(runId: string): Promise<boolean> {
+  try {
+    const raw = await postJson(
+      `/api/hmi/build-cancel/${encodeURIComponent(runId)}`,
+      {},
+    );
+    const data = (typeof raw === 'object' && raw !== null ? raw : {}) as JsonRecord;
+    return data.cancelled === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function buildHmiProject(
   project: ProjectFile,
   runId?: string,

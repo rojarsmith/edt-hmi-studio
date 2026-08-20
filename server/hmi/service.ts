@@ -42,6 +42,13 @@ import type { BoardId } from '../../src/types/hmi';
 
 const DEFAULT_TOOLCHAIN_ROOT = 'C:\\ST\\STM32CubeCLT_1.22.0';
 const BUILD_METADATA_FILE = 'build-metadata.json';
+
+/**
+ * Builds that can still be stopped, by the run id their client gave them.
+ * Cancelling is only offered for building: flashing writes to the board, and a
+ * half-written image is worse than a slow one.
+ */
+const cancellableBuilds = new Map<string, AbortController>();
 const FLASH_ARTIFACT_NAME = 'firmware.hex';
 /**
  * Image resources, linked into the board's external NOR and written through its
@@ -449,6 +456,9 @@ export class HmiService {
       }
     };
     if (runId) openBuildLog(runId);
+
+    const aborter = new AbortController();
+    if (runId) cancellableBuilds.set(runId, aborter);
     const metadata: BuildMetadata = {
       buildId,
       boardId,
@@ -516,8 +526,12 @@ export class HmiService {
           // Streaming replaces the end-of-run commandLog() below rather than
           // adding to it, so the two never both report the same output.
           onLine: runId ? (line) => emit(line) : undefined,
+          signal: runId ? aborter.signal : undefined,
         },
       );
+      if (aborter.signal.aborted) {
+        throw new Error('Firmware build stopped.');
+      }
       if (!runId) emit(...commandLog(buildResult));
       if (buildResult.exitCode !== 0) {
         throw new Error(
@@ -570,8 +584,25 @@ export class HmiService {
     } finally {
       // Tells every watcher the build is over, whichever way it ended, so an
       // SSE connection closes instead of hanging on a finished build.
-      if (runId) closeBuildLog(runId);
+      if (runId) {
+        cancellableBuilds.delete(runId);
+        closeBuildLog(runId);
+      }
     }
+  }
+
+  /**
+   * Stops a build that is still running, by the run id its client chose.
+   *
+   * Returns whether there was one to stop: a build that has just finished is
+   * not an error to try to cancel, it is a race the client lost.
+   */
+  cancelBuild(runIdValue: unknown): { success: boolean; cancelled: boolean } {
+    const runId = typeof runIdValue === 'string' ? runIdValue : '';
+    const aborter = runId ? cancellableBuilds.get(runId) : undefined;
+    if (!aborter) return { success: true, cancelled: false };
+    aborter.abort();
+    return { success: true, cancelled: true };
   }
 
   /**

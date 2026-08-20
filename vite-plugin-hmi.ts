@@ -264,6 +264,16 @@ function createHmiMiddleware(
         return;
       }
 
+      const cancelMatch = path.match(/^\/api\/hmi\/build-cancel\/([^/]+)$/);
+      if (cancelMatch) {
+        if (request.method !== 'POST') {
+          methodNotAllowed(response, 'POST');
+          return;
+        }
+        sendJson(response, 200, service.cancelBuild(cancelMatch[1]));
+        return;
+      }
+
       const logStreamMatch = path.match(/^\/api\/hmi\/build-log\/([^/]+)$/);
       if (logStreamMatch) {
         if (request.method !== 'GET') {

@@ -18,6 +18,7 @@ import { useResourceStore } from '../resources';
 import { useLogicEditorStore } from '../components/LogicEditor';
 import {
   buildHmiProject,
+  cancelHmiBuild,
   subscribeBuildLog,
   flashHmiBuild,
   getHmiCapabilities,
@@ -27,6 +28,7 @@ import {
   type HmiImageLayout,
   type HmiSerialPort,
 } from '../services/hmiApi';
+import { useWorkStore } from './workStore';
 import {
   DEFAULT_BOARD_ID,
   DEFAULT_PROTOCOL_ID,
@@ -171,6 +173,8 @@ export const useDeployStore = create<DeployState>((set, get) => ({
 
     set({ busy: 'building', buildId: '', artifactUrl: '', layout: null });
     const append = (message: string | string[]) => get().appendLog('build', message);
+    const work = useWorkStore.getState();
+    let workId: number | null = null;
 
     try {
       const project = useProjectStore.getState();
@@ -193,9 +197,23 @@ export const useDeployStore = create<DeployState>((set, get) => ({
       // wait for its last. See docs/streaming-build-log.md.
       const runId = newRunId();
       let streamed = 0;
+      let stopped = false;
+
+      // A build is the one operation here that may be interrupted: it writes
+      // to a scratch directory, not to the board. See docs/work-progress.md.
+      const buildWorkId = work.start('Build Firmware', {
+        cancellable: true,
+        cancel: () => {
+          stopped = true;
+          void cancelHmiBuild(runId);
+        },
+      });
+      workId = buildWorkId;
+
       const stopStreaming = subscribeBuildLog(runId, (line) => {
         streamed += 1;
         append(line);
+        work.note(buildWorkId, line);
       });
 
       let result;
@@ -210,7 +228,12 @@ export const useDeployStore = create<DeployState>((set, get) => ({
       if (streamed === 0) append(result.log);
 
       if (!result.success) {
-        append(`Firmware build failed: ${result.error || 'Unknown error'}`);
+        const message = stopped
+          ? 'Firmware build stopped.'
+          : `Firmware build failed: ${result.error || 'Unknown error'}`;
+        append(message);
+        work.finish(buildWorkId, stopped ? 'cancelled' : 'failed', message);
+        workId = null;
         return;
       }
       if (result.buildId) set({ buildId: result.buildId });
@@ -225,14 +248,20 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         }
       }
 
-      append(
-        result.buildId
-          ? `Firmware build complete, buildId: ${result.buildId}`
-          : 'Firmware build complete.',
-      );
+      const done = result.buildId
+        ? `Firmware build complete, buildId: ${result.buildId}`
+        : 'Firmware build complete.';
+      append(done);
+      work.finish(buildWorkId, 'succeeded', done);
+      workId = null;
     } catch (error) {
-      append(`Firmware build failed: ${error instanceof Error ? error.message : String(error)}`);
+      const message = `Firmware build failed: ${error instanceof Error ? error.message : String(error)}`;
+      append(message);
+      if (workId !== null) work.finish(workId, 'failed', message);
+      workId = null;
     } finally {
+      // A work item must never be left running by a path that forgot it.
+      if (workId !== null) work.finish(workId, 'failed', 'Firmware build ended unexpectedly.');
       set({ busy: null });
     }
   },
@@ -248,18 +277,31 @@ export const useDeployStore = create<DeployState>((set, get) => ({
     if (busy !== null) return;
 
     set({ busy: 'flashing' });
+    // Not cancellable, and that is the point of the capability being per item:
+    // this one writes to the board, and a half-written image is worse than a
+    // slow one. See docs/work-progress.md.
+    const work = useWorkStore.getState();
+    const workId = work.start('Flash & Reset', { cancellable: false });
+    let settled = false;
+
     try {
       const probeSerial = ports.find((port) => port.path === runtimePort)?.probeSerial;
+      work.note(workId, `Writing ${buildId} over SWD...`);
       const result = await flashHmiBuild(buildId, probeSerial);
       append(result.log);
-      append(
-        result.success
-          ? 'Firmware flashed and device reset.'
-          : `Firmware flashing failed: ${result.error || 'Unknown error'}`,
-      );
+      const message = result.success
+        ? 'Firmware flashed and device reset.'
+        : `Firmware flashing failed: ${result.error || 'Unknown error'}`;
+      append(message);
+      work.finish(workId, result.success ? 'succeeded' : 'failed', message);
+      settled = true;
     } catch (error) {
-      append(`Firmware flashing failed: ${error instanceof Error ? error.message : String(error)}`);
+      const message = `Firmware flashing failed: ${error instanceof Error ? error.message : String(error)}`;
+      append(message);
+      work.finish(workId, 'failed', message);
+      settled = true;
     } finally {
+      if (!settled) work.finish(workId, 'failed', 'Flashing ended unexpectedly.');
       set({ busy: null });
     }
   },
