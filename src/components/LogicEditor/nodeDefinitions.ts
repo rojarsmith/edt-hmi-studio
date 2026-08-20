@@ -159,7 +159,11 @@ export const NODE_DEFINITIONS: LogicNodeDefinition[] = [
     color: NODE_COLORS.screen,
     defaultParams: {
       targetScreen: '',
-      animation: 'none',
+      // The same default the Edit Event dialog offers, so one navigation does
+      // not look different from another for having been written in a graph.
+      transition: 'fade',
+      transitionDirection: 'left',
+      transitionDuration: 300,
     },
     inputs: [
       { name: 'Execute', type: 'execution' },

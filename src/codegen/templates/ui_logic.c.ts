@@ -2,6 +2,8 @@
 // Generates C code from logic orchestration graphs
 
 import type { CodeGenOptions } from '../types';
+import { screenLoadStatement } from '../screenTransition';
+import { logicNodeTransition } from '../../utils/screenTransitions';
 import type { LvglComponent, Screen } from '../../types';
 import type { ModbusRegisterTag } from '../../types/hmi';
 import { getNodeDefinition } from '../../components/LogicEditor/nodeDefinitions';
@@ -1058,26 +1060,12 @@ function generateNavigatePageCode(
     context,
     options,
   );
-  const animation = node.params.animation || 'none';
-  const legacyVariableName = `ui_${toSnakeCase(targetScreen.screen.name)}`;
-  
-  if (animation === 'none') {
-    return targetScreen.resolved
-      ? `${indent}${targetScreen.loadFunctionName}();`
-      : `${indent}lv_scr_load(${legacyVariableName});`;
-  }
-  const animMap: Record<string, string> = {
-    fade: 'LV_SCR_LOAD_ANIM_FADE_IN',
-    slide_left: 'LV_SCR_LOAD_ANIM_MOVE_LEFT',
-    slide_right: 'LV_SCR_LOAD_ANIM_MOVE_RIGHT',
-    slide_up: 'LV_SCR_LOAD_ANIM_MOVE_TOP',
-    slide_down: 'LV_SCR_LOAD_ANIM_MOVE_BOTTOM',
-  };
-  const animType = animMap[animation] || 'LV_SCR_LOAD_ANIM_FADE_IN';
+  // A screen the graph names but the project does not have keeps the name it
+  // was written with, so the generated line still says who it meant.
   const variableName = targetScreen.resolved
     ? targetScreen.variableName
-    : legacyVariableName;
-  return `${indent}lv_scr_load_anim(${variableName}, ${animType}, 300, 0, false);`;
+    : `ui_${toSnakeCase(targetScreen.screen.name)}`;
+  return `${indent}${screenLoadStatement(variableName, logicNodeTransition(node.params))}`;
 }
 
 function generateShowHideCode(

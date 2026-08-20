@@ -12,27 +12,26 @@
  * so they are what comes out here too.
  */
 
-import type { Screen } from '../types';
 import {
   lvglScreenLoadAnim,
   resolveScreenTransition,
   type ScreenTransitionFields,
 } from '../utils/screenTransitions';
-import type { CodeGenOptions } from './types';
-import { getScreenVarName } from './utils/nameUtils';
 
 /**
- * The C statement that loads `screen`, drawn the way `action` asks for.
+ * The C statement that loads the screen held in `screenVar`, drawn the way
+ * `action` asks for.
+ *
+ * Takes the variable name rather than the screen, because the logic graph has
+ * its own answer for a screen it cannot resolve and needs to keep giving it.
  *
  * None becomes lv_scr_load: LVGL's own shortcut for a zero-length transition
  * loads the screen between two frames, which is the point of choosing it.
  */
 export function screenLoadStatement(
-  screen: Screen,
+  screenVar: string,
   action: ScreenTransitionFields | undefined,
-  options: CodeGenOptions,
 ): string {
-  const screenVar = getScreenVarName(screen.name, options);
   const { transition, direction, duration } = resolveScreenTransition(action);
 
   if (transition === 'none') {

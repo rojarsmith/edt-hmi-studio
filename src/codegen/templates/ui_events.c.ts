@@ -25,6 +25,7 @@ import type { CodeGenOptions } from '../types';
 import {
   getEventHandlerName,
   getComponentVarName,
+  getScreenVarName,
   colorToLvgl,
   escapeCString,
 } from '../utils/nameUtils';
@@ -168,7 +169,8 @@ function generateBuiltinActionCode(
           if (options.generateComments) {
             lines.push(`${indent}${generateComment(`Navigate to: ${targetName}`, options)}`);
           }
-          lines.push(`${indent}${screenLoadStatement(targetScreen, action, options)}`);
+          const screenVar = getScreenVarName(targetScreen.name, options);
+          lines.push(`${indent}${screenLoadStatement(screenVar, action)}`);
         }
       }
       break;

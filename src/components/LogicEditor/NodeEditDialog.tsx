@@ -8,6 +8,15 @@ import { useAppStore } from '../../store/appStore';
 import { NODE_COLORS } from './nodeDefinitions';
 import type { CompareOperator, LogicOperator, MathOperator, StringOperation } from './types';
 import type { ModbusRegisterTag } from '../../types/hmi';
+import type { ScreenTransition, ScreenTransitionDirection } from '../../types';
+import {
+  DEFAULT_SCREEN_TRANSITION_DIRECTION,
+  DEFAULT_SCREEN_TRANSITION_DURATION,
+  SCREEN_TRANSITIONS,
+  SCREEN_TRANSITION_DIRECTIONS,
+  logicNodeTransition,
+} from '../../utils/screenTransitions';
+import NumberField from '../common/NumberField';
 import './NodeEditDialog.css';
 
 interface NodeEditDialogProps {
@@ -95,6 +104,71 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
   if (!node) {
     return null;
   }
+
+  /**
+   * Which of the five effects the screen change is drawn with, shared with the
+   * Edit Event dialog so the same choice means the same thing in both places.
+   * Graphs written before these existed stored one of four strings under
+   * `animation`; logicNodeTransition reads those, and the first edit here
+   * replaces them.
+   */
+  const renderTransitionParams = () => {
+    const saved = logicNodeTransition(params);
+    const transition = saved.transition ?? 'none';
+    const effect = SCREEN_TRANSITIONS.find(candidate => candidate.value === transition);
+    const direction = saved.transitionDirection ?? DEFAULT_SCREEN_TRANSITION_DIRECTION;
+    const duration = saved.transitionDuration ?? DEFAULT_SCREEN_TRANSITION_DURATION;
+    // Every field is written together, so a node never holds half of the old
+    // spelling and half of the new one.
+    const write = (next: Partial<typeof saved>) => {
+      handleParamChange('animation', undefined);
+      handleParamChange('transition', next.transition ?? transition);
+      handleParamChange('transitionDirection', next.transitionDirection ?? direction);
+      handleParamChange('transitionDuration', next.transitionDuration ?? duration);
+    };
+
+    return (
+      <>
+        <div className="param-group">
+          <label>Transition</label>
+          <select
+            value={transition}
+            onChange={e => write({ transition: e.target.value as ScreenTransition })}
+          >
+            {SCREEN_TRANSITIONS.map(candidate => (
+              <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
+            ))}
+          </select>
+        </div>
+        {transition !== 'none' && effect?.directional && (
+          <div className="param-group">
+            <label>Direction</label>
+            <select
+              value={direction}
+              onChange={e =>
+                write({ transitionDirection: e.target.value as ScreenTransitionDirection })
+              }
+            >
+              {SCREEN_TRANSITION_DIRECTIONS.map(candidate => (
+                <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {transition !== 'none' && (
+          <div className="param-group">
+            <label>Duration (ms)</label>
+            <NumberField
+              min={0}
+              step={50}
+              value={duration}
+              onChange={value => write({ transitionDuration: value })}
+            />
+          </div>
+        )}
+      </>
+    );
+  };
 
   const renderParamEditor = () => {
     switch (node.subType) {
@@ -226,18 +300,7 @@ const NodeEditDialog: React.FC<NodeEditDialogProps> = ({ nodeId, onClose }) => {
                 ))}
               </select>
             </div>
-            <div className="param-group">
-              <label>Transition</label>
-              <select
-                value={params.animation || 'none'}
-                onChange={e => handleParamChange('animation', e.target.value)}
-              >
-                <option value="none">None</option>
-                <option value="fade">Fade</option>
-                <option value="slide_left">Slide Left</option>
-                <option value="slide_right">Slide Right</option>
-              </select>
-            </div>
+            {renderTransitionParams()}
           </>
         );
 

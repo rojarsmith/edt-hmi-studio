@@ -6,14 +6,12 @@ import { describe, it, expect } from 'vitest';
 import { screenLoadStatement } from '../screenTransition';
 import {
   describeScreenTransition,
+  logicNodeTransition,
   lvglScreenLoadAnim,
   resolveScreenTransition,
 } from '../../utils/screenTransitions';
-import { createScreen, defaultOptions } from './helpers';
-
-const screen = createScreen({ name: 'settings' });
 const statement = (action: Parameters<typeof screenLoadStatement>[1]) =>
-  screenLoadStatement(screen, action, defaultOptions());
+  screenLoadStatement('ui_screen_settings', action);
 
 describe('screen transitions', () => {
   it('maps each effect onto its LVGL family', () => {
@@ -62,5 +60,31 @@ describe('screen transitions', () => {
       .toBe('Slide Up, 400 ms');
     expect(describeScreenTransition({ transition: 'fade' })).toBe('Fade, 300 ms');
     expect(describeScreenTransition({ transition: 'none' })).toBe('None');
+  });
+});
+
+describe('a logic graph written before the five effects', () => {
+  it('reads its four old spellings', () => {
+    expect(logicNodeTransition({ animation: 'slide_left' }))
+      .toEqual({ transition: 'slide', transitionDirection: 'left' });
+    expect(logicNodeTransition({ animation: 'slide_right' }))
+      .toEqual({ transition: 'slide', transitionDirection: 'right' });
+    expect(logicNodeTransition({ animation: 'fade' })).toEqual({ transition: 'fade' });
+    expect(logicNodeTransition({ animation: 'none' })).toEqual({ transition: 'none' });
+  });
+
+  it('means None when it says nothing', () => {
+    // Which is not what an absent field means on a navigate action: the node
+    // has always defaulted to no transition, and the action to a fade.
+    expect(logicNodeTransition({})).toEqual({ transition: 'none' });
+  });
+
+  it('is overridden by the fields an edited node writes', () => {
+    expect(logicNodeTransition({
+      animation: 'fade',
+      transition: 'cover',
+      transitionDirection: 'up',
+      transitionDuration: 200,
+    })).toEqual({ transition: 'cover', transitionDirection: 'up', transitionDuration: 200 });
   });
 });

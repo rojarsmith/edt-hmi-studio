@@ -154,3 +154,39 @@ export function describeScreenTransition(action: ScreenTransitionFields | undefi
     : name;
   return `${heading}, ${duration} ms`;
 }
+
+/**
+ * What a logic graph's Navigate node means by its transition.
+ *
+ * The node predates the five effects and stored one of four strings under
+ * `animation`. Those are read here rather than rewritten in the project file,
+ * so an old graph keeps working and a re-saved one carries the new fields.
+ *
+ * A node that says nothing at all means None, which is what the node has
+ * always defaulted to - unlike a navigate action, whose silence means the fade
+ * its screen load function used to perform.
+ */
+export function logicNodeTransition(params: {
+  transition?: ScreenTransition;
+  transitionDirection?: ScreenTransitionDirection;
+  transitionDuration?: number;
+  animation?: string;
+}): ScreenTransitionFields {
+  if (params.transition) {
+    return {
+      transition: params.transition,
+      transitionDirection: params.transitionDirection,
+      transitionDuration: params.transitionDuration,
+    };
+  }
+  return LEGACY_LOGIC_ANIMATIONS[params.animation ?? ''] ?? { transition: 'none' };
+}
+
+const LEGACY_LOGIC_ANIMATIONS: Record<string, ScreenTransitionFields> = {
+  none: { transition: 'none' },
+  fade: { transition: 'fade' },
+  slide_left: { transition: 'slide', transitionDirection: 'left' },
+  slide_right: { transition: 'slide', transitionDirection: 'right' },
+  slide_up: { transition: 'slide', transitionDirection: 'up' },
+  slide_down: { transition: 'slide', transitionDirection: 'down' },
+};

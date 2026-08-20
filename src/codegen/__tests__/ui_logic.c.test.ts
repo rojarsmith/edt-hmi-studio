@@ -251,6 +251,37 @@ describe('generateLogicSource', () => {
       const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
       expect(result).toContain('LV_SCR_LOAD_ANIM_MOVE_LEFT');
     });
+
+    it('takes the five effects a node written today carries', () => {
+      const node = createLogicNode('navigate_page', {
+        id: 'n1',
+        params: {
+          targetScreen: 'page2',
+          transition: 'wipe',
+          transitionDirection: 'down',
+          transitionDuration: 600,
+        },
+        inputs: [],
+        outputs: [],
+      });
+      const graph = createLogicGraph({ name: 'nav', nodes: [node] });
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      expect(result).toContain('lv_scr_load_anim(ui_page2, LV_SCR_LOAD_ANIM_OUT_BOTTOM, 600, 0, false);');
+    });
+
+    it('reads a graph that says nothing at all as None', () => {
+      // The node has always defaulted to no transition, unlike a navigate
+      // action, whose silence means the fade its load function performed.
+      const node = createLogicNode('navigate_page', {
+        id: 'n1',
+        params: { targetScreen: 'page2' },
+        inputs: [],
+        outputs: [],
+      });
+      const graph = createLogicGraph({ name: 'nav', nodes: [node] });
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      expect(result).toContain('lv_scr_load(ui_page2);');
+    });
   });
 
   // ── show_hide ─────────────────────────────────────────────
@@ -1556,7 +1587,9 @@ describe('generateLogicSource', () => {
       );
       expect(declarationIndex).toBeGreaterThan(-1);
       expect(registrationIndex).toBeGreaterThan(declarationIndex);
-      expect(result).toContain('ui_load_screen_machine_status();');
+      // The node says None, so the screen changes between two frames. It used
+      // to call the screen's load function here, which fades over 300 ms.
+      expect(result).toContain('lv_scr_load(ui_screen_machine_status);');
       expect(result).not.toContain('button_uuid');
       expect(result).not.toContain('destination_page_uuid');
     });

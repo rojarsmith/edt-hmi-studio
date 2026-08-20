@@ -22,6 +22,7 @@ import {
 } from '../../utils/screenTransitions';
 import { screenLoadStatement } from '../../codegen/screenTransition';
 import { DEFAULT_CODEGEN_OPTIONS } from '../../codegen/types';
+import { getScreenVarName } from '../../codegen/utils/nameUtils';
 import NumberField from '../common/NumberField';
 import { LVGL_EVENTS, LVGL_SCREEN_EVENTS } from './EventPanel';
 import CodeEditor from './CodeEditor';
@@ -236,7 +237,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
           break;
         }
         code += `        // Navigate to screen: ${targetScreen}\n`;
-        code += `        ${screenLoadStatement(target, { transition, transitionDirection, transitionDuration }, DEFAULT_CODEGEN_OPTIONS)}\n`;
+        code += `        ${screenLoadStatement(getScreenVarName(target.name, DEFAULT_CODEGEN_OPTIONS), { transition, transitionDirection, transitionDuration })}\n`;
         break;
       }
       case 'setProperty':
