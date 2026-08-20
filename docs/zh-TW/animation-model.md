@@ -67,6 +67,10 @@
 | `LV_EVENT_SCREEN_UNLOAD_START` | 此畫面開始離開時 |
 | `LV_EVENT_SCREEN_UNLOADED` | 此畫面已完全離開 |
 
+同一次換頁，一個畫面只會收到其中兩個：進場的收到 LOAD 那一對，離場的收到 UNLOAD
+那一對。兩者之間隔多久，取決於那次導覽選了哪一種換頁動畫——詳見
+[screen-transitions.md](./screen-transitions.md)。
+
 有兩個內建動作可以驅動動畫，畫面與元件皆可使用：**Play Animation** 從頭播放
 （不論上一次跑到哪裡）——Absolute 從它陳述的起點，Offset 則從元件當下所在之處
 ——**Stop Animation** 則讓元件停在當下位置。

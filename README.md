@@ -39,7 +39,7 @@ A full-featured **visual editor for LVGL user interfaces**, with drag-and-drop d
 - **Visual event editor**
 - **Every LVGL event**: click, long press, value changed, focus and more
 - **Built-in actions**:
-  - Page navigation
+  - Page navigation, drawn with one of five transitions. See [docs/screen-transitions.md](docs/screen-transitions.md)
   - Set a property
   - Show / hide a widget
   - Set text or value

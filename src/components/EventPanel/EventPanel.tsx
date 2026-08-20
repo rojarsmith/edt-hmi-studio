@@ -6,6 +6,7 @@ import { NEXT_LANGUAGE } from '../../types';
 import EventEditDialog from './EventEditDialog';
 import PanelChevron from '../LogicEditor/PanelChevron';
 import LackBadge from '../common/LackBadge';
+import { describeScreenTransition } from '../../utils/screenTransitions';
 import './EventPanel.css';
 
 // LVGL Event type definitions
@@ -188,7 +189,8 @@ const EventPanel: React.FC<EventPanelProps> = ({ screenId }) => {
           // projects — the same fallback the generator applies. `||` rather
           // than `??` because the dialog writes an empty string for a navigate
           // whose screen was never chosen, and that is "Not set", not blank.
-          return `Navigate to: ${event.action.targetScreen || event.action.targetPage || 'Not set'}`;
+          return `Navigate to: ${event.action.targetScreen || event.action.targetPage || 'Not set'}`
+            + ` (${describeScreenTransition(event.action)})`;
         case 'setProperty':
           return `Set property: ${event.action.property || 'Not set'}`;
         case 'show':

@@ -40,28 +40,42 @@ describe('EventPanel — navigate description', () => {
   it('names the screen an event created by the current editor points at', () => {
     selectButtonWith({ type: 'navigate', targetScreen: 'Settings' });
     render(<EventPanel />);
-    expect(screen.getByText('Navigate to: Settings')).toBeInTheDocument();
+    expect(screen.getByText(/Navigate to: Settings/)).toBeInTheDocument();
   });
 
   it('still names it for a project saved before the rename', () => {
     // `targetPage` is all an older project file carries
     selectButtonWith({ type: 'navigate', targetPage: 'Settings' });
     render(<EventPanel />);
-    expect(screen.getByText('Navigate to: Settings')).toBeInTheDocument();
+    expect(screen.getByText(/Navigate to: Settings/)).toBeInTheDocument();
   });
 
   it('prefers the current spelling when a reopened project carries both', () => {
     // Editing an old event writes `targetScreen` and leaves `targetPage` behind
     selectButtonWith({ type: 'navigate', targetScreen: 'Alarms', targetPage: 'Settings' });
     render(<EventPanel />);
-    expect(screen.getByText('Navigate to: Alarms')).toBeInTheDocument();
+    expect(screen.getByText(/Navigate to: Alarms/)).toBeInTheDocument();
+  });
+
+  it('names the transition beside the screen', () => {
+    // Two buttons can reach the same screen and look different doing it, so
+    // the row says which one this is.
+    selectButtonWith({
+      type: 'navigate',
+      targetScreen: 'Settings',
+      transition: 'slide',
+      transitionDirection: 'left',
+      transitionDuration: 250,
+    });
+    render(<EventPanel />);
+    expect(screen.getByText('Navigate to: Settings (Slide Left, 250 ms)')).toBeInTheDocument();
   });
 
   it('says Not set when no screen was chosen', () => {
     // The dialog saves an empty string rather than omitting the field
     selectButtonWith({ type: 'navigate', targetScreen: '' });
     render(<EventPanel />);
-    expect(screen.getByText('Navigate to: Not set')).toBeInTheDocument();
+    expect(screen.getByText(/Navigate to: Not set/)).toBeInTheDocument();
   });
 });
 

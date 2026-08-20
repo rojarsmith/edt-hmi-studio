@@ -81,6 +81,11 @@ rather than input:
 | `LV_EVENT_SCREEN_UNLOAD_START` | As this screen begins to leave |
 | `LV_EVENT_SCREEN_UNLOADED` | The screen has finished leaving |
 
+Only two of the four reach a given screen per change: a screen arriving hears
+the LOAD pair, one leaving hears the UNLOAD pair. How long the gap between
+them is depends on the transition the navigation chose — see
+[screen-transitions.md](./screen-transitions.md).
+
 Two built-in actions drive an animation, available to screens and widgets
 alike: **Play Animation** runs one from the beginning however far a previous
 run had reached — from its stated start, or from wherever the widget is if it

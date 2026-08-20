@@ -39,7 +39,7 @@
 - **視覺化事件編輯器**
 - **支援所有 LVGL 事件**：點擊、長按、值改變、取得焦點等
 - **內建動作**：
-  - 頁面導覽
+  - 頁面導覽，可從五種換頁動畫中挑選。詳見 [docs/zh-TW/screen-transitions.md](docs/zh-TW/screen-transitions.md)
   - 設定屬性
   - 顯示／隱藏元件
   - 設定文字或數值
