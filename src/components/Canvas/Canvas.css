@@ -51,18 +51,27 @@
   border-radius: 4px;
 }
 
-/* Zoom controls */
-.zoom-controls {
+/* The floating controls along the canvas's bottom edge. One row, so a new
+   control is added by putting it in the row rather than by working out an
+   offset that clears whatever happens to be beside it. */
+.canvas-overlay-controls {
   position: absolute;
   bottom: 16px;
   right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 100;
+}
+
+/* Zoom controls */
+.zoom-controls {
   display: flex;
   gap: 4px;
   background: #fff;
   padding: 4px;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 100;
 }
 
 .zoom-controls button {
@@ -102,11 +111,43 @@
   z-index: 1000;
 }
 
+/* Pointer position — same pill as its neighbours, after TouchGFX Designer's
+   readout. The origin is the canvas's top-left corner and the numbers go
+   negative outside it. */
+.mouse-position {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #666;
+  font-size: 13px;
+  /* The pointer is not a target: clicking through it keeps the corner of the
+     canvas usable. */
+  pointer-events: none;
+  user-select: none;
+}
+
+.mouse-position-icon {
+  color: #9aa3ad;
+  flex: none;
+}
+
+.mouse-position-value {
+  /* Tabular figures and a floor on the width: without them the pill resizes on
+     nearly every mouse move, which is far more distracting than the reading is
+     useful. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  min-width: 72px;
+  text-align: right;
+  white-space: nowrap;
+}
+
 /* Language preview — sits beside the zoom controls, same visual weight */
 .language-controls {
-  position: absolute;
-  bottom: 16px;
-  right: 148px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -114,7 +155,6 @@
   padding: 4px 8px;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 100;
 }
 
 .language-controls .language-icon {

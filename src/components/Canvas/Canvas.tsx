@@ -6,6 +6,7 @@ import { resizeBox } from './resizeGeometry';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
 import CanvasComponent from './CanvasComponent';
 import AlignmentGuides from './AlignmentGuides';
+import MousePosition from './MousePosition';
 import ContextMenu, { type ContextMenuItem } from '../ContextMenu';
 import {
   hasClipboard,
@@ -938,32 +939,38 @@ const Canvas: React.FC = () => {
         </div>
       </div>
       
-      {/* Language preview: which column of the text table the canvas renders.
-          One language means nothing to switch, so the control stays hidden. */}
-      {languages.length > 1 && (
-        <div className="language-controls">
-          <span className="language-icon" title="Preview language">🌐</span>
-          <select
-            value={previewLanguage ?? languages[0].code}
-            onChange={(e) => setPreviewLanguage(e.target.value)}
-            title="Preview language"
-          >
-            {languages.map((language) => (
-              <option key={language.code} value={language.code}>
-                {language.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      {/* The floating controls, in one row so that adding another cannot push
+          the others off their hardcoded offsets. */}
+      <div className="canvas-overlay-controls">
+        <MousePosition containerRef={containerRef} canvasRef={canvasRef} />
 
-      {/* Zoom controls */}
-      <div className="zoom-controls">
-        <button onClick={handleZoomOut} title="Zoom Out">−</button>
-        <button className="zoom-level" onClick={handleZoomReset} title="Reset Zoom">
-          {Math.round(canvas.zoom * 100)}%
-        </button>
-        <button onClick={handleZoomIn} title="Zoom In">+</button>
+        {/* Language preview: which column of the text table the canvas renders.
+            One language means nothing to switch, so the control stays hidden. */}
+        {languages.length > 1 && (
+          <div className="language-controls">
+            <span className="language-icon" title="Preview language">🌐</span>
+            <select
+              value={previewLanguage ?? languages[0].code}
+              onChange={(e) => setPreviewLanguage(e.target.value)}
+              title="Preview language"
+            >
+              {languages.map((language) => (
+                <option key={language.code} value={language.code}>
+                  {language.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Zoom controls */}
+        <div className="zoom-controls">
+          <button onClick={handleZoomOut} title="Zoom Out">−</button>
+          <button className="zoom-level" onClick={handleZoomReset} title="Reset Zoom">
+            {Math.round(canvas.zoom * 100)}%
+          </button>
+          <button onClick={handleZoomIn} title="Zoom In">+</button>
+        </div>
       </div>
       
       {/* Context Menu */}
