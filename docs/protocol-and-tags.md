@@ -125,8 +125,8 @@ shape is why [Decision 1 of the logic node taxonomy](./logic-node-taxonomy.md)
 works: a graph says `MotorSpeed`, and the Protocol tab decides whether that is
 holding register 40001 or CAN `0x123.rpm`.
 
-A line-oriented UART command protocol usually is not addressable. It looks
-like:
+A line-oriented UART command protocol is not addressable *in that same way*.
+It looks like:
 
 ```
 > GET TEMP\r\n
@@ -143,6 +143,11 @@ Three things about that have no home in today's tag:
    access mode.
 3. **The reply has to be parsed** — a prefix, a delimiter, a field index, a
    unit suffix. No field expresses that today.
+
+None of that means it *cannot* be addressable, only that it is not addressable
+by accident. [§8](#8-can-a-uart-command-protocol-be-addressable) works out what
+it would take, and concludes that most such protocols can be — through one
+decision about where the command shape lives.
 
 ### Two shapes, and which one to reserve
 
@@ -230,3 +235,195 @@ and expensive once two more protocols reference the same field.
 - **Blocking the switch when bindings exist.** An author retargeting a project
   at a new device is doing something legitimate. Tell them what it costs;
   do not decide for them.
+
+## 8. Can a UART command protocol be addressable?
+
+Short answer: **most of them, yes — and the way to get there is to move the
+command shape up to the connection and leave only an address on the tag.**
+
+### 8.1 What "addressable" actually requires
+
+Not a number. A tag is addressable when it carries a stable key that answers
+two questions: **how do I ask**, and **where in the answer is the value**.
+Under that lens the three protocols are the same shape:
+
+| | How to ask | Where the answer is |
+|---|---|---|
+| **Modbus** | function code, implied by the area | the register at `address` |
+| **CAN** | nothing — the frame arrives on its own | `frameId` + bit window |
+| **UART** | a command line | a position in the reply |
+
+CAN already proves the model has to allow **no request at all**: a receive-only
+tag whose key is purely a locator. That same allowance covers a UART device
+that pushes unsolicited lines, which is otherwise the hardest case to fit.
+
+### 8.2 Which command protocols fit
+
+| Style | Example | Addressable? | The key |
+|---|---|---|---|
+| ASCII register | `RD 40001` / `WR 40001 25` | Yes, directly | the register number |
+| Named parameter | `GET TEMP` / `SET TEMP 30` | Yes | the parameter name |
+| SCPI-like | `MEAS:VOLT?` | Yes | the node path |
+| Bulk reply | `STATUS?` → `25.4,60,1,0` | Yes — this is the CAN case in text | (command, field index) |
+| Binary framed | `STX 03 … ETX` | Yes | (command byte, byte offset + length) |
+| One-shot verb | `TARE`, `REBOOT` | Not a value — model as a write-only tag | the verb |
+| Unsolicited push | device sends `TEMP=25.4` unasked | Yes to decode, no to poll | (match pattern, field) |
+| **Stateful session** | log in, switch mode, then read | **No** | needs a script, not a table |
+
+The last row is the honest limit, and it is worth stating plainly: a protocol
+where a command's meaning depends on what was sent before it is not a table of
+independent tags, and no amount of column-adding makes it one. That case needs
+the escape hatch in §8.7, and the tool should say so rather than contort.
+
+### 8.3 The design: template up, address down
+
+The obvious first attempt — give every tag its own command string — makes a
+register-like device unusable: `RD 40001`, `RD 40002`, `RD 40003`, typed a
+hundred times, each one a chance to mistype the verb.
+
+Put the **shape** on the connection and the **address** on the tag:
+
+| Connection template | Tag's address | Produces |
+|---|---|---|
+| `RD {address}` / `WR {address} {value}` | `40001` | `RD 40001` |
+| `GET {address}` / `SET {address} {value}` | `TEMP` | `GET TEMP` |
+| `{address}?` / `{address} {value}` | `MEAS:VOLT` | `MEAS:VOLT?` |
+
+The tag table then looks **identical for all three protocols** — a name, a
+where, a type, a scale, a poll interval — and only the meaning of the "where"
+column changes. That is what makes a UART tag as addressable as a Modbus one,
+and it is what lets the same widget binding, the same Read Tag node and the
+same poll loop serve all three.
+
+```ts
+type TagSource =
+  | { kind: 'modbus'; area: ModbusRegisterArea; address: number }
+  | { kind: 'can'; frameId: number; startBit: number; bitLength: number; byteOrder: CanByteOrder }
+  | { kind: 'uart';
+      /** Substituted into the connection's templates. */
+      address: string;
+      /** Per-tag overrides, for the tags the templates do not fit. */
+      readCommand?: string;
+      writeCommand?: string;
+      locate?: ReplyLocator;
+    };
+```
+
+The overrides carry the exceptions: a bulk reply shared by several tags, a
+one-shot verb with no address, a single oddly-spelled command on an otherwise
+regular device. **The regular case needs no per-tag command at all.**
+
+### 8.4 Where the answer is: a ladder of locators
+
+A no-code tool should offer these in order, and stop at the first that fits:
+
+| Locator | Fits | Example |
+|---|---|---|
+| **Whole reply** | the reply is the value | `25.4` |
+| **Strip affix** | a labelled value | `TEMP=25.4`, prefix `TEMP=` |
+| **Field** | delimited records | `25.4,60,1`, separator `,`, index 0 |
+| **Bytes** | binary frames | offset 3, length 2, big-endian |
+| **Pattern** | everything else | a regex with one capture group |
+
+The first four are structured fields an author can fill in without knowing what
+a regex is. The fifth is the escape hatch: put it last, label it as such, and
+do not let it become the default answer to a protocol that one of the first
+four would have covered.
+
+A **bulk reply is one request with several locators** — the same relationship
+CAN has between a frame and its signals. That is not a new concept to teach; it
+is the concept CAN already introduced, spelled in text.
+
+### 8.5 What belongs to the connection, not the tag
+
+Getting this boundary right is what stops the tag table growing a column per
+device quirk. These are per-link and belong beside the baud rate:
+
+- **Framing** — how a reply ends: line terminator, fixed length, STX/ETX, or an
+  idle gap. Without it the runtime cannot tell a complete reply from a partial
+  one, and nothing else works.
+- **Checksum** — none, XOR, sum, CRC-16; verified on receive, appended on send.
+- **Echo suppression** — half-duplex links that return what was sent.
+- **Inter-command delay** — devices that need a gap before the next request.
+- **Command templates** — §8.3.
+
+None of these is per-value, and a tag table that carries them is a tag table
+that has to be re-entered for every tag on the device.
+
+### 8.6 What the firmware already has, and what it lacks
+
+The generated descriptor is **already mostly protocol-neutral**. Of its
+thirteen fields, exactly two are Modbus:
+
+| Concern | Fields | Protocol-specific? |
+|---|---|---|
+| Where the value lives | `area`, `address` | **Yes — these two** |
+| What the value is | `data_type`, `access`, `scale`, `poll_ms` | No |
+| What it drives | `object`, `widget`, `property`, `write_behavior`, `write_value`, `value_reader`, `value_writer` | No |
+
+Even the header's one Modbus sentence is confined to a comment: *"Addresses are
+zero-based Modbus PDU addresses."* Replacing those two fields with a tagged
+`source` union is a surgical change to the ABI, not a rewrite.
+
+The runtime is further along than expected too: `hmi_runtime.c` already has a
+**transaction** with a kind, a retry counter and a timeout, and a round-robin
+poll cursor over the bindings. Three things are missing:
+
+1. **A transaction serves exactly one binding.** `hmi_transaction_t` holds a
+   single `hmi_binding_state_t *`. A bulk reply updates several tags from one
+   round trip, so a transaction has to be able to fan out.
+2. **The transport is a concrete global.** `static modbus_rtu_async_client_t
+   g_modbus_client;` — a second protocol needs an interface here, or a second
+   runtime.
+3. **Widget descriptors are per binding, not per tag.** Three widgets showing
+   one tag generate three descriptors and three round trips. The logic side
+   already deduplicates: `collectLogicHoldingRegisterAddresses` collects into a
+   `Set`.
+
+Point 3 changes character under a command protocol. A Modbus RTU read at 9600
+baud is a few milliseconds; an ASCII request and its reply, with an
+inter-command gap, is tens of milliseconds. Three widgets on one tag at 250 ms
+therefore go from *wasteful* to *impossible*. **Coalescing stops being an
+optimisation and becomes a requirement**, and the natural unit to coalesce on is
+the tag — another reason for widgets to reference tags rather than carry
+snapshots (§1).
+
+### 8.7 The escape hatch, and when to reach for it
+
+For protocols the table cannot express — a login handshake, a mode that changes
+what a command means, length-prefixed variable records — the honest answer is a
+generated hook rather than another column. The generator already emits
+`USER_CODE_START` / `USER_CODE_END` markers that survive regeneration; a UART
+transport can expose the same seam: *here is the line that arrived, here is
+where to put the value*.
+
+A tool that says "this protocol needs code, and here is where to write it" is
+more useful than one that grows a checkbox per device.
+
+### 8.8 Recommendation
+
+**Yes, design it as addressable** — for a device whose protocol is
+register-like, named-parameter or SCPI-like, which is most industrial serial
+equipment. The shape to reserve:
+
+1. **Command templates on the connection**, an address string on the tag. This
+   single decision is what keeps the tag table one table.
+2. **A locator ladder**, structured first and regex last.
+3. **Framing and checksum at the connection**, never per tag.
+4. **Per-tag command overrides** for the exceptions, so the regular case stays
+   empty.
+5. **A transaction that can fan out to several tags**, because bulk replies and
+   coalescing both need it.
+
+What to decide **now**: only the shape above, and only far enough to stop
+`modbusBinding` becoming a three-way fork (§6 step 4). What to decide **with a
+real device in hand**: the locator vocabulary, the framing options and the
+checksum list — these should be written against a protocol that exists. A
+locator ladder invented against an imagined device will have exactly the wrong
+four rungs.
+
+And the test for whether this route is right at all, applied to whatever device
+turns up: **can every value the screen needs be named, asked for independently,
+and found in a reply without remembering what was asked before?** If yes, it is
+addressable and belongs in the tag table. If no, it needs the escape hatch, and
+forcing it into the table would cost more than writing the code.
