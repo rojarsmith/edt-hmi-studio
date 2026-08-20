@@ -99,6 +99,36 @@ quietly unbind every button that plays it.
 An animation nothing binds simply never runs. That is what lets one be
 reserved for a button while the screen's entry animations play on load.
 
+### An animation is a trigger too
+
+An animation carries its own **Events** category, with one event in it: it has
+finished. That is the only thing an animation itself can announce — started is
+its delay, and repeated is its repeat count. What follows can be anything the
+other categories offer, which is what makes a sequence expressible:
+
+- Play the exit animation, and **when it has finished**, change screen. A
+  navigation happens at once, so without this it cuts its own exit animation
+  off part way.
+- Play the next animation, so two run one after the other without either
+  needing to know how long the one before it takes.
+
+LVGL has no event for this. An animation finishing is a callback on the
+animation — `lv_anim_set_completed_cb` — not an event on an object, so the
+binding compiles to that callback rather than to `lv_obj_add_event_cb`.
+Starting another animation or loading another screen from inside it is safe:
+LVGL removes the animation from its list before calling the callback, and its
+timer notices the list changed and walks it again.
+
+Exactly one of an animation's tracks carries the callback. They share one
+clock and end together, so any of them would do — but one of them has to, or
+an animation driving two properties would announce itself twice.
+
+Two things follow from the semantics rather than the implementation. **Stop
+Animation does not finish it**: `lv_anim_delete` is a deletion, not a
+completion, so nothing bound here runs. And a chain that leads back to where it
+started is a loop rather than a mistake — two animations that play each other
+alternate for as long as the screen is up.
+
 ### Parking
 
 The starting place still has to be restored automatically. A widget keeps

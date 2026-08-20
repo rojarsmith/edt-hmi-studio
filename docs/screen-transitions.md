@@ -99,6 +99,12 @@ screen partly visible while it travels, and its entry animation does not start
 until it has arrived. The widgets sit still through the transition and then
 move. At 300 ms this is hard to see; at 500 ms it is obvious.
 
+Going the other way — playing an **exit** animation before the change — is a
+binding on the animation rather than on the button: navigation happens at once
+and would cut its own exit animation off part way. Bind the navigation to the
+animation's **Animation Finished** event instead; see
+[animation-model.md](./animation-model.md).
+
 ## What is deliberately absent
 
 - **Per-screen defaults.** A screen cannot declare "I am always entered by
