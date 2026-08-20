@@ -30,6 +30,11 @@ import {
 } from '../services/hmiApi';
 import { useWorkStore } from './workStore';
 import {
+  describeBuildLine,
+  describeFlashLine,
+  OUTCOMES,
+} from './deployPhases';
+import {
   DEFAULT_BOARD_ID,
   DEFAULT_PROTOCOL_ID,
   type BoardId,
@@ -213,7 +218,8 @@ export const useDeployStore = create<DeployState>((set, get) => ({
       const stopStreaming = subscribeBuildLog(runId, (line) => {
         streamed += 1;
         append(line);
-        work.note(buildWorkId, line);
+        // The log pane keeps the line; Work gets the phase it implies.
+        work.note(buildWorkId, describeBuildLine(line));
       });
 
       let result;
@@ -232,7 +238,11 @@ export const useDeployStore = create<DeployState>((set, get) => ({
           ? 'Firmware build stopped.'
           : `Firmware build failed: ${result.error || 'Unknown error'}`;
         append(message);
-        work.finish(buildWorkId, stopped ? 'cancelled' : 'failed', message);
+        work.finish(
+          buildWorkId,
+          stopped ? 'cancelled' : 'failed',
+          stopped ? OUTCOMES.buildStopped : OUTCOMES.buildFailed,
+        );
         workId = null;
         return;
       }
@@ -252,16 +262,16 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         ? `Firmware build complete, buildId: ${result.buildId}`
         : 'Firmware build complete.';
       append(done);
-      work.finish(buildWorkId, 'succeeded', done);
+      work.finish(buildWorkId, 'succeeded', OUTCOMES.buildSucceeded);
       workId = null;
     } catch (error) {
       const message = `Firmware build failed: ${error instanceof Error ? error.message : String(error)}`;
       append(message);
-      if (workId !== null) work.finish(workId, 'failed', message);
+      if (workId !== null) work.finish(workId, 'failed', OUTCOMES.buildFailed);
       workId = null;
     } finally {
       // A work item must never be left running by a path that forgot it.
-      if (workId !== null) work.finish(workId, 'failed', 'Firmware build ended unexpectedly.');
+      if (workId !== null) work.finish(workId, 'failed', OUTCOMES.buildFailed);
       set({ busy: null });
     }
   },
@@ -282,26 +292,33 @@ export const useDeployStore = create<DeployState>((set, get) => ({
     // slow one. See docs/work-progress.md.
     const work = useWorkStore.getState();
     const workId = work.start('Flash & Reset', { cancellable: false });
+    work.note(workId, { label: 'Connecting to the board' });
     let settled = false;
 
     try {
       const probeSerial = ports.find((port) => port.path === runtimePort)?.probeSerial;
-      work.note(workId, `Writing ${buildId} over SWD...`);
       const result = await flashHmiBuild(buildId, probeSerial);
       append(result.log);
+      // Flashing answers in one go, so its phases are read back from the log
+      // it returns rather than as they happen.
+      for (const line of result.log) work.note(workId, describeFlashLine(line));
       const message = result.success
         ? 'Firmware flashed and device reset.'
         : `Firmware flashing failed: ${result.error || 'Unknown error'}`;
       append(message);
-      work.finish(workId, result.success ? 'succeeded' : 'failed', message);
+      work.finish(
+        workId,
+        result.success ? 'succeeded' : 'failed',
+        result.success ? OUTCOMES.flashSucceeded : OUTCOMES.flashFailed,
+      );
       settled = true;
     } catch (error) {
       const message = `Firmware flashing failed: ${error instanceof Error ? error.message : String(error)}`;
       append(message);
-      work.finish(workId, 'failed', message);
+      work.finish(workId, 'failed', OUTCOMES.flashFailed);
       settled = true;
     } finally {
-      if (!settled) work.finish(workId, 'failed', 'Flashing ended unexpectedly.');
+      if (!settled) work.finish(workId, 'failed', OUTCOMES.flashFailed);
       set({ busy: null });
     }
   },

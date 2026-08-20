@@ -50,25 +50,14 @@ interface WorkState {
 
   start: (name: string, options?: { cancellable?: boolean; cancel?: () => void }) => number;
   update: (id: number, patch: Partial<Omit<WorkItem, 'id' | 'name' | 'startedAt'>>) => void;
-  /** Records the most recent output line, and any count it carries. */
-  note: (id: number, detail: string) => void;
+  /**
+   * Advances an item's phase and count. The caller decides what a line means:
+   * nothing here knows about compilers, and nothing raw should be passed in.
+   * See deployPhases.ts.
+   */
+  note: (id: number, update: { label?: string; progress?: WorkProgress }) => void;
   finish: (id: number, status: Exclude<WorkStatus, 'running'>, detail?: string) => void;
   clearFinished: () => void;
-}
-
-/**
- * Ninja counts its own work: `[263/585] Building C object ...`. Reading it back
- * out of the log costs nothing and turns an indeterminate bar into a real one.
- */
-const NINJA_PROGRESS = /^\[(\d+)\/(\d+)\]/;
-
-export function parseProgress(line: string): WorkProgress | null {
-  const match = NINJA_PROGRESS.exec(line.trim());
-  if (!match) return null;
-  const done = Number(match[1]);
-  const total = Number(match[2]);
-  if (!Number.isFinite(done) || !Number.isFinite(total) || total <= 0) return null;
-  return { done: Math.min(done, total), total };
 }
 
 export const useWorkStore = create<WorkState>((set) => ({
@@ -84,7 +73,7 @@ export const useWorkStore = create<WorkState>((set) => ({
         name,
         startedAt: Date.now(),
         status: 'running',
-        detail: 'Starting...',
+        detail: 'Starting',
         cancellable: options?.cancellable ?? false,
         cancel: options?.cancel,
       };
@@ -99,15 +88,16 @@ export const useWorkStore = create<WorkState>((set) => ({
       items: state.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
     })),
 
-  note: (id, detail) =>
+  note: (id, update) =>
     set((state) => ({
       items: state.items.map((item) => {
         if (item.id !== id) return item;
-        const progress = parseProgress(detail);
         return {
           ...item,
-          detail,
-          progress: progress ?? item.progress,
+          // A line that says nothing new leaves the phase where it was, which
+          // is why an unrecognised line can never surface.
+          detail: update.label ?? item.detail,
+          progress: update.progress ?? item.progress,
         };
       }),
     })),

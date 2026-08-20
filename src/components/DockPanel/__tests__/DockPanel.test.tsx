@@ -81,6 +81,8 @@ describe('DockPanel', () => {
     const lamp = container.querySelector('.dock-running-lamp');
     expect(lamp).toBeInTheDocument();
     expect(lamp).toHaveAttribute('aria-label', 'Build Firmware is running');
+    // On the Work tab itself, which is the tab that answers what it raises.
+    expect(screen.getByRole('tab', { name: /Work/ })).toContainElement(lamp as HTMLElement);
 
     useDeployStore.setState({ busy: null });
     rerender(<DockPanel />);

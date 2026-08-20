@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { parseProgress, useWorkStore } from '../workStore';
+import { useWorkStore } from '../workStore';
 
 beforeEach(() => {
   useWorkStore.setState({ items: [], nextId: 1 });
@@ -25,33 +25,39 @@ describe('work history', () => {
     expect(item.endedAt).toBeGreaterThanOrEqual(item.startedAt);
   });
 
-  it('reads a determinate count out of the build output', () => {
+  it('takes the phase and count its caller worked out', () => {
     const id = useWorkStore.getState().start('Build Firmware');
 
-    useWorkStore.getState().note(id, '-- The ASM compiler identification is GNU');
+    useWorkStore.getState().note(id, { label: 'Setting up the build' });
+    expect(useWorkStore.getState().items[0].detail).toBe('Setting up the build');
     expect(useWorkStore.getState().items[0].progress).toBeUndefined();
 
-    useWorkStore.getState().note(id, '[263/585] Building C object lvgl/...');
+    useWorkStore.getState().note(id, {
+      label: 'Compiling your screens',
+      progress: { done: 263, total: 585 },
+    });
     expect(useWorkStore.getState().items[0].progress).toEqual({ done: 263, total: 585 });
-    expect(useWorkStore.getState().items[0].detail).toContain('[263/585]');
   });
 
-  it('keeps the last known count when later lines carry none', () => {
+  it('holds the phase and the count when an update carries neither', () => {
+    // Which is what stops an unrecognised line from surfacing: the caller
+    // reports nothing and the row simply does not change.
     const id = useWorkStore.getState().start('Build Firmware');
-    useWorkStore.getState().note(id, '[10/20] Building');
-    useWorkStore.getState().note(id, 'Firmware artifacts:');
+    useWorkStore.getState().note(id, { label: 'Compiling images', progress: { done: 10, total: 20 } });
+    useWorkStore.getState().note(id, {});
 
+    expect(useWorkStore.getState().items[0].detail).toBe('Compiling images');
     expect(useWorkStore.getState().items[0].progress).toEqual({ done: 10, total: 20 });
   });
 
   it('fills the bar on success and leaves it where it stopped otherwise', () => {
     const ok = useWorkStore.getState().start('Build Firmware');
-    useWorkStore.getState().note(ok, '[300/585] Building');
+    useWorkStore.getState().note(ok, { progress: { done: 300, total: 585 } });
     useWorkStore.getState().finish(ok, 'succeeded');
     expect(useWorkStore.getState().items[0].progress).toEqual({ done: 585, total: 585 });
 
     const stopped = useWorkStore.getState().start('Build Firmware');
-    useWorkStore.getState().note(stopped, '[42/585] Building');
+    useWorkStore.getState().note(stopped, { progress: { done: 42, total: 585 } });
     useWorkStore.getState().finish(stopped, 'cancelled');
     // A build stopped at 42 should still say 42.
     expect(useWorkStore.getState().items[0].progress).toEqual({ done: 42, total: 585 });
@@ -79,23 +85,5 @@ describe('work history', () => {
     const items = useWorkStore.getState().items;
     expect(items).toHaveLength(1);
     expect(items[0].name).toBe('Flash & Reset');
-  });
-});
-
-describe('parseProgress', () => {
-  it('reads Ninja counters', () => {
-    expect(parseProgress('[1/585] Building C object')).toEqual({ done: 1, total: 585 });
-    expect(parseProgress('  [585/585] Linking')).toEqual({ done: 585, total: 585 });
-  });
-
-  it('ignores anything that is not one', () => {
-    expect(parseProgress('Firmware build complete')).toBeNull();
-    expect(parseProgress('[stderr]')).toBeNull();
-    expect(parseProgress('[0/0] nothing to do')).toBeNull();
-  });
-
-  it('will not report more done than there is', () => {
-    // A counter that overshoots would push the bar past its own end.
-    expect(parseProgress('[600/585] Building')).toEqual({ done: 585, total: 585 });
   });
 });

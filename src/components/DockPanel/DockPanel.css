@@ -76,14 +76,15 @@
   color: #ffffff;
 }
 
-/* One lamp for the whole dock, at the right of the strip. It breathes rather
-   than blinks: a blink demands attention, and a build that takes two minutes
-   should not demand attention for two minutes. Visible while collapsed, which
-   is the case it exists for. */
+/* Sits on the Work tab, just after its label - the tab that would answer the
+   question the lamp raises. It breathes rather than blinks: a blink demands
+   attention, and a build that takes two minutes should not demand attention for
+   two minutes. Visible while the dock is collapsed, which is the case it exists
+   for. */
 .dock-running-lamp {
-  width: 8px;
-  height: 8px;
-  margin-right: 8px;
+  width: 7px;
+  height: 7px;
+  margin-left: 1px;
   border-radius: 50%;
   background: #ff5f56;
   box-shadow: 0 0 6px rgba(255, 95, 86, 0.75);

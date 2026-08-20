@@ -106,21 +106,21 @@ const DockPanel: React.FC = () => {
             onClick={() => setActivePane(pane.id)}
           >
             {pane.label}
+            {/* On the Work tab itself rather than off at the strip's end: the
+                lamp is about what Work lists, and it reads as belonging to the
+                tab that would answer it. */}
+            {pane.id === 'work' && runningName && (
+              <span
+                className="dock-running-lamp"
+                role="status"
+                aria-label={`${runningName} is running`}
+                title={`${runningName} is running`}
+              />
+            )}
           </button>
         ))}
 
         <div className="dock-tabs-end">
-          {/* One lamp for the whole dock rather than a mark per tab: what a
-              reader needs from a collapsed strip is "something is running",
-              and the Work pane says which. */}
-          {runningName && (
-            <span
-              className="dock-running-lamp"
-              role="status"
-              aria-label={`${runningName} is running`}
-              title={`${runningName} is running`}
-            />
-          )}
           <button
             type="button"
             className="dock-toggle"
