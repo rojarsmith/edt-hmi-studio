@@ -33,7 +33,7 @@ function component(id: string, name: string): LvglComponent {
 function node(params: Record<string, unknown>): LogicNode {
   return {
     id: 'n1',
-    type: 'action',
+    type: 'screen',
     subType: 'set_property',
     label: 'Set Property',
     position: { x: 0, y: 0 },
@@ -52,6 +52,9 @@ function show(logicNode: LogicNode) {
         data={{ logicNode } as never}
         selected={false}
         dragging={false}
+        draggable={false}
+        selectable={false}
+        deletable={false}
         zIndex={0}
         isConnectable
         positionAbsoluteX={0}
