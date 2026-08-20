@@ -26,6 +26,11 @@ import {
   normalizeLinePoints,
   orientedLinePoints,
 } from '../../utils/lineGeometry';
+import {
+  MIN_POLYGON_POINTS,
+  isConvexPolygon,
+  normalizePolygonPoints,
+} from '../../utils/polygonGeometry';
 import type { CircleShape } from '../../utils/circleGeometry';
 import {
   DEFAULT_END_ANGLE,
@@ -2498,6 +2503,9 @@ function renderComponentProps(
     case 'circle':
       return <CircleEditor props={props} onChange={onChange} />;
 
+    case 'polygon':
+      return <PolygonEditor props={props} onChange={onChange} />;
+
     case 'dropdown':
       return (
         <div className="property-section">
@@ -3946,6 +3954,137 @@ function CircleEditor({
   );
 }
 
+/**
+ * A polygon's own settings: the outline, and the points it is drawn from.
+ *
+ * The fill is not here. It is the Style section's background, the same one a
+ * rectangle fills with, because that is what the generated code reads — a
+ * second colour field would be a second answer to one question.
+ */
+function PolygonEditor({
+  props,
+  onChange,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  props: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+}): React.ReactNode {
+  const points = normalizePolygonPoints(props.points);
+  const lineWidth = props.lineWidth ?? DEFAULT_LINE_WIDTH;
+  const convex = isConvexPolygon(points);
+
+  const updatePoint = (index: number, axis: 0 | 1, value: number) => {
+    onChange(
+      'points',
+      points.map((p, i) => (i === index ? (axis === 0 ? [value, p[1]] : [p[0], value]) : [...p])),
+    );
+  };
+
+  // A new corner goes on the closing edge — between the last point and the
+  // first — which is the edge the list does not show.
+  const addPoint = () => {
+    const last = points[points.length - 1];
+    const first = points[0];
+    onChange('points', [...points, [(last[0] + first[0]) / 2, (last[1] + first[1]) / 2]]);
+  };
+
+  const removePoint = (index: number) => {
+    if (points.length <= MIN_POLYGON_POINTS) return;
+    onChange('points', points.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="property-section">
+      <div className="section-header">Polygon</div>
+      <p className="field-hint">
+        The points close into a shape: the last one joins the first. The fill is
+        the Style section's background.
+      </p>
+      {!convex && (
+        <p className="shape-warning">
+          This outline turns back on itself, so it is drawn unfilled — here, in
+          the preview and on the panel alike. LVGL fills a shape with triangles,
+          which cover a convex outline only.
+        </p>
+      )}
+      <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+        <label>Outline Width: {lineWidth}px</label>
+        <input
+          type="range"
+          min={0}
+          max={20}
+          value={lineWidth}
+          onChange={(e) => onChange('lineWidth', parseInt(e.target.value) || 0)}
+        />
+      </div>
+      <div className="property-row">
+        <label>Outline Color</label>
+        <div className="color-input-wrapper">
+          <input
+            type="color"
+            value={props.lineColor || '#333333'}
+            onChange={(e) => onChange('lineColor', e.target.value)}
+          />
+          <input
+            type="text"
+            value={props.lineColor || '#333333'}
+            onChange={(e) => onChange('lineColor', e.target.value)}
+            className="color-text"
+          />
+        </div>
+      </div>
+      <div className="property-row">
+        <label title="Rounds the corners of the outline by half its width, as lv_obj_set_style_line_rounded does">
+          Rounded Corners
+        </label>
+        <input
+          type="checkbox"
+          checked={!!props.lineRounded}
+          onChange={(e) => onChange('lineRounded', e.target.checked)}
+          aria-label="Rounded Corners"
+        />
+      </div>
+      <CollapsibleSection title={`Points (${points.length})`} defaultOpen>
+        <div className="shape-points-list">
+          {points.map((pt, i) => (
+            <div key={i} className="shape-point-row">
+              <span className="shape-point-index">{i + 1}</span>
+              <div className="shape-point-fields">
+                <label htmlFor={`polygon-point-${i}-x`}>X</label>
+                <NumberField
+                  id={`polygon-point-${i}-x`}
+                  value={pt[0]}
+                  className="shape-point-input"
+                  onChange={(value) => updatePoint(i, 0, value)}
+                />
+                <label htmlFor={`polygon-point-${i}-y`}>Y</label>
+                <NumberField
+                  id={`polygon-point-${i}-y`}
+                  value={pt[1]}
+                  className="shape-point-input"
+                  onChange={(value) => updatePoint(i, 1, value)}
+                />
+              </div>
+              {points.length > MIN_POLYGON_POINTS && (
+                <button
+                  className="shape-point-delete"
+                  onClick={() => removePoint(i)}
+                  title="Delete"
+                  aria-label={`Delete point ${i + 1}`}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          <button className="shape-point-add" onClick={addPoint}>+ Add Point</button>
+        </div>
+      </CollapsibleSection>
+    </div>
+  );
+}
+
 function LineEditor({
   props,
   onChange,
@@ -4068,32 +4207,32 @@ function LineEditor({
         </div>
       </div>
       <CollapsibleSection title={`Points (${points.length})`} defaultOpen>
-        <div className="line-points-list">
+        <div className="shape-points-list">
           {points.map((pt, i) => (
-            <div key={i} className="line-point-row">
-              <span className="line-point-index">{i + 1}</span>
-              <div className="line-point-fields">
+            <div key={i} className="shape-point-row">
+              <span className="shape-point-index">{i + 1}</span>
+              <div className="shape-point-fields">
                 <label>X</label>
                 <input
                   type="number"
                   value={pt[0]}
                   onChange={(e) => updatePoint(i, 0, parseInt(e.target.value) || 0)}
-                  className="line-point-input"
+                  className="shape-point-input"
                 />
                 <label>Y</label>
                 <input
                   type="number"
                   value={pt[1]}
                   onChange={(e) => updatePoint(i, 1, parseInt(e.target.value) || 0)}
-                  className="line-point-input"
+                  className="shape-point-input"
                 />
               </div>
               {points.length > 2 && (
-                <button className="line-point-delete" onClick={() => removePoint(i)} title="Delete">✕</button>
+                <button className="shape-point-delete" onClick={() => removePoint(i)} title="Delete">✕</button>
               )}
             </div>
           ))}
-          <button className="line-point-add" onClick={addPoint}>+ Add Point</button>
+          <button className="shape-point-add" onClick={addPoint}>+ Add Point</button>
         </div>
       </CollapsibleSection>
     </div>
