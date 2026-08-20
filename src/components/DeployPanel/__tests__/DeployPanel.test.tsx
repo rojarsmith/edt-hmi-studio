@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import DeployPanel from '../DeployPanel';
+import { useDeployStore } from '../../../store/deployStore';
 
 const mocks = vi.hoisted(() => ({
   getProjectConfig: vi.fn(),
@@ -8,18 +9,29 @@ const mocks = vi.hoisted(() => ({
   exportProject: vi.fn(),
   flushProjectConfigWrites: vi.fn(),
   getHmiCapabilities: vi.fn(),
+  getHmiImageLayout: vi.fn(),
   listHmiPorts: vi.fn(),
   buildHmiProject: vi.fn(),
   flashHmiBuild: vi.fn(),
 }));
 
+/**
+ * The panel reads these through hooks and deployStore reads the same modules
+ * through getState(), so a stand-in has to answer to both.
+ */
+const fakeStore = vi.hoisted(() => <T,>(state: T) => {
+  const hook = (selector?: (value: T) => unknown) =>
+    (selector ? selector(state) : state);
+  hook.getState = () => state;
+  return hook;
+});
+
 vi.mock('../../../store/appStore', () => ({
-  useAppStore: (selector: (state: { currentProjectId: string }) => unknown) =>
-    selector({ currentProjectId: 'project-1' }),
+  useAppStore: fakeStore({ currentProjectId: 'project-1', factoryDevMode: false }),
 }));
 
 vi.mock('../../../store/projectStore', () => ({
-  useProjectStore: () => ({
+  useProjectStore: fakeStore({
     getProjectConfig: mocks.getProjectConfig,
     saveProjectData: mocks.saveProjectData,
     exportProject: mocks.exportProject,
@@ -28,25 +40,20 @@ vi.mock('../../../store/projectStore', () => ({
 }));
 
 vi.mock('../../../store/editorStore', () => ({
-  useEditorStore: (
-    selector: (state: { screens: unknown[] }) => unknown,
-  ) => selector({ screens: [] }),
+  useEditorStore: fakeStore({ screens: [], animations: [] }),
 }));
 
 vi.mock('../../../resources', () => ({
-  useResourceStore: (
-    selector: (state: { images: unknown[]; fonts: unknown[] }) => unknown,
-  ) => selector({ images: [], fonts: [] }),
+  useResourceStore: fakeStore({ images: [], fonts: [] }),
 }));
 
 vi.mock('../../LogicEditor', () => ({
-  useLogicEditorStore: (
-    selector: (state: { graphs: unknown[] }) => unknown,
-  ) => selector({ graphs: [] }),
+  useLogicEditorStore: fakeStore({ graphs: [] }),
 }));
 
 vi.mock('../../../services/hmiApi', () => ({
   getHmiCapabilities: mocks.getHmiCapabilities,
+  getHmiImageLayout: mocks.getHmiImageLayout,
   listHmiPorts: mocks.listHmiPorts,
   buildHmiProject: mocks.buildHmiProject,
   flashHmiBuild: mocks.flashHmiBuild,
@@ -71,6 +78,18 @@ async function buildWithLog(log: string[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The store outlives the component now, so each test starts from a clean one.
+  useDeployStore.setState({
+    loadedProjectId: null,
+    busy: null,
+    buildId: '',
+    artifactUrl: '',
+    layout: null,
+    buildLog: [],
+    flashLog: [],
+    ports: [],
+    capabilities: null,
+  });
   mocks.getProjectConfig.mockResolvedValue(projectConfig);
   mocks.flushProjectConfigWrites.mockResolvedValue(undefined);
   mocks.saveProjectData.mockResolvedValue(undefined);
@@ -84,10 +103,6 @@ beforeEach(() => {
     success: true,
     ports: [],
     log: [],
-  });
-  Object.defineProperty(navigator, 'clipboard', {
-    configurable: true,
-    value: undefined,
   });
 });
 
@@ -106,7 +121,7 @@ describe('DeployPanel build', () => {
 
     // The build must not export settings the user typed but that are still
     // sitting in the Protocol tab's debounce.
-    expect(order.indexOf('flush')).toBeLessThan(order.indexOf('export'));
+    expect(order.lastIndexOf('flush')).toBeLessThan(order.indexOf('export'));
   });
 
   it('refuses to build a project whose protocol has no firmware support', async () => {
@@ -125,64 +140,43 @@ describe('DeployPanel build', () => {
   });
 });
 
-describe('DeployPanel build and flash log', () => {
-  it('copies every log entry in display order and reports success', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
+describe('DeployPanel state outlives the panel', () => {
+  it('keeps the build id when the tab is left and re-entered', async () => {
+    mocks.buildHmiProject.mockResolvedValue({
+      success: true,
+      log: ['compiling'],
+      buildId: 'build-42',
     });
 
-    await buildWithLog(['First log entry', 'Second log entry']);
+    const first = render(<DeployPanel />);
+    const build = await screen.findByRole('button', { name: 'Build Firmware' });
+    await waitFor(() => expect(build).toBeEnabled());
+    fireEvent.click(build);
+    await waitFor(() => expect(useDeployStore.getState().buildId).toBe('build-42'));
 
-    const copyButton = await screen.findByRole('button', {
-      name: 'Copy build and flash log',
-    });
-    await waitFor(() => expect(copyButton).toBeEnabled());
-    fireEvent.click(copyButton);
-
-    await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith(
-        'First log entry\nSecond log entry\nFirmware build complete.',
-      );
-    });
-    expect(await screen.findByRole('status')).toHaveTextContent('Copied 3 log entries.');
-  });
-
-  it('disables copy and clear when there are no log entries', async () => {
+    // Switching tabs unmounts the panel; the build must not go with it, or
+    // Flash & Reset has nothing to flash. See docs/bottom-dock-panel.md §3.
+    first.unmount();
     render(<DeployPanel />);
 
-    const copyButton = await screen.findByRole('button', {
-      name: 'Copy build and flash log',
-    });
-    const clearButton = screen.getByRole('button', {
-      name: 'Clear build and flash log',
-    });
-
-    expect(copyButton).toBeDisabled();
-    expect(copyButton).toHaveAttribute('title', 'No log entries to copy');
-    expect(clearButton).toBeDisabled();
-    expect(clearButton).toHaveAttribute('title', 'No log entries to clear');
+    await waitFor(() =>
+      expect(screen.getByText('Build ID: build-42')).toBeInTheDocument(),
+    );
+    expect(useDeployStore.getState().buildLog).toContain('compiling');
   });
 
-  it('reports clipboard failures without changing the displayed log', async () => {
-    const writeText = vi.fn().mockRejectedValue(new Error('Permission denied'));
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
+  it('clears the build when a different project is opened', async () => {
+    useDeployStore.setState({
+      loadedProjectId: 'project-0',
+      buildId: 'stale-build',
+      buildLog: ['from the other project'],
     });
 
-    await buildWithLog(['Log entry that must remain visible']);
+    render(<DeployPanel />);
 
-    const copyButton = await screen.findByRole('button', {
-      name: 'Copy build and flash log',
-    });
-    await waitFor(() => expect(copyButton).toBeEnabled());
-    fireEvent.click(copyButton);
-
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Could not copy the log. Check clipboard permissions and try again.',
+    await waitFor(() => expect(useDeployStore.getState().buildId).toBe(''));
+    expect(useDeployStore.getState().buildLog).not.toContain(
+      'from the other project',
     );
-    expect(screen.getByText(/Log entry that must remain visible/)).toBeInTheDocument();
   });
 });

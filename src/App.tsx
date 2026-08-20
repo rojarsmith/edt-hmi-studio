@@ -15,6 +15,7 @@ import AnimationPanel from './components/AnimationPanel';
 import ScreenTabs from './components/ScreenTabs';
 import ScreenManager from './components/ScreenManager';
 import StatusBar from './components/StatusBar';
+import DockPanel from './components/DockPanel';
 import AlignToolbar from './components/AlignToolbar';
 import HelpPanel from './components/HelpPanel';
 import AboutDialog from './components/AboutDialog';
@@ -42,6 +43,8 @@ import {
 import { useEditorStore } from './store/editorStore';
 import { useAppStore, parseFontSize } from './store/appStore';
 import { useProjectStore } from './store/projectStore';
+import { useDeployStore } from './store/deployStore';
+import { useDockStore } from './store/dockStore';
 import type { LvglComponent, Screen } from './types';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { getComponentDefinition } from './utils/componentDefinitions';
@@ -194,6 +197,17 @@ const EditorView: React.FC<EditorViewProps> = ({
   const effectiveTab: TabType = (activeTab === 'code' || activeTab === 'icon') && !factoryDevMode
     ? 'design'
     : activeTab;
+  // The bottom dock follows the Deploy tab, but a running build outranks that:
+  // the moment the panel is most useful is the moment the author switches away
+  // from it. It stays up until the operation ends, then follows the tab again.
+  // See docs/bottom-dock-panel.md §6.
+  const deployBusy = useDeployStore(s => s.busy);
+  const dockVisible = effectiveTab === 'deploy' || deployBusy !== null;
+  const setDockExpanded = useDockStore(s => s.setExpanded);
+  useEffect(() => {
+    if (effectiveTab === 'deploy') setDockExpanded(true);
+  }, [effectiveTab, setDockExpanded]);
+
   const [previewMode, setPreviewMode] = useState<'simple' | 'wasm' | 'compile'>('simple');
   const resolvedPreviewMode = !isCompilePreviewEnabled && previewMode === 'compile'
     ? 'simple'
@@ -654,6 +668,8 @@ const EditorView: React.FC<EditorViewProps> = ({
       </div>
 
       {renderMainContent()}
+
+      <DockPanel visible={dockVisible} />
 
       <StatusBar />
 

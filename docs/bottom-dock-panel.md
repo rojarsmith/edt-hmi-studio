@@ -4,8 +4,9 @@
   <strong>English</strong> · <a href="./zh-TW/bottom-dock-panel.md">繁體中文</a>
 </p>
 
-Status: **planning only. No code has been changed.** Verified against the
-source, not from memory.
+Status: **evaluated, then built.** §1–§9 are the evaluation as written before
+any code existed; §10 records what was implemented and where the evaluation was
+wrong. Verified against the source, not from memory.
 
 The proposal: imitate Visual Studio's bottom tool-window strip — a collapsible,
 resizable panel occupying the horizontal band **above the status bar**, holding
@@ -153,3 +154,52 @@ in-flight `fetch` and unmount timing.
 3. **Whether the dock may stay visible off the Deploy tab while an operation
    runs** (§6). Saying no is a legitimate choice; it just has to be made
    deliberately, because it decides whether §3's defect gets fixed.
+
+## 10. What was built
+
+All three decisions of §9 were taken as recommended: **B**, **(a)**, and the
+amended visibility rule. What landed:
+
+| File | Role |
+|---|---|
+| `src/store/deployStore.ts` | The operation state and the operations themselves. `runBuild` / `runFlash` read their inputs through `getState()` rather than closing over React state, so nothing depends on a mounted component |
+| `src/store/dockStore.ts` | Dock chrome only — expanded, active pane, height (in `localStorage`) |
+| `src/components/DockPanel/DockPanel.tsx` | The shell: tab strip, collapse, drag-resize |
+| `src/components/DockPanel/DeployLogPane.tsx` | One pane, parameterised by which log it shows and which operation its toolbar runs |
+| `src/App.tsx` | Renders the dock between `renderMainContent()` and `<StatusBar />`, and owns the visibility rule |
+
+Three things worth recording because they are not obvious from §1–§9.
+
+**The visibility rule is one expression.** `effectiveTab === 'deploy' ||
+deployBusy !== null` — the Deploy tab shows it, and a running operation outranks
+the tab. It does not auto-close when the operation ends off-tab: the moment a
+build finishes is the moment its last lines matter most, so the dock stays until
+the author leaves Deploy again with nothing running.
+
+**Collapsed and hidden turned out to be the same control, split by owner.**
+`dockStore.expanded` is the author's choice, and is expanded-versus-tab-strip.
+Hidden is not stored at all: it is `visible`, which `App` derives. Measured: the
+dock is 220 px expanded, 30 px collapsed, absent when hidden, and `.app-body`
+absorbs the difference each time with the status bar never moving.
+
+**§7's max-height clamp was wrong the first time, in a way worth keeping.** The
+first attempt clamped against `window.innerHeight - 240`, which quietly ignores
+the header and the status bar: at a 720 px window it left the workspace 127 px,
+not 240 px. The fix measures the band the workspace and the dock actually share
+— from the top of `.app-body` to the top of `.status-bar` — and subtracts the
+minimum from that. The lesson generalises: a constant named for the workspace
+has to be subtracted from the workspace, not from the window.
+
+Verified in the browser, by measured geometry rather than by eye: hidden on the
+Design tab with `.app-body` reclaiming the full 607 px; 220 px on Deploy with
+the status bar unmoved; 30 px collapsed with the tab strip still switchable;
+drag up 100 px giving exactly 320 px and `localStorage` holding it; the max
+clamp stopping with exactly 240 px of workspace left; the min clamp stopping at
+120 px with the toolbar and log both still visible. Full suite: 1355 passing,
+no console errors.
+
+**Not done, and deliberately.** Keyboard switching for the tab strip and a
+keyboard alternative to the drag grip (§7) are still open — the panes carry
+`role="tab"` / `role="tabpanel"` and the grip carries `role="separator"`, but
+arrow-key navigation is not wired. That is the first thing to add if this dock
+grows a third pane.

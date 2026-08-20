@@ -1,40 +1,13 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useAppStore } from '../../store/appStore';
-import { useProjectStore } from '../../store/projectStore';
-import { useEditorStore } from '../../store/editorStore';
-import { useResourceStore } from '../../resources';
-import { useLogicEditorStore } from '../LogicEditor';
-import type { BoardId, ProtocolId } from '../../types/hmi';
+import { useDeployStore } from '../../store/deployStore';
+import { useDockStore } from '../../store/dockStore';
 import {
-  DEFAULT_BOARD_ID,
-  DEFAULT_PROTOCOL_ID,
   getBoardDefinition,
   getProtocolDefinition,
 } from '../../types/hmi';
-import {
-  buildHmiProject,
-  flashHmiBuild,
-  getHmiCapabilities,
-  getHmiImageLayout,
-  listHmiPorts,
-  type HmiCapabilities,
-  type HmiImageLayout,
-  type HmiSerialPort,
-} from '../../services/hmiApi';
 import '../HmiPanel/hmiPanel.css';
 import './DeployPanel.css';
-
-type BusyAction = 'building' | 'flashing' | null;
-
-type LogCopyFeedback = {
-  kind: 'success' | 'error';
-  message: string;
-} | null;
 
 
 function formatAddress(address: number): string {
@@ -56,30 +29,23 @@ const REGION_LABEL: Record<string, string> = {
 const DeployPanel: React.FC = () => {
   const currentProjectId = useAppStore((state) => state.currentProjectId);
   const factoryDevMode = useAppStore((state) => state.factoryDevMode);
-  const {
-    getProjectConfig,
-    saveProjectData,
-    exportProject,
-    flushProjectConfigWrites,
-  } = useProjectStore();
-  const screens = useEditorStore((state) => state.screens);
-  const animations = useEditorStore((state) => state.animations);
-  const logicGraphs = useLogicEditorStore((state) => state.graphs);
-  const images = useResourceStore((state) => state.images);
-  const fonts = useResourceStore((state) => state.fonts);
 
-  /* Replaced by the project's own board as soon as its config loads. */
-  const [boardId, setBoardId] = useState<BoardId>(DEFAULT_BOARD_ID);
-  const [protocol, setProtocol] = useState<ProtocolId>(DEFAULT_PROTOCOL_ID);
-  const [runtimePort, setRuntimePort] = useState('');
-  const [ports, setPorts] = useState<HmiSerialPort[]>([]);
-  const [capabilities, setCapabilities] = useState<HmiCapabilities | null>(null);
-  const [busy, setBusy] = useState<BusyAction>(null);
-  const [buildId, setBuildId] = useState('');
-  const [artifactUrl, setArtifactUrl] = useState('');
-  const [logs, setLogs] = useState<string[]>([]);
-  const [logCopyFeedback, setLogCopyFeedback] = useState<LogCopyFeedback>(null);
-  const [layout, setLayout] = useState<HmiImageLayout | null>(null);
+  // Everything operational now lives in deployStore, so a build survives the
+  // author switching tabs and the dock can drive it too.
+  // See docs/bottom-dock-panel.md §3.
+  const boardId = useDeployStore((state) => state.boardId);
+  const protocol = useDeployStore((state) => state.protocol);
+  const ports = useDeployStore((state) => state.ports);
+  const runtimePort = useDeployStore((state) => state.runtimePort);
+  const capabilities = useDeployStore((state) => state.capabilities);
+  const busy = useDeployStore((state) => state.busy);
+  const buildId = useDeployStore((state) => state.buildId);
+  const artifactUrl = useDeployStore((state) => state.artifactUrl);
+  const layout = useDeployStore((state) => state.layout);
+  const loadProjectContext = useDeployStore((state) => state.loadProjectContext);
+  const runBuild = useDeployStore((state) => state.runBuild);
+  const runFlash = useDeployStore((state) => state.runFlash);
+  const showPane = useDockStore((state) => state.showPane);
 
   const board = useMemo(() => getBoardDefinition(boardId), [boardId]);
   const protocolDefinition = useMemo(
@@ -101,170 +67,22 @@ const DeployPanel: React.FC = () => {
     && capabilities?.canBuild !== false;
   const canFlash = serviceAvailable !== false && capabilities?.canFlash !== false;
 
-  const appendLog = useCallback((message: string | string[]) => {
-    const next = Array.isArray(message) ? message : [message];
-    setLogCopyFeedback(null);
-    setLogs((current) => [...current, ...next].filter(Boolean));
-  }, []);
-
-  const handleCopyLogs = useCallback(async () => {
-    if (logs.length === 0) {
-      setLogCopyFeedback({
-        kind: 'error',
-        message: 'No log entries to copy.',
-      });
-      return;
-    }
-
-    try {
-      if (!navigator.clipboard?.writeText) {
-        throw new Error('Clipboard API is unavailable');
-      }
-      await navigator.clipboard.writeText(logs.join('\n'));
-      setLogCopyFeedback({
-        kind: 'success',
-        message: `Copied ${logs.length} log ${logs.length === 1 ? 'entry' : 'entries'}.`,
-      });
-    } catch {
-      setLogCopyFeedback({
-        kind: 'error',
-        message: 'Could not copy the log. Check clipboard permissions and try again.',
-      });
-    }
-  }, [logs]);
-
-  const handleClearLogs = useCallback(() => {
-    setLogs([]);
-    setLogCopyFeedback(null);
-  }, []);
-
-  const refreshPorts = useCallback(async () => {
-    try {
-      const result = await listHmiPorts();
-      setPorts(result.ports);
-    } catch {
-      // The port list only supplies the ST-LINK serial number here; the local
-      // service picks a probe on its own when it is missing.
-    }
-  }, []);
-
   useEffect(() => {
-    let cancelled = false;
     if (!currentProjectId) return;
+    void loadProjectContext(currentProjectId);
+  }, [currentProjectId, loadProjectContext]);
 
-    setBuildId('');
-    setArtifactUrl('');
+  // Each button also brings its own pane to the front, so the output the author
+  // just asked for is the one they are looking at.
+  const handleBuild = () => {
+    showPane('build');
+    void runBuild();
+  };
 
-    // The Protocol tab debounces its saves and may have unmounted moments ago,
-    // so wait for those writes before reading the board and protocol back.
-    void flushProjectConfigWrites()
-      .then(() => getProjectConfig(currentProjectId))
-      .then((config) => {
-        if (cancelled || !config) return;
-        setBoardId(config.boardId);
-        setProtocol(config.protocol ?? DEFAULT_PROTOCOL_ID);
-        setRuntimePort(config.communication?.port ?? '');
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          appendLog(`Failed to load project settings: ${String(error)}`);
-        }
-      });
-
-    getHmiCapabilities()
-      .then((result) => {
-        if (cancelled) return;
-        setCapabilities(result);
-        if (result.error) appendLog(`Local HMI service: ${result.error}`);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setCapabilities({ success: false, available: false, error: String(error) });
-        appendLog(`Local HMI service unavailable: ${error instanceof Error ? error.message : String(error)}`);
-      });
-
-    refreshPorts();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    appendLog,
-    currentProjectId,
-    flushProjectConfigWrites,
-    getProjectConfig,
-    refreshPorts,
-  ]);
-
-  const handleBuild = useCallback(async () => {
-    if (!currentProjectId) return;
-    setBusy('building');
-    setBuildId('');
-    setArtifactUrl('');
-    setLayout(null);
-    try {
-      // Anything the user typed on the Protocol tab has to be on disk before
-      // the project is exported, or the firmware is built from stale settings.
-      await flushProjectConfigWrites();
-      await saveProjectData(currentProjectId, screens, logicGraphs, images, fonts, undefined, undefined, undefined, undefined, undefined, undefined, animations);
-      const project = await exportProject(currentProjectId);
-      const result = await buildHmiProject(project);
-      appendLog(result.log);
-      if (!result.success) {
-        appendLog(`Firmware build failed: ${result.error || 'Unknown error'}`);
-        return;
-      }
-      if (result.buildId) setBuildId(result.buildId);
-      if (result.artifact?.downloadUrl) setArtifactUrl(result.artifact.downloadUrl);
-      if (result.buildId && factoryDevMode) {
-        // Only read back when the section is on screen; it is a file parse.
-        try {
-          setLayout(await getHmiImageLayout(result.buildId));
-        } catch {
-          // The layout is diagnostic; a build is not less successful without it.
-        }
-      }
-      appendLog(
-        result.buildId
-          ? `Firmware build complete, buildId: ${result.buildId}`
-          : 'Firmware build complete.',
-      );
-    } catch (error) {
-      appendLog(`Firmware build failed: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setBusy(null);
-    }
-  }, [
-    appendLog,
-    currentProjectId,
-    exportProject,
-    flushProjectConfigWrites,
-    fonts,
-    images,
-    logicGraphs,
-    factoryDevMode,
-    saveProjectData,
-    screens,
-    animations,
-  ]);
-
-  const handleFlash = useCallback(async () => {
-    if (!buildId) {
-      appendLog('Build the firmware first.');
-      return;
-    }
-    setBusy('flashing');
-    try {
-      const result = await flashHmiBuild(buildId, selectedPort?.probeSerial);
-      appendLog(result.log);
-      appendLog(result.success
-        ? 'Firmware flashed and device reset.'
-        : `Firmware flashing failed: ${result.error || 'Unknown error'}`);
-    } catch (error) {
-      appendLog(`Firmware flashing failed: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setBusy(null);
-    }
-  }, [appendLog, buildId, selectedPort?.probeSerial]);
+  const handleFlash = () => {
+    showPane('flash');
+    void runFlash();
+  };
 
   if (!currentProjectId) {
     return <div className="hmi-panel hmi-panel-empty">Open a project first.</div>;
@@ -354,40 +172,23 @@ const DeployPanel: React.FC = () => {
             <span>ST-LINK: {selectedPort?.probeSerial || 'Selected automatically by the local service'}</span>
           </div>
 
-          <div className="deploy-log">
-            <div className="deploy-log-header">
-              <span>Build / Flash log</span>
-              <div className="deploy-log-controls">
-                {logCopyFeedback && (
-                  <span
-                    className={`deploy-log-feedback ${logCopyFeedback.kind}`}
-                    role="status"
-                    aria-live="polite"
-                  >
-                    {logCopyFeedback.message}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={handleCopyLogs}
-                  disabled={logs.length === 0}
-                  aria-label="Copy build and flash log"
-                  title={logs.length === 0 ? 'No log entries to copy' : 'Copy all log entries'}
-                >
-                  Copy
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearLogs}
-                  disabled={logs.length === 0}
-                  aria-label="Clear build and flash log"
-                  title={logs.length === 0 ? 'No log entries to clear' : 'Clear all log entries'}
-                >
-                  Clear
-                </button>
-              </div>
+          {/* The log itself moved to the bottom dock, where it survives a
+              tab switch and where each operation has its own pane and toolbar.
+              See docs/bottom-dock-panel.md. */}
+          <div className="deploy-log-moved">
+            <span>
+              Build and flash output appears in the panel below, one pane per
+              operation. It keeps running — and keeps its log — if you switch
+              tabs.
+            </span>
+            <div className="deploy-log-moved-links">
+              <button type="button" onClick={() => showPane('build')}>
+                Open Build output
+              </button>
+              <button type="button" onClick={() => showPane('flash')}>
+                Open Flash output
+              </button>
             </div>
-            <pre>{logs.length > 0 ? logs.join('\n') : 'Waiting for an operation...'}</pre>
           </div>
         </section>
 

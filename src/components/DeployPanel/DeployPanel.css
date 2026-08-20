@@ -53,57 +53,42 @@
   font-size: 11px;
 }
 
-.deploy-log {
-  overflow: hidden;
-  border: 1px solid #263247;
+/* The build and flash logs live in the bottom dock now; this is the pointer
+   that replaced them. See docs/bottom-dock-panel.md. */
+.deploy-log-moved {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid #dfe4ec;
   border-radius: 5px;
-  background: #172033;
+  background: #f7f9fc;
+  color: #5c6b82;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
-.deploy-log-header {
+.deploy-log-moved-links {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 7px 10px;
-  border-bottom: 1px solid #2d3b54;
-  color: #aebbd0;
-  font-size: 11px;
+  gap: 8px;
+  margin-left: auto;
 }
 
-.deploy-log-header button {
-  min-height: 24px;
-  padding: 2px 8px;
-  border-color: #43516a;
-  background: transparent;
-  color: #aebbd0;
+.deploy-log-moved-links button {
+  min-height: 26px;
+  padding: 3px 10px;
+  border: 1px solid #c7d0de;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #3d4a5e;
+  font-size: 12px;
+  cursor: pointer;
 }
 
-.deploy-log-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.deploy-log-feedback {
-  margin-right: 2px;
-  color: #88d4a5;
-}
-
-.deploy-log-feedback.error {
-  color: #ff9b9b;
-}
-
-.deploy-log pre {
-  min-height: 130px;
-  max-height: 280px;
-  margin: 0;
-  overflow: auto;
-  padding: 12px;
-  color: #d7e2f2;
-  font-family: Consolas, 'Courier New', monospace;
-  font-size: 11px;
-  line-height: 1.55;
-  white-space: pre-wrap;
+.deploy-log-moved-links button:hover {
+  border-color: #9fb0c8;
+  color: #1f2937;
 }
 
 /* ------------------------------------------------------ image placement --- */
