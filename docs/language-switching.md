@@ -119,6 +119,12 @@ was converted needs the font rebuilding.
 
 ### 4.3 What each level does not cover
 
+The editor has a fourth level this table omits, **LVGL Preview**. It is left out
+because it cannot exercise a language switch at all: switching is an event
+action, and `editorStateToJson.ts` carries no events across to it. For the full
+ladder and what separates the four, see
+[preview-ladder.md](./preview-ladder.md) §1.
+
 | | Canvas 🌐 | Build & Run | Hardware |
 | --- | --- | --- | --- |
 | Translations complete | ✅ | ✅ | ✅ |

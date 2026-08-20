@@ -114,9 +114,15 @@ runtime side is sound; it is only ever handed nothing to register.
 - The **Debug** button in the Logic tab is a manual walkthrough that starts at
   the first trigger node and follows execution wires as you press Step. It
   simulates no click and evaluates no values.
-- The **WASM preview** (Build & Run) ignores logic graphs entirely —
-  `editorStateToJson.ts` exports screens, styles and events, but no graphs.
-  Only exported C code carries logic.
+- **LVGL Preview** ignores logic graphs entirely, and events with them:
+  `editorStateToJson.ts` exports screens and styles, and nothing else. It feeds
+  real LVGL a widget tree, so it is a renderer rather than a runtime.
+- **Build & Run** is the only preview that runs a graph. `CompilePreview` passes
+  the graphs to `generateCode`, which emits `ui_logic.c`; every generated file
+  goes to the compiler, and `ui_events.c` includes `ui_logic.h`. What runs there
+  is the same C that runs on hardware. See
+  [preview-ladder.md](./preview-ladder.md) for what each preview does and does
+  not cover.
 
 ## Adjacent facts, recorded while the ground was open
 

@@ -104,6 +104,10 @@ Event 面板 → 新增事件 → **Built-in Action** → **Switch Language**：
 
 ### 4.3 每一層測不到什麼
 
+編輯器還有第四層是這張表沒有列的：**LVGL Preview**。沒列是因為它根本試不了語言切換
+——切換是一個事件動作，而 `editorStateToJson.ts` 沒有把事件帶過去。完整的階梯以及
+四層之間的差別，見 [preview-ladder.md](./preview-ladder.md) §1。
+
 | | 畫布 🌐 | Build & Run | 硬體 |
 | --- | --- | --- | --- |
 | 翻譯有沒有填完 | ✅ | ✅ | ✅ |

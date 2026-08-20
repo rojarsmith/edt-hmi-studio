@@ -103,8 +103,11 @@ the rendered panel, the active tab highlight, the menu — follows that one valu
 so no state has to be synced back and no effect is involved.
 
 Hiding the tab does not disable code generation itself: `generateCode()` still
-runs for the WASM preview, the Build & Run flow and project export. Only the
-tab that displays the generated source is gated.
+runs for **Build & Run** (`CompilePreview`) and for the **Deploy** build, which
+calls the same generator server-side in `server/hmi/projectSource.ts`. Only the
+tab that displays the generated source is gated. LVGL Preview is not on that
+list and never was — it is fed a widget-tree JSON rather than generated C
+([preview-ladder.md](./preview-ladder.md) §3).
 
 ## Where it is implemented
 
