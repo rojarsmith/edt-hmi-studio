@@ -40,6 +40,10 @@ CANbus 與其他協定會跟上。由此出發，每個調色盤決策用兩把�
 `ModbusRegisterTag` 與 binding 機制已經在為暫存器命名。今天的
 *Read Holding Register* 節點應演化成 *Read Tag*，而不是長出兄弟。
 
+元件那一側從來沒有套用這個決定：元件至今仍透過 `component.modbusBinding` 綁定，
+而它從名字、型別到欄位都是 Modbus。這件事的代價、以及第三個協定會付出的代價，
+在 [protocol-and-tags.md](./protocol-and-tags.md) 裡算過。
+
 一個比外觀更重要的誠實性註記：**寫入路徑根本不存在。** 作者能讀暫存器，
 卻不能把任何東西寫回設備 —— 而「按鈕控制機器」正是 HMI 最核心的使用情境。
 Write Tag 的價值高於下面所有的重新分組。

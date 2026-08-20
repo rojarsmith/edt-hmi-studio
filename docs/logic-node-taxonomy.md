@@ -46,6 +46,11 @@ every graph. The groundwork exists: `ModbusRegisterTag` and the binding
 machinery already name registers. Today's *Read Holding Register* node
 evolves into *Read Tag* rather than gaining siblings.
 
+The widget side never got this treatment: a widget still binds through
+`component.modbusBinding`, which is Modbus in its name, its type and its
+fields. What that costs, and what a third protocol would cost, is worked out
+in [protocol-and-tags.md](./protocol-and-tags.md).
+
 An honesty note that outranks the cosmetics: **the write path does not
 exist at all.** An author can read a register but cannot write anything
 back to the device — and a button that commands the machine is the core
