@@ -82,11 +82,25 @@
   align-items: center;
   gap: 8px;
   z-index: 100;
+
+  /* One height for every control in the row. They are read as a set, so a
+     couple of pixels between them reads as a mistake rather than as variety;
+     each one below takes its height from here rather than from its contents. */
+  --canvas-control-height: 34px;
+  /* What is left for a control's contents once its pill has its padding. */
+  --canvas-control-inner: 26px;
 }
 
-/* Zoom controls */
-.zoom-controls {
+.canvas-overlay-controls > * {
+  height: var(--canvas-control-height);
+  box-sizing: border-box;
+}
+
+/* Zoom controls. Scoped to the row: the class name is a common one, and an
+   unscoped copy of these rules in StatusBar.css used to win over them. */
+.canvas-overlay-controls .zoom-controls {
   display: flex;
+  align-items: center;
   gap: 4px;
   background: #fff;
   padding: 4px;
@@ -94,9 +108,11 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.zoom-controls button {
-  width: 32px;
-  height: 32px;
+.canvas-overlay-controls .zoom-controls button {
+  /* Square, so the row's height sets the width too. */
+  width: var(--canvas-control-inner);
+  height: var(--canvas-control-inner);
+  padding: 0;
   border: none;
   background: #f5f5f5;
   border-radius: 4px;
@@ -108,11 +124,12 @@
   transition: background-color 0.15s;
 }
 
-.zoom-controls button:hover {
+.canvas-overlay-controls .zoom-controls button:hover {
   background: #e0e0e0;
 }
 
-.zoom-controls .zoom-level {
+.canvas-overlay-controls .zoom-controls .zoom-level {
+  width: auto;
   padding: 0 12px;
   display: flex;
   align-items: center;
@@ -138,8 +155,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  /* Square: the row's height is the width as well. */
+  width: var(--canvas-control-height);
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -164,8 +181,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  /* Square: the row's height is the width as well. */
+  width: var(--canvas-control-height);
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -199,7 +216,7 @@
   align-items: center;
   gap: 6px;
   background: #fff;
-  padding: 4px 10px;
+  padding: 0 10px;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   color: #666;
@@ -232,7 +249,7 @@
   align-items: center;
   gap: 6px;
   background: #fff;
-  padding: 4px 8px;
+  padding: 0 8px;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }

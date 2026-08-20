@@ -72,37 +72,12 @@
   font-size: 14px;
 }
 
-.zoom-controls {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.zoom-controls button {
-  width: 28px;
-  height: 24px;
-  border: none;
-  background: #f5f5f5;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #666;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-
-.zoom-controls button:hover {
-  background: #e0e0e0;
-}
-
-.zoom-controls .zoom-level {
-  width: auto;
-  min-width: 50px;
-  padding: 0 8px;
-  font-size: 12px;
-}
+/* The zoom control lives on the canvas, not here — see Canvas.css. There was
+   a copy of its styles at this level once, unscoped, and because nothing in
+   this file renders a .zoom-controls it silently restyled the canvas's own
+   instead: its buttons came out 28x24 rather than 32x32 and its gaps and
+   padding were wrong. Class names in these stylesheets are global; a rule that
+   matches nothing here still matches something somewhere. */
 
 .status-save-time {
   color: #4caf50;
