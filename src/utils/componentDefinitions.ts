@@ -339,6 +339,41 @@ export const componentDefinitions: ComponentDefinition[] = [
     },
     isContainer: false,
   },
+  {
+    type: 'polygon',
+    name: 'Polygon',
+    // Fourth shape in the category, same family name as the others.
+    typeName: 'Shape',
+    icon: '🔷',
+    category: 'shape',
+    // The default is a diamond: four points, visibly not a rectangle, and
+    // convex, so it can be filled. See utils/polygonGeometry.ts.
+    defaultWidth: 100,
+    defaultHeight: 100,
+    defaultProps: {
+      points: [[50, 0], [100, 50], [50, 100], [0, 50]],
+      // The outline is a line_* style, exactly as Line's is, because LVGL
+      // draws the outline with lv_line and reaches those styles no other way.
+      lineWidth: 2,
+      lineColor: '#212121',
+      lineRounded: false,
+    },
+    defaultStyles: {
+      default: {
+        // The same drawn-not-themed palette the other shapes use. bgColor is
+        // the fill: transparent leaves the outline alone, which is also what a
+        // concave polygon gets whatever this says.
+        bgColor: '#E0E0E0',
+        borderColor: 'transparent',
+        borderWidth: 0,
+        borderRadius: 0,
+        textColor: '#212121',
+        opacity: 1,
+        padding: 0,
+      },
+    },
+    isContainer: false,
+  },
 
   // Container Components
   {

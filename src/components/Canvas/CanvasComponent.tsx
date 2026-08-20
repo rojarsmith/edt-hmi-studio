@@ -18,6 +18,12 @@ import {
   pointsInBox,
 } from '../../utils/lineGeometry';
 import {
+  isConvexPolygon,
+  normalizePolygonPoints,
+  pointsInPolygonBox,
+  polygonBox,
+} from '../../utils/polygonGeometry';
+import {
   DEFAULT_END_ANGLE,
   DEFAULT_START_ANGLE,
   sectorPath,
@@ -333,7 +339,10 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
   // simply rounds it all the way.
   const circleShape: 'circle' | 'sector' | undefined =
     type === 'circle' ? (props.shape === 'sector' ? 'sector' : 'circle') : undefined;
-  const drawsBox = type !== 'line' && circleShape !== 'sector';
+  // A polygon draws its own fill and outline from its points, so the box
+  // styles would only add a rectangle around it — the same reason a line has
+  // none.
+  const drawsBox = type !== 'line' && type !== 'polygon' && circleShape !== 'sector';
 
   // Build inline styles from component styles
   const componentStyle: React.CSSProperties = {
@@ -482,7 +491,53 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
           </svg>
         );
       }
-      
+
+      case 'polygon': {
+        // Drawn from its own points, closed, and filled only when a triangle
+        // fan could cover it — which is exactly what the panel will do, so
+        // the canvas never shows a fill the device cannot draw. See
+        // utils/polygonGeometry.ts.
+        const points = normalizePolygonPoints(props.points);
+        const placed = pointsInPolygonBox(points);
+        const box = polygonBox(placed);
+        const path = placed.map(([x, y]) => `${x},${y}`).join(' ');
+        const stroke = Math.max(0, props.lineWidth ?? DEFAULT_LINE_WIDTH);
+        const strokeColor =
+          props.lineColor || defaultStyle.borderColor || defaultStyle.textColor || '#333333';
+        const fill =
+          resolvedBgColor && resolvedBgColor !== 'transparent' && isConvexPolygon(placed)
+            ? resolvedBgColor
+            : 'none';
+
+        return (
+          <svg
+            className="lvgl-polygon"
+            viewBox={`0 0 ${box.width} ${box.height}`}
+            preserveAspectRatio="none"
+            style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+          >
+            {/* An unfilled outline is only as clickable as its stroke. This
+                widens the target without widening the widget — editor chrome,
+                never drawn on the panel. */}
+            <polygon
+              points={path}
+              fill={fill === 'none' ? 'transparent' : fill}
+              stroke="transparent"
+              strokeWidth={Math.max(stroke, 10)}
+              vectorEffect="non-scaling-stroke"
+            />
+            <polygon
+              points={path}
+              fill={fill}
+              stroke={stroke > 0 ? strokeColor : 'none'}
+              strokeWidth={stroke}
+              strokeLinejoin={props.lineRounded ? 'round' : 'miter'}
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        );
+      }
+
       case 'textarea':
         return (
           <div className="lvgl-textarea" style={{

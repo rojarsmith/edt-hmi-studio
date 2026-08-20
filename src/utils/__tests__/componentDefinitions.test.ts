@@ -70,7 +70,7 @@ describe('componentDefinitions', () => {
 
     it('should return shape components', () => {
       const shapes = getComponentsByCategory('shape');
-      expect(shapes.map(c => c.type)).toEqual(['rectangle', 'line', 'circle']);
+      expect(shapes.map(c => c.type)).toEqual(['rectangle', 'line', 'circle', 'polygon']);
       expect(shapes.every(c => c.category === 'shape')).toBe(true);
       // Shapes are drawn, not filled with children
       expect(shapes.every(c => !c.isContainer)).toBe(true);

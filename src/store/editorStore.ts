@@ -31,6 +31,7 @@ import type { ModbusRegisterTag } from '../types/hmi';
 import { getComponentDefinition } from '../utils/componentDefinitions';
 import { synchronizeModbusBindings } from '../utils/modbusBindings';
 import { applyLineGeometry } from '../utils/lineGeometry';
+import { applyPolygonGeometry } from '../utils/polygonGeometry';
 import { squareBox } from '../utils/circleGeometry';
 import { keyFromText, literalOf, resolveText } from '../codegen/textResources';
 
@@ -368,6 +369,22 @@ function withShapeGeometry(
     const next = { ...component, ...updates };
     if (next.width === component.width && next.height === component.height) return updates;
     return { ...updates, ...squareBox(component, next) };
+  }
+
+  // A polygon's box is its points' extent, with no margin around the shape.
+  // See utils/polygonGeometry.ts.
+  if (component.type === 'polygon') {
+    const next = { ...component, ...updates };
+    const geometry = applyPolygonGeometry(
+      { width: component.width, height: component.height, points: component.props?.points },
+      { width: next.width, height: next.height, points: next.props?.points },
+    );
+    return {
+      ...updates,
+      width: geometry.width,
+      height: geometry.height,
+      props: { ...next.props, points: geometry.points },
+    };
   }
 
   if (component.type !== 'line') return updates;
