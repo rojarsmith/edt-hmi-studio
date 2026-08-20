@@ -18,6 +18,7 @@ import { useResourceStore } from '../resources';
 import { useLogicEditorStore } from '../components/LogicEditor';
 import {
   buildHmiProject,
+  subscribeBuildLog,
   flashHmiBuild,
   getHmiCapabilities,
   getHmiImageLayout,
@@ -38,6 +39,12 @@ export type DeployBusy = 'building' | 'flashing' | null;
 
 /** The two dock panes, and the two log streams behind them. */
 export type DeployLogPane = 'build' | 'flash';
+
+/** Names one run's log channel. randomUUID is not in every context we build for. */
+function newRunId(): string {
+  return globalThis.crypto?.randomUUID?.()
+    ?? `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 interface DeployState {
   /* Project context, refreshed whenever the Deploy tab mounts. */
@@ -180,8 +187,27 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         animations,
       );
       const projectFile = await project.exportProject(projectId);
-      const result = await buildHmiProject(projectFile);
-      append(result.log);
+
+      // Live output. The run id is ours, and the subscription opens before the
+      // POST, so the first line of a build that takes minutes does not have to
+      // wait for its last. See docs/streaming-build-log.md.
+      const runId = newRunId();
+      let streamed = 0;
+      const stopStreaming = subscribeBuildLog(runId, (line) => {
+        streamed += 1;
+        append(line);
+      });
+
+      let result;
+      try {
+        result = await buildHmiProject(projectFile, runId);
+      } finally {
+        stopStreaming();
+      }
+
+      // The stream and the response carry the same sequence, so take it from
+      // whichever actually arrived rather than from both.
+      if (streamed === 0) append(result.log);
 
       if (!result.success) {
         append(`Firmware build failed: ${result.error || 'Unknown error'}`);

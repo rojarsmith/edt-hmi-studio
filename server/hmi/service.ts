@@ -32,6 +32,11 @@ import {
   resolveProjectBoardId,
   SUPPORTED_BOARD_IDS,
 } from './validation';
+import {
+  closeBuildLog,
+  openBuildLog,
+  pushBuildLog,
+} from './buildLog';
 import { getBoardDefinition } from '../../src/types/hmi';
 import type { BoardId } from '../../src/types/hmi';
 
@@ -411,7 +416,15 @@ export class HmiService {
     return { success: true, port: normalizedPort, device };
   }
 
-  async buildProject(project: unknown): Promise<HmiBuildResult> {
+  /**
+   * `runId` opts the build into live output: every line it would have returned
+   * at the end is also pushed to that channel as it happens, for the SSE
+   * endpoint to relay. Omit it and the behaviour is exactly as before.
+   */
+  async buildProject(
+    project: unknown,
+    runId?: string,
+  ): Promise<HmiBuildResult> {
     assertSupportedProject(project);
     const buildId = randomUUID();
     const buildDirectory = resolveBuildDirectory(
@@ -427,6 +440,15 @@ export class HmiService {
     const buildScript = this.buildScript(boardId);
     const createdAt = new Date().toISOString();
     const log: string[] = [];
+    // One sink for both destinations, so a streaming client and a batched one
+    // see the same sequence and neither can drift from the other.
+    const emit = (...lines: string[]) => {
+      for (const line of lines) {
+        log.push(line);
+        if (runId) pushBuildLog(runId, line);
+      }
+    };
+    if (runId) openBuildLog(runId);
     const metadata: BuildMetadata = {
       buildId,
       boardId,
@@ -459,9 +481,7 @@ export class HmiService {
         project,
         projectSourceDirectory,
       );
-      log.push(
-        `Generated project source: ${generatedFiles.join(', ')}`,
-      );
+      emit(`Generated project source: ${generatedFiles.join(', ')}`);
 
       const buildResult = await runExecutable(
         this.paths.powerShell,
@@ -493,9 +513,12 @@ export class HmiService {
           // old 10 minute budget went. Later builds hit the cache and finish in
           // well under a minute.
           timeoutMs: 30 * 60_000,
+          // Streaming replaces the end-of-run commandLog() below rather than
+          // adding to it, so the two never both report the same output.
+          onLine: runId ? (line) => emit(line) : undefined,
         },
       );
-      log.push(...commandLog(buildResult));
+      if (!runId) emit(...commandLog(buildResult));
       if (buildResult.exitCode !== 0) {
         throw new Error(
           `Firmware build exited with code ${buildResult.exitCode}`,
@@ -531,7 +554,7 @@ export class HmiService {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error);
-      log.push(message);
+      emit(message);
       await writeBuildMetadata(buildDirectory, {
         ...metadata,
         status: 'failed',
@@ -544,6 +567,10 @@ export class HmiService {
         log,
         error: message,
       };
+    } finally {
+      // Tells every watcher the build is over, whichever way it ended, so an
+      // SSE connection closes instead of hanging on a finished build.
+      if (runId) closeBuildLog(runId);
     }
   }
 

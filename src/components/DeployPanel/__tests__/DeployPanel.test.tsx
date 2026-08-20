@@ -57,6 +57,8 @@ vi.mock('../../../services/hmiApi', () => ({
   listHmiPorts: mocks.listHmiPorts,
   buildHmiProject: mocks.buildHmiProject,
   flashHmiBuild: mocks.flashHmiBuild,
+  // Live output is additive: no stream still means a complete log at the end.
+  subscribeBuildLog: () => () => {},
 }));
 
 const projectConfig = {

@@ -13,6 +13,7 @@ import type {
 } from 'vite';
 import { HmiService } from './server/hmi/service';
 import { isRecord } from './server/hmi/validation';
+import { subscribeBuildLog } from './server/hmi/buildLog';
 
 const JSON_BODY_LIMIT = 64 * 1024 * 1024;
 
@@ -108,6 +109,73 @@ function methodNotAllowed(
   });
 }
 
+/**
+ * Server-sent events carrying one build's output as it happens.
+ *
+ * `?from=N` replays from that line, so a client that reconnects continues
+ * rather than starting again. The stream ends itself when the build does; a
+ * client that disappears first is cleaned up by the 'close' handler.
+ */
+function streamBuildLog(
+  request: IncomingMessage,
+  response: ServerResponse,
+  runId: string,
+): void {
+  let from = 0;
+  try {
+    const raw = new URL(request.url || '/', 'http://127.0.0.1').searchParams.get('from');
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) from = Math.floor(parsed);
+  } catch {
+    // A malformed query is a request to start from the beginning.
+  }
+
+  response.statusCode = 200;
+  response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('Connection', 'keep-alive');
+  // Vite sits behind no proxy here, but a packaged build may not.
+  response.setHeader('X-Accel-Buffering', 'no');
+  response.flushHeaders?.();
+
+  const send = (event: string, data: unknown) => {
+    if (response.destroyed || response.writableEnded) return;
+    response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // Something has to cross the wire before the browser reports the connection
+  // open, and a build's first line can be a minute away.
+  send('open', { runId, from });
+
+  const unsubscribe = subscribeBuildLog(
+    runId,
+    from,
+    (line, index) => send('line', { index, line }),
+    () => {
+      send('done', { runId });
+      if (!response.writableEnded) response.end();
+    },
+  );
+
+  const stop = () => {
+    unsubscribe();
+    clearInterval(heartbeat);
+  };
+  // Keeps intermediaries from closing a stream that is merely waiting on a
+  // compiler, and gives the server a write that fails once the client is gone.
+  const heartbeat = setInterval(() => {
+    if (response.destroyed || response.writableEnded) {
+      stop();
+      return;
+    }
+    response.write(': keep-alive\n\n');
+  }, 15_000);
+  heartbeat.unref?.();
+
+  request.on('close', stop);
+  response.on('close', stop);
+}
+
 function createHmiMiddleware(
   service: HmiService,
 ): Connect.NextHandleFunction {
@@ -176,7 +244,8 @@ function createHmiMiddleware(
         if (!Object.hasOwn(body, 'project')) {
           throw new HttpError(400, 'project is required');
         }
-        const result = await service.buildProject(body.project);
+        const runId = typeof body.runId === 'string' ? body.runId : undefined;
+        const result = await service.buildProject(body.project, runId);
         sendJson(response, 200, result);
         return;
       }
@@ -192,6 +261,16 @@ function createHmiMiddleware(
           body.probeSerial,
         );
         sendJson(response, 200, result);
+        return;
+      }
+
+      const logStreamMatch = path.match(/^\/api\/hmi\/build-log\/([^/]+)$/);
+      if (logStreamMatch) {
+        if (request.method !== 'GET') {
+          methodNotAllowed(response, 'GET');
+          return;
+        }
+        streamBuildLog(request, response, logStreamMatch[1]);
         return;
       }
 
