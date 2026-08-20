@@ -190,3 +190,83 @@ const LEGACY_LOGIC_ANIMATIONS: Record<string, ScreenTransitionFields> = {
   slide_up: { transition: 'slide', transitionDirection: 'up' },
   slide_down: { transition: 'slide', transitionDirection: 'down' },
 };
+
+/** Where each screen sits, and how opaque it is, part way through a change. */
+export interface ScreenChangeFrame {
+  from: { dx: number; dy: number; alpha: number };
+  to: { dx: number; dy: number; alpha: number };
+  /** True when the outgoing screen is drawn over the incoming one. */
+  outgoingOnTop: boolean;
+}
+
+/** Which way the picture travels, as a unit vector. */
+const TRAVEL: Record<ScreenTransitionDirection, { x: number; y: number }> = {
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+};
+
+/**
+ * What a screen change looks like `progress` of the way through, so the
+ * preview can draw what the panel will.
+ *
+ * Reproduces what lv_screen_load_anim does to the two screen objects: Slide
+ * moves both, Cover moves only the screen arriving, Wipe moves only the one
+ * leaving, and Fade moves neither. LVGL runs these on its linear path, so this
+ * takes progress as it comes.
+ */
+export function screenChangeFrame(
+  transition: ScreenTransition,
+  direction: ScreenTransitionDirection,
+  progress: number,
+  width: number,
+  height: number,
+): ScreenChangeFrame {
+  const travel = TRAVEL[direction];
+  const spanX = travel.x * width;
+  const spanY = travel.y * height;
+  const still = { dx: 0, dy: 0, alpha: 1 };
+  // Multiplying a zero span produces -0, which is a strange thing to hand to
+  // anyone comparing two frames.
+  const offset = (span: number, factor: number) => span * factor || 0;
+
+  switch (transition) {
+    case 'slide':
+      return {
+        // The one arriving starts a screen away, on the side it travels from.
+        from: { dx: offset(spanX, progress), dy: offset(spanY, progress), alpha: 1 },
+        to: {
+          dx: offset(spanX, -(1 - progress)),
+          dy: offset(spanY, -(1 - progress)),
+          alpha: 1,
+        },
+        outgoingOnTop: false,
+      };
+    case 'cover':
+      return {
+        from: still,
+        to: {
+          dx: offset(spanX, -(1 - progress)),
+          dy: offset(spanY, -(1 - progress)),
+          alpha: 1,
+        },
+        outgoingOnTop: false,
+      };
+    case 'wipe':
+      return {
+        from: { dx: offset(spanX, progress), dy: offset(spanY, progress), alpha: 1 },
+        to: still,
+        // The screen leaving slides across the one it uncovers.
+        outgoingOnTop: true,
+      };
+    case 'fade':
+      return {
+        from: still,
+        to: { dx: 0, dy: 0, alpha: progress },
+        outgoingOnTop: false,
+      };
+    case 'none':
+      return { from: still, to: still, outgoingOnTop: false };
+  }
+}

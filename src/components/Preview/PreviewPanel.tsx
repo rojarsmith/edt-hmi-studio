@@ -1,8 +1,18 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
-import type { LvglComponent, Animation } from '../../types';
+import type {
+  LvglComponent,
+  Animation,
+  ScreenTransition,
+  ScreenTransitionDirection,
+} from '../../types';
 import { getEntryScreen } from '../../utils/entryScreen';
+import {
+  resolveScreenTransition,
+  screenChangeFrame,
+  type ScreenTransitionFields,
+} from '../../utils/screenTransitions';
 import { componentsById } from '../../utils/animationAssets';
 import { trackPreviewValues } from '../../utils/animationValues';
 import { animationTracks } from '../../utils/animationTracks';
@@ -127,6 +137,14 @@ function collectInitialImageButtonStates(
   return result;
 }
 
+/** A screen change being drawn, and how far through it is. */
+interface ActiveScreenChange {
+  fromScreenId: string;
+  transition: ScreenTransition;
+  direction: ScreenTransitionDirection;
+  progress: number;
+}
+
 const PreviewPanel: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -146,6 +164,14 @@ const PreviewPanel: React.FC = () => {
   const runningAnimsRef = useRef<{ compId: string; anim: Animation }[]>([]);
   const animPausedAtRef = useRef<number>(0);
   const [animStates, setAnimStates] = useState<Map<string, Partial<AnimState>>>(new Map());
+  /**
+   * A screen change being drawn, if one is. The ref shadows the state so the
+   * click handler and the frame loop can read it without either of them being
+   * rebuilt every frame.
+   */
+  const [screenChange, setScreenChange] = useState<ActiveScreenChange | null>(null);
+  const screenChangeRef = useRef<ActiveScreenChange | null>(null);
+  const changeFrameRef = useRef<number>(0);
   const [imageButtonStateIndices, setImageButtonStateIndices] =
     useState<Map<string, number>>(new Map());
 
@@ -290,13 +316,56 @@ const PreviewPanel: React.FC = () => {
    * Show a screen, playing whatever it plays on load — the same thing the
    * firmware does when lv_scr_load_anim finishes.
    */
-  const enterScreen = useCallback((screenId: string) => {
+  const enterScreen = useCallback((screenId: string, action?: ScreenTransitionFields) => {
+    const from = previewPageId;
     setPreviewPageId(screenId);
-    const played = loadAnimationsOf(screenId);
-    if (played.length === 0) return;
-    cancelAnimationFrame(animFrameRef.current);
-    runAnimations(played);
-  }, [loadAnimationsOf, runAnimations]);
+
+    const play = () => {
+      const played = loadAnimationsOf(screenId);
+      if (played.length === 0) return;
+      cancelAnimationFrame(animFrameRef.current);
+      runAnimations(played);
+    };
+
+    const { transition, direction, duration } = resolveScreenTransition(action);
+    // A jump with no navigation behind it - the footer's screen buttons - has
+    // no transition to draw, and neither has an instant one.
+    const drawn = !!action
+      && transition !== 'none'
+      && duration > 0
+      && from !== screenId
+      && screens.some(screen => screen.id === from);
+    if (!drawn) {
+      setScreenChange(null);
+      screenChangeRef.current = null;
+      play();
+      return;
+    }
+
+    cancelAnimationFrame(changeFrameRef.current);
+    const startedAt = performance.now();
+    const change: ActiveScreenChange = { fromScreenId: from, transition, direction, progress: 0 };
+    screenChangeRef.current = change;
+    setScreenChange(change);
+
+    const step = () => {
+      const progress = Math.min(1, (performance.now() - startedAt) / duration);
+      if (progress < 1) {
+        const next = { ...change, progress };
+        screenChangeRef.current = next;
+        setScreenChange(next);
+        changeFrameRef.current = requestAnimationFrame(step);
+        return;
+      }
+      screenChangeRef.current = null;
+      setScreenChange(null);
+      // The firmware starts these on LV_EVENT_SCREEN_LOADED, which LVGL sends
+      // once the transition has finished - so an entry animation waits here
+      // too, rather than running behind the change.
+      play();
+    };
+    changeFrameRef.current = requestAnimationFrame(step);
+  }, [previewPageId, screens, loadAnimationsOf, runAnimations]);
 
   /**
    * The toolbar's play button replays the current screen's entry. A screen
@@ -378,13 +447,19 @@ const PreviewPanel: React.FC = () => {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => cancelAnimationFrame(animFrameRef.current);
+    return () => {
+      cancelAnimationFrame(animFrameRef.current);
+      cancelAnimationFrame(changeFrameRef.current);
+    };
   }, []);
 
   // Handle click for navigation
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+    // Mid-change the two screens are somewhere between where they were and
+    // where they are going, so there is nothing sensible to hit.
+    if (screenChangeRef.current) return;
     const x = (e.clientX - rect.left) / scale;
     const y = (e.clientY - rect.top) / scale;
 
@@ -435,10 +510,16 @@ const PreviewPanel: React.FC = () => {
           setAnimPaused(false);
           continue;
         }
-        if (ev.action?.type === 'navigate' && ev.action.targetPage) {
-          const targetPage = screens.find(p => p.name === ev.action!.targetPage || p.id === ev.action!.targetPage);
+        if (ev.action?.type === 'navigate') {
+          // `targetPage` is the pre-rename spelling, still present in older
+          // projects; every binding written since says `targetScreen`, which
+          // this had stopped looking at.
+          const wanted = ev.action.targetScreen ?? ev.action.targetPage;
+          const targetPage = wanted
+            ? screens.find(p => p.name === wanted || p.id === wanted)
+            : undefined;
           if (targetPage) {
-            enterScreen(targetPage.id);
+            enterScreen(targetPage.id, ev.action);
             return;
           }
         }
@@ -454,6 +535,10 @@ const PreviewPanel: React.FC = () => {
     // Clear canvas
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // How opaque the screen being painted is as a whole, which is what Fade
+    // animates. A widget's own opacity multiplies into it.
+    let screenAlpha = 1;
 
     // Render each component
     const renderComponent = (comp: LvglComponent, offsetX = 0, offsetY = 0) => {
@@ -478,10 +563,11 @@ const PreviewPanel: React.FC = () => {
           y += (h - newH) / 2;
           h = newH;
         }
-        if (aState.opacity !== undefined) {
-          ctx.save();
-          ctx.globalAlpha = aState.opacity;
-        }
+      }
+      const alpha = screenAlpha * (aState?.opacity ?? 1);
+      if (alpha !== 1) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
       }
 
       // Get styles
@@ -843,15 +929,62 @@ const PreviewPanel: React.FC = () => {
         ctx.restore();
       }
 
-      // Restore alpha if animation changed it
-      if (aState?.opacity !== undefined) {
+      // Restore alpha if the animation or the screen changed it
+      if (alpha !== 1) {
         ctx.restore();
       }
     };
 
-    components.forEach(comp => renderComponent(comp));
+    /** One screen, laid down where a change in progress puts it. */
+    const paintScreen = (
+      screenComponents: LvglComponent[],
+      background: string,
+      at: { dx: number; dy: number; alpha: number },
+    ) => {
+      screenAlpha = at.alpha;
+      if (at.dx !== 0 || at.dy !== 0 || at.alpha !== 1) {
+        ctx.save();
+        ctx.globalAlpha = at.alpha;
+        ctx.fillStyle = background;
+        ctx.fillRect(at.dx, at.dy, canvas.width, canvas.height);
+        ctx.restore();
+      }
+      screenComponents.forEach(comp => renderComponent(comp, at.dx, at.dy));
+      screenAlpha = 1;
+    };
+
+    const leaving = screenChange
+      ? screens.find(screen => screen.id === screenChange.fromScreenId)
+      : undefined;
+
+    if (!screenChange || !leaving) {
+      components.forEach(comp => renderComponent(comp));
+      return;
+    }
+
+    // Both screens are on the panel at once until the change finishes, drawn
+    // where lv_screen_load_anim would have them.
+    const frame = screenChangeFrame(
+      screenChange.transition,
+      screenChange.direction,
+      screenChange.progress,
+      canvas.width,
+      canvas.height,
+    );
+    const paintLeaving = () =>
+      paintScreen(leaving.components, leaving.backgroundColor || '#ffffff', frame.from);
+    const paintArriving = () => paintScreen(components, bgColor, frame.to);
+    if (frame.outgoingOnTop) {
+      paintArriving();
+      paintLeaving();
+    } else {
+      paintLeaving();
+      paintArriving();
+    }
   }, [
     components,
+    screens,
+    screenChange,
     canvas,
     bgColor,
     hoveredComponent,

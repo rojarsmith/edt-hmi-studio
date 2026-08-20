@@ -8,6 +8,7 @@ import {
   describeScreenTransition,
   logicNodeTransition,
   lvglScreenLoadAnim,
+  screenChangeFrame,
   resolveScreenTransition,
 } from '../../utils/screenTransitions';
 const statement = (action: Parameters<typeof screenLoadStatement>[1]) =>
@@ -86,5 +87,50 @@ describe('a logic graph written before the five effects', () => {
       transitionDirection: 'up',
       transitionDuration: 200,
     })).toEqual({ transition: 'cover', transitionDirection: 'up', transitionDuration: 200 });
+  });
+});
+
+describe('what a change looks like part way through', () => {
+  const frame = (t: Parameters<typeof screenChangeFrame>[0], d: Parameters<typeof screenChangeFrame>[1], p: number) =>
+    screenChangeFrame(t, d, p, 800, 480);
+
+  it('moves both screens for Slide', () => {
+    // Half way through a leftward slide, the old screen is half off to the
+    // left and the new one half on from the right.
+    expect(frame('slide', 'left', 0.5)).toEqual({
+      from: { dx: -400, dy: 0, alpha: 1 },
+      to: { dx: 400, dy: 0, alpha: 1 },
+      outgoingOnTop: false,
+    });
+  });
+
+  it('moves only the screen arriving for Cover', () => {
+    expect(frame('cover', 'up', 0.25)).toEqual({
+      from: { dx: 0, dy: 0, alpha: 1 },
+      to: { dx: 0, dy: 360, alpha: 1 },
+      outgoingOnTop: false,
+    });
+  });
+
+  it('moves only the screen leaving for Wipe, and draws it on top', () => {
+    expect(frame('wipe', 'right', 0.5)).toEqual({
+      from: { dx: 400, dy: 0, alpha: 1 },
+      to: { dx: 0, dy: 0, alpha: 1 },
+      outgoingOnTop: true,
+    });
+  });
+
+  it('moves neither for Fade', () => {
+    expect(frame('fade', 'left', 0.4)).toEqual({
+      from: { dx: 0, dy: 0, alpha: 1 },
+      to: { dx: 0, dy: 0, alpha: 0.4 },
+      outgoingOnTop: false,
+    });
+  });
+
+  it('lands both screens where they belong when it finishes', () => {
+    for (const transition of ['slide', 'cover', 'wipe', 'fade'] as const) {
+      expect(frame(transition, 'down', 1).to).toEqual({ dx: 0, dy: 0, alpha: 1 });
+    }
   });
 });
