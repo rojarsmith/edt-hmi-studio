@@ -1,0 +1,132 @@
+# 狀態列上方的可隱藏式面板——評估
+
+<p align="center">
+  <a href="../bottom-dock-panel.md">English</a> · <strong>繁體中文</strong>
+</p>
+
+狀態：**只有規劃，沒有改任何程式碼。** 內容都對照過原始碼，不是憑印象。
+
+提案內容：模仿 Visual Studio 底部那條工具視窗列——在**狀態列上方**的橫向空間放一個
+可收合、可調整高度的面板，裡面放好幾個可切換的分頁。先做兩個：**Build Firmware** 與
+**Flash & Reset**，在 Deploy 分頁自動顯示，在其他分頁自動隱藏。
+
+先講結論：**可行，而且版面那一半幾乎是免費的。** 成本不在那個抽屜，在 Deploy 分頁把
+狀態放在哪裡。
+
+## 1. 版面本來就是對的形狀
+
+`App.tsx` 畫出來的是一個乾淨的 flex column：
+
+```
+.app  (display: flex; flex-direction: column; height: 100%)
+├── .app-header            固定高
+├── renderMainContent()    .app-body { flex: 1; overflow: hidden; min-height: 0 }
+└── <StatusBar />          固定高
+```
+
+抽屜就是 `renderMainContent()` 與 `<StatusBar />` 之間再多一個兄弟節點
+（`App.tsx:656`）。決定這件事會不會成立的是兩個屬性，而**兩個都已經寫好了**：
+`.app-body` 帶著 `flex: 1`、`overflow: hidden` **以及 `min-height: 0`**
+（`App.css:140`）。`min-height: 0` 正是最常被忘記的那一個——沒有它，flex 子項不肯縮到
+比內容還小，抽屜就會把狀態列擠出畫面外，而不是壓縮工作區。
+
+所以 Design 畫布、Preview 以及每一個 full-panel 分頁都會正確讓出高度，**完全不需要重構
+版面**。這是這份估算裡最關鍵的一個輸入。
+
+## 2. 互動零件也已經有了
+
+這個 repo 做過同樣形狀的東西：
+
+| 需要的 | 已經存在 | 在哪 |
+|---|---|---|
+| 拖上緣改高度 | `.panel-grip`——8 px、`row-resize`、absolute 貼在面板自己的上緣 | `components/panelBar.css:94`，已被四個面板共用 |
+| pointer 拖曳＋min/max 夾制 | 約 30 行，可以原樣抽出來 | `LogicEditor/GraphManager.tsx:24` |
+| 收合箭頭 | `PanelChevron` | `LogicEditor/` |
+
+一個命名上的註記：這個 codebase 已經把 **Manager** 用在內容管理器上了——`GraphManager`、
+`ScreenManager`、`ProjectManager`。這次提的東西比較接近 Visual Studio 的 *tool window*。
+值得換一個詞（一個 **dock**，裡面放 **pane**），免得之後討論講不清楚。
+
+## 3. 真正的成本：Deploy 的狀態是 local 的，切分頁就會被銷毀
+
+抽屜要顯示的每一樣東西，都住在元件裡的 `useState`（`DeployPanel.tsx:72`–`:82`）：
+`busy`、`buildId`、`logs`、`artifactUrl`、`layout`。而 `renderMainContent()` 是對
+active tab 做的 `switch`，所以一離開 Deploy 就會 **unmount `DeployPanel`，把這些全部
+丟掉**。
+
+這不是這個提案帶來的新問題，而是提案會一頭撞上的既有缺陷：
+
+> 開始建置、切到 Design、再切回來——log 是空的、`buildId` 也沒了，於是
+> **Flash & Reset 不知道要燒什麼。**
+
+所以底下那個選擇，就是這整件事的全部決定。
+
+## 4. 兩種架構
+
+**A——抽屜掛在 Deploy 裡面**（用 portal 投影到狀態列上方那條帶子）。
+
+- 最便宜：一個元件加一點 CSS。
+- 但它只是把現有的 log 框換個位置。它會跟著 `DeployPanel` 一起死，所以「這個區域可以有
+  多個管理器」交付不出來——之後要加第三個 pane（例如全域錯誤清單）就得重做一次。
+
+**B——抽屜掛在 `App` 層，Deploy 的狀態搬到 store。**
+
+- 抽屜本身一樣便宜；工作量在把 `logs` / `busy` / `buildId` / `artifactUrl` 搬進一個
+  `deployStore`（zustand，這個專案到處都在用）。
+- 除了抽屜以外它還換到：**你在別的分頁工作時建置照跑，切回來 log 還在。**`buildId` 也
+  還在，Flash & Reset 因此一直有效。§3 是它順手修掉的副作用。
+
+**建議 B。** 那句需求本身——*這個區域可以有多個管理器*——只有在全域抽屜下才站得住。
+A 是那種「一旦成功就得砍掉重做」的版本。
+
+## 5.「管理器」裡該放什麼：輸出，不是按鈕
+
+這件事該在動工之前定案。在 Visual Studio 裡，底部那條放的是**輸出視窗**——Error List、
+Output、Package Manager Console。而這裡提的兩個 pane 是用 Deploy 卡片上那兩顆*按鈕*
+命名的，所以有兩種讀法：
+
+- **(a) 每個 pane 是一個操作的輸出。** 現在那個混在一起的「Build / Flash log」拆成兩個，
+  各自有生命週期、各自有 Copy/Clear，而每個 pane 的工具列可以帶自己的觸發按鈕——就像
+  Package Manager Console 有自己的控制項。Deploy 卡片保留兩顆大按鈕與摘要。**建議這個。**
+- **(b) 按鈕整個搬進 pane。** 那 Deploy 分頁就只剩說明文字了。
+
+(a) 符合被模仿的那個模型，也讓 Deploy 分頁還有存在的理由。
+
+## 6. 自動隱藏規則有個陷阱
+
+「在 Deploy 顯示、其他地方隱藏」讀起來很自然，但**這個面板最有用的時刻，正好就是你離開
+那個分頁的時刻。** Visual Studio 不會因為你打開了別的檔案就把 Output 收掉。
+
+建議改成這條規則：**進 Deploy 就展開；離開時，只有在沒有操作進行中才收起**——如果有，
+要嘛讓抽屜保持可見，要嘛在狀態列留一個進度指示。注意這條規則**只有在架構 B 之下才做得
+出來**，因為它要求操作的狀態活得比分頁久。
+
+## 7. 要一併想清楚的細節
+
+| 項目 | 說明 |
+|---|---|
+| 高度持久化 | `GraphManager` 的高度放在 `useState`，重整就沒了。抽屜至少該用 `localStorage`——這個 app 本來就直接讀它（`App.tsx:92`），不需要包裝層 |
+| 收合 vs 隱藏 | 「收到只剩分頁列」跟「整個不見」是兩種狀態；Visual Studio 兩種都有 |
+| 小螢幕 | 抽屜需要 max-height 夾制，工作區永遠不能被壓到 0 |
+| LVGL Preview | 它的 `<iframe>` 在 resize 時會重繪；在那個分頁開著時拖抽屜要實際看一下 |
+| 工廠模式 | Deploy 分頁本身沒有被工廠模式擋（`TAB_DEFS` 只擋 `code` 與 `icon`），但面板裡有部分有擋（`DeployPanel.tsx:218`、`:397`）。抽屜的規則不能不小心把它們露出來 |
+| 鍵盤與無障礙 | 分頁列要能用鍵盤切換，拖曳把手要有鍵盤替代方案 |
+
+## 8. 工作量
+
+| 階段 | 內容 | 粗估規模 |
+|---|---|---|
+| 1 | `App` 層的抽屜外殼：分頁列、收合、拖曳改高度（複用 `.panel-grip` 與 `GraphManager` 那 30 行）、`localStorage` 高度 | 1 個元件 ＋ 1 份樣式，約 200–250 行 |
+| 2 | `deployStore`：把 `logs` / `busy` / `buildId` / `artifactUrl` 上移；`DeployPanel` 改讀 store | 新 store 約 80 行，`DeployPanel` 改動約 40–60 行 |
+| 3 | 兩個 pane，各自帶 log 與工具列 | 2 個小元件，各 60–100 行 |
+| 4 | 顯示規則（§6） | 約 20 行 |
+
+**合計大約 500–600 行新程式碼，一個中型 PR。** 沒有任何一階是架構上有風險的改動。要最
+小心的是階段 2，因為它會碰到還在飛的 `fetch` 與 unmount 的時機。
+
+## 9. 動工前要決定的事
+
+1. **A 還是 B**（§4）。其他每一件事都跟著它走，而建議是 B。
+2. **一個 pane 裡放什麼**（§5）——帶自己工具列的輸出，還是按鈕本身。
+3. **有操作在跑時，抽屜可不可以在 Deploy 以外的分頁保持可見**（§6）。答「不可以」是個
+   正當的選擇，只是必須是刻意做的選擇，因為它同時決定了 §3 那個缺陷會不會被修掉。
