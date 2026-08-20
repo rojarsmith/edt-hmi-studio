@@ -111,6 +111,34 @@
   z-index: 1000;
 }
 
+/* Reset canvas — one icon button, the same pill as its neighbours. Its two
+   effects belong together: zoom and centring are what get lost together after
+   a while of moving around a screen. */
+.canvas-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #666;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.canvas-reset:hover {
+  background: #f0f0f0;
+  color: #2196F3;
+}
+
+.canvas-reset:active {
+  background: #e0e0e0;
+}
+
 /* Pointer position — same pill as its neighbours, after TouchGFX Designer's
    readout. The origin is the canvas's top-left corner and the numbers go
    negative outside it. */

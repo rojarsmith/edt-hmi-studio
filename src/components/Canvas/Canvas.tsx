@@ -3,6 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { useEditorStore } from '../../store/editorStore';
 import type { LvglComponent, ResizeHandle } from '../../types';
 import { resizeBox } from './resizeGeometry';
+import { centringPan } from './canvasView';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
 import CanvasComponent from './CanvasComponent';
 import AlignmentGuides from './AlignmentGuides';
@@ -803,6 +804,54 @@ const Canvas: React.FC = () => {
     setZoom(1);
   }, [setZoom]);
 
+  /**
+   * Back to 100% and centred: the two things that get lost together after a
+   * while of zooming and panning around a screen. See canvasView.ts for how
+   * the centre is worked out.
+   */
+  const handleResetCanvas = useCallback(() => {
+    const container = containerRef.current;
+    const canvasElement = canvasRef.current;
+    const { canvas: c } = useEditorStore.getState();
+
+    setZoom(1);
+    if (!container || !canvasElement) {
+      setPan(0, 0);
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const canvasRect = canvasElement.getBoundingClientRect();
+    const pan = centringPan({
+      container: containerRect,
+      canvasCorner: { left: canvasRect.left, top: canvasRect.top },
+      currentPan: { x: c.panX, y: c.panY },
+      design: { width: c.width, height: c.height },
+    });
+
+    setPan(pan.x, pan.y);
+  }, [setZoom, setPan]);
+
+  // Ctrl+0, scoped to the canvas rather than global: resetting the view means
+  // nothing on the tabs where there is no view to reset.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      if (event.key !== '0' && event.code !== 'Digit0') return;
+      event.preventDefault();
+      handleResetCanvas();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleResetCanvas]);
+
   // Render grid
   const renderGrid = () => {
     if (!canvas.showGrid) return null;
@@ -942,6 +991,25 @@ const Canvas: React.FC = () => {
       {/* The floating controls, in one row so that adding another cannot push
           the others off their hardcoded offsets. */}
       <div className="canvas-overlay-controls">
+        <button
+          type="button"
+          className="canvas-reset"
+          onClick={handleResetCanvas}
+          title="Reset Canvas — zoom to 100% and centre the screen (Ctrl+0)"
+          aria-label="Reset canvas: zoom to 100% and centre the screen"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            {/* Corner brackets around a screen: fit it back into view. */}
+            <path
+              d="M2 5.5V3a1 1 0 0 1 1-1h2.5M10.5 2H13a1 1 0 0 1 1 1v2.5M14 10.5V13a1 1 0 0 1-1 1h-2.5M5.5 14H3a1 1 0 0 1-1-1v-2.5"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+            <rect x="5.5" y="5.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+          </svg>
+        </button>
+
         <MousePosition containerRef={containerRef} canvasRef={canvasRef} />
 
         {/* Language preview: which column of the text table the canvas renders.
