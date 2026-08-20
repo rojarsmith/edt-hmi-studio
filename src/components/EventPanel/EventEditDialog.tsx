@@ -3,8 +3,26 @@ import { v4 as uuidv4 } from 'uuid';
 import { useEditorStore } from '../../store/editorStore';
 import { componentsById } from '../../utils/animationAssets';
 import { useLogicEditorStore } from '../LogicEditor';
-import type { EventBinding, LvglEventType, BuiltinActionType, BuiltinAction } from '../../types';
+import type {
+  EventBinding,
+  LvglEventType,
+  BuiltinActionType,
+  BuiltinAction,
+  ScreenTransition,
+  ScreenTransitionDirection,
+} from '../../types';
 import { NEXT_LANGUAGE } from '../../types';
+import {
+  DEFAULT_SCREEN_TRANSITION,
+  DEFAULT_SCREEN_TRANSITION_DIRECTION,
+  DEFAULT_SCREEN_TRANSITION_DURATION,
+  SCREEN_TRANSITIONS,
+  SCREEN_TRANSITION_DIRECTIONS,
+  resolveScreenTransition,
+} from '../../utils/screenTransitions';
+import { screenLoadStatement } from '../../codegen/screenTransition';
+import { DEFAULT_CODEGEN_OPTIONS } from '../../codegen/types';
+import NumberField from '../common/NumberField';
 import { LVGL_EVENTS, LVGL_SCREEN_EVENTS } from './EventPanel';
 import CodeEditor from './CodeEditor';
 import './EventEditDialog.css';
@@ -79,6 +97,17 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [targetScreen, setTargetScreen] = useState(
     event?.action?.targetScreen || event?.action?.targetPage || ''
   );
+  // Absent fields resolve to the fade every project generated before they
+  // existed, so an old binding opens showing what it already does.
+  const savedTransition = resolveScreenTransition(event?.action);
+  const [transition, setTransition] = useState<ScreenTransition>(savedTransition.transition);
+  const [transitionDirection, setTransitionDirection] =
+    useState<ScreenTransitionDirection>(savedTransition.direction);
+  const [transitionDuration, setTransitionDuration] = useState(
+    // None resolves to 0, which is not a duration to offer back when the user
+    // switches away from it.
+    savedTransition.transition === 'none' ? 300 : savedTransition.duration,
+  );
   const [targetComponent, setTargetComponent] = useState(event?.action?.targetComponent || '');
   const [property, setProperty] = useState(event?.action?.property || '');
   const [value, setValue] = useState<string>(
@@ -98,6 +127,9 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     if (!event) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset fields when action type changes
       setTargetScreen('');
+      setTransition(DEFAULT_SCREEN_TRANSITION);
+      setTransitionDirection(DEFAULT_SCREEN_TRANSITION_DIRECTION);
+      setTransitionDuration(DEFAULT_SCREEN_TRANSITION_DURATION);
       setTargetComponent('');
       setProperty('');
       setValue('');
@@ -118,6 +150,11 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       switch (actionType) {
         case 'navigate':
           action.targetScreen = targetScreen;
+          action.transition = transition;
+          if (transition !== 'none') {
+            action.transitionDirection = transitionDirection;
+            action.transitionDuration = transitionDuration;
+          }
           break;
         case 'setProperty':
           action.targetComponent = targetComponent;
@@ -157,7 +194,8 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     onSave(newEvent);
   }, [
     event, eventType, handlerType, actionType,
-    targetScreen, targetComponent, property, value, languageCode, animationId, customCode,
+    targetScreen, transition, transitionDirection, transitionDuration,
+    targetComponent, property, value, languageCode, animationId, customCode,
     logicGraphIds, onSave
   ]);
 
@@ -190,10 +228,17 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     code += `    if (code == ${eventType}) {\n`;
 
     switch (actionType) {
-      case 'navigate':
-        code += `        // Navigate to screen: ${targetScreen || 'page_name'}\n`;
-        code += `        lv_scr_load(${targetScreen || 'page_name'});\n`;
+      case 'navigate': {
+        // The real emitter, so the preview cannot drift from the firmware.
+        const target = screens?.find(candidate => candidate.name === targetScreen);
+        if (!target) {
+          code += `        // No screen chosen\n`;
+          break;
+        }
+        code += `        // Navigate to screen: ${targetScreen}\n`;
+        code += `        ${screenLoadStatement(target, { transition, transitionDirection, transitionDuration }, DEFAULT_CODEGEN_OPTIONS)}\n`;
         break;
+      }
       case 'setProperty':
         code += `        // Set property: ${property || 'property'} = ${value || 'value'}\n`;
         code += `        lv_obj_set_style_${property || 'bg_color'}(${targetComponent || 'target'}, ${value || '0'}, 0);\n`;
@@ -252,13 +297,15 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
 
   const renderActionConfig = () => {
     switch (actionType) {
-      case 'navigate':
+      case 'navigate': {
+        const effect = SCREEN_TRANSITIONS.find(candidate => candidate.value === transition);
         return (
           <div className="action-config">
             <div className="config-row">
-              <label>Target Screen</label>
-              <select 
-                value={targetScreen} 
+              <label htmlFor="navigate-target-screen">Target Screen</label>
+              <select
+                id="navigate-target-screen"
+                value={targetScreen}
                 onChange={(e) => setTargetScreen(e.target.value)}
               >
                 <option value="">Select a screen...</option>
@@ -269,8 +316,57 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                 ))}
               </select>
             </div>
+            <div className="config-row">
+              <label htmlFor="navigate-transition">Transition</label>
+              <select
+                id="navigate-transition"
+                value={transition}
+                onChange={(e) => setTransition(e.target.value as ScreenTransition)}
+              >
+                {SCREEN_TRANSITIONS.map(candidate => (
+                  <option key={candidate.value} value={candidate.value}>
+                    {candidate.label}
+                  </option>
+                ))}
+              </select>
+              <p className="field-hint">{effect?.description}</p>
+            </div>
+            {/* None is instant, so neither of these has anything to say. */}
+            {transition !== 'none' && (
+              <div className="config-row config-row-pair">
+                {effect?.directional && (
+                  <div className="config-field">
+                    <label htmlFor="navigate-transition-direction">Direction</label>
+                    <select
+                      id="navigate-transition-direction"
+                      value={transitionDirection}
+                      onChange={(e) =>
+                        setTransitionDirection(e.target.value as ScreenTransitionDirection)
+                      }
+                    >
+                      {SCREEN_TRANSITION_DIRECTIONS.map(candidate => (
+                        <option key={candidate.value} value={candidate.value}>
+                          {candidate.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="config-field">
+                  <label htmlFor="navigate-transition-duration">Duration (ms)</label>
+                  <NumberField
+                    id="navigate-transition-duration"
+                    min={0}
+                    step={50}
+                    value={transitionDuration}
+                    onChange={setTransitionDuration}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         );
+      }
 
       case 'setProperty':
         return (

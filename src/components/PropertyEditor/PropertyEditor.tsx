@@ -41,7 +41,7 @@ import {
 import PanelChevron from '../LogicEditor/PanelChevron';
 import EventPanel from '../EventPanel';
 import AnimationProperties from './AnimationProperties';
-import NumberField from './NumberField';
+import NumberField from '../common/NumberField';
 import './PropertyEditor.css';
 
 // Inline CollapsibleSection component

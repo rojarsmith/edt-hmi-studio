@@ -7,6 +7,7 @@ interface NumberFieldProps {
   max?: number;
   step?: number;
   className?: string;
+  id?: string;
   'aria-label'?: string;
   title?: string;
   disabled?: boolean;

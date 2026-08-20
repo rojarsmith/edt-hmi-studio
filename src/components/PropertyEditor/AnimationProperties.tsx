@@ -12,7 +12,7 @@ import { componentsById } from '../../utils/animationAssets';
 import { animationTracks, newTrack } from '../../utils/animationTracks';
 import { supportsOffset, trackValueMode } from '../../utils/animationValues';
 import { isAnimationNameTaken } from '../../utils/animationNames';
-import NumberField from './NumberField';
+import NumberField from '../common/NumberField';
 
 const EASING_OPTIONS: { type: AnimationEasing; label: string }[] = [
   { type: 'linear', label: 'Linear' },

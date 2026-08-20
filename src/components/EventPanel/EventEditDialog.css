@@ -289,3 +289,15 @@
 .save-btn:hover {
   background: #1976D2;
 }
+
+/* Two fields that only make sense read together - which way, and for how
+   long - so they share a line rather than stacking. */
+.config-row-pair {
+  display: flex;
+  gap: 12px;
+}
+
+.config-field {
+  flex: 1;
+  min-width: 0;
+}
