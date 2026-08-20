@@ -54,6 +54,7 @@
 | Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | 以 `lv_obj_create` 實作的填色方框，直角、無內距 | [rectangle.md](rectangle.md) |
 | Line | `line` | 📏 | 100×2 | ❌ | 線條，以座標點陣列定義線段，以 `lv_line_create` 實作；外框就是點座標的範圍，不會比筆畫更寬 | [line.md](line.md) |
 | Circle | `circle` | 🔵 | 100×100 | ❌ | 圓盤、圓環、扇形與環狀扇形。以帶圓形半徑的 `lv_obj_create` 或 `lv_arc_create` 實作。只有正圓 — 軟體渲染器沒有橢圓圖元 | [circle.md](circle.md) |
+| Polygon | `polygon` | 🔷 | 100×100 | ❌ | 封閉的座標點串。輪廓以 `lv_line_create` 實作，填色是一組 `lv_draw_triangle` 扇形；凹多邊形不填色，因為扇形蓋不住 | [polygon.md](polygon.md) |
 
 ---
 
@@ -168,6 +169,7 @@ docs/components/
 ├── rectangle.md       ← Rectangle 矩形
 ├── line.md            ← Line 線條
 ├── circle.md          ← Circle 圓形
+├── polygon.md         ← Polygon 多邊形
 ├── obj.md             ← Container 通用容器
 ├── tabview.md         ← Tab View 分頁檢視
 ├── tileview.md        ← Tile View 圖磚檢視

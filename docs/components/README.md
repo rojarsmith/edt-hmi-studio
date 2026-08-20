@@ -54,6 +54,7 @@ Shapes are drawn, not operated. Each one is named for itself in the palette and 
 | Rectangle | `rectangle` | 🟦 | 120×80 | ❌ | A filled, bordered box built on `lv_obj_create`. Square corners and no padding | [rectangle.md](rectangle.md) |
 | Line | `line` | 📏 | 100×2 | ❌ | A line, defined by an array of points. Built on `lv_line_create`; its box is the points' extent, never wider than the stroke | [line.md](line.md) |
 | Circle | `circle` | 🔵 | 100×100 | ❌ | A disc, ring, sector or annular sector. `lv_obj_create` with a circular radius, or `lv_arc_create` for a sector. Circular only — the software renderer has no elliptical primitive | [circle.md](circle.md) |
+| Polygon | `polygon` | 🔷 | 100×100 | ❌ | A closed run of points. `lv_line_create` for the outline and a fan of `lv_draw_triangle` for the fill; a concave outline is drawn unfilled, because a fan cannot cover one | [polygon.md](polygon.md) |
 
 ---
 
@@ -168,6 +169,7 @@ docs/components/
 ├── rectangle.md       ← Rectangle
 ├── line.md            ← Line
 ├── circle.md          ← Circle
+├── polygon.md         ← Polygon
 ├── obj.md             ← Container
 ├── tabview.md         ← Tab View
 ├── tileview.md        ← Tile View
