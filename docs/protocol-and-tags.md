@@ -427,3 +427,184 @@ turns up: **can every value the screen needs be named, asked for independently,
 and found in a reply without remembering what was asked before?** If yes, it is
 addressable and belongs in the tag table. If no, it needs the escape hatch, and
 forcing it into the table would cost more than writing the code.
+
+## 9. Does today's abstraction hold for all three at once?
+
+**No — but it fails in three specific places, and it already succeeds in more
+places than it fails.** The gap is not that the design is wrong; it is that
+one protocol was implemented and the abstraction was never asked to carry a
+second.
+
+### 9.1 The three layers an abstraction has to separate
+
+| Layer | Question it answers | Must be per-protocol? |
+|---|---|---|
+| **Link** | What is on the wire, and how do I talk to it | **Yes** — serial parameters, CAN bit timing and UART framing have nothing in common |
+| **Value** | What is this number, and how do I get at it | **Half.** *What it is* is neutral; *where it lives* is not |
+| **Binding** | What does this value drive on screen | **No** — a slider tracking a value does not care which bus fed it |
+
+The test this yields is one sentence: **can the word "Modbus" be deleted from
+the Value layer's neutral half and from the Binding layer entirely?** Today it
+cannot be deleted from either.
+
+### 9.2 Layer by layer
+
+| Layer | What is there today | Holds for three? |
+|---|---|---|
+| Project config | `protocol` + `communication` + `canBus`, side by side | ⚠️ Works, but grows one top-level field per protocol |
+| Tag | `ModbusRegisterTag` **and** `CanSignalTag` — two whole types | ❌ **Fails** — see §9.3 |
+| Widget binding | `ModbusBinding` only, mounted on every widget regardless of protocol | ❌ **Fails** |
+| Logic nodes | Read Tag / Write Tag, resolved from `communication.tags` | ⚠️ Right shape, Modbus wiring |
+| Generated descriptor | 11 of 13 fields protocol-neutral | ✅ Nearly holds |
+| Firmware runtime | `static modbus_rtu_async_client_t g_modbus_client`; one binding per transaction | ❌ **Fails** |
+| Protocol tab | 1104 lines, one top-level `protocol === 'modbus-rtu' ? … : …` | ⚠️ Honest fork — see §9.6 |
+| Previews | Neither simulates a tag at all | ➖ Neutral by omission |
+
+The widget-binding row is the one with a visible symptom today: a CAN project
+still shows a **Modbus** binding editor on every widget, offering a tag list
+that is empty because the CAN signals live in a different field.
+
+### 9.3 The evidence is in the two tag types
+
+Put them side by side:
+
+| | `ModbusRegisterTag` | `CanSignalTag` |
+|---|---|---|
+| Identity | `id`, `name` | `id`, `name` |
+| Where | `area`, `address` | `frameId`, `frameFormat`, `startBit`, `bitLength`, `byteOrder` |
+| What | `dataType: ModbusDataType` | `dataType: CanSignalDataType` |
+| Access | `access: ModbusAccess` | `access: BusAccess` |
+| Scaling | `scale` | `scale`, **`offset`** |
+| Schedule | `pollIntervalMs` | `pollIntervalMs` |
+
+Three things stand out, and none of them is a real protocol difference:
+
+1. **`offset` exists on one and not the other.** A linear scale of
+   `raw × scale + offset` is arithmetic, not a bus feature. A Modbus register
+   holding tenths-of-a-degree above -40 cannot be expressed today; a CAN signal
+   with the same physics can. That is the abstraction leaking, not the
+   protocols differing.
+2. **Two vocabularies for "what is this value".** `ModbusDataType` is
+   `uint16 | int16 | uint32 | …` — width *and* interpretation in one word.
+   `CanSignalDataType` is `unsigned | signed | float32` — interpretation only,
+   with the width in `bitLength`. Both describe the same thing and neither can
+   read the other.
+3. **`BusAccess` is already shared.** `export type ModbusAccess = BusAccess`
+   is one line, and it is the whole unification, already done — for exactly one
+   field. The seam exists; it is one field wide.
+
+One more, from the binding side: `ModbusWidgetProperty` can target `text`, but
+no tag type can carry a string. Today that means "format the number as text".
+A UART device answering `RUNNING` / `STOPPED` would want a real one.
+
+### 9.4 What a model that holds all three looks like
+
+The split that falls out of §9.1:
+
+```ts
+interface Tag {
+  id: string;
+  name: string;
+  /** Neutral: fillable without knowing which bus is behind it. */
+  value: {
+    dataType: TagDataType;   // bool | int | uint | float | string
+    access: BusAccess;       // already shared today
+    scale: number;
+    offset: number;          // CAN has it; everyone should
+    unit?: string;           // for the label, not the wire
+  };
+  /** Protocol-specific: where the value lives, and how it is scheduled. */
+  source: TagSource;
+}
+```
+
+The load-bearing decision is the one that resolves §9.3's second point:
+
+> **The semantic type belongs to the value; the width belongs to the source.**
+
+`uint16` is two facts wearing one name. Split them and all three protocols fit
+the same vocabulary: Modbus says *uint, two bytes at register N*; CAN says
+*uint, 12 bits at frame 0x123 bit 8*; UART says *uint, parsed from the reply* —
+with no width at all, because text has none.
+
+The schedule follows the same rule. A poll interval is meaningful for Modbus,
+meaningless for a CAN signal that arrives when the frame arrives, and belongs
+to the **command** rather than the value for UART. So it sits in the source,
+where a receive-driven source can simply not have one — instead of sitting on
+`CanSignalTag`, where it does today and means nothing.
+
+### 9.5 The runtime shape that serves all three
+
+Three operations, and every protocol is a filling-in of them:
+
+| | Request | Decode | Schedule |
+|---|---|---|---|
+| **Modbus** | read N registers at A | registers → value | per tag, coalescable |
+| **CAN** | *none* | frame payload → several signals | driven by arrival |
+| **UART** | a command line | reply → one or several values | per command |
+
+`hmi_runtime.c` already has this in Modbus-shaped form: `hmi_transaction_t`
+carries a kind, a retry counter and a timeout, and a round-robin cursor decides
+what goes next. Making it serve all three needs exactly two changes and no
+redesign:
+
+1. **A transaction fans out.** It holds one `hmi_binding_state_t *` today; a
+   CAN frame and a UART bulk reply both update several tags from one event.
+2. **The transport becomes an interface.** `static modbus_rtu_async_client_t
+   g_modbus_client` is a concrete global; the loop above it is already generic.
+
+### 9.6 What should **not** be unified
+
+An abstraction that covers everything covers nothing, so two things are worth
+leaving alone:
+
+- **The link layer.** Baud rate, parity and unit id have no CAN counterpart;
+  bitrate, sample point and FD have no serial counterpart; framing and checksum
+  are UART's alone. A common "connection" type would be two-thirds irrelevant
+  whichever protocol was selected. Keeping `communication` and `canBus`
+  separate is correct — the only cost is one top-level field per protocol,
+  which is honest bookkeeping rather than a leak.
+- **The Protocol tab's fork.** `protocol === 'modbus-rtu' ? … : …` over the
+  link section is the UI reflecting a real difference. What should *not* fork
+  is the tag table below it: that is one table with one shape, and today it is
+  two.
+
+The rule separating the two cases: **fork where the protocols genuinely
+differ, unify where they only appear to.** The link differs. The value does
+not.
+
+### 9.7 Recommendation
+
+Ordered by what pays off soonest, and by what can be done before a second
+protocol exists:
+
+| # | Change | Pays off |
+|---|---|---|
+| 1 | Add `offset` to the Modbus tag | **Immediately, with one protocol.** It is a missing feature today, not preparation |
+| 2 | One `TagDataType` vocabulary, width moved into the source | Immediately — it is also what lets a Modbus tag say `uint32` and a UART tag say `uint` without two enums |
+| 3 | `modbusBinding` → a neutral name, source behind a discriminator | Before a second protocol; cheap now, a three-way fork later |
+| 4 | Gate the binding editor on the project's protocol | Immediately — a CAN project should not be offered a Modbus tag list |
+| 5 | One `Tag` type with a `source` union, replacing the two tables | With the second implemented protocol |
+| 6 | Transport interface + fan-out transaction in the runtime | With the second implemented protocol |
+
+Items 1, 2 and 4 are worth doing whether or not CAN or UART ever ships: each
+fixes something that is wrong with the single protocol that exists. Item 3 is
+the one with a deadline. Items 5 and 6 should wait for a second protocol that
+is actually being built, because an abstraction with one implementation is a
+guess.
+
+### 9.8 The test to keep applying
+
+For every field added to a tag or a binding from here on:
+
+> **Can this be filled in without knowing which bus is behind it?**
+
+Yes → it belongs in the neutral half, and no protocol name should appear in it.
+No → it belongs in the source, behind the discriminator.
+
+Applied to today's fields, that test puts `scale`, `offset`, `access`,
+`dataType` and everything about the widget in the neutral half, and `area`,
+`address`, `frameId`, the bit window, the command template and the reply
+locator in the source. It also explains the one field that is currently in the
+wrong place: `pollIntervalMs` on a CAN signal, which cannot be answered without
+knowing that CAN does not poll.
