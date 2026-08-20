@@ -15,9 +15,11 @@ export interface EventHandlerGroup {
 }
 import { getLogicFuncNames } from '../utils/nameUtils';
 import {
+  animCompletedFuncName,
   animStartFuncName,
   animStopFuncName,
   animationSymbolsById,
+  hasCompletedBindings,
   type AnimationSymbol,
 } from '../animationSymbols';
 import { screenLoadStatement } from '../screenTransition';
@@ -151,9 +153,11 @@ function generateBuiltinActionCode(
   animations: Map<string, AnimationSymbol>,
   /** The screen carrying the binding, when a screen rather than a widget does. */
   ownerScreen?: Screen,
+  /** Two inside an object handler's `if (code == ...)`, one without it. */
+  indentLevel = 2,
 ): string[] {
   const lines: string[] = [];
-  const indent = getIndent(options, 2);
+  const indent = getIndent(options, indentLevel);
   
   switch (action.type) {
     case 'navigate': {
@@ -381,9 +385,10 @@ function generateLogicHandlerCode(
   options: CodeGenOptions,
   logicGraphs: LogicGraph[],
   logicFuncNames: Map<string, string>,
+  indentLevel = 2,
 ): string[] {
   const lines: string[] = [];
-  const indent2 = getIndent(options, 2);
+  const indent2 = getIndent(options, indentLevel);
   const graphIds = event.logicGraphIds ?? [];
 
   if (graphIds.length === 0) {
@@ -444,6 +449,44 @@ export function groupEventHandlers(screens: Screen[]): EventHandlerGroup[] {
   return [...groups.values()];
 }
 
+/**
+ * What a list of bindings runs, in the order the panel lists them.
+ *
+ * Shared by the two kinds of handler: an object's, whose body sits inside an
+ * `if (code == ...)`, and an animation's, which has no event code to test.
+ */
+function generateBindingBodies(
+  bindings: EventBinding[],
+  handlerBase: string,
+  options: CodeGenOptions,
+  screens: Screen[],
+  languages: ProjectLanguage[],
+  logicGraphs: LogicGraph[],
+  logicFuncNames: Map<string, string>,
+  animations: Map<string, AnimationSymbol>,
+  indentLevel: number,
+  ownerScreen?: Screen,
+): string[] {
+  const lines: string[] = [];
+  const indent = getIndent(options, indentLevel);
+
+  for (const event of bindings) {
+    if (event.handlerType === 'builtin' && event.action) {
+      lines.push(...generateBuiltinActionCode(
+        event.action, options, screens, languages, animations, ownerScreen, indentLevel,
+      ));
+    } else if (event.handlerType === 'custom' && event.customCode) {
+      lines.push(...event.customCode.split('\n').map(line => `${indent}${line}`));
+    } else if (event.handlerType === 'logic') {
+      lines.push(...generateLogicHandlerCode(event, options, logicGraphs, logicFuncNames, indentLevel));
+    } else if (options.userCodeMarkers) {
+      lines.push(`${indent}${generateUserCodeSection(handlerBase, options)}`);
+    }
+  }
+
+  return lines;
+}
+
 function generateEventHandler(
   group: EventHandlerGroup,
   options: CodeGenOptions,
@@ -455,7 +498,6 @@ function generateEventHandler(
 ): string {
   const lines: string[] = [];
   const indent = getIndent(options);
-  const indent2 = getIndent(options, 2);
   const funcName = getEventHandlerName(group.handlerBase, group.eventType, options);
   const hasAction = group.bindings.some(
     (event) => event.handlerType === 'builtin' && event.action,
@@ -473,19 +515,53 @@ function generateEventHandler(
   lines.push(`${indent}if (code == ${group.eventType}) {`);
 
   // Every binding of this type runs here, in the order the panel lists them.
-  for (const event of group.bindings) {
-    if (event.handlerType === 'builtin' && event.action) {
-      lines.push(...generateBuiltinActionCode(event.action, options, screens, languages, animations, group.screen));
-    } else if (event.handlerType === 'custom' && event.customCode) {
-      lines.push(...event.customCode.split('\n').map(line => `${indent2}${line}`));
-    } else if (event.handlerType === 'logic') {
-      lines.push(...generateLogicHandlerCode(event, options, logicGraphs, logicFuncNames));
-    } else if (options.userCodeMarkers) {
-      lines.push(`${indent2}${generateUserCodeSection(`${group.handlerBase}_${group.eventType}`, options)}`);
-    }
-  }
+  lines.push(...generateBindingBodies(
+    group.bindings,
+    `${group.handlerBase}_${group.eventType}`,
+    options, screens, languages, logicGraphs, logicFuncNames, animations, 2, group.screen,
+  ));
 
   lines.push(`${indent}}`);
+  lines.push('}');
+
+  return lines.join('\n');
+}
+
+/**
+ * The handler LVGL calls when an animation has finished, holding whatever that
+ * animation's own bindings run.
+ *
+ * LVGL removes the animation from its list before calling this, so starting
+ * another animation - or loading another screen - from in here is safe: the
+ * animation timer notices the list changed and walks it again.
+ *
+ * An animation with no generatable track has no start function either, so
+ * nothing would ever call this; it gets none.
+ */
+function generateAnimationCompletedHandler(
+  symbol: AnimationSymbol,
+  options: CodeGenOptions,
+  screens: Screen[],
+  languages: ProjectLanguage[],
+  logicGraphs: LogicGraph[],
+  logicFuncNames: Map<string, string>,
+  animations: Map<string, AnimationSymbol>,
+): string {
+  const lines: string[] = [];
+  const indent = getIndent(options);
+  const funcName = animCompletedFuncName(symbol);
+
+  if (options.generateComments) {
+    lines.push(generateComment(`${symbol.animation.name} has finished`, options));
+  }
+  lines.push(`void ${funcName}(lv_anim_t *a) {`);
+  lines.push(`${indent}(void)a;`);
+  lines.push('');
+  lines.push(...generateBindingBodies(
+    symbol.animation.events ?? [],
+    `anim_${symbol.animation.name}_completed`,
+    options, screens, languages, logicGraphs, logicFuncNames, animations, 1, symbol.screen,
+  ));
   lines.push('}');
 
   return lines.join('\n');
@@ -530,8 +606,9 @@ export function generateEventsSource(
   // Event handlers
   const allEvents = getAllEvents(screens);
   const hasScreenEvents = screens.some((screen) => (screen.events ?? []).length > 0);
+  const hasAnimationEvents = [...animations.values()].some(hasCompletedBindings);
 
-  if (allEvents.length > 0 || hasScreenEvents) {
+  if (allEvents.length > 0 || hasScreenEvents || hasAnimationEvents) {
     if (options.generateComments) {
       lines.push(generateSectionHeader('Event Handlers', options));
       lines.push('');
@@ -539,6 +616,16 @@ export function generateEventsSource(
 
     for (const group of groupEventHandlers(screens)) {
       lines.push(generateEventHandler(group, options, screens, languages, logicGraphs, logicFuncNames, animations));
+      lines.push('');
+    }
+
+    // An animation announces itself the same way, through a callback of its
+    // own rather than an event on an object.
+    for (const symbol of animations.values()) {
+      if (!hasCompletedBindings(symbol)) continue;
+      lines.push(generateAnimationCompletedHandler(
+        symbol, options, screens, languages, logicGraphs, logicFuncNames, animations,
+      ));
       lines.push('');
     }
   } else {

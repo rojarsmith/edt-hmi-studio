@@ -22,9 +22,11 @@ import {
 import {
   ANIM_WRAPPERS,
   ANIM_DIRECT_SETTERS,
+  animCompletedFuncName,
   animStartFuncName,
   animStopFuncName,
   collectAnimationSymbols,
+  hasCompletedBindings,
   type AnimationSymbol,
 } from '../animationSymbols';
 import {
@@ -1239,6 +1241,14 @@ function generateAnimationFunction(
     lines.push(`${indent}lv_anim_set_path_cb(&${animVar}, ${getEasingPath(anim.easing)});`);
     if (anim.repeat > 0) {
       lines.push(`${indent}lv_anim_set_repeat_count(&${animVar}, ${anim.repeat});`);
+    }
+    // Only the first track announces the animation. They share one clock, so
+    // they end together and any one of them would do - but exactly one has to,
+    // or an animation with two tracks would fire its event twice.
+    if (index === 0 && hasCompletedBindings(symbol)) {
+      lines.push(
+        `${indent}lv_anim_set_completed_cb(&${animVar}, ${animCompletedFuncName(symbol)});`,
+      );
     }
     // lv_anim_start drops any running animation with the same var and exec_cb,
     // so triggering this twice restarts it rather than stacking two.

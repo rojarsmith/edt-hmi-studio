@@ -102,6 +102,23 @@ export function animStopFuncName(symbol: AnimationSymbol): string {
   return `${symbol.base}_stop`;
 }
 
+/**
+ * `${base}_completed`: what LVGL calls once the animation has finished, which
+ * is where the animation's own event bindings run.
+ *
+ * Only the animation's first track carries it. The tracks share one clock, so
+ * they all end together and any one of them would do - one of them has to,
+ * or an animation with two tracks would announce itself twice.
+ */
+export function animCompletedFuncName(symbol: AnimationSymbol): string {
+  return `${symbol.base}_completed`;
+}
+
+/** Whether anything is waiting for this animation to finish. */
+export function hasCompletedBindings(symbol: AnimationSymbol): boolean {
+  return symbol.tracks.length > 0 && (symbol.animation.events ?? []).length > 0;
+}
+
 /** The project's animations indexed by id, for resolving a binding. */
 export function animationSymbolsById(
   animations: Animation[],

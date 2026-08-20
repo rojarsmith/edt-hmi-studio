@@ -88,6 +88,16 @@ export interface Animation {
   tracks?: AnimationTrack[];
 
   /**
+   * What runs when this animation has finished - the only thing an animation
+   * itself can announce. Absent means nothing follows it.
+   *
+   * It is the same EventBinding a screen or a widget carries, so the action
+   * list is the same one: play another animation, change screen, set a
+   * property, run a logic graph.
+   */
+  events?: EventBinding[];
+
+  /**
    * @deprecated A preset picker rather than a property of the animation: it
    * said the same thing as `property` and could contradict it. The dialog now
    * offers presets that add tracks instead.
@@ -185,7 +195,15 @@ export type LvglEventType =
   | 'LV_EVENT_SCREEN_LOAD_START'
   | 'LV_EVENT_SCREEN_LOADED'
   | 'LV_EVENT_SCREEN_UNLOAD_START'
-  | 'LV_EVENT_SCREEN_UNLOADED';
+  | 'LV_EVENT_SCREEN_UNLOADED'
+  /**
+   * Not an LVGL event. An animation finishing is a callback on the animation
+   * (lv_anim_set_completed_cb), not an event on an object, so this one never
+   * reaches lv_obj_add_event_cb - it names the generated completed callback
+   * instead. It travels in an EventBinding so that an animation's Events
+   * category is the same category a screen and a widget have.
+   */
+  | 'ANIM_COMPLETED';
 
 /**
  * How a screen change is drawn. Named after TouchGFX Designer's set, mapped

@@ -53,7 +53,7 @@ export function generateCode(
   return {
     'ui.h': generateUiHeader(screens, opts, fontResources, defaultFont, defaultFontSize, useBuiltinSymbols, effectiveTypographies, animations),
     'ui.c': generateUiSource(screens, opts, theme, imageResources, defaultFont, defaultFontSize, fontResources, useBuiltinSymbols, symbolFont, typographies, texts, languages, animations),
-    'ui_events.h': generateEventsHeader(screens, opts),
+    'ui_events.h': generateEventsHeader(screens, opts, animations),
     'ui_events.c': generateEventsSource(screens, opts, languages, activeGraphs, animations),
     'ui_logic.h': generateLogicHeader(opts, activeGraphs),
     'ui_logic.c': generateLogicSource(opts, activeGraphs, screens, modbusTags),
