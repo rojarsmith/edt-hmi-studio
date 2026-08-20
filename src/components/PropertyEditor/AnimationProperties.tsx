@@ -33,22 +33,6 @@ const PROPERTY_OPTIONS = [
   { value: 'transform_angle', label: 'Rotation Angle (transform_angle)' },
 ];
 
-/**
- * Ready-made journeys, kept as buttons rather than as a field on the
- * animation. A preset used to be an Animation Type stored beside the property
- * it duplicated, free to contradict it — "Slide In from Left" on an opacity
- * animation. It adds tracks now and is forgotten.
- */
-const PRESETS: { label: string; track: () => AnimationTrack }[] = [
-  { label: 'Slide in from left', track: () => ({ id: uuidv4(), property: 'x', valueMode: 'offset', startValue: 0, endValue: 0, distance: 100 }) },
-  { label: 'Slide in from right', track: () => ({ id: uuidv4(), property: 'x', valueMode: 'offset', startValue: 0, endValue: 0, distance: -100 }) },
-  { label: 'Slide in from top', track: () => ({ id: uuidv4(), property: 'y', valueMode: 'offset', startValue: 0, endValue: 0, distance: 100 }) },
-  { label: 'Slide in from bottom', track: () => ({ id: uuidv4(), property: 'y', valueMode: 'offset', startValue: 0, endValue: 0, distance: -100 }) },
-  { label: 'Fade in', track: () => ({ id: uuidv4(), property: 'opa', valueMode: 'absolute', startValue: 0, endValue: 255 }) },
-  { label: 'Fade out', track: () => ({ id: uuidv4(), property: 'opa', valueMode: 'absolute', startValue: 255, endValue: 0 }) },
-  { label: 'Zoom in', track: () => ({ id: uuidv4(), property: 'transform_zoom', valueMode: 'absolute', startValue: 128, endValue: 256 }) },
-];
-
 const AnimationProperties: React.FC<{
   animation: Animation;
   /** The panel's search box, which sits directly below the pinned block. */
@@ -204,7 +188,7 @@ const AnimationProperties: React.FC<{
 
         {tracks.length === 0 ? (
           <p className="field-hint">
-            This animation drives nothing yet. Add a property, or pick a preset below.
+            This animation drives nothing yet. Add a property to give it something to move.
           </p>
         ) : (
           tracks.map(track => (
@@ -295,26 +279,6 @@ const AnimationProperties: React.FC<{
         >
           ＋ Property
         </button>
-      </div>
-
-      <div className="property-section">
-        <div className="section-header">Presets</div>
-        <div className="anim-presets">
-          {PRESETS.map(preset => (
-            <button
-              key={preset.label}
-              type="button"
-              className="anim-preset-btn"
-              onClick={() => setTracks([...tracks, preset.track()])}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-        <p className="field-hint">
-          A preset adds properties to the list above; it is not remembered as a
-          setting of its own.
-        </p>
       </div>
 
     </>

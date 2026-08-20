@@ -346,8 +346,7 @@
   margin-bottom: 0;
 }
 
-.anim-track-add,
-.anim-preset-btn {
+.anim-track-add {
   border: 1px solid #ddd;
   background: #fff;
   border-radius: 4px;
@@ -358,8 +357,7 @@
   transition: all 0.15s;
 }
 
-.anim-track-add:hover,
-.anim-preset-btn:hover {
+.anim-track-add:hover {
   background: #f0f0f0;
   color: #222;
 }
@@ -397,12 +395,6 @@
 .anim-track-remove:hover {
   background: #ffebee;
   color: #d32f2f;
-}
-
-.anim-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
 /* The row the property panel is currently editing. */

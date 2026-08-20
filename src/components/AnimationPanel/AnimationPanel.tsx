@@ -57,7 +57,9 @@ const AnimationPanel: React.FC = () => {
     const id = addAnimation({
       targetComponentId: '',
       easing: 'ease_out',
-      duration: 300,
+      // Long enough to read as a movement rather than a jump, and a round
+      // number to adjust from.
+      duration: 1000,
       delay: 0,
       repeat: 0,
       tracks: [newTrack(uuidv4(), 'x')],

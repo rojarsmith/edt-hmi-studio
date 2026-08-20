@@ -1445,7 +1445,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addAnimation: (seed) => {
     const id = seed.id ?? uuidv4();
     const animations = get().animations;
-    const name = seed.name?.trim() || nextAnimationName(animations, 'Anim');
+    const name = seed.name?.trim() || nextAnimationName(animations, 'Animation');
     set({ animations: [...animations, { ...seed, id, name }] });
     return id;
   },

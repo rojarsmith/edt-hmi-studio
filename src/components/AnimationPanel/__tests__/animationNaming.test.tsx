@@ -62,18 +62,26 @@ describe('naming an animation in the manager', () => {
     fireEvent.click(screen.getByTitle('Add animation'));
 
     // It exists straight away, under a neutral numbered name.
-    expect(useEditorStore.getState().animations.map(a => a.name)).toEqual(['Anim_1']);
+    expect(useEditorStore.getState().animations.map(a => a.name)).toEqual(['Animation_1']);
     // And the name is in an input, waiting.
-    expect((screen.getByLabelText('Animation name') as HTMLInputElement).value).toBe('Anim_1');
+    expect((screen.getByLabelText('Animation name') as HTMLInputElement).value).toBe('Animation_1');
   });
 
-  it('numbers a second one without clashing', () => {
-    setUp([component('comp-1')], [anim('Anim_1')]);
+  it('starts a second long, which is long enough to see', () => {
     render(<AnimationPanel />);
 
     fireEvent.click(screen.getByTitle('Add animation'));
 
-    expect(useEditorStore.getState().animations.map(a => a.name)).toEqual(['Anim_1', 'Anim_2']);
+    expect(useEditorStore.getState().animations[0].duration).toBe(1000);
+  });
+
+  it('numbers a second one without clashing', () => {
+    setUp([component('comp-1')], [anim('Animation_1')]);
+    render(<AnimationPanel />);
+
+    fireEvent.click(screen.getByTitle('Add animation'));
+
+    expect(useEditorStore.getState().animations.map(a => a.name)).toEqual(['Animation_1', 'Animation_2']);
   });
 
   it('points the property panel at what it just created', () => {

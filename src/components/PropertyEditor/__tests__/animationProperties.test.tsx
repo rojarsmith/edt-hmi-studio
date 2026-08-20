@@ -145,14 +145,6 @@ describe('animation properties', () => {
     expect(current().tracks).toHaveLength(1);
   });
 
-  it('adds a track from a preset', () => {
-    render(<PropertyEditor />);
-
-    fireEvent.click(screen.getByText('Fade in'));
-
-    expect(current().tracks!.map(t => t.property)).toEqual(['x', 'opa']);
-  });
-
   it('switches a track to absolute, which asks for two coordinates', () => {
     const { container } = render(<PropertyEditor />);
 

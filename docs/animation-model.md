@@ -25,9 +25,10 @@ animations kept in step by hand.
 
 There is no Animation Type. It said the same thing as the property beside it
 and was free to contradict it: "Slide In from Left" stored against an opacity
-animation, with only the property reaching the firmware. Presets remain in the
-property editor as buttons that add tracks and are then forgotten, which is
-all a preset ever was.
+animation, with only the property reaching the firmware. There are no presets
+either: a ready-made "Slide in from left" only ever added one track anyone
+could add, and reading a list of them was slower than choosing a property and
+a distance.
 
 A designer can therefore build a screen's entry animation without writing
 code: place the widgets, define the animation, and bind it to the screen's
@@ -41,9 +42,11 @@ drives rather than living inside it, so retargeting an animation does not
 move it, and deleting a widget does not delete the animations aimed at it.
 
 Names are unique across the project because the name becomes the generated C
-function's name (see below). Adding one hands out `Anim_1`, `Anim_2` and so
-on under the same gap-filling rule component ids use, and a name another
-animation already answers to is refused rather than taken.
+function's name (see below). Adding one hands out `Animation_1`,
+`Animation_2` and so on under the same gap-filling rule component ids use, and
+a name another animation already answers to is refused rather than taken. It
+starts a second long, which is long enough to read as a movement rather than
+a jump, and a round number to adjust from.
 
 ### Where it is edited
 
@@ -51,7 +54,7 @@ Naming happens in the manager, in place: adding an animation creates it and
 puts the cursor in its name, and a double click renames it later — the same
 gesture that names a screen. Selecting a row points the **property editor** at
 it, which is where everything else about it lives: target, the shared clock,
-the property tracks, and the presets that add them.
+and the property tracks.
 
 That panel shows one thing at a time. Picking an animation clears the canvas
 selection, and picking a component clears the animation, so the question "what
@@ -141,9 +144,8 @@ with somewhere to travel from. A width of 100 is a hundred pixels wherever it
 is measured from, and an opacity has no position at all. An animation carrying
 no mode reads as absolute, which is what the generator always did with one.
 
-The slide presets hand out a distance rather than a pair of coordinates, since
-a slide is a journey. Fades and zooms stay absolute: they are values, not
-places.
+A slide is a journey, so offset asks for a distance rather than a pair of
+coordinates. Fades and zooms stay absolute: they are values, not places.
 
 ## What gets generated
 
