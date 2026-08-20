@@ -15,6 +15,11 @@ import {
   pointsInBox,
 } from '../../utils/lineGeometry';
 import {
+  isConvexPolygon,
+  normalizePolygonPoints,
+  pointsInPolygonBox,
+} from '../../utils/polygonGeometry';
+import {
   DEFAULT_END_ANGLE,
   DEFAULT_START_ANGLE,
   normalizeSweep,
@@ -130,6 +135,10 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
     img: isV9 ? 'lv_image_create' : 'lv_img_create',
     'image-button': isV9 ? 'lv_image_create' : 'lv_img_create',
     line: 'lv_line_create',
+    // A polygon is a closed line, plus a fill drawn under it. LVGL has no
+    // polygon widget and no filled-polygon primitive - see
+    // generatePolygonFillSupport.
+    polygon: 'lv_line_create',
     textarea: 'lv_textarea_create',
     dropdown: 'lv_dropdown_create',
     checkbox: 'lv_checkbox_create',
@@ -211,7 +220,7 @@ function withoutBoxStyles(component: LvglComponent): StyleProps {
     } = rest;
     return { ...arcRest, bgColor: 'transparent', borderWidth: 0 };
   }
-  if (component.type !== 'line') return styles;
+  if (component.type !== 'line' && component.type !== 'polygon') return styles;
   const {
     bgColor: _bgColor,
     bgGradColor: _bgGradColor,
@@ -240,6 +249,34 @@ function generatedLinePoints(props: Record<string, any>): number[][] {
   ]);
 }
 
+/**
+ * The points a polygon is drawn from, placed in its box the way the editor
+ * places them, and closed: the first point is repeated at the end because
+ * `lv_line_set_points` draws an open polyline.
+ *
+ * Rounded on the way out. `lv_point_precise_t` is a float only when a build
+ * sets `LV_USE_FLOAT`, and this firmware does not - the editor keeps the
+ * precision it was drawn at, and the panel gets whole pixels.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function generatedPolygonPoints(props: Record<string, any>): number[][] {
+  const points = pointsInPolygonBox(normalizePolygonPoints(props?.points))
+    .map(([x, y]) => [Math.round(x), Math.round(y)]);
+  return [...points, points[0]];
+}
+
+/** Whether this polygon's fill can be drawn, and what colour it is. */
+function polygonFill(component: LvglComponent): string | null {
+  if (component.type !== 'polygon') return null;
+  const color = component.styles.default.bgColor;
+  if (!color || color === 'transparent') return null;
+  // A triangle fan covers a convex outline only. A concave one is drawn as an
+  // outline here exactly as it is on the canvas, rather than filled with a
+  // shape nobody asked for.
+  const points = normalizePolygonPoints(component.props?.points);
+  return isConvexPolygon(points) ? color : null;
+}
+
 /** The file-scope array `lv_line_set_points` will hold a pointer to. */
 function linePointsDeclaration(
   varName: string,
@@ -247,9 +284,86 @@ function linePointsDeclaration(
   options: CodeGenOptions,
 ): string {
   const pointType = options.lvglVersion === '9' ? 'lv_point_precise_t' : 'lv_point_t';
-  const points = generatedLinePoints(comp.props || {});
+  const points = comp.type === 'polygon'
+    ? generatedPolygonPoints(comp.props || {})
+    : generatedLinePoints(comp.props || {});
   const values = points.map(([x, y]) => `{${x}, ${y}}`).join(', ');
   return `static ${pointType} ${varName}_points[${points.length}] = {${values}};`;
+}
+
+/**
+ * The one callback every filled polygon shares, and the record each of them
+ * hands it.
+ *
+ * LVGL has a filled triangle and no filled polygon, so a convex outline is
+ * covered by a fan of n-2 triangles sharing its first point. It is drawn on
+ * LV_EVENT_DRAW_MAIN_BEGIN - before the line widget strokes its own outline,
+ * so the outline stays on top - and at the same origin lv_line draws from, so
+ * fill and outline cannot drift apart.
+ *
+ * The colour travels as a plain integer rather than an lv_color_t because a
+ * static initialiser cannot call lv_color_hex().
+ */
+function generatePolygonFillSupport(
+  components: { comp: LvglComponent; varName: string }[],
+  options: CodeGenOptions,
+): string[] {
+  const filled = components.filter(({ comp }) => polygonFill(comp) !== null);
+  if (filled.length === 0) return [];
+
+  const indent = getIndent(options);
+  const lines: string[] = [];
+
+  if (options.generateComments) {
+    lines.push(generateSectionHeader('Polygon Fill', options));
+    lines.push('');
+  }
+
+  lines.push('typedef struct {');
+  lines.push(`${indent}const lv_point_precise_t *points;`);
+  lines.push(`${indent}uint32_t point_cnt;`);
+  lines.push(`${indent}uint32_t color;`);
+  lines.push('} ui_polygon_fill_t;');
+  lines.push('');
+  lines.push('static void ui_polygon_fill_cb(lv_event_t *e) {');
+  lines.push(`${indent}lv_obj_t *obj = lv_event_get_target(e);`);
+  lines.push(`${indent}lv_layer_t *layer = lv_event_get_layer(e);`);
+  lines.push(`${indent}const ui_polygon_fill_t *fill = lv_event_get_user_data(e);`);
+  lines.push('');
+  lines.push(`${indent}lv_area_t area;`);
+  lines.push(`${indent}lv_obj_get_coords(obj, &area);`);
+  lines.push(`${indent}int32_t x_ofs = area.x1 - lv_obj_get_scroll_x(obj);`);
+  lines.push(`${indent}int32_t y_ofs = area.y1 - lv_obj_get_scroll_y(obj);`);
+  lines.push('');
+  lines.push(`${indent}lv_draw_triangle_dsc_t dsc;`);
+  lines.push(`${indent}lv_draw_triangle_dsc_init(&dsc);`);
+  lines.push(`${indent}dsc.color = lv_color_hex(fill->color);`);
+  lines.push(`${indent}dsc.opa = lv_obj_get_style_opa(obj, LV_PART_MAIN);`);
+  lines.push('');
+  lines.push(`${indent}for (uint32_t i = 1; i + 1 < fill->point_cnt; i++) {`);
+  lines.push(`${indent}${indent}dsc.p[0].x = fill->points[0].x + x_ofs;`);
+  lines.push(`${indent}${indent}dsc.p[0].y = fill->points[0].y + y_ofs;`);
+  lines.push(`${indent}${indent}dsc.p[1].x = fill->points[i].x + x_ofs;`);
+  lines.push(`${indent}${indent}dsc.p[1].y = fill->points[i].y + y_ofs;`);
+  lines.push(`${indent}${indent}dsc.p[2].x = fill->points[i + 1].x + x_ofs;`);
+  lines.push(`${indent}${indent}dsc.p[2].y = fill->points[i + 1].y + y_ofs;`);
+  lines.push(`${indent}${indent}lv_draw_triangle(layer, &dsc);`);
+  lines.push(`${indent}}`);
+  lines.push('}');
+  lines.push('');
+
+  for (const { comp, varName } of filled) {
+    // point_cnt is one short of the array: the closing repeat is the outline's,
+    // and a fan has no use for it.
+    const closed = generatedPolygonPoints(comp.props || {});
+    const color = (polygonFill(comp) ?? '#000000').replace('#', '0x');
+    lines.push(
+      `static const ui_polygon_fill_t ${varName}_fill = { ${varName}_points, ${closed.length - 1}, ${color} };`,
+    );
+  }
+  lines.push('');
+
+  return lines;
 }
 
 /**
@@ -794,6 +908,28 @@ function generatePropsCode(
         // LV_RADIUS_CIRCLE is clamped to half the shorter side, so a square
         // box gives a circle. The widget keeps its box square for that reason.
         lines.push(`${indent}lv_obj_set_style_radius(${varName}, LV_RADIUS_CIRCLE, 0);`);
+      }
+      break;
+    }
+
+    case 'polygon': {
+      const points = generatedPolygonPoints(props);
+      lines.push(
+        `${indent}lv_line_set_points(${varName}, ${varName}_points, ${points.length});`,
+      );
+      if (props.lineWidth !== undefined && props.lineWidth !== DEFAULT_LINE_WIDTH) {
+        lines.push(`${indent}lv_obj_set_style_line_width(${varName}, ${props.lineWidth}, 0);`);
+      }
+      if (props.lineColor) {
+        lines.push(`${indent}lv_obj_set_style_line_color(${varName}, ${colorToLvgl(props.lineColor)}, 0);`);
+      }
+      if (props.lineRounded) {
+        lines.push(`${indent}lv_obj_set_style_line_rounded(${varName}, true, 0);`);
+      }
+      if (component && polygonFill(component) !== null) {
+        lines.push(
+          `${indent}lv_obj_add_event_cb(${varName}, ui_polygon_fill_cb, LV_EVENT_DRAW_MAIN_BEGIN, (void *)&${varName}_fill);`,
+        );
       }
       break;
     }
@@ -2613,11 +2749,25 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
       lines.push(`lv_obj_t *${varName};`);
       // lv_line_set_points keeps the pointer it is given rather than copying,
       // so the array has to outlive the widget: file scope, beside it.
-      if (comp.type === 'line') {
+      if (comp.type === 'line' || comp.type === 'polygon') {
         lines.push(linePointsDeclaration(varName, comp, options));
       }
     }
     lines.push('');
+  }
+
+  // Before any screen init registers it, and beside the point arrays it reads.
+  const polygonFillSupport = generatePolygonFillSupport(
+    allComponents.map(({ comp, screenName }) => ({
+      comp,
+      varName: needsScreenPrefix.has(comp.id)
+        ? getComponentVarName(`${screenName}_${comp.name}`, options)
+        : getComponentVarName(comp.name, options),
+    })),
+    options,
+  );
+  if (polygonFillSupport.length > 0) {
+    lines.push(...polygonFillSupport);
   }
 
   const imageButtonSupport = generateImageButtonSupport(
