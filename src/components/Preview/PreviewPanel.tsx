@@ -4,6 +4,7 @@ import { useResourceStore } from '../../resources/resourceStore';
 import type {
   LvglComponent,
   Animation,
+  EventBinding,
   ScreenTransition,
   ScreenTransitionDirection,
 } from '../../types';
@@ -172,16 +173,31 @@ const PreviewPanel: React.FC = () => {
   const [screenChange, setScreenChange] = useState<ActiveScreenChange | null>(null);
   const screenChangeRef = useRef<ActiveScreenChange | null>(null);
   const changeFrameRef = useRef<number>(0);
+  /**
+   * Which animations of the current run have already announced themselves, so
+   * one announces once however many frames it is still asked about.
+   */
+  const completedRef = useRef<Set<string>>(new Set());
+  /**
+   * What a binding does, held in a ref because the animation loop runs it and
+   * it, in turn, can start the animation loop.
+   */
+  const runActionsRef = useRef<(bindings: EventBinding[]) => void>(() => {});
   const [imageButtonStateIndices, setImageButtonStateIndices] =
     useState<Map<string, number>>(new Map());
 
-  // Re-boot when the entry screen moves, or when playback stops. Adjusted
-  // during render behind a previous-value guard rather than in an effect, so
-  // the preview never paints a stale screen first.
-  const [prevSync, setPrevSync] = useState({ screenId: entryScreenId, playing: animPlaying });
-  if (prevSync.screenId !== entryScreenId || prevSync.playing !== animPlaying) {
-    setPrevSync({ screenId: entryScreenId, playing: animPlaying });
-    if (!animPlaying) setPreviewPageId(entryScreenId);
+  // Re-boot when the entry screen moves. Adjusted during render behind a
+  // previous-value guard rather than in an effect, so the preview never paints
+  // a stale screen first.
+  //
+  // Playback ending used to re-boot too, which an animation that changes
+  // screen as its last act would have had undone a frame later. Reset returns
+  // to the entry screen itself, so nothing is lost by leaving a finished run
+  // wherever it arrived.
+  const [prevEntry, setPrevEntry] = useState(entryScreenId);
+  if (prevEntry !== entryScreenId) {
+    setPrevEntry(entryScreenId);
+    setPreviewPageId(entryScreenId);
   }
 
   const previewPage = screens.find(p => p.id === previewPageId) || screens.find(p => p.id === entryScreenId);
@@ -247,6 +263,7 @@ const PreviewPanel: React.FC = () => {
   const runAnimations = useCallback((allAnims: { compId: string; anim: Animation }[]) => {
     if (allAnims.length === 0) return;
     runningAnimsRef.current = allAnims;
+    completedRef.current = new Set();
 
     setAnimPlaying(true);
     setAnimPaused(false);
@@ -290,11 +307,26 @@ const PreviewPanel: React.FC = () => {
 
       setAnimStates(newStates);
 
+      // Each animation announces itself on its own clock, not the run's: two
+      // played together can be different lengths.
+      const finished = allAnims.filter(({ anim }) => {
+        const end = (anim.delay || 0) + (anim.duration || 300) * Math.max(1, anim.repeat || 1);
+        if (elapsed < end || completedRef.current.has(anim.id)) return false;
+        completedRef.current.add(anim.id);
+        return (anim.events ?? []).length > 0;
+      });
+
       if (elapsed < maxEnd * (Math.max(...allAnims.map(a => a.anim.repeat || 1)))) {
         animFrameRef.current = requestAnimationFrame(tick);
       } else {
         setAnimPlaying(false);
         setAnimStates(new Map());
+      }
+
+      // Last, so a binding that starts another run replaces the frame just
+      // scheduled rather than racing it.
+      for (const { anim } of finished) {
+        runActionsRef.current(anim.events ?? []);
       }
     };
 
@@ -453,6 +485,52 @@ const PreviewPanel: React.FC = () => {
     };
   }, []);
 
+  /**
+   * Run a list of bindings, in the order the panel lists them - a widget's, or
+   * an animation's now that one can say it has finished.
+   */
+  const runActions = useCallback((bindings: EventBinding[]) => {
+    for (const ev of bindings) {
+      if (ev.action?.type === 'playAnimation' && ev.action.animationId) {
+        const target = animationsOn(components, projectAnimations)
+          .find(entry => entry.anim.id === ev.action!.animationId);
+        // An animation on another screen has nothing to move here.
+        if (target) {
+          cancelAnimationFrame(animFrameRef.current);
+          runAnimations([target]);
+        }
+        continue;
+      }
+      if (ev.action?.type === 'stopAnimation') {
+        // Stop leaves the widget where it reached, so the states stay put.
+        cancelAnimationFrame(animFrameRef.current);
+        setAnimPlaying(false);
+        setAnimPaused(false);
+        continue;
+      }
+      if (ev.action?.type === 'navigate') {
+        // `targetPage` is the pre-rename spelling, still present in older
+        // projects; every binding written since says `targetScreen`, which
+        // this had stopped looking at.
+        const wanted = ev.action.targetScreen ?? ev.action.targetPage;
+        const targetPage = wanted
+          ? screens.find(p => p.name === wanted || p.id === wanted)
+          : undefined;
+        if (targetPage) {
+          enterScreen(targetPage.id, ev.action);
+          return;
+        }
+      }
+    }
+  }, [components, screens, projectAnimations, runAnimations, enterScreen]);
+
+  // The animation loop reaches it through this, which is what keeps the two
+  // from having to be defined in terms of each other. Written in an effect
+  // because a ref may not be touched during render.
+  useEffect(() => {
+    runActionsRef.current = runActions;
+  }, [runActions]);
+
   // Handle click for navigation
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -491,41 +569,8 @@ const PreviewPanel: React.FC = () => {
         });
       }
     }
-    if (hit && hit.events) {
-      for (const ev of hit.events) {
-        if (ev.action?.type === 'playAnimation' && ev.action.animationId) {
-          const target = animationsOn(components, projectAnimations)
-            .find(entry => entry.anim.id === ev.action!.animationId);
-          // An animation on another screen has nothing to move here.
-          if (target) {
-            cancelAnimationFrame(animFrameRef.current);
-            runAnimations([target]);
-          }
-          continue;
-        }
-        if (ev.action?.type === 'stopAnimation') {
-          // Stop leaves the widget where it reached, so the states stay put.
-          cancelAnimationFrame(animFrameRef.current);
-          setAnimPlaying(false);
-          setAnimPaused(false);
-          continue;
-        }
-        if (ev.action?.type === 'navigate') {
-          // `targetPage` is the pre-rename spelling, still present in older
-          // projects; every binding written since says `targetScreen`, which
-          // this had stopped looking at.
-          const wanted = ev.action.targetScreen ?? ev.action.targetPage;
-          const targetPage = wanted
-            ? screens.find(p => p.name === wanted || p.id === wanted)
-            : undefined;
-          if (targetPage) {
-            enterScreen(targetPage.id, ev.action);
-            return;
-          }
-        }
-      }
-    }
-  }, [components, screens, scale, projectAnimations, runAnimations, enterScreen]);
+    if (hit && hit.events) runActions(hit.events);
+  }, [components, scale, runActions]);
 
   // Render components to canvas
   useEffect(() => {
