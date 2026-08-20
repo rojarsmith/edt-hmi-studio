@@ -32,10 +32,30 @@
   background: #ffffff;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   position: relative;
-  /* Deliberately not clipped. A component parked outside the screen — the
+  /* Not clipped by default. A component parked outside the screen — the
      starting place of a slide-in, say — is off the display, not gone, and
      hiding it would leave the author with nothing to select or drag. The white
-     panel is what marks the visible area; the firmware does the real clipping. */
+     panel is what marks the visible area; the firmware does the real clipping.
+     Clip Content turns the clipping on for anyone who wants to see the panel's
+     own view of a screen. */
+}
+
+.canvas.clip-content {
+  overflow: hidden;
+}
+
+/* What falls outside the canvas, while it is not being clipped.
+   One element the size of the canvas with an enormous shadow spread, so the
+   whole surround is covered without four elements to keep in step; the
+   container clips the overflow.
+   The wash is the workspace's own colour, which is the trick that makes it
+   read as intended: painting #e8e8e8 over #e8e8e8 changes nothing, so the
+   background is untouched and only what overhangs it fades. */
+.canvas-outside-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(232, 232, 232, 0.62);
 }
 
 .canvas-grid {
@@ -137,6 +157,38 @@
 
 .canvas-reset:active {
   background: #e0e0e0;
+}
+
+/* Clip content — a toggle, so it also has an on state. */
+.canvas-clip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #666;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.canvas-clip:hover {
+  background: #f0f0f0;
+  color: #2196F3;
+}
+
+.canvas-clip.active {
+  background: #2196F3;
+  color: #fff;
+}
+
+.canvas-clip.active:hover {
+  background: #1e88e5;
+  color: #fff;
 }
 
 /* Pointer position — same pill as its neighbours, after TouchGFX Designer's

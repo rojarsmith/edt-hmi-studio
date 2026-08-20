@@ -121,6 +121,7 @@ const Canvas: React.FC = () => {
   // Actions — stable references from zustand
   const setZoom = useEditorStore(s => s.setZoom);
   const setPan = useEditorStore(s => s.setPan);
+  const toggleClipContent = useEditorStore(s => s.toggleClipContent);
   const selectComponent = useEditorStore(s => s.selectComponent);
   const selectComponents = useEditorStore(s => s.selectComponents);
   const clearSelection = useEditorStore(s => s.clearSelection);
@@ -972,7 +973,7 @@ const Canvas: React.FC = () => {
             canvasRef.current = node as HTMLDivElement;
             setNodeRef(node);
           }}
-          className="canvas"
+          className={`canvas ${canvas.clipContent ? 'clip-content' : ''}`}
           style={{
             width: canvas.width,
             height: canvas.height,
@@ -985,6 +986,13 @@ const Canvas: React.FC = () => {
           {renderComponents(components)}
           {renderBoxSelection()}
           <AlignmentGuides guides={alignmentGuides} />
+
+          {/* Everything outside the canvas, washed towards the workspace
+              colour. Last in the canvas so it paints over the components
+              without needing a z-index — this canvas stacks by document order
+              on purpose, see CanvasComponent.css. Nothing to wash once the
+              content is clipped. */}
+          {!canvas.clipContent && <div className="canvas-outside-wash" aria-hidden="true" />}
         </div>
       </div>
       
@@ -1007,6 +1015,30 @@ const Canvas: React.FC = () => {
               strokeLinecap="round"
             />
             <rect x="5.5" y="5.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          className={`canvas-clip ${canvas.clipContent ? 'active' : ''}`}
+          onClick={toggleClipContent}
+          aria-pressed={canvas.clipContent}
+          title={
+            canvas.clipContent
+              ? 'Clip Content: on — anything outside the canvas is hidden'
+              : 'Clip Content: off — anything outside the canvas is shown, dimmed'
+          }
+          aria-label="Clip content to the canvas"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            {/* A crop mark: the frame that decides what the panel will show. */}
+            <path
+              d="M4.5 1v10.5H15M1 4.5h10.5V15"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
 

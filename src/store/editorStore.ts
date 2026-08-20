@@ -303,6 +303,8 @@ interface EditorState {
   setZoom: (zoom: number) => void;
   setPan: (x: number, y: number) => void;
   toggleGrid: () => void;
+  /** Show or hide whatever falls outside the canvas. */
+  toggleClipContent: () => void;
   setSnapToGrid: (snap: boolean) => void;
   
   // Actions - Drag
@@ -751,6 +753,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     showGrid: true,
     gridSize: 10,
     snapToGrid: true,
+    clipContent: false,
   },
   
   selection: {
@@ -1923,6 +1926,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
   
+  toggleClipContent: () => {
+    set((state) => ({
+      canvas: { ...state.canvas, clipContent: !state.canvas.clipContent },
+    }));
+  },
+
   toggleGrid: () => {
     set(state => ({
       canvas: { ...state.canvas, showGrid: !state.canvas.showGrid },

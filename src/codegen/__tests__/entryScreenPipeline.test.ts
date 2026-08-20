@@ -17,6 +17,7 @@ const canvas: CanvasState = {
   showGrid: true,
   gridSize: 10,
   snapToGrid: true,
+  clipContent: false,
 };
 
 function screensOf(...names: [name: string, isEntry?: boolean][]): Screen[] {

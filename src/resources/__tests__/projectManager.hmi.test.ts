@@ -49,6 +49,7 @@ const canvas: CanvasState = {
   showGrid: true,
   gridSize: 10,
   snapToGrid: true,
+  clipContent: false,
 };
 
 describe('HMI project file round-trip', () => {

@@ -681,6 +681,15 @@ export interface CanvasState {
   showGrid: boolean;
   gridSize: number;
   snapToGrid: boolean;
+  /**
+   * Whether the canvas hides the parts of components that fall outside it.
+   *
+   * Off by default: a component parked off-screen is the normal starting place
+   * of a slide-in, and hiding it outright leaves nothing to select or drag.
+   * While it is off, those parts are washed towards the workspace colour
+   * instead, so what the panel will not show is visible but plainly marked.
+   */
+  clipContent: boolean;
 }
 
 // Selection State
