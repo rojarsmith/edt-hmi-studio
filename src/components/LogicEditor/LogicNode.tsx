@@ -212,6 +212,52 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
   );
 };
 
+/** The component a node's target names - by id, or by name in older graphs. */
+function findComponent(screens: Screen[], target: unknown): LvglComponent | undefined {
+  if (typeof target !== 'string' || !target.trim()) return undefined;
+
+  const walk = (components: LvglComponent[]): LvglComponent | undefined => {
+    for (const component of components) {
+      if (component.id === target || component.name === target) return component;
+      const child = walk(component.children);
+      if (child) return child;
+    }
+    return undefined;
+  };
+
+  for (const screen of screens) {
+    const found = walk(screen.components);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * The component a node drives, named rather than identified: the params store
+ * an id, and an id on the node face tells the reader nothing.
+ *
+ * A target that resolves to nothing wears a LACK badge, because nothing is
+ * generated for it - naming a variable the project does not declare is what
+ * used to stop the firmware compiling.
+ */
+function targetPreview(target: unknown, screens: Screen[]): React.ReactNode {
+  const component = findComponent(screens, target);
+  if (component) {
+    return <span className="param-preview">Target: {component.name}</span>;
+  }
+  const named = typeof target === 'string' ? target.trim() : '';
+  return (
+    <span className="param-preview">
+      Target: not set
+      <LackBadge
+        reason={named
+          ? `The project has no component "${named}" — this node generates no code`
+          : 'No component chosen — this node generates no code'}
+      />
+    </span>
+  );
+}
+
 // Render a preview of node parameters
 function renderParamsPreview(node: LogicNode, screens: Screen[]): React.ReactNode {
   const { params, subType } = node;
@@ -219,8 +265,12 @@ function renderParamsPreview(node: LogicNode, screens: Screen[]): React.ReactNod
   switch (subType) {
     case 'event_trigger':
       // The binding decides the event type; the face shows the callers
-      // instead (rendered by the component alongside this preview)
-      return null;
+      // instead (rendered by the component alongside this preview). A graph
+      // saved before that still names a component here, and nothing is
+      // registered against one the project has since lost.
+      return params.targetComponent && !findComponent(screens, params.targetComponent)
+        ? targetPreview(params.targetComponent, screens)
+        : null;
     case 'timer_trigger':
       return <span className="param-preview">{params.mode === 'delay' ? 'Delay' : 'Interval'}: {params.duration}ms</span>;
     case 'compare':
@@ -234,7 +284,23 @@ function renderParamsPreview(node: LogicNode, screens: Screen[]): React.ReactNod
     case 'delay':
       return <span className="param-preview">Delay: {params.duration}ms</span>;
     case 'show_hide':
-      return <span className="param-preview">Action: {params.action}</span>;
+      return (
+        <>
+          {targetPreview(params.targetComponent, screens)}
+          <span className="param-preview">Action: {params.action}</span>
+        </>
+      );
+    case 'set_property':
+    case 'get_property':
+      return (
+        <>
+          {targetPreview(params.targetComponent, screens)}
+          <span className="param-preview">Property: {params.property || 'x'}</span>
+        </>
+      );
+    case 'set_text':
+    case 'set_value':
+      return targetPreview(params.targetComponent, screens);
     case 'navigate_page': {
       // `targetPage` is the pre-rename spelling, still present in older graphs.
       const target = params.targetScreen || params.targetPage;

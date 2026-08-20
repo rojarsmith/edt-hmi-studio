@@ -12,7 +12,37 @@ import {
   createModbusTag,
 } from './helpers';
 import { getNodeDefinition } from '../../components/LogicEditor/nodeDefinitions';
-import type { LogicGraph } from '../../components/LogicEditor/types';
+import type { LogicGraph, LogicNode, LogicNodeSubType } from '../../components/LogicEditor/types';
+
+/**
+ * A project for the graphs in this file to point at.
+ *
+ * Their nodes name targets by name, as older graphs do, and the components
+ * have to be somewhere: a node naming one the project does not have generates
+ * no call at all, because the variable it would name is declared nowhere.
+ */
+const projectScreens = () => [
+  createScreen({
+    name: 'main',
+    components: [
+      createComponent('btn', { name: 'myBtn' }),
+      createComponent('btn', { name: 'btn' }),
+      createComponent('btn', { name: 'btn1' }),
+      createComponent('btn', { name: 'button' }),
+      createComponent('btn', { name: 'evTarget' }),
+      createComponent('btn', { name: 'tickTarget' }),
+      createComponent('obj', { name: 'panel' }),
+      createComponent('led', { name: 'led' }),
+      createComponent('label', { name: 'myLabel' }),
+      createComponent('label', { name: 'statusLabel' }),
+      createComponent('slider', { name: 'mySlider' }),
+      createComponent('slider', { name: 'slider' }),
+      createComponent('slider', { name: 'speedSlider' }),
+      createComponent('bar', { name: 'myBar' }),
+      createComponent('arc', { name: 'myArc' }),
+    ],
+  }),
+];
 
 describe('generateLogicSource', () => {
   // ── Includes ──────────────────────────────────────────────
@@ -36,7 +66,7 @@ describe('generateLogicSource', () => {
       const graph = createLogicGraph({
         variables: [createLogicVariable({ name: 'counter', type: 'int', defaultValue: 10 })],
       });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('static int32_t var_counter = 10;');
     });
 
@@ -44,7 +74,7 @@ describe('generateLogicSource', () => {
       const graph = createLogicGraph({
         variables: [createLogicVariable({ name: 'speed', type: 'float', defaultValue: 3.5 })],
       });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('static float var_speed = 3.5f;');
     });
 
@@ -52,7 +82,7 @@ describe('generateLogicSource', () => {
       const graph = createLogicGraph({
         variables: [createLogicVariable({ name: 'label', type: 'string', defaultValue: 'hello' })],
       });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('static char* var_label = "hello";');
     });
 
@@ -60,7 +90,7 @@ describe('generateLogicSource', () => {
       const graph = createLogicGraph({
         variables: [createLogicVariable({ name: 'active', type: 'bool', defaultValue: true })],
       });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('static bool var_active = true;');
     });
 
@@ -68,7 +98,7 @@ describe('generateLogicSource', () => {
       const graph = createLogicGraph({
         variables: [createLogicVariable({ name: 'done', type: 'bool', defaultValue: false })],
       });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('static bool var_done = false;');
     });
 
@@ -76,7 +106,7 @@ describe('generateLogicSource', () => {
       const v = createLogicVariable({ name: 'shared', type: 'int', defaultValue: 0 });
       const g1 = createLogicGraph({ name: 'g1', variables: [v] });
       const g2 = createLogicGraph({ name: 'g2', variables: [{ ...v, id: 'other-id' }] });
-      const result = generateLogicSource(defaultOptions(), [g1, g2]);
+      const result = generateLogicSource(defaultOptions(), [g1, g2], projectScreens());
       const matches = result.match(/static int32_t var_shared/g);
       expect(matches).toHaveLength(1);
     });
@@ -110,7 +140,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'click_handler', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph], projectScreens());
       expect(result).toContain('// Event: LV_EVENT_CLICKED on myBtn');
     });
 
@@ -121,7 +151,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'click_handler', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).not.toContain('// Event:');
     });
   });
@@ -135,7 +165,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'poll', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph], projectScreens());
       expect(result).toContain('// Timer: repeat, 500ms');
     });
 
@@ -146,7 +176,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'poll', nodes: [node] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('static void logic_poll_timer_cb(lv_timer_t *timer)');
       // The graph function is the EVENT entry; a timer elapsing must not
       // route through it
@@ -161,7 +191,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'poll', nodes: [node] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       // Forward declaration should appear before the function body
       const fwdIdx = result.indexOf('static void logic_poll_timer_cb(lv_timer_t *timer);');
       expect(fwdIdx).toBeGreaterThan(-1);
@@ -174,7 +204,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'oneshot', nodes: [node] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('lv_timer_del(timer)');
     });
 
@@ -185,7 +215,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'repeater', nodes: [node] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).not.toContain('lv_timer_del(timer)');
     });
   });
@@ -209,10 +239,125 @@ describe('generateLogicSource', () => {
           outputs: [],
         });
         const graph = createLogicGraph({ name: 'sp', nodes: [node] });
-        const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+        const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
         expect(result).toMatch(pattern);
       });
     }
+  });
+
+  // ── a target the project does not have ──────────────────
+
+  describe('a node whose component is not there', () => {
+    const graphWith = (node: LogicNode) =>
+      generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({ name: 'lack', nodes: [node] })],
+        projectScreens(),
+      );
+
+    const node = (subType: LogicNodeSubType, params: Record<string, unknown>) =>
+      createLogicNode(subType, { id: 'n1', params, inputs: [], outputs: [] });
+
+    it('generates no call when nothing is chosen', () => {
+      // It used to name `ui_obj`, a variable nothing declares, and the
+      // firmware failed to compile.
+      const result = graphWith(node('set_property', { property: 'x', value: 10 }));
+
+      expect(result).toContain('// Set Property skipped: this node has no component chosen');
+      expect(result).not.toContain('ui_obj');
+    });
+
+    it('generates no call when the component it names is gone', () => {
+      const result = graphWith(node('show_hide', { targetComponent: 'deletedBtn', action: 'show' }));
+
+      expect(result).toContain('// Show/Hide skipped: the project has no component "deletedBtn"');
+      expect(result).not.toContain('lv_obj_clear_flag');
+    });
+
+    it('says so for every node that drives a component', () => {
+      expect(graphWith(node('set_text', { targetComponent: 'gone' })))
+        .toContain('// Set Text skipped: the project has no component "gone"');
+      expect(graphWith(node('set_value', { targetComponent: 'gone' })))
+        .toContain('// Set Value skipped: the project has no component "gone"');
+    });
+
+    it('no longer falls back to whatever is called label or slider', () => {
+      // An empty target used to resolve the literal names "label" and
+      // "slider", so a node with nothing chosen drove whichever component
+      // happened to answer to one of them.
+      expect(graphWith(node('set_text', {})))
+        .toContain('// Set Text skipped: this node has no component chosen');
+      expect(graphWith(node('set_value', {})))
+        .toContain('// Set Value skipped: this node has no component chosen');
+    });
+
+    it('reads as zero where a value is expected', () => {
+      // get_property is read inside an expression, which a comment of its own
+      // would not survive.
+      const readNode = node('get_property', { targetComponent: 'gone', property: 'x' });
+      const writeNode = createLogicNode('var_write', {
+        id: 'n2',
+        params: { variableName: 'counter' },
+        inputs: [createLogicPort({ id: 'value', name: 'Value', type: 'int' })],
+        outputs: [],
+      });
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({
+          name: 'read_gone',
+          nodes: [readNode, writeNode],
+          connections: [createLogicConnection({
+            sourceNode: 'n1',
+            sourceOutput: 'value',
+            targetNode: 'n2',
+            targetInput: 'value',
+            type: 'data',
+          })],
+        })],
+        projectScreens(),
+      );
+
+      expect(result).toContain('0 /* no component to read from */');
+      expect(result).not.toContain('lv_obj_get_x(ui_gone)');
+    });
+
+    it('registers no event callback against a component that is gone', () => {
+      const trigger = createLogicNode('event_trigger', {
+        id: 'n1',
+        params: { targetComponent: 'deletedBtn', eventType: 'LV_EVENT_CLICKED' },
+        inputs: [],
+        outputs: [],
+      });
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({ name: 'orphan', nodes: [trigger] })],
+        projectScreens(),
+      );
+
+      expect(result).toContain('skipped: the project has no component "deletedBtn"');
+      expect(result).not.toContain('lv_obj_add_event_cb');
+    });
+
+    it('says which of two components with one name it cannot choose between', () => {
+      // Both are called dial, so neither is what the graph meant. The
+      // generated names are prefixed by screen, so the bare one is declared
+      // nowhere either.
+      const screens = [
+        createScreen({ id: 's1', name: 'Main', components: [createComponent('arc', { name: 'dial' })] }),
+        createScreen({ id: 's2', name: 'Setup', components: [createComponent('arc', { name: 'dial' })] }),
+      ];
+      const result = generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [createLogicGraph({
+          name: 'ambiguous',
+          nodes: [node('set_property', { targetComponent: 'dial', property: 'x', value: 1 })],
+        })],
+        screens,
+      );
+
+      expect(result).toContain('// Set Property skipped: more than one component is called "dial"');
+      expect(result).not.toContain('lv_obj_set_x(ui_dial');
+    });
   });
 
   // ── navigate_page ─────────────────────────────────────────
@@ -332,7 +477,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'sh', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('lv_obj_clear_flag(ui_panel, LV_OBJ_FLAG_HIDDEN)');
     });
 
@@ -344,7 +489,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'sh', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('lv_obj_add_flag(ui_panel, LV_OBJ_FLAG_HIDDEN)');
     });
 
@@ -356,7 +501,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'sh', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('lv_obj_has_flag(ui_panel, LV_OBJ_FLAG_HIDDEN)');
       expect(result).toContain('lv_obj_clear_flag(ui_panel, LV_OBJ_FLAG_HIDDEN)');
       expect(result).toContain('lv_obj_add_flag(ui_panel, LV_OBJ_FLAG_HIDDEN)');
@@ -373,7 +518,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'st', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('lv_label_set_text(ui_my_label,');
     });
   });
@@ -388,7 +533,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'sv', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('lv_slider_set_value(ui_my_slider,');
     });
 
@@ -400,7 +545,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'sv', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('lv_bar_set_value(ui_my_bar,');
     });
 
@@ -412,7 +557,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'sv', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('lv_arc_set_value(ui_my_arc,');
     });
   });
@@ -427,7 +572,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'cf', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('my_custom_func();');
     });
 
@@ -439,7 +584,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'cf', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('set_brightness(100, true);');
     });
   });
@@ -454,7 +599,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'dl', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph], projectScreens());
       expect(result).toContain('// Delay 500ms');
     });
   });
@@ -479,7 +624,7 @@ describe('generateLogicSource', () => {
         targetNode: 'n1', targetInput: '', type: 'execution',
       });
       const graph = createLogicGraph({ name: 'vw', nodes: [trigger, node], connections: [conn] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('var_counter = 42;');
     });
   });
@@ -494,7 +639,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'cc', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('printf("hello world");');
     });
 
@@ -506,7 +651,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'cc', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('int x = 1;');
       expect(result).toContain('int y = 2;');
     });
@@ -556,7 +701,7 @@ describe('generateLogicSource', () => {
         targetNode: 'vw1', targetInput: 'vw1_in', type: 'data',
       });
       const graph = graphWithTriggerChain('expr', [varRead, varWrite], [dataConn], 'vw1');
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('var_result = var_counter;');
     });
 
@@ -581,7 +726,7 @@ describe('generateLogicSource', () => {
         targetNode: 'vw1', targetInput: 'vw1_in', type: 'data',
       });
       const graph = graphWithTriggerChain('math', [mathNode, varWrite], [dataConn], 'vw1');
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('var_sum = (10 + 20);');
     });
 
@@ -609,7 +754,7 @@ describe('generateLogicSource', () => {
         targetNode: 'if1', targetInput: 'if1_cond', type: 'data',
       });
       const graph = graphWithTriggerChain('cmp', [cmpNode, ifNode], [dataConn], 'if1');
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('if ((5 == 5))');
     });
 
@@ -637,7 +782,7 @@ describe('generateLogicSource', () => {
         targetNode: 'if1', targetInput: 'if1_cond', type: 'data',
       });
       const graph = graphWithTriggerChain('logic_and', [logicNode, ifNode], [dataConn], 'if1');
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('(true && false)');
     });
 
@@ -665,7 +810,7 @@ describe('generateLogicSource', () => {
         targetNode: 'if1', targetInput: 'if1_cond', type: 'data',
       });
       const graph = graphWithTriggerChain('logic_not', [logicNode, ifNode], [dataConn], 'if1');
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('(!true)');
     });
 
@@ -690,7 +835,7 @@ describe('generateLogicSource', () => {
         targetNode: 'vw1', targetInput: 'vw1_in', type: 'data',
       });
       const graph = graphWithTriggerChain('str_len', [strNode, varWrite], [dataConn], 'vw1');
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('var_len = strlen("test");');
     });
 
@@ -715,7 +860,7 @@ describe('generateLogicSource', () => {
         targetNode: 'vw1', targetInput: 'vw1_in', type: 'data',
       });
       const graph = graphWithTriggerChain('str_cat', [strNode, varWrite], [dataConn], 'vw1');
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('strcat');
     });
 
@@ -737,7 +882,7 @@ describe('generateLogicSource', () => {
         targetNode: 'vw1', targetInput: 'vw1_in', type: 'data',
       });
       const graph = graphWithTriggerChain('get_prop', [getProp, varWrite], [dataConn], 'vw1');
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('var_pos_x = lv_obj_get_x(ui_my_btn);');
     });
   });
@@ -787,7 +932,7 @@ describe('generateLogicSource', () => {
         nodes: [trigger, ifNode, trueAction, falseAction],
         connections: [execConn, connTrue, connFalse],
       });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('if (true)');
       expect(result).toContain('lv_obj_set_style_opa(ui_led, 255, LV_PART_MAIN)');
       expect(result).toContain('} else {');
@@ -828,7 +973,7 @@ describe('generateLogicSource', () => {
         nodes: [trigger, ifNode, trueAction],
         connections: [execConn, connTrue],
       });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('if (true)');
       expect(result).toContain('do_something()');
       expect(result).not.toContain('} else {');
@@ -873,7 +1018,7 @@ describe('generateLogicSource', () => {
         nodes: [trigger, switchNode, act0],
         connections: [execConn, conn0],
       });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       expect(result).toContain('switch (0)');
       expect(result).toContain('case 0:');
       expect(result).toContain('handle_zero()');
@@ -924,7 +1069,7 @@ describe('generateLogicSource', () => {
         nodes: [trigger, action1, action2],
         connections: [conn1, conn2],
       });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       // Both actions should appear in order
       const setXIdx = result.indexOf('lv_obj_set_x(ui_led, 10)');
       const callIdx = result.indexOf('update_ui()');
@@ -967,7 +1112,7 @@ describe('generateLogicSource', () => {
         connections: [conn1, conn2],
       });
       // Should not infinite loop — just generates once
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       const matches = result.match(/loop_func\(\)/g);
       expect(matches).toHaveLength(1);
     });
@@ -983,7 +1128,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'click', nodes: [trigger] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('lv_obj_add_event_cb(ui_my_btn, logic_click_event_cb, LV_EVENT_CLICKED, NULL)');
     });
 
@@ -995,7 +1140,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'poll', nodes: [trigger] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('lv_timer_create(logic_poll_timer_cb, 2000, NULL)');
     });
 
@@ -1007,7 +1152,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'click', nodes: [trigger] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('static void logic_click_event_cb(lv_event_t *e)');
       expect(result).toContain('(void)e;');
       expect(result).toContain('logic_click();');
@@ -1021,7 +1166,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'tick', nodes: [trigger] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('static void logic_tick_timer_cb(lv_timer_t *timer)');
       expect(result).toContain('(void)timer;');
       expect(result).not.toContain('logic_tick();');
@@ -1035,7 +1180,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'press', nodes: [trigger] });
-      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph], projectScreens());
       expect(result).toContain('// press: LV_EVENT_PRESSED on panel');
     });
 
@@ -1047,7 +1192,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'fast_poll', nodes: [trigger] });
-      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph], projectScreens());
       expect(result).toContain('// fast_poll: timer repeat, 500ms');
     });
 
@@ -1059,7 +1204,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'manual', nodes: [node] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('// No triggers to register');
     });
   });
@@ -1083,7 +1228,7 @@ describe('generateLogicSource', () => {
   describe('logic function structure', () => {
     it('generates function with graph name', () => {
       const graph = createLogicGraph({ name: 'my_flow' });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('void logic_my_flow(void) {');
     });
 
@@ -1092,14 +1237,14 @@ describe('generateLogicSource', () => {
         name: 'my_flow',
         description: 'Handles the main flow',
       });
-      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: true }), [graph], projectScreens());
       expect(result).toContain('* Logic: my_flow');
       expect(result).toContain('* Handles the main flow');
     });
 
     it('generates "Empty logic graph" comment for graph with no nodes', () => {
       const graph = createLogicGraph({ name: 'empty_flow', nodes: [] });
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('// Empty logic graph');
     });
   });
@@ -1155,7 +1300,7 @@ describe('generateLogicSource', () => {
         ],
       });
 
-      const result = generateLogicSource(defaultOptions(), [graph], [], [tag]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens(), [tag]);
       expect(result).toContain('((int16_t)logic_read_holding_register_cached(5U) * 0.1f)');
       expect(result).toContain('#include "hmi_runtime.h"');
     });
@@ -1195,7 +1340,7 @@ describe('generateLogicSource', () => {
         ],
       });
 
-      const result = generateLogicSource(defaultOptions(), [graph], [], []);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens(), []);
       expect(result).toContain('0 /* tag Ghost no longer exists */');
     });
 
@@ -1227,7 +1372,7 @@ describe('generateLogicSource', () => {
 
     it('writes a holding-register tag as the engineering value', () => {
       const tag = createModbusTag({ id: 'sp-tag', name: 'SetPoint', address: 7 });
-      const result = generateLogicSource(defaultOptions(), [writeGraph('sp-tag', 42)], [], [tag]);
+      const result = generateLogicSource(defaultOptions(), [writeGraph('sp-tag', 42)], projectScreens(), [tag]);
       expect(result).toContain('(void)hmi_runtime_write_holding_register(7U, (float)(42));');
       expect(result).toContain('#include "hmi_runtime.h"');
     });
@@ -1241,13 +1386,13 @@ describe('generateLogicSource', () => {
         dataType: 'bool',
         access: 'write',
       });
-      const result = generateLogicSource(defaultOptions(), [writeGraph('run-tag', 1)], [], [tag]);
+      const result = generateLogicSource(defaultOptions(), [writeGraph('run-tag', 1)], projectScreens(), [tag]);
       expect(result).toContain('(void)hmi_runtime_write_coil(3U, (1) != 0);');
     });
 
     it('refuses to write a read-only tag', () => {
       const tag = createModbusTag({ id: 'ro-tag', name: 'SetPoint', access: 'read' });
-      const result = generateLogicSource(defaultOptions(), [writeGraph('ro-tag', 1)], [], [tag]);
+      const result = generateLogicSource(defaultOptions(), [writeGraph('ro-tag', 1)], projectScreens(), [tag]);
       expect(result).toContain('// Write Tag SetPoint: tag is read-only');
       expect(result).not.toContain('hmi_runtime_write_holding_register(');
     });
@@ -1300,7 +1445,7 @@ describe('generateLogicSource', () => {
         ],
       });
 
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
+      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph], projectScreens());
       const timerCbIndex = result.indexOf('static void logic_mixed_timer_cb(lv_timer_t *timer) {');
       const eventChainIndex = result.indexOf('lv_obj_clear_flag(ui_ev_target');
       const timerChainIndex = result.indexOf('lv_obj_add_flag(ui_tick_target');
@@ -1328,7 +1473,7 @@ describe('generateLogicSource', () => {
       });
       const graph = createLogicGraph({ name: 'pair', nodes: [repeatTrigger, delayTrigger] });
 
-      const result = generateLogicSource(defaultOptions(), [graph]);
+      const result = generateLogicSource(defaultOptions(), [graph], projectScreens());
       expect(result).toContain('lv_timer_create(logic_pair_timer_cb, 1000, NULL);');
       expect(result).toContain('lv_timer_create(logic_pair_timer2_cb, 3000, NULL);');
       // Only the delay-mode callback deletes its timer
@@ -1393,6 +1538,7 @@ describe('generateLogicSource', () => {
           nodes: [trigger, readNode, writeNode],
           connections: [executionConnection, dataConnection],
         })],
+        projectScreens(),
       );
 
       expect(result).toContain('#include "hmi_runtime.h"');
@@ -1430,13 +1576,14 @@ describe('generateLogicSource', () => {
           nodes: [readNode, textNode],
           connections: [dataConnection],
         })],
+        projectScreens(),
       );
 
       expect(result).toContain('logic_read_holding_register_cached(65535U)');
     });
 
     it('does not include the HMI runtime when no Modbus node is present', () => {
-      const result = generateLogicSource(defaultOptions(), [createLogicGraph({ name: 'plain' })]);
+      const result = generateLogicSource(defaultOptions(), [createLogicGraph({ name: 'plain' })], projectScreens());
 
       expect(result).not.toContain('#include "hmi_runtime.h"');
       expect(result).not.toContain('logic_read_holding_register_cached');
@@ -1466,6 +1613,7 @@ describe('generateLogicSource', () => {
       const result = generateLogicSource(
         defaultOptions({ generateComments: false }),
         [createLogicGraph({ name: 'condition', nodes: [trigger, node], connections: [connection] })],
+        projectScreens(),
       );
       expect(result).toContain('if (true)');
     });
@@ -1486,6 +1634,7 @@ describe('generateLogicSource', () => {
       const result = generateLogicSource(
         defaultOptions({ generateComments: false }),
         [createLogicGraph({ name: 'values', nodes: [textNode, numberNode] })],
+        projectScreens(),
       );
       expect(result).toContain('lv_label_set_text(ui_status_label, "Ready")');
       expect(result).toContain('lv_slider_set_value(ui_speed_slider, 42, LV_ANIM_ON)');
@@ -1514,6 +1663,7 @@ describe('generateLogicSource', () => {
       const result = generateLogicSource(
         defaultOptions({ generateComments: false }),
         [createLogicGraph({ name: 'write', nodes: [trigger, node], connections: [connection] })],
+        projectScreens(),
       );
       expect(result).toContain('var_counter = 7;');
     });

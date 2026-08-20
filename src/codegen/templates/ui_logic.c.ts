@@ -30,6 +30,12 @@ interface ComponentReference {
   component?: LvglComponent;
   screenName: string;
   variableName: string;
+  /**
+   * False when the project has no such component - deleted since the graph was
+   * written, never chosen, or a name more than one component answers to. The
+   * variable name is invented in that case and nothing declares it.
+   */
+  resolved: boolean;
 }
 
 interface PageReference {
@@ -43,6 +49,12 @@ interface LogicCodegenContext {
   options: CodeGenOptions;
   componentsById: Map<string, ComponentReference>;
   componentsByName: Map<string, ComponentReference>;
+  /**
+   * Names shared by more than one component, which are therefore in neither
+   * lookup - only so a node naming one can be told that rather than being told
+   * the project has no such component.
+   */
+  ambiguousComponentNames: Set<string>;
   pagesById: Map<string, PageReference>;
   pagesByName: Map<string, PageReference>;
   /** Graph id → C function name, deduplicated. Shared with ui_logic.h. */
@@ -264,6 +276,7 @@ function createLogicCodegenContext(
     const reference: ComponentReference = {
       component,
       screenName,
+      resolved: true,
       variableName: getComponentVarName(
         needsScreenPrefix.has(component.id)
           ? `${screenName}_${component.name}`
@@ -297,6 +310,7 @@ function createLogicCodegenContext(
     options,
     componentsById,
     componentsByName,
+    ambiguousComponentNames,
     pagesById,
     pagesByName,
     logicFuncNames: getLogicFuncNames(graphs),
@@ -323,7 +337,33 @@ function resolveComponent(
   return {
     screenName: '',
     variableName: getComponentVarName(targetValue, options),
+    resolved: false,
   };
+}
+
+/**
+ * The line a node leaves behind instead of the call it cannot make.
+ *
+ * A component target that resolves to nothing used to become a variable named
+ * after whatever the node said - `ui_obj` for one that said nothing at all -
+ * and the firmware failed to compile on a name nothing declares. Nothing is
+ * generated for a missing dependency; the node face carries the LACK badge
+ * that says so.
+ */
+function skippedForComponent(
+  label: string,
+  target: unknown,
+  context: LogicCodegenContext,
+  indent: string,
+): string {
+  const named = typeof target === 'string' ? target.trim() : '';
+  if (!named) {
+    return `${indent}// ${label} skipped: this node has no component chosen`;
+  }
+  if (context.ambiguousComponentNames.has(named)) {
+    return `${indent}// ${label} skipped: more than one component is called "${named}"`;
+  }
+  return `${indent}// ${label} skipped: the project has no component "${named}"`;
 }
 
 function resolveScreen(
@@ -451,6 +491,14 @@ function generateInitFunction(
       const targetComp = trigger.params.targetComponent;
       if (targetComp) {
         const target = resolveComponent(targetComp, context, options);
+        // Registering against a component the project no longer has would name
+        // a variable nothing declares. The graph then has nothing to fire it,
+        // which is what the missing component means.
+        if (!target.resolved) {
+          lines.push(skippedForComponent(`${graph.name}: ${eventType}`, targetComp, context, indent));
+          hasContent = true;
+          continue;
+        }
         if (options.generateComments) {
           lines.push(`${indent}// ${graph.name}: ${eventType} on ${target.component?.name ?? targetComp}`);
         }
@@ -819,6 +867,11 @@ function generateNodeExpression(
         context,
         context.options,
       );
+      // This one is read in the middle of an expression, so it cannot become a
+      // comment of its own - it reads as zero, and says why in passing.
+      if (!target.resolved) {
+        return '0 /* no component to read from */';
+      }
       const prop = node.params.property || 'x';
       const targetVar = target.variableName;
       const propGetters: Record<string, string> = {
@@ -1033,6 +1086,9 @@ function generateSetPropertyCode(
   indent: string,
 ): string {
   const target = resolveComponent(node.params.targetComponent, context, options);
+  if (!target.resolved) {
+    return skippedForComponent('Set Property', node.params.targetComponent, context, indent);
+  }
   const property = node.params.property || 'x';
   const value = node.params.value !== undefined ? node.params.value : 'value';
   const targetName = target.variableName;
@@ -1077,6 +1133,9 @@ function generateShowHideCode(
   indent: string,
 ): string {
   const target = resolveComponent(node.params.targetComponent, context, options);
+  if (!target.resolved) {
+    return skippedForComponent('Show/Hide', node.params.targetComponent, context, indent);
+  }
   const action = node.params.action || 'toggle';
   const targetName = target.variableName;
   
@@ -1105,7 +1164,10 @@ function generateSetTextCode(
   context: LogicCodegenContext,
   indent: string,
 ): string {
-  const target = resolveComponent(node.params.targetComponent || 'label', context, options);
+  const target = resolveComponent(node.params.targetComponent, context, options);
+  if (!target.resolved) {
+    return skippedForComponent('Set Text', node.params.targetComponent, context, indent);
+  }
   const text = getInputValue(node, 'Text', graph, context, '文本');
   const targetName = target.variableName;
 
@@ -1128,7 +1190,10 @@ function generateSetValueCode(
   context: LogicCodegenContext,
   indent: string,
 ): string {
-  const target = resolveComponent(node.params.targetComponent || 'slider', context, options);
+  const target = resolveComponent(node.params.targetComponent, context, options);
+  if (!target.resolved) {
+    return skippedForComponent('Set Value', node.params.targetComponent, context, indent);
+  }
   const value = getInputValue(node, 'Number', graph, context, '数值');
   const targetName = target.variableName;
   const compType = target.component?.type || node.params.componentType || 'slider';
