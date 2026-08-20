@@ -13,9 +13,19 @@
   color: #d7e2f2;
 }
 
-.dock-panel.collapsed {
+.dock-panel.collapsed,
+.dock-panel.inert {
   height: auto;
 }
+
+/* Off the Deploy tab the strip stays put and empties out. Keeping the band in
+   the layout means the workspace never jumps by its height when a tab changes,
+   and the dead chevron says the panel is still there rather than gone. */
+.dock-panel.inert {
+  background: #131b2b;
+}
+
+
 
 /* The drag grip runs along the dock's own top edge - inside it, so the panel
    can clip its content without clipping the grip. Same idiom as .panel-grip. */
@@ -41,6 +51,9 @@
   align-items: stretch;
   flex: none;
   gap: 2px;
+  /* Fixed rather than derived from its contents: the strip empties out off the
+     Deploy tab and must not change height when it does. */
+  min-height: 28px;
   padding: 0 6px;
   border-bottom: 1px solid #2d3b54;
   background: #131b2b;
@@ -103,8 +116,13 @@
   cursor: pointer;
 }
 
-.dock-toggle:hover {
+.dock-toggle:hover:not(:disabled) {
   color: #d7e2f2;
+}
+
+.dock-toggle:disabled {
+  color: #38445c;
+  cursor: default;
 }
 
 /* PanelChevron points right; point it down when expanded, up when collapsed. */

@@ -72,17 +72,20 @@ const DockPanel: React.FC<DockPanelProps> = ({ visible }) => {
     [height, setHeight],
   );
 
-  if (!visible) return null;
-
   const busyPane: DockPaneId | null =
     busy === 'building' ? 'build' : busy === 'flashing' ? 'flash' : null;
 
+  // Three states, not two. The strip is always in the layout, so the workspace
+  // never jumps by its height when a tab changes; what varies is whether it
+  // carries anything. Inert is the strip with no panes and a dead chevron.
+  const open = visible && expanded;
+
   return (
     <div
-      className={`dock-panel ${expanded ? 'expanded' : 'collapsed'}`}
-      style={expanded ? { height } : undefined}
+      className={`dock-panel ${visible ? (expanded ? 'expanded' : 'collapsed') : 'inert'}`}
+      style={open ? { height } : undefined}
     >
-      {expanded && (
+      {open && (
         <div
           className={`dock-grip ${resizing ? 'resizing' : ''}`}
           onPointerDown={handleResizeStart}
@@ -92,8 +95,8 @@ const DockPanel: React.FC<DockPanelProps> = ({ visible }) => {
         />
       )}
 
-      <div className="dock-tabs" role="tablist">
-        {PANES.map((pane) => (
+      <div className="dock-tabs" role={visible ? 'tablist' : undefined}>
+        {visible && PANES.map((pane) => (
           <button
             key={pane.id}
             type="button"
@@ -112,15 +115,20 @@ const DockPanel: React.FC<DockPanelProps> = ({ visible }) => {
             type="button"
             className="dock-toggle"
             onClick={toggleExpanded}
-            aria-expanded={expanded}
-            title={expanded ? 'Collapse the panel' : 'Expand the panel'}
+            disabled={!visible}
+            aria-expanded={open}
+            title={
+              visible
+                ? expanded ? 'Collapse the panel' : 'Expand the panel'
+                : 'Open the Deploy tab to use this panel'
+            }
           >
-            <PanelChevron open={expanded} className="dock-chevron" />
+            <PanelChevron open={open} className="dock-chevron" />
           </button>
         </div>
       </div>
 
-      {expanded && (
+      {open && (
         <div className="dock-body" role="tabpanel">
           <DeployLogPane pane={activePane} />
         </div>

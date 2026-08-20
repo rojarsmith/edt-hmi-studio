@@ -176,11 +176,20 @@ the tab. It does not auto-close when the operation ends off-tab: the moment a
 build finishes is the moment its last lines matter most, so the dock stays until
 the author leaves Deploy again with nothing running.
 
-**Collapsed and hidden turned out to be the same control, split by owner.**
-`dockStore.expanded` is the author's choice, and is expanded-versus-tab-strip.
-Hidden is not stored at all: it is `visible`, which `App` derives. Measured: the
-dock is 220 px expanded, 30 px collapsed, absent when hidden, and `.app-body`
-absorbs the difference each time with the status bar never moving.
+**There are three states, not two, and only one of them is stored.**
+`dockStore.expanded` is the author's choice — expanded versus collapsed to its
+tab strip. The third is *inert*: off the Deploy tab the band stays exactly where
+it is, empties of panes, and its chevron goes dark and dead. That is derived by
+`App` from the tab and the busy flag, never stored, so leaving the tab cannot
+spend the author's expansion — coming back restores it.
+
+Keeping the band rather than removing it is what stops the workspace jumping by
+the strip's height every time a tab changes, and the dead chevron says *the
+panel is still there, just not now* rather than *the panel is gone*. The strip's
+height is pinned in CSS rather than derived from its contents, because emptying
+it would otherwise shrink it: measured at 29 px collapsed and 29 px inert, 220 px
+expanded, with `.app-body` absorbing every difference and the status bar never
+moving.
 
 **§7's max-height clamp was wrong the first time, in a way worth keeping.** The
 first attempt clamped against `window.innerHeight - 240`, which quietly ignores
