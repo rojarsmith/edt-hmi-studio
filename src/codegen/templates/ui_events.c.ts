@@ -557,10 +557,13 @@ function generateAnimationCompletedHandler(
   lines.push(`void ${funcName}(lv_anim_t *a) {`);
   lines.push(`${indent}(void)a;`);
   lines.push('');
+  // No owner screen: a screen refuses to animate a widget it does not show,
+  // but an animation finishing has no screen of its own to judge by - the
+  // bindings run in order, and one of them may have changed screen already.
   lines.push(...generateBindingBodies(
     symbol.animation.events ?? [],
     `anim_${symbol.animation.name}_completed`,
-    options, screens, languages, logicGraphs, logicFuncNames, animations, 1, symbol.screen,
+    options, screens, languages, logicGraphs, logicFuncNames, animations, 1,
   ));
   lines.push('}');
 

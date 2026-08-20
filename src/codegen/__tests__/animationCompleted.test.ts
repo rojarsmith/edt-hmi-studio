@@ -115,6 +115,25 @@ describe('an animation that has finished', () => {
     expect(events(p)).toContain('ui_anim_settle_start();');
   });
 
+  it('plays an animation on the screen a navigation just reached', () => {
+    // A screen refuses to animate a widget it does not show. An animation has
+    // no screen of its own to judge by, and the bindings run in order - the
+    // navigation before this one has already changed screen.
+    const p = project([
+      completed({ type: 'navigate', targetScreen: 'next' }),
+      { ...completed({ type: 'playAnimation', animationId: 'anim-2' }), id: 'e2' },
+    ]);
+    p.screens[1].components.push(createComponent('obj', { id: 'panel', name: 'Panel' }));
+    p.animations.push(createAnimation({
+      id: 'anim-2',
+      name: 'Arrive',
+      targetComponentId: 'panel',
+      tracks: [{ id: 't1', property: 'opa', valueMode: 'absolute', startValue: 0, endValue: 255 }],
+    }));
+
+    expect(events(p)).toContain('ui_anim_arrive_start();');
+  });
+
   it('generates nothing for an animation that drives nothing', () => {
     // No start function exists, so nothing would ever call the callback.
     const p = project([completed({ type: 'navigate', targetScreen: 'next' })], { tracks: [] });

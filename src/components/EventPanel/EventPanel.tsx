@@ -36,6 +36,21 @@ export const LVGL_SCREEN_EVENTS: { type: LvglEventType; label: string; descripti
   { type: 'LV_EVENT_SCREEN_UNLOADED', label: 'Screen Unloaded', description: 'The screen has finished leaving' },
 ];
 
+/**
+ * What an animation itself can announce. Only one thing, which is why the
+ * dialog's Event Type has a single choice: an animation has finished. Anything
+ * else about it - started, repeated - is the delay and the repeat count it
+ * already has.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const LVGL_ANIMATION_EVENTS: { type: LvglEventType; label: string; description: string }[] = [
+  {
+    type: 'ANIM_COMPLETED',
+    label: 'Animation Finished',
+    description: 'This animation has run to its end — where what follows it belongs',
+  },
+];
+
 // Monochrome line icons, in the panel family's stroke language.
 const BoltIcon: React.FC = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -84,6 +99,11 @@ interface EventPanelProps {
    * property editor passes it when nothing on the canvas is selected.
    */
   screenId?: string;
+  /**
+   * Edit this animation's own events instead. The property editor passes it
+   * while an animation is the thing being shown.
+   */
+  animationId?: string;
 }
 
 /** Every component id on a screen, children included. */
@@ -99,8 +119,9 @@ function componentIdsOf(screen: Screen): Set<string> {
   return ids;
 }
 
-const EventPanel: React.FC<EventPanelProps> = ({ screenId }) => {
+const EventPanel: React.FC<EventPanelProps> = ({ screenId, animationId }) => {
   const { selection, getComponentById, updateComponent, screens, setScreenEvents, animations } = useEditorStore();
+  const updateAnimation = useEditorStore(s => s.updateAnimation);
   const logicGraphs = useLogicEditorStore(state => state.graphs);
   const [editingEvent, setEditingEvent] = useState<EventBinding | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -108,16 +129,19 @@ const EventPanel: React.FC<EventPanelProps> = ({ screenId }) => {
   const [expanded, setExpanded] = useState(true);
 
   const selectedId = selection.selectedIds[0];
-  const component = screenId ? undefined : (selectedId ? getComponentById(selectedId) : undefined);
+  const owns = screenId || animationId;
+  const component = owns ? undefined : (selectedId ? getComponentById(selectedId) : undefined);
   const screen = screenId ? screens.find(s => s.id === screenId) : undefined;
-  const owner = screen ?? component;
+  const animation = animationId ? animations.find(a => a.id === animationId) : undefined;
+  const owner = screen ?? animation ?? component;
   const events = useMemo(() => owner?.events ?? [], [owner]);
 
   /** Write the list back to whichever owner this panel is serving. */
   const commit = useCallback((next: EventBinding[]) => {
     if (screen) setScreenEvents(screen.id, next);
+    else if (animation) updateAnimation(animation.id, { events: next });
     else if (selectedId && component) updateComponent(selectedId, { events: next });
-  }, [screen, setScreenEvents, selectedId, component, updateComponent]);
+  }, [screen, setScreenEvents, animation, updateAnimation, selectedId, component, updateComponent]);
 
   const handleAddEvent = useCallback(() => {
     setEditingEvent(null);
@@ -146,7 +170,9 @@ const EventPanel: React.FC<EventPanelProps> = ({ screenId }) => {
     setEditingEvent(null);
   }, []);
 
-  const eventCatalog = screen ? LVGL_SCREEN_EVENTS : LVGL_EVENTS;
+  const eventCatalog = animation
+    ? LVGL_ANIMATION_EVENTS
+    : screen ? LVGL_SCREEN_EVENTS : LVGL_EVENTS;
 
   /** Why this binding cannot run, or null. Same rule as the animation panel. */
   const eventLack = (event: EventBinding): string | null => {
@@ -298,7 +324,7 @@ const EventPanel: React.FC<EventPanelProps> = ({ screenId }) => {
         <EventEditDialog
           event={editingEvent}
           isCreating={isCreating}
-          forScreen={!!screen}
+          owner={animation ? 'animation' : screen ? 'screen' : 'component'}
           onSave={handleSaveEvent}
           onClose={handleCloseDialog}
         />

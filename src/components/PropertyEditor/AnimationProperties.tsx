@@ -13,6 +13,7 @@ import { animationTracks, newTrack } from '../../utils/animationTracks';
 import { supportsOffset, trackValueMode } from '../../utils/animationValues';
 import { isAnimationNameTaken } from '../../utils/animationNames';
 import NumberField from '../common/NumberField';
+import EventPanel from '../EventPanel';
 
 const EASING_OPTIONS: { type: AnimationEasing; label: string }[] = [
   { type: 'linear', label: 'Linear' },
@@ -281,6 +282,8 @@ const AnimationProperties: React.FC<{
         </button>
       </div>
 
+      {/* What follows it - the same Events category a screen and a widget have. */}
+      <EventPanel animationId={animation.id} />
     </>
   );
 };

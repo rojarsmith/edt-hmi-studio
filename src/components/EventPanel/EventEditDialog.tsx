@@ -24,13 +24,14 @@ import { screenLoadStatement } from '../../codegen/screenTransition';
 import { DEFAULT_CODEGEN_OPTIONS } from '../../codegen/types';
 import { getScreenVarName } from '../../codegen/utils/nameUtils';
 import NumberField from '../common/NumberField';
-import { LVGL_EVENTS, LVGL_SCREEN_EVENTS } from './EventPanel';
+import { LVGL_ANIMATION_EVENTS, LVGL_EVENTS, LVGL_SCREEN_EVENTS } from './EventPanel';
 import CodeEditor from './CodeEditor';
 import './EventEditDialog.css';
 
 interface EventEditDialogProps {
   /** True when the binding belongs to a screen rather than a widget. */
-  forScreen?: boolean;
+  /** Whose events these are, which decides what they can be bound to. */
+  owner?: 'component' | 'screen' | 'animation';
   event: EventBinding | null;
   isCreating: boolean;
   onSave: (event: EventBinding) => void;
@@ -65,12 +66,15 @@ const CODE_TEMPLATE = `// Event handler code
 const EventEditDialog: React.FC<EventEditDialogProps> = ({
   event,
   isCreating,
-  forScreen,
+  owner = 'component',
   onSave,
   onClose,
 }) => {
   // A screen reacts to its own lifecycle; a widget to input.
-  const eventCatalog = forScreen ? LVGL_SCREEN_EVENTS : LVGL_EVENTS;
+  const eventCatalog =
+    owner === 'animation' ? LVGL_ANIMATION_EVENTS
+    : owner === 'screen' ? LVGL_SCREEN_EVENTS
+    : LVGL_EVENTS;
   const { screens, currentScreenId, getAllComponents, languages } = useEditorStore();
   const animations = useEditorStore(s => s.animations);
   const components = useMemo(() => componentsById(screens), [screens]);
@@ -81,7 +85,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   // Form state
   const [eventType, setEventType] = useState<LvglEventType>(
     // A screen has no Clicked to default to.
-    event?.eventType || (forScreen ? 'LV_EVENT_SCREEN_LOADED' : 'LV_EVENT_CLICKED')
+    event?.eventType || eventCatalog[0].type
   );
   const [handlerType, setHandlerType] = useState<'builtin' | 'custom' | 'logic'>(
     event?.handlerType || 'builtin'
@@ -570,9 +574,10 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
         <div className="dialog-content">
           {/* Event Type Selection */}
           <div className="form-section">
-            <label className="section-label">Event Type</label>
-            <select 
-              value={eventType} 
+            <label className="section-label" htmlFor="event-type">Event Type</label>
+            <select
+              id="event-type"
+              value={eventType}
               onChange={(e) => setEventType(e.target.value as LvglEventType)}
               className="event-type-select"
             >
