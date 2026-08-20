@@ -1055,17 +1055,19 @@ function generateNavigatePageCode(
   indent: string,
 ): string {
   // `targetPage` is the pre-rename spelling, still present in older projects.
-  const targetScreen = resolveScreen(
-    node.params.targetScreen ?? node.params.targetPage,
-    context,
-    options,
-  );
-  // A screen the graph names but the project does not have keeps the name it
-  // was written with, so the generated line still says who it meant.
-  const variableName = targetScreen.resolved
-    ? targetScreen.variableName
-    : `ui_${toSnakeCase(targetScreen.screen.name)}`;
-  return `${indent}${screenLoadStatement(variableName, logicNodeTransition(node.params))}`;
+  const wanted = node.params.targetScreen ?? node.params.targetPage;
+  const targetScreen = resolveScreen(wanted, context, options);
+  // A node with no screen chosen used to fall back to `ui_page1`, and one
+  // naming a deleted screen to a variable named after it. Neither is declared
+  // anywhere, so the firmware failed to compile. Say what is missing and
+  // generate no call - the same answer the event actions give.
+  if (!targetScreen.resolved) {
+    const named = typeof wanted === 'string' ? wanted.trim() : '';
+    return named
+      ? `${indent}// Navigate skipped: the project has no screen "${named}"`
+      : `${indent}// Navigate skipped: this node has no screen chosen`;
+  }
+  return `${indent}${screenLoadStatement(targetScreen.variableName, logicNodeTransition(node.params))}`;
 }
 
 function generateShowHideCode(

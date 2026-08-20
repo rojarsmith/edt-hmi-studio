@@ -12,6 +12,7 @@ import {
   createModbusTag,
 } from './helpers';
 import { getNodeDefinition } from '../../components/LogicEditor/nodeDefinitions';
+import type { LogicGraph } from '../../components/LogicEditor/types';
 
 describe('generateLogicSource', () => {
   // ── Includes ──────────────────────────────────────────────
@@ -216,6 +217,16 @@ describe('generateLogicSource', () => {
 
   // ── navigate_page ─────────────────────────────────────────
   describe('navigate_page node', () => {
+    // The screens the graph names have to be in the project, as they are in a
+    // real one: a node pointing at a screen nothing declares generates no
+    // call at all.
+    const withScreens = (graph: LogicGraph, ...names: string[]) =>
+      generateLogicSource(
+        defaultOptions({ generateComments: false }),
+        [graph],
+        names.map(name => createScreen({ name })),
+      );
+
     it('generates lv_scr_load for no animation', () => {
       const node = createLogicNode('navigate_page', {
         id: 'n1',
@@ -224,8 +235,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'nav', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
-      expect(result).toContain('lv_scr_load(ui_settings)');
+      expect(withScreens(graph, 'settings')).toContain('lv_scr_load(ui_screen_settings)');
     });
 
     it('generates lv_scr_load_anim for fade animation', () => {
@@ -236,8 +246,8 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'nav', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
-      expect(result).toContain('lv_scr_load_anim(ui_home, LV_SCR_LOAD_ANIM_FADE_IN');
+      expect(withScreens(graph, 'home'))
+        .toContain('lv_scr_load_anim(ui_screen_home, LV_SCR_LOAD_ANIM_FADE_IN');
     });
 
     it('generates lv_scr_load_anim for slide_left', () => {
@@ -248,8 +258,7 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'nav', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
-      expect(result).toContain('LV_SCR_LOAD_ANIM_MOVE_LEFT');
+      expect(withScreens(graph, 'page2')).toContain('LV_SCR_LOAD_ANIM_MOVE_LEFT');
     });
 
     it('takes the five effects a node written today carries', () => {
@@ -265,8 +274,8 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'nav', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
-      expect(result).toContain('lv_scr_load_anim(ui_page2, LV_SCR_LOAD_ANIM_OUT_BOTTOM, 600, 0, false);');
+      expect(withScreens(graph, 'page2'))
+        .toContain('lv_scr_load_anim(ui_screen_page2, LV_SCR_LOAD_ANIM_OUT_BOTTOM, 600, 0, false);');
     });
 
     it('reads a graph that says nothing at all as None', () => {
@@ -279,8 +288,37 @@ describe('generateLogicSource', () => {
         outputs: [],
       });
       const graph = createLogicGraph({ name: 'nav', nodes: [node] });
-      const result = generateLogicSource(defaultOptions({ generateComments: false }), [graph]);
-      expect(result).toContain('lv_scr_load(ui_page2);');
+      expect(withScreens(graph, 'page2')).toContain('lv_scr_load(ui_screen_page2);');
+    });
+
+    it('generates no call when the node has no screen chosen', () => {
+      // It used to load `ui_page1`, a variable nothing declares, and the
+      // firmware failed to compile.
+      const node = createLogicNode('navigate_page', {
+        id: 'n1',
+        params: { transition: 'fade' },
+        inputs: [],
+        outputs: [],
+      });
+      const graph = createLogicGraph({ name: 'nav', nodes: [node] });
+      const result = withScreens(graph, 'page2');
+
+      expect(result).toContain('// Navigate skipped: this node has no screen chosen');
+      expect(result).not.toContain('lv_scr_load');
+    });
+
+    it('generates no call when the screen it names is gone', () => {
+      const node = createLogicNode('navigate_page', {
+        id: 'n1',
+        params: { targetScreen: 'deleted_screen', transition: 'fade' },
+        inputs: [],
+        outputs: [],
+      });
+      const graph = createLogicGraph({ name: 'nav', nodes: [node] });
+      const result = withScreens(graph, 'page2');
+
+      expect(result).toContain('// Navigate skipped: the project has no screen "deleted_screen"');
+      expect(result).not.toContain('lv_scr_load');
     });
   });
 

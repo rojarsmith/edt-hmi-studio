@@ -9,6 +9,7 @@ import { NODE_COLORS } from './nodeDefinitions';
 import { useLogicEditorStore } from './logicEditorStore';
 import { useAppStore } from '../../store/appStore';
 import { useEditorStore } from '../../store/editorStore';
+import LackBadge from '../common/LackBadge';
 import './LogicNode.css';
 
 // Port type colors
@@ -191,7 +192,7 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
         {/* Node Parameters Preview */}
         {(Object.keys(logicNode.params).length > 0 || logicNode.subType === 'event_trigger') && (
           <div className="logic-node-params">
-            {renderParamsPreview(logicNode)}
+            {renderParamsPreview(logicNode, screens)}
             {logicNode.subType === 'event_trigger' && (
               logicCallers.length > 0 ? (
                 <span className="param-preview">
@@ -212,7 +213,7 @@ const LogicNodeComponent: React.FC<NodeProps> = ({
 };
 
 // Render a preview of node parameters
-function renderParamsPreview(node: LogicNode): React.ReactNode {
+function renderParamsPreview(node: LogicNode, screens: Screen[]): React.ReactNode {
   const { params, subType } = node;
 
   switch (subType) {
@@ -235,8 +236,28 @@ function renderParamsPreview(node: LogicNode): React.ReactNode {
     case 'show_hide':
       return <span className="param-preview">Action: {params.action}</span>;
     case 'navigate_page': {
+      // `targetPage` is the pre-rename spelling, still present in older graphs.
       const target = params.targetScreen || params.targetPage;
-      return target ? <span className="param-preview">Screen: {target}</span> : null;
+      const screen = target
+        ? screens.find(candidate => candidate.id === target || candidate.name === target)
+        : undefined;
+      if (screen) {
+        // Stored by id, so the name has to be looked up - the id itself tells
+        // the reader nothing.
+        return <span className="param-preview">Screen: {screen.name}</span>;
+      }
+      // Nothing is generated for a navigation with no screen behind it, so the
+      // node says so rather than looking finished.
+      return (
+        <span className="param-preview">
+          Screen: not set
+          <LackBadge
+            reason={target
+              ? `The project has no screen "${target}" — this node generates no navigation`
+              : 'No screen chosen — this node generates no navigation'}
+          />
+        </span>
+      );
     }
     case 'call_function':
       return params.functionName ? <span className="param-preview">Function: {params.functionName}</span> : null;
