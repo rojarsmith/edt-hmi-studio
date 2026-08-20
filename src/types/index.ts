@@ -187,6 +187,18 @@ export type LvglEventType =
   | 'LV_EVENT_SCREEN_UNLOAD_START'
   | 'LV_EVENT_SCREEN_UNLOADED';
 
+/**
+ * How a screen change is drawn. Named after TouchGFX Designer's set, mapped
+ * onto what LVGL draws natively - see utils/screenTransitions.
+ */
+export type ScreenTransition = 'none' | 'slide' | 'cover' | 'wipe' | 'fade';
+
+/**
+ * Which way the screens travel. This is the direction of travel, as LVGL names
+ * it, not the edge the incoming screen appears from.
+ */
+export type ScreenTransitionDirection = 'left' | 'right' | 'up' | 'down';
+
 // Built-in Action Types
 export type BuiltinActionType =
   | 'navigate'
@@ -217,6 +229,19 @@ export interface BuiltinAction {
   targetScreen?: string;    // For navigate
   /** @deprecated Pre-rename spelling of `targetScreen`; still read from older projects. */
   targetPage?: string;
+  /**
+   * For navigate: how the change from one screen to the next is drawn, and
+   * over how long. Absent means the fade every project generated before these
+   * existed - see resolveScreenTransition, which is where the defaults live.
+   *
+   * The transition belongs to the navigation rather than to the destination:
+   * Next wants to slide left and Back wants to slide right, and the screen
+   * being entered cannot know which of the two brought the user there.
+   */
+  transition?: ScreenTransition;
+  transitionDirection?: ScreenTransitionDirection;
+  /** Milliseconds. Ignored when the transition is 'none'. */
+  transitionDuration?: number;
   targetComponent?: string; // For setProperty, show, hide, enable, disable, setText, setValue
   property?: string;        // For setProperty
   value?: string | number | boolean;  // For setProperty, setText, setValue

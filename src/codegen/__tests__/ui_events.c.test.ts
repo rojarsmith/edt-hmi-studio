@@ -144,7 +144,50 @@ describe('generateEventsSource', () => {
       createScreen({ name: 'settings' }),
     ];
     const result = generateEventsSource(screens, defaultOptions());
-    expect(result).toContain('ui_load_screen_settings();');
+    // Written out at the call site, so the transition this navigation chose is
+    // visible in the handler rather than buried in the screen's load function.
+    expect(result).toContain('lv_scr_load_anim(ui_screen_settings, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);');
+  });
+
+  it('draws a navigation the way the action asks', () => {
+    const btn = createComponent('btn', {
+      name: 'navBtn',
+      events: [createEvent({
+        eventType: 'LV_EVENT_CLICKED',
+        handlerType: 'builtin',
+        action: createBuiltinAction({
+          type: 'navigate',
+          targetScreen: 'settings',
+          transition: 'cover',
+          transitionDirection: 'up',
+          transitionDuration: 450,
+        }),
+      })],
+    });
+    const screens = [
+      createScreen({ name: 'main', components: [btn] }),
+      createScreen({ name: 'settings' }),
+    ];
+    const result = generateEventsSource(screens, defaultOptions());
+    expect(result).toContain('lv_scr_load_anim(ui_screen_settings, LV_SCR_LOAD_ANIM_OVER_TOP, 450, 0, false);');
+  });
+
+  it('switches between two frames when the navigation asks for None', () => {
+    const btn = createComponent('btn', {
+      name: 'navBtn',
+      events: [createEvent({
+        eventType: 'LV_EVENT_CLICKED',
+        handlerType: 'builtin',
+        action: createBuiltinAction({ type: 'navigate', targetScreen: 'settings', transition: 'none' }),
+      })],
+    });
+    const screens = [
+      createScreen({ name: 'main', components: [btn] }),
+      createScreen({ name: 'settings' }),
+    ];
+    const result = generateEventsSource(screens, defaultOptions());
+    expect(result).toContain('lv_scr_load(ui_screen_settings);');
+    expect(result).not.toContain('LV_SCR_LOAD_ANIM');
   });
 
   // --- Builtin action: setProperty ---

@@ -20,10 +20,10 @@ import {
   animationSymbolsById,
   type AnimationSymbol,
 } from '../animationSymbols';
+import { screenLoadStatement } from '../screenTransition';
 import type { CodeGenOptions } from '../types';
 import {
   getEventHandlerName,
-  getScreenLoadFuncName,
   getComponentVarName,
   colorToLvgl,
   escapeCString,
@@ -159,14 +159,16 @@ function generateBuiltinActionCode(
       // `targetPage` is the pre-rename spelling, still present in older projects.
       const targetName = action.targetScreen ?? action.targetPage;
       if (targetName) {
-        // Find the screen to get the load function name
         const targetScreen = screens.find(s => s.name === targetName);
         if (targetScreen) {
-          const loadFunc = getScreenLoadFuncName(targetScreen.name, options);
+          // The load call is written out here rather than delegated to the
+          // screen's load function, because the transition belongs to this
+          // navigation - two buttons can enter the same screen from opposite
+          // directions.
           if (options.generateComments) {
             lines.push(`${indent}${generateComment(`Navigate to: ${targetName}`, options)}`);
           }
-          lines.push(`${indent}${loadFunc}();`);
+          lines.push(`${indent}${screenLoadStatement(targetScreen, action, options)}`);
         }
       }
       break;
