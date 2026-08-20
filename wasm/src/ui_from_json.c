@@ -522,6 +522,131 @@ static lv_obj_t *create_line(lv_obj_t *parent, const cJSON *comp) {
 }
 
 /*
+ * The Polygon widget: a closed line over a fill of triangles.
+ *
+ * LVGL has no polygon widget and no filled-polygon primitive, so the outline
+ * is an lv_line whose first point is repeated at the end, and the fill is a
+ * fan of triangles sharing that point - the same pair of things the generated
+ * firmware draws, so this preview shows what the panel will.
+ *
+ * A fan only covers a convex outline. A concave one is drawn unfilled here
+ * exactly as it is on the canvas and on the panel.
+ */
+typedef struct {
+    const lv_point_precise_t *points;
+    uint32_t point_cnt;
+    lv_color_t color;
+} polygon_fill_t;
+
+#define POLYGON_POOL_SHAPES LINE_POOL_LINES
+static polygon_fill_t polygon_fill_pool[POLYGON_POOL_SHAPES];
+static int polygon_pool_used;
+
+static void polygon_pool_reset(void) { polygon_pool_used = 0; }
+
+/* True when the outline turns the same way all the way round. */
+static bool polygon_is_convex(const lv_point_precise_t *p, int n) {
+    int sign = 0;
+    if (n < 3) return false;
+    for (int i = 0; i < n; i++) {
+        int32_t ax = (int32_t)p[i].x, ay = (int32_t)p[i].y;
+        int32_t bx = (int32_t)p[(i + 1) % n].x, by = (int32_t)p[(i + 1) % n].y;
+        int32_t cx = (int32_t)p[(i + 2) % n].x, cy = (int32_t)p[(i + 2) % n].y;
+        int32_t cross = (bx - ax) * (cy - by) - (by - ay) * (cx - bx);
+        int turn;
+        if (cross == 0) continue;
+        turn = cross > 0 ? 1 : -1;
+        if (sign == 0) sign = turn;
+        else if (turn != sign) return false;
+    }
+    return sign != 0;
+}
+
+static void polygon_fill_cb(lv_event_t *e) {
+    lv_obj_t *obj = lv_event_get_target(e);
+    lv_layer_t *layer = lv_event_get_layer(e);
+    const polygon_fill_t *fill = lv_event_get_user_data(e);
+    lv_area_t area;
+    int32_t x_ofs, y_ofs;
+    lv_draw_triangle_dsc_t dsc;
+    uint32_t i;
+
+    lv_obj_get_coords(obj, &area);
+    x_ofs = area.x1 - lv_obj_get_scroll_x(obj);
+    y_ofs = area.y1 - lv_obj_get_scroll_y(obj);
+
+    lv_draw_triangle_dsc_init(&dsc);
+    dsc.color = fill->color;
+    dsc.opa = lv_obj_get_style_opa(obj, LV_PART_MAIN);
+
+    for (i = 1; i + 1 < fill->point_cnt; i++) {
+        dsc.p[0].x = fill->points[0].x + x_ofs;
+        dsc.p[0].y = fill->points[0].y + y_ofs;
+        dsc.p[1].x = fill->points[i].x + x_ofs;
+        dsc.p[1].y = fill->points[i].y + y_ofs;
+        dsc.p[2].x = fill->points[i + 1].x + x_ofs;
+        dsc.p[2].y = fill->points[i + 1].y + y_ofs;
+        lv_draw_triangle(layer, &dsc);
+    }
+}
+
+static lv_obj_t *create_polygon(lv_obj_t *parent, const cJSON *comp) {
+    lv_obj_t *poly = lv_line_create(parent);
+    const cJSON *props = cJSON_GetObjectItemCaseSensitive(comp, "props");
+    const cJSON *styles = cJSON_GetObjectItemCaseSensitive(comp, "styles");
+    int slot = line_pool_used < LINE_POOL_LINES ? line_pool_used++ : LINE_POOL_LINES - 1;
+    lv_point_precise_t *points = line_point_pool[slot];
+    int count = 0;
+    const char *fill_color = NULL;
+
+    if (props) {
+        cJSON *pts = cJSON_GetObjectItemCaseSensitive(props, "points");
+        if (cJSON_IsArray(pts)) {
+            cJSON *pt;
+            cJSON_ArrayForEach(pt, pts) {
+                /* One slot is kept for the repeat that closes the run. */
+                if (count >= LINE_POOL_POINTS - 1) break;
+                if (!cJSON_IsArray(pt) || cJSON_GetArraySize(pt) < 2) continue;
+                points[count].x = cJSON_GetArrayItem(pt, 0)->valuedouble;
+                points[count].y = cJSON_GetArrayItem(pt, 1)->valuedouble;
+                count++;
+            }
+        }
+    }
+    if (count < 3) return poly;
+
+    if (styles) {
+        const cJSON *def = cJSON_GetObjectItemCaseSensitive(styles, "default");
+        if (def) fill_color = cjson_get_string(def, "bgColor");
+    }
+
+    if (fill_color && strcmp(fill_color, "transparent") != 0 &&
+        polygon_is_convex(points, count) && polygon_pool_used < POLYGON_POOL_SHAPES) {
+        polygon_fill_t *fill = &polygon_fill_pool[polygon_pool_used++];
+        fill->points = points;
+        fill->point_cnt = (uint32_t)count;
+        fill->color = hex_to_color(fill_color);
+        lv_obj_add_event_cb(poly, polygon_fill_cb, LV_EVENT_DRAW_MAIN_BEGIN, fill);
+    }
+
+    /* Closed here, because lv_line draws an open polyline. */
+    points[count] = points[0];
+    lv_line_set_points(poly, points, count + 1);
+
+    if (props) {
+        const cJSON *item = cJSON_GetObjectItemCaseSensitive(props, "lineWidth");
+        if (cJSON_IsNumber(item))
+            lv_obj_set_style_line_width(poly, item->valueint, LV_PART_MAIN);
+        const char *color = cjson_get_string(props, "lineColor");
+        if (color)
+            lv_obj_set_style_line_color(poly, hex_to_color(color), LV_PART_MAIN);
+        if (cjson_get_bool(props, "lineRounded", 0))
+            lv_obj_set_style_line_rounded(poly, true, LV_PART_MAIN);
+    }
+    return poly;
+}
+
+/*
  * The Circle widget. Everything it draws is circular: a disc is a plain
  * object with a circular radius, a sector is an arc's background part with a
  * width thick enough to close the wedge. The software renderer has no
@@ -613,6 +738,7 @@ static const type_entry_t type_table[] = {
     { "win",       create_win },
     { "spinner",   create_spinner },
     { "line",      create_line },
+    { "polygon",   create_polygon },
     { "img",       create_img },
     { NULL, NULL }
 };
@@ -638,6 +764,7 @@ void ui_from_json(const char *json_str) {
     lv_obj_t *screen = lv_screen_active();
     id_map_reset();
     line_pool_reset();
+    polygon_pool_reset();
 
     /* Apply screen settings */
     cJSON *scr_cfg = cJSON_GetObjectItemCaseSensitive(root, "screen");

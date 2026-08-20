@@ -18,6 +18,12 @@ import { componentsById } from '../../utils/animationAssets';
 import { trackPreviewValues } from '../../utils/animationValues';
 import { animationTracks } from '../../utils/animationTracks';
 import {
+  isConvexPolygon,
+  normalizePolygonPoints,
+  pointsInPolygonBox,
+  polygonBox,
+} from '../../utils/polygonGeometry';
+import {
   DEFAULT_LINE_WIDTH,
   normalizeLinePoints,
   pointsInBox,
@@ -842,6 +848,17 @@ const PreviewPanel: React.FC = () => {
           });
           break;
 
+        case 'polygon':
+          drawPolygon(ctx, x, y, w, h, {
+            points: comp.props.points,
+            // The style background is the fill, the same one the panel draws.
+            fill: bgColorStyle && bgColorStyle !== 'transparent' ? bgColorStyle : null,
+            lineColor: comp.props.lineColor || styles.borderColor || '#333333',
+            lineWidth: comp.props.lineWidth ?? DEFAULT_LINE_WIDTH,
+            rounded: !!comp.props.lineRounded,
+          });
+          break;
+
         case 'spinner':
           drawSpinner(ctx, x, y, w, h, {
             borderColor: styles.borderColor || '#2196F3',
@@ -1605,6 +1622,55 @@ function drawLine(
     else ctx.lineTo(x + px, y + py);
   });
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * A polygon: the closed run of points, filled only when a triangle fan could
+ * cover it, and stroked with its outline.
+ *
+ * The fill is drawn as one path rather than as the fan the firmware uses -
+ * over a convex outline the two cover the same pixels, and a path has no seams
+ * between triangles.
+ */
+function drawPolygon(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  opts: {
+    points: unknown;
+    fill: string | null;
+    lineColor: string;
+    lineWidth: number;
+    rounded: boolean;
+  }
+) {
+  const points = normalizePolygonPoints(opts.points);
+  const placed = pointsInPolygonBox(points);
+  const box = polygonBox(placed);
+  // The box the preview was given is the widget's; the points are drawn in
+  // theirs, scaled to fit, so a resized polygon fills its box here too.
+  const scaleX = box.width > 0 ? w / box.width : 1;
+  const scaleY = box.height > 0 ? h / box.height : 1;
+
+  ctx.save();
+  ctx.beginPath();
+  placed.forEach(([px, py], i) => {
+    const cx = x + px * scaleX;
+    const cy = y + py * scaleY;
+    if (i === 0) ctx.moveTo(cx, cy);
+    else ctx.lineTo(cx, cy);
+  });
+  ctx.closePath();
+  if (opts.fill && isConvexPolygon(placed)) {
+    ctx.fillStyle = opts.fill;
+    ctx.fill();
+  }
+  if (opts.lineWidth > 0) {
+    ctx.strokeStyle = opts.lineColor;
+    ctx.lineWidth = opts.lineWidth;
+    ctx.lineJoin = opts.rounded ? 'round' : 'miter';
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
