@@ -782,3 +782,96 @@ by a successful build.
   piece and nothing above depends on it.
 - **A rebuilt `lvgl_wasm.wasm`**, which needs `emcc`.
 - **The H747I portrait touch mapping**, which needs the board.
+
+## 15. The EDT driver, and the bug that nearly shipped with it
+
+The partial-mode portrait path of §8.3 is built. Two things came out of doing it
+that the evaluation did not predict, and the first is the important one.
+
+### 15.1 A `__weak const` read from its own translation unit is folded away
+
+§9 chose the `hmi_runtime_config` pattern — a `__weak` default in the board's own
+file, overridden by a strong definition in generated code — and put the default
+in `board_display.c`, next to the code that reads it. That is wrong, and wrong in
+the worst way available: **it compiles, it links, the linker map shows the strong
+definition winning, and the firmware ignores it completely.**
+
+GCC may read a `const` object's value out of its own initialiser when the
+definition is visible in the same translation unit, and it does so here despite
+`__weak`. So while compiling `board_display.c`:
+
+```c
+const bool portrait =
+    hmi_display_config.orientation == HMI_DISPLAY_ORIENTATION_PORTRAIT;
+```
+
+folded to `false`, the entire rotated path became dead code, `--gc-sections` then
+discarded the two 51 KB render buffers it referenced, and the portrait image came
+out **byte-for-byte identical to the landscape one**.
+
+It was caught only because the partial buffers gave it a visible tell: they
+appeared under *Discarded input sections* in the map. Nothing else about the
+build looked wrong.
+
+**This invalidates part of §14.4.** The H747I check recorded there — "the
+generated strong definition wins, `hmi_display_config` resolves to
+`hmi_display_generated.c.obj`" — was true and did not mean what it was taken to
+mean. The symbol did resolve to the generated object; the *reads inside
+`board_display.c`* had already been folded against the local weak definition at
+compile time, so that firmware would have come up landscape whatever the project
+said. Rebuilding after the fix grew the H747I's `.text` by 32 bytes: the portrait
+branch, back from the dead.
+
+The fix is structural rather than clever. The weak default moved to a file of its
+own, `src/board_display_config.c`, on all three boards; `board_display.c` now
+sees only the `extern` declaration from `board_display.h` and has no initialiser
+to fold against. `hmi_runtime_config` escapes the same trap by accident — its
+readers reach it through a pointer `main.c` passes in.
+
+**The general lesson, worth carrying to any future weak-symbol contract here: a
+link-time symbol check does not prove the value was read at link time.** The
+thing to verify is that the two configurations produce *different* firmware.
+
+### 15.2 What the EDT driver does
+
+`lv_display_create` still takes the panel's 480x272 — LVGL keeps that as the
+original and swaps only what the UI sees, so the screens come out 272x480 while
+the frame buffers stay the panel's shape. Then `LV_DISPLAY_ROTATION_90` and
+`LV_DISPLAY_RENDER_MODE_PARTIAL` with two 272x48x4 render buffers, which is one
+tenth of the logical screen and exactly the 48 rows LVGL derives back out of the
+byte count in `get_max_row`.
+
+Each flush turns one band into the frame buffer the LTDC is *not* scanning, using
+`lv_display_rotate_area` for the position and `lv_draw_sw_rotate` for the pixels.
+On the last band of a refresh the buffers swap at vertical blanking, and the box
+just written is copied across so both hold the same picture — §8.5's option (3),
+taken because partial mode redraws only what changed and the buffer LVGL draws
+into next would otherwise hold the frame before last. So the tear-free property
+the direct-mode driver was built around is preserved.
+
+Touch is turned in `touch_read` rather than in the vendored driver, which goes on
+mapping onto the panel's own frame in both orientations. LVGL rotates no input at
+all — `lv_indev.c` has no notion of display rotation — so the driver owes it
+already-turned coordinates. The transform is the inverse of
+`lv_display_rotate_area`'s: panel `(x, y)` becomes logical `(271 - y, x)`. The
+bring-up log deliberately records the **raw** reading, since recording the
+transformed one would hide the thing it exists to check.
+
+### 15.3 Cost, measured where it can be
+
+| | Value |
+|---|---|
+| `.text` | 294,792 B |
+| `.bss` | 1,173,940 B (+104,448 for the two render buffers) |
+| RAM free to `_estack` | 334.7 KB, against an 8 KB stack |
+
+The two 51 KB render buffers are static, so they cost the same 102 KB in
+landscape, where nothing reads them. That was a deliberate trade against the
+alternative — giving up the second frame buffer to free 510 KB in the frame
+buffer region — which would have made portrait free but reintroduced tearing.
+334.7 KB still free says the trade is affordable.
+
+**What is not measured is anything that runs.** The rotate loop's cost per
+refresh (§8.3 estimated 5–8 ms worst case), whether the swap-and-reconcile keeps
+up at 60 Hz, and whether the touch transform is right, all need the board. The
+EDT now offers Portrait in the editor precisely so that can be tried.

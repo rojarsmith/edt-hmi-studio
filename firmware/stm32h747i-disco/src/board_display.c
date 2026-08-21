@@ -16,15 +16,6 @@
     (HMI_DISPLAY_WIDTH * HMI_DISPLAY_HEIGHT * sizeof(uint32_t))
 
 /*
- * Landscape unless the generated hmi_display_generated.c says otherwise. A
- * firmware image built from a bare template — no project source at all — keeps
- * this one and comes up the way the board always has.
- */
-__weak const hmi_display_config_t hmi_display_config = {
-    .orientation = HMI_DISPLAY_ORIENTATION_LANDSCAPE,
-};
-
-/*
  * Two full frame buffers in the board's SDRAM. LVGL renders straight into the
  * one the LTDC is not scanning, and they are swapped during vertical blanking,
  * so a frame is never displayed while it is being drawn. Copying rendered bands

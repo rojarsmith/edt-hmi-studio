@@ -39,17 +39,6 @@ static void clean_dcache_range(const void *address, size_t length)
     __DSB();
 }
 
-/*
- * Landscape, and on this board that is not a default but the only value the
- * driver can honour — the panel is parallel RGB with no scan-direction
- * register, so portrait would need LVGL's partial render mode and a software
- * rotate on every flush. board_display_init refuses rather than drawing a
- * sheared screen. See docs/display-orientation.md §8.2.
- */
-__weak const hmi_display_config_t hmi_display_config = {
-    .orientation = HMI_DISPLAY_ORIENTATION_LANDSCAPE,
-};
-
 static void display_flush(
     lv_display_t *display,
     const lv_area_t *area,

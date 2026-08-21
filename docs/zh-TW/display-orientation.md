@@ -649,3 +649,76 @@ F746G 與 EDT 則是**拒絕**：`board_display_init` 對非橫向直接回傳 f
   這是剩下最大的一塊，而且上面所有東西都不依賴它。
 - **重建 `lvgl_wasm.wasm`**，需要 `emcc`。
 - **H747I 直向的觸控對應**，需要板子。
+
+## 15. EDT 驅動，以及差點跟著一起出貨的那個 bug
+
+§8.3 的 partial mode 直向路徑做好了。過程中跑出兩件評估沒有預測到的事，而第一件才是重點。
+
+### 15.1 在自己的編譯單元裡讀 `__weak const`，會被摺掉
+
+§9 選了 `hmi_runtime_config` 的做法——板子自己的檔案裡放 `__weak` 預設，由產生的程式碼以強
+定義覆寫——並且把預設放在 `board_display.c`，就在讀它的程式碼旁邊。這是錯的，而且錯在最糟
+糕的那一種：**編得過、連結得過、linker map 顯示強定義勝出，而韌體完全不理它。**
+
+當一個 `const` 物件的定義在同一個編譯單元裡看得見時，GCC 可以直接從它的初始值讀出結果，
+而且即使帶著 `__weak` 它也真的這麼做了。所以在編譯 `board_display.c` 時：
+
+```c
+const bool portrait =
+    hmi_display_config.orientation == HMI_DISPLAY_ORIENTATION_PORTRAIT;
+```
+
+被摺成 `false`，整條旋轉路徑變成死碼，`--gc-sections` 接著把它引用的兩塊 51 KB 繪製緩衝區
+丟掉，於是直向的映像檔跟橫向的**一個位元組都不差**。
+
+會被抓到，只因為 partial buffer 留下了一個看得見的痕跡：它們出現在 map 檔的
+*Discarded input sections* 裡。這次 build 其他地方看起來都沒有問題。
+
+**這讓 §14.4 有一部分作廢。** 那裡記錄的 H747I 檢查——「產生的強定義勝出，
+`hmi_display_config` 解析到 `hmi_display_generated.c.obj`」——是真的，但不是當時以為的意思。
+符號確實解析到產生的目的檔；而 **`board_display.c` 裡面那些讀取**在編譯期就已經對著本地的
+weak 定義摺掉了，所以那份韌體不論專案怎麼寫都會以橫向開機。修正後重建，H747I 的 `.text`
+多了 32 個位元組：那條直向分支，從死裡回來了。
+
+修法是結構性的，不是小聰明。weak 預設在三塊板子上都搬進自己的檔案
+`src/board_display_config.c`；`board_display.c` 現在只看得到 `board_display.h` 裡的 `extern`
+宣告，沒有初始值可以摺。`hmi_runtime_config` 是誤打誤撞躲過同一個陷阱——它的讀取都是透過
+`main.c` 傳進去的指標。
+
+**通用的教訓，值得帶到這個 repo 未來任何一份 weak symbol 契約：連結期的符號檢查，不能證明
+那個值是在連結期被讀取的。** 該驗證的是兩種設定會不會產生**不同的**韌體。
+
+### 15.2 EDT 驅動做了什麼
+
+`lv_display_create` 仍然吃面板的 480x272——LVGL 會把它保留為 original，只對調 UI 看到的那一
+組，所以畫面出來是 272x480，而 frame buffer 維持面板的形狀。接著是 `LV_DISPLAY_ROTATION_90`
+與 `LV_DISPLAY_RENDER_MODE_PARTIAL`，配兩塊 272x48x4 的繪製緩衝區——那是邏輯螢幕的十分之
+一，也正是 LVGL 在 `get_max_row` 裡從位元組數反推回來的 48 列。
+
+每次 flush 把一條橫帶轉進 LTDC **沒有**在掃的那張 frame buffer，位置用
+`lv_display_rotate_area`、像素用 `lv_draw_sw_rotate`。一次刷新的最後一條橫帶進來時，兩張在
+垂直空白期交換，然後把剛寫過的那個框複製到另一張，讓兩張持有同一幅畫面——這是 §8.5 的選項
+（3），會這樣選是因為 partial mode 只重畫變動的部分，否則 LVGL 下一次要畫進去的那張會是上
+上一幀。所以 direct mode 驅動當初繞著它設計的那個「不撕裂」性質被保住了。
+
+觸控是在 `touch_read` 裡轉的，不是在 vendored 驅動裡——後者在兩個方向都照樣映射到面板自己
+的座標系。LVGL 完全不轉輸入（`lv_indev.c` 裡沒有顯示旋轉這個概念），所以驅動有義務交給它
+已經轉好的座標。這個轉換是 `lv_display_rotate_area` 的反函數：面板的 `(x, y)` 變成邏輯的
+`(271 - y, x)`。bring-up 記錄刻意存**原始**讀值，因為存轉換後的值會把它存在要檢查的那件事
+藏起來。
+
+### 15.3 成本，能量的都量了
+
+| | 數值 |
+|---|---|
+| `.text` | 294,792 B |
+| `.bss` | 1,173,940 B（兩塊繪製緩衝區多佔 104,448） |
+| 到 `_estack` 的空閒 RAM | 334.7 KB，而堆疊只要 8 KB |
+
+兩塊 51 KB 繪製緩衝區是靜態的，所以在橫向也一樣佔 102 KB，而那裡根本沒人讀它們。這是刻意
+的取捨，另一個選項是放棄第二張 frame buffer、在 frame buffer 區釋出 510 KB——那會讓直向免
+費，但會把撕裂帶回來。仍然剩 334.7 KB，說明這個取捨付得起。
+
+**沒有被量到的，是任何會跑起來的東西。** 旋轉迴圈每次刷新的成本（§8.3 估最壞 5–8 ms）、
+交換與補寫跟不跟得上 60 Hz、以及觸控轉換對不對，全都需要板子。EDT 現在在編輯器裡提供
+Portrait，正是為了讓這些可以被試出來。

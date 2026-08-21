@@ -49,6 +49,52 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *timer);
 #define HMI_FRAMEBUFFER_0 0x20000000U
 #define HMI_FRAMEBUFFER_1 (HMI_FRAMEBUFFER_0 + HMI_FRAMEBUFFER_BYTES)
 
+/*
+ * Portrait cannot use the direct mode above, and the reason is worth stating
+ * because getting it wrong is silent. The ET043027 is a parallel RGB panel: no
+ * MADCTL, no scan-direction register, and neither the LTDC nor DMA2D rotates.
+ * That leaves LVGL's software rotation, which only runs in *partial* render
+ * mode — set on a direct-mode display, lv_refr.c sizes the layer to the rotated
+ * resolution while the LTDC goes on scanning the buffer 480 pixels wide, with
+ * no warning and a sheared picture as the result. See
+ * docs/display-orientation.md §8.2.
+ *
+ * So portrait renders into these instead, and display_flush turns each band on
+ * its way to the frame buffer. One tenth of the logical screen each, which is
+ * LVGL's own guidance: 272 x 48 x 4 = 51 KB, and LVGL derives exactly those 48
+ * rows back out of the byte count (get_max_row, lv_refr.c). Two of them so the
+ * next band can be drawn while this one is being rotated out.
+ *
+ * They cost the same 102 KB in landscape, where nothing reads them. That is
+ * affordable and measured: the map file puts 437 KB free after the 1 MB LVGL
+ * heap, against an 8 KB stack. Static rather than carved out at run time so
+ * the linker accounts for them and a build that no longer fits says so.
+ */
+#define HMI_PARTIAL_LINES 48U
+#define HMI_PARTIAL_BYTES \
+    (HMI_DISPLAY_HEIGHT * HMI_PARTIAL_LINES * HMI_DISPLAY_BYTES_PER_PIXEL)
+
+static uint8_t partial_buffer_0[HMI_PARTIAL_BYTES] __attribute__((aligned(4)));
+static uint8_t partial_buffer_1[HMI_PARTIAL_BYTES] __attribute__((aligned(4)));
+
+/*
+ * Portrait only. Which frame buffer the LTDC is scanning, and which one the
+ * rotated output is going into — the same alternation direct mode gets for
+ * free, kept by hand because partial mode does not manage frame buffers.
+ */
+static uint32_t fb_scanning = HMI_FRAMEBUFFER_0;
+static uint32_t fb_drawing = HMI_FRAMEBUFFER_1;
+
+/*
+ * Panel-space bounding box of everything rotated into fb_drawing since the last
+ * swap. Partial mode redraws only what changed, so after a swap the buffer LVGL
+ * is about to draw into holds the frame before last; copying this box across
+ * brings it back up to date. Without it, every second frame shows the one
+ * before it wherever nothing was invalidated.
+ */
+static lv_area_t dirty_area;
+static bool dirty_valid;
+
 /* A frame is ~16 ms; well beyond that means the LTDC is not scanning and we
    must not block the main loop, which also drives Modbus. */
 #define HMI_RELOAD_TIMEOUT_MS 100U
@@ -112,23 +158,124 @@ void EDT_Sleep_SetDetected(bool detected)
     (void)detected;
 }
 
-/*
- * Landscape, and on this board that is not a default but the only value the
- * driver can honour — the panel is parallel RGB with no scan-direction
- * register, so portrait would need LVGL's partial render mode and a software
- * rotate on every flush. board_display_init refuses rather than drawing a
- * sheared screen. See docs/display-orientation.md §8.2.
+/** Stage a frame buffer address and hold until the LTDC has actually taken it. */
+static void present(uint32_t framebuffer)
+{
+    uint32_t started_ms;
+
+    /* Reloading was switched off at init, so this only stages the address. */
+    (void)HAL_LTDC_SetAddress_NoReload(&hltdc, framebuffer, HMI_LCD_LAYER);
+    (void)HAL_LTDC_Reload(&hltdc, LTDC_RELOAD_VERTICAL_BLANKING);
+
+    /* Hold the buffer until the swap has actually happened, otherwise LVGL
+       would start drawing into the frame still being scanned out. */
+    started_ms = HAL_GetTick();
+    while ((LTDC->SRCR & LTDC_SRCR_VBR) != 0U) {
+        if ((HAL_GetTick() - started_ms) > HMI_RELOAD_TIMEOUT_MS) {
+            break;
+        }
+    }
+}
+
+/** One rectangle, copied between the two frame buffers. Panel coordinates. */
+static void copy_between_framebuffers(
+    uint32_t from,
+    uint32_t to,
+    const lv_area_t *area)
+{
+    const uint32_t stride = HMI_DISPLAY_WIDTH * HMI_DISPLAY_BYTES_PER_PIXEL;
+    const uint32_t offset = (stride * (uint32_t)area->y1)
+        + (HMI_DISPLAY_BYTES_PER_PIXEL * (uint32_t)area->x1);
+    const uint32_t row_bytes =
+        (uint32_t)lv_area_get_width(area) * HMI_DISPLAY_BYTES_PER_PIXEL;
+    const uint8_t *source = (const uint8_t *)from + offset;
+    uint8_t *destination = (uint8_t *)to + offset;
+    int32_t rows = lv_area_get_height(area);
+    int32_t row;
+
+    /* DMA2D is fitted and could do this without the CPU. Left as a straight
+       copy so the cost shows up in a measurement before it is optimised away —
+       see docs/display-orientation.md §8.5. */
+    for (row = 0; row < rows; row++) {
+        (void)memcpy(destination, source, row_bytes);
+        source += stride;
+        destination += stride;
+    }
+}
+
+/**
+ * Portrait: turn one rendered band into the frame buffer the LTDC is not
+ * scanning, and swap once the last band of the refresh is in.
  */
-__weak const hmi_display_config_t hmi_display_config = {
-    .orientation = HMI_DISPLAY_ORIENTATION_LANDSCAPE,
-};
+static void display_flush_rotated(
+    lv_display_t *display,
+    const lv_area_t *area,
+    uint8_t *pixel_map)
+{
+    const uint32_t stride = HMI_DISPLAY_WIDTH * HMI_DISPLAY_BYTES_PER_PIXEL;
+    const int32_t width = lv_area_get_width(area);
+    const int32_t height = lv_area_get_height(area);
+    lv_area_t panel = *area;
+    uint8_t *first_pixel;
+
+    /* LVGL hands out areas in the rotated frame the UI is laid out in; the
+       frame buffer is the panel's. This is the one conversion between them. */
+    lv_display_rotate_area(display, &panel);
+    first_pixel = (uint8_t *)fb_drawing
+        + (stride * (uint32_t)panel.y1)
+        + (HMI_DISPLAY_BYTES_PER_PIXEL * (uint32_t)panel.x1);
+
+    lv_draw_sw_rotate(
+        pixel_map,
+        first_pixel,
+        width,
+        height,
+        width * (int32_t)HMI_DISPLAY_BYTES_PER_PIXEL,
+        (int32_t)stride,
+        LV_DISPLAY_ROTATION_90,
+        LV_COLOR_FORMAT_ARGB8888);
+
+    if (dirty_valid) {
+        if (panel.x1 < dirty_area.x1) dirty_area.x1 = panel.x1;
+        if (panel.y1 < dirty_area.y1) dirty_area.y1 = panel.y1;
+        if (panel.x2 > dirty_area.x2) dirty_area.x2 = panel.x2;
+        if (panel.y2 > dirty_area.y2) dirty_area.y2 = panel.y2;
+    } else {
+        dirty_area = panel;
+        dirty_valid = true;
+    }
+
+    /* More bands of this refresh still to come; the frame is not showable. */
+    if (!lv_display_flush_is_last(display)) {
+        lv_display_flush_ready(display);
+        return;
+    }
+
+    present(fb_drawing);
+
+    {
+        const uint32_t previous = fb_scanning;
+        fb_scanning = fb_drawing;
+        fb_drawing = previous;
+    }
+
+    if (dirty_valid) {
+        copy_between_framebuffers(fb_scanning, fb_drawing, &dirty_area);
+        dirty_valid = false;
+    }
+
+    lv_display_flush_ready(display);
+}
 
 static void display_flush(
     lv_display_t *display,
     const lv_area_t *area,
     uint8_t *pixel_map)
 {
-    uint32_t started_ms;
+    if (lv_display_get_rotation(display) != LV_DISPLAY_ROTATION_0) {
+        display_flush_rotated(display, area, pixel_map);
+        return;
+    }
 
     (void)area;
 
@@ -143,19 +290,9 @@ static void display_flush(
        DCACHE1 covers the external memories rather than SRAM. The LTDC therefore
        sees what LVGL wrote as soon as it is written. */
 
-    /* Reloading was switched off at init, so this only stages the address. */
-    (void)HAL_LTDC_SetAddress_NoReload(
-        &hltdc, (uint32_t)pixel_map, HMI_LCD_LAYER);
-    (void)HAL_LTDC_Reload(&hltdc, LTDC_RELOAD_VERTICAL_BLANKING);
-
-    /* Hold the buffer until the swap has actually happened, otherwise LVGL
-       would start drawing into the frame still being scanned out. */
-    started_ms = HAL_GetTick();
-    while ((LTDC->SRCR & LTDC_SRCR_VBR) != 0U) {
-        if ((HAL_GetTick() - started_ms) > HMI_RELOAD_TIMEOUT_MS) {
-            break;
-        }
-    }
+    /* In direct mode LVGL rendered straight into a frame buffer, so the buffer
+       to show is the one it handed back. */
+    present((uint32_t)pixel_map);
 
     lv_display_flush_ready(display);
 }
@@ -232,11 +369,33 @@ static void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
     (void)indev;
 
     if ((EDT_TS_GetState(&touch) == TS_OK) && (touch.touchDetected > 0U)) {
-        last_x = (int32_t)touch.touchX[0];
-        last_y = (int32_t)touch.touchY[0];
-        /* One entry per press, not per poll, so the log stays readable. */
+        /*
+         * The vendor driver maps a reading onto the panel's own landscape
+         * frame, and is left doing exactly that in both orientations — it is
+         * vendored code, and EDT_LCD_GetXSize/GetYSize below still answer with
+         * the panel. The rotation is undone here instead.
+         *
+         * LVGL does not rotate input at all: lv_indev.c has no notion of
+         * display rotation, so a driver on a turned display must hand it
+         * already-turned coordinates. This is the inverse of what
+         * lv_display_rotate_area does to an area for ROTATION_90 — that maps
+         * logical to panel as (x, y) -> (y, ver_res - x - 1), so panel to
+         * logical is (x, y) -> (ver_res - y - 1, x).
+         */
+        if (lv_display_get_rotation(lv_display_get_default())
+                != LV_DISPLAY_ROTATION_0) {
+            last_x = (int32_t)HMI_DISPLAY_HEIGHT - 1 - (int32_t)touch.touchY[0];
+            last_y = (int32_t)touch.touchX[0];
+        } else {
+            last_x = (int32_t)touch.touchX[0];
+            last_y = (int32_t)touch.touchY[0];
+        }
+        /* One entry per press, not per poll, so the log stays readable. The
+           *raw* reading, deliberately: the log exists to work out the mapping,
+           and recording what the transform above already produced would hide
+           the very thing being checked. */
         if (!was_pressed) {
-            record_touch(last_x, last_y);
+            record_touch((int32_t)touch.touchX[0], (int32_t)touch.touchY[0]);
             was_pressed = true;
         }
         data->state = LV_INDEV_STATE_PRESSED;
@@ -560,13 +719,8 @@ bool board_display_init(void)
     lv_display_t *display;
     lv_indev_t *touch_device;
 
-    /* A build for this board should never carry a portrait config — the editor
-       does not offer the option (BoardDefinition.display.orientations). If one
-       arrives anyway, stop here: a visibly dead display leads to this line,
-       whereas rendering it regardless leads to a bug report about LVGL. */
-    if (hmi_display_config.orientation != HMI_DISPLAY_ORIENTATION_LANDSCAPE) {
-        return false;
-    }
+    const bool portrait =
+        hmi_display_config.orientation == HMI_DISPLAY_ORIENTATION_PORTRAIT;
 
     panel_power_init();
     board_init_stage = BOARD_STAGE_PANEL_POWER;
@@ -631,12 +785,31 @@ bool board_display_init(void)
     }
     lv_display_set_color_format(display, LV_COLOR_FORMAT_ARGB8888);
     lv_display_set_flush_cb(display, display_flush);
-    lv_display_set_buffers(
-        display,
-        (void *)HMI_FRAMEBUFFER_0,
-        (void *)HMI_FRAMEBUFFER_1,
-        HMI_FRAMEBUFFER_BYTES,
-        LV_DISPLAY_RENDER_MODE_DIRECT);
+    if (portrait) {
+        /*
+         * The panel's resolution goes in either way — LVGL keeps it as the
+         * original and swaps only what the UI sees, so the screens come out
+         * 272 x 480 while the frame buffers stay 480 x 272.
+         *
+         * Rotation before buffers, because set_buffers derives the partial
+         * buffer's row count from the byte count and the colour format, and
+         * reading it back afterwards is how the two stay consistent.
+         */
+        lv_display_set_rotation(display, LV_DISPLAY_ROTATION_90);
+        lv_display_set_buffers(
+            display,
+            partial_buffer_0,
+            partial_buffer_1,
+            sizeof(partial_buffer_0),
+            LV_DISPLAY_RENDER_MODE_PARTIAL);
+    } else {
+        lv_display_set_buffers(
+            display,
+            (void *)HMI_FRAMEBUFFER_0,
+            (void *)HMI_FRAMEBUFFER_1,
+            HMI_FRAMEBUFFER_BYTES,
+            LV_DISPLAY_RENDER_MODE_DIRECT);
+    }
     lv_display_set_default(display);
 
     /* No input device at all when the controller did not answer, rather than

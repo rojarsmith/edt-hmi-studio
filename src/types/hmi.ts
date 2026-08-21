@@ -269,12 +269,14 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
       // SRAM for the two frame buffers. See docs/color-depth.md.
       colorDepth: 32,
       colorFormat: 'ARGB8888',
-      // Landscape only, for the same reason as the F746G — the ET043027 is a
-      // parallel RGB panel with no scan rotation. This board additionally has
-      // the tightest memory of the three: a third full-screen buffer is 510 KB
-      // against 437 KB of free SRAM, so even the workaround that keeps the
-      // current render mode does not fit. See docs/display-orientation.md §8.4.
-      orientations: ['landscape'],
+      // Both. The ET043027 is parallel RGB with no scan rotation of its own, so
+      // unlike the H747I this one is not free: portrait renders through LVGL's
+      // partial mode and turns each band on its way to the frame buffer, at a
+      // cost in CPU per refresh. It fits because partial mode needs no third
+      // full-screen buffer — 2 x 51 KB of render buffer against the 437 KB of
+      // SRAM free after the 1 MB LVGL heap. See docs/display-orientation.md
+      // §8.3, and §13 for what still has to be measured on the board.
+      orientations: ['landscape', 'portrait'],
     },
     // Bank 1 of the STM32U599NJ's two 2 MB banks. Bank 2 is left erased and out
     // of this image — see docs/edt-evk043027b.md.

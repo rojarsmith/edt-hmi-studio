@@ -23,10 +23,10 @@ extern "C" {
 /*
  * Which way up the UI was designed. Set by the generated
  * hmi_display_generated.c, which overrides the __weak default in
- * board_display.c. Every board declares this because the generator emits that
- * file for every build; this one can only drive landscape, and
- * board_display_init refuses anything else rather than rendering it wrong.
- * See docs/display-orientation.md §8.2.
+ * board_display.c. Portrait is driven by turning each rendered band on its way
+ * to the frame buffer, because this panel has no scan-direction register of its
+ * own — see the partial-buffer comment in board_display.c and
+ * docs/display-orientation.md §8.3.
  */
 typedef enum {
     HMI_DISPLAY_ORIENTATION_LANDSCAPE = 0,
