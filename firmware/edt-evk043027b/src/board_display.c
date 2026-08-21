@@ -112,6 +112,17 @@ void EDT_Sleep_SetDetected(bool detected)
     (void)detected;
 }
 
+/*
+ * Landscape, and on this board that is not a default but the only value the
+ * driver can honour — the panel is parallel RGB with no scan-direction
+ * register, so portrait would need LVGL's partial render mode and a software
+ * rotate on every flush. board_display_init refuses rather than drawing a
+ * sheared screen. See docs/display-orientation.md §8.2.
+ */
+__weak const hmi_display_config_t hmi_display_config = {
+    .orientation = HMI_DISPLAY_ORIENTATION_LANDSCAPE,
+};
+
 static void display_flush(
     lv_display_t *display,
     const lv_area_t *area,
@@ -548,6 +559,14 @@ bool board_display_init(void)
 {
     lv_display_t *display;
     lv_indev_t *touch_device;
+
+    /* A build for this board should never carry a portrait config — the editor
+       does not offer the option (BoardDefinition.display.orientations). If one
+       arrives anyway, stop here: a visibly dead display leads to this line,
+       whereas rendering it regardless leads to a bug report about LVGL. */
+    if (hmi_display_config.orientation != HMI_DISPLAY_ORIENTATION_LANDSCAPE) {
+        return false;
+    }
 
     panel_power_init();
     board_init_stage = BOARD_STAGE_PANEL_POWER;

@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
 import type { DisplayConfig, LvglConfig } from '../../store/projectStore';
 import { DEFAULT_LVGL_CONFIG } from '../../store/projectStore';
-import type { BoardId, ProtocolId } from '../../types/hmi';
+import type { BoardId, DisplayOrientation, ProtocolId } from '../../types/hmi';
 import {
   DEFAULT_BOARD_ID,
+  ORIENTATION_LABELS,
   SUPPORTED_BOARDS,
+  SUPPORTED_ORIENTATIONS,
+  boardCanDriveOrientation,
   formatMemSize,
   getBoardDefinition,
+  getBoardDefaultOrientation,
   getBoardProtocols,
   getProtocolDefinition,
+  logicalResolution,
 } from '../../types/hmi';
 import './NewProjectDialog.css';
 
@@ -31,18 +36,25 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
   const [protocol, setProtocol] = useState<ProtocolId>(
     () => getBoardProtocols(DEFAULT_BOARD_ID)[0],
   );
+  const [orientation, setOrientation] = useState<DisplayOrientation>(
+    () => getBoardDefaultOrientation(DEFAULT_BOARD_ID),
+  );
 
   // Everything the dialog does not ask for is derived from here.
   const board = getBoardDefinition(boardId);
   const boardProtocols = getBoardProtocols(boardId);
+  const orientationBuildable = boardCanDriveOrientation(boardId, orientation);
+  // What the designer is about to draw in, which is not the panel's geometry
+  // when the two disagree. Shown live so the orientation select has a visible
+  // effect before the project exists.
+  const design = logicalResolution(boardId, orientation);
 
   const handleCreate = () => {
     const projectName = name.trim() || 'Untitled Project';
     const display: DisplayConfig = {
-      width: board.display.width,
-      height: board.display.height,
+      ...design,
       colorDepth: board.display.colorDepth,
-      rotation: 0,
+      orientation,
     };
     // The LVGL build settings are a property of the board, not a user choice —
     // they mirror firmware/<board>/include/lv_conf.h.
@@ -106,6 +118,9 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
                 setProtocol((current) => (
                   nextProtocols.includes(current) ? current : nextProtocols[0]
                 ));
+                // Orientation is not clamped the same way: both are always
+                // designable, and a board that cannot build one says so below
+                // rather than silently changing the author's choice.
               }}
             >
               {SUPPORTED_BOARDS.map((item) => (
@@ -119,6 +134,33 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose, onCreate }
               {board.display.colorFormat} ({board.display.colorDepth}-bit) ·{' '}
               LVGL heap {formatMemSize(board.lvgl.memSizeKb)} · default font{' '}
               {board.lvgl.defaultFont}
+            </span>
+          </label>
+
+          {/* Unlike the board and the protocol, this one can be changed later,
+              in Project Settings — which turns the existing layout with the
+              canvas. Choosing it here is simply free, because there is nothing
+              on the canvas yet to turn. See docs/display-orientation.md §6. */}
+          <label className="npd-label">
+            Display Orientation
+            <select
+              className="npd-select"
+              value={orientation}
+              onChange={(e) => setOrientation(e.target.value as DisplayOrientation)}
+            >
+              {SUPPORTED_ORIENTATIONS.map((id) => (
+                <option key={id} value={id}>
+                  {ORIENTATION_LABELS[id]}
+                  {boardCanDriveOrientation(boardId, id) ? '' : ' — no firmware support yet'}
+                </option>
+              ))}
+            </select>
+            <span className="npd-hint">
+              Design canvas {design.width}×{design.height}.
+              {orientationBuildable
+                ? ''
+                : ` ${board.name} cannot be built this way up yet — the project`
+                  + ' can still be designed and previewed.'}
             </span>
           </label>
 

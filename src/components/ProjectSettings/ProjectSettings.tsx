@@ -5,18 +5,26 @@ import type { ProjectConfig } from '../../store/projectStore';
 import { DEFAULT_LVGL_CONFIG } from '../../store/projectStore';
 import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
-import { getBoardDefinition } from '../../types/hmi';
+import type { DisplayOrientation } from '../../types/hmi';
+import {
+  ORIENTATION_LABELS,
+  SUPPORTED_ORIENTATIONS,
+  boardCanDriveOrientation,
+  getBoardDefinition,
+  logicalResolution,
+} from '../../types/hmi';
 import { toast } from '../Toast';
 import './ProjectSettings.css';
 
 const ProjectSettings: React.FC = () => {
   const { currentProjectId, setShowProjectSettings, setDefaultFontSize } = useAppStore();
   const { getProjectConfig, updateProjectConfig } = useProjectStore();
-  const { setCanvasSize } = useEditorStore();
+  const { setCanvasSize, rotateLayout } = useEditorStore();
   const fonts = useResourceStore((s) => s.fonts);
 
   const [config, setConfig] = useState<ProjectConfig | null>(null);
   const [name, setName] = useState('');
+  const [orientation, setOrientation] = useState<DisplayOrientation | null>(null);
 
   useEffect(() => {
     if (!currentProjectId) return;
@@ -24,6 +32,7 @@ const ProjectSettings: React.FC = () => {
       if (!cfg) return;
       setConfig(cfg);
       setName(cfg.name);
+      setOrientation(cfg.display.orientation);
     });
   }, [currentProjectId, getProjectConfig]);
 
@@ -40,14 +49,35 @@ const ProjectSettings: React.FC = () => {
   const board = config ? getBoardDefinition(config.boardId) : null;
 
   const handleSave = async () => {
-    if (!config || !board) return;
+    if (!config || !board || !orientation) return;
 
+    /*
+     * Through the orientation, never straight from the board. The board's
+     * width/height are the panel's, and a portrait project's are the panel's
+     * turned — copying the panel's numbers over them would resize the canvas
+     * out from under the widgets, on a save the user made to rename the
+     * project. See docs/display-orientation.md §4.1.
+     */
     const display = {
       ...config.display,
-      width: board.display.width,
-      height: board.display.height,
+      ...logicalResolution(config.boardId, orientation),
       colorDepth: board.display.colorDepth,
+      orientation,
     };
+
+    /*
+     * Turning an existing design, not just resizing the canvas under it. The
+     * direction is the one that takes the widgets with the canvas: clockwise
+     * into portrait, back the other way out of it.
+     *
+     * rotateLayout transposes the canvas itself as part of the same history
+     * entry, so the setCanvasSize below is a no-op in that case and the one
+     * that matters when nothing turned.
+     */
+    const turned = orientation !== config.display.orientation;
+    if (turned) {
+      rotateLayout(orientation === 'portrait' ? 'cw' : 'ccw');
+    }
     const lvglConfig = {
       ...config.lvglConfig,
       colorFormat: board.display.colorFormat,
@@ -81,6 +111,15 @@ const ProjectSettings: React.FC = () => {
 
     setShowProjectSettings(false);
     toast.success('Project settings saved');
+    if (turned) {
+      // Says what moved and what did not, because the second half is the part
+      // that surprises people — see utils/rotateLayout.ts.
+      toast.info(
+        `Layout turned to ${ORIENTATION_LABELS[orientation].toLowerCase()} `
+        + `(${display.width}×${display.height}). Widget positions and sizes were `
+        + 'rotated; text direction and arc angles were not. Ctrl+Z undoes it.',
+      );
+    }
     if (resynced) {
       toast.info(`Display and LVGL settings re-synced to ${board.name}.`);
     }
@@ -88,7 +127,11 @@ const ProjectSettings: React.FC = () => {
 
   const handleClose = () => setShowProjectSettings(false);
 
-  if (!config || !board) return null;
+  if (!config || !board || !orientation) return null;
+
+  const design = logicalResolution(config.boardId, orientation);
+  const willTurn = orientation !== config.display.orientation;
+  const orientationBuildable = boardCanDriveOrientation(config.boardId, orientation);
 
   return (
     <div className="modal-global-overlay" onClick={handleClose}>
@@ -98,6 +141,41 @@ const ProjectSettings: React.FC = () => {
           <label className="npd-label">
             Project Name
             <input className="npd-input" type="text" value={name} onChange={e => setName(e.target.value)} />
+          </label>
+
+          {/* Changeable here, unlike the board and the protocol, because the
+              layout can be turned with the canvas. What cannot be turned is
+              what is *inside* each widget, which is why the warning below
+              appears before the change rather than after it. See
+              docs/display-orientation.md §6. */}
+          <label className="npd-label">
+            Display Orientation
+            <select
+              className="npd-select"
+              value={orientation}
+              onChange={e => setOrientation(e.target.value as DisplayOrientation)}
+            >
+              {SUPPORTED_ORIENTATIONS.map(id => (
+                <option key={id} value={id}>
+                  {ORIENTATION_LABELS[id]}
+                  {boardCanDriveOrientation(config.boardId, id) ? '' : ' — no firmware support yet'}
+                </option>
+              ))}
+            </select>
+            <span className="npd-hint">
+              Design canvas {design.width}×{design.height}.
+              {orientationBuildable
+                ? ''
+                : ` ${board.name} cannot be built this way up yet — the project`
+                  + ' can still be designed and previewed.'}
+            </span>
+            {willTurn && (
+              <span className="ps-warning">
+                ⚠️ Saving turns every widget on every screen a quarter turn.
+                Positions and sizes rotate; text direction, arc angles and
+                chart axes do not. Undo with Ctrl+Z.
+              </span>
+            )}
           </label>
         </div>
 

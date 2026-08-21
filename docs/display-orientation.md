@@ -4,8 +4,10 @@
   <strong>English</strong> · <a href="./zh-TW/display-orientation.md">繁體中文</a>
 </p>
 
-Status: **evaluated, not built.** Written before any code exists, verified
-against the source and against one real linker map, not from memory.
+Status: **evaluated, then built.** §1–§13 are the evaluation as written before
+any code existed; §14 records what was implemented and where the evaluation was
+wrong. Verified against the source and against one real linker map, not from
+memory.
 
 The proposal: the New Project dialog gains a **Display Orientation** field next
 to Hardware Model Number, offering **Landscape** and **Portrait**. Landscape is
@@ -662,3 +664,103 @@ Every one of these has a `docs/zh-TW/` mirror that changes with it.
 4. **Is 437 KB of free RAM enough for two partial buffers plus the stack on the
    EDT?** The map gives the static figure; the stack's high-water mark under
    load is not in it.
+
+## 14. What was built, and where §1–§13 were wrong
+
+Implemented on `feat/display-orientation`. Two of the recommendations above did
+not survive contact, and both were reversed on the user's instruction rather
+than on new evidence.
+
+### 14.1 Orientation is changeable after creation — §6 was overruled
+
+§6 recommended fixing it at creation, on the grounds that rotating boxes leaves
+widget *contents* upright. The requirement was to allow it in Project Settings
+anyway, so it is allowed.
+
+The argument in §6 is still correct, and the implementation does not pretend
+otherwise. `utils/rotateLayout.ts` turns boxes and only boxes; the dialog shows
+a warning listing what does not turn *before* the save rather than after it; and
+the whole rotation is one `saveToHistory()` entry, so Ctrl+Z takes it back. The
+recursive part is the piece §6 did not mention: a child's coordinates are
+relative to its parent, so each subtree turns inside its parent's
+*pre-rotation* box, not inside the canvas. Eight tests in
+`utils/__tests__/rotateLayout.test.ts` pin that down, including the round trip.
+
+One thing the transform must do that was not obvious: **drop `align`**. An
+aligned widget is positioned by LVGL from an anchor rather than from x/y, so
+turning its box while leaving the anchor set moves it twice.
+
+### 14.2 Both orientations are always offered — §3's gate moved
+
+§3 had `orientations` deciding what the New Project dialog *shows*, so the EDT
+and the F746G would have offered Landscape alone. That is wrong for the same
+reason the protocol design already knew about: the design side has no hardware
+in it, and a project can usefully be laid out and previewed in an orientation
+whose firmware does not exist yet.
+
+So `orientations` now gates **building**, not designing — exactly
+`ProtocolDefinition.implemented`'s split. Both orientations appear in both
+dialogs; an undrivable one is labelled "— no firmware support yet", the hint
+says the project can still be designed and previewed, and the Deploy tab
+refuses the build with a specific reason. `boardCanDriveOrientation()` is the
+predicate; `getDrivableOrientations()` is what it reads.
+
+This also corrected `normalizeOrientation`, which in the first cut downgraded a
+portrait project to landscape when the board could not drive it. That would
+have silently resized the author's canvas on load — the one thing §2's invariant
+exists to prevent.
+
+### 14.3 What §4.1's fix actually looks like
+
+Confirmed as predicted: `ProjectSettings.handleSave` re-derived width and height
+straight from the board and would have flattened every portrait project on a
+rename. It now goes through `logicalResolution(boardId, orientation)`, which is
+the single definition §4.1 asked for and is used by the New Project dialog and
+Project Settings alike.
+
+### 14.4 The firmware contract
+
+As designed in §9: `hmi_display_config_t` declared in each board's
+`board_display.h`, weak-defaulted in each `board_display.c`, and strongly
+defined by a generated `hmi_display_generated.c` from
+`codegen/displayConfigGenerator.ts`. A template with no generated source still
+links and boots in landscape.
+
+The H747I acts on it (§8.1) — `LCD_ORIENTATION_PORTRAIT`, a swapped
+width/height into `BSP_LCD_InitEx`, and `lv_display_create` at the turned
+resolution, with the render mode and the frame buffers untouched. The F746G and
+the EDT **refuse**: `board_display_init` returns false for anything but
+landscape, so a config that should not exist produces a dead display that leads
+straight to that line, rather than a sheared screen that looks like an LVGL bug.
+
+One correction to §8.1: the touch change is *only* the orientation flags.
+`touch_init.Width`/`Height` must stay 800x480 in both orientations, because the
+BSP uses them solely as the numerators of a scale whose denominators are the
+fixed `FT6X06_MAX_X/Y_LENGTH` — not as a clamp, which is what they look like.
+Making them follow the orientation would squash every touch into the left half
+of the screen. The flag choice itself (`TS_SWAP_NONE` in portrait) is still
+reasoned rather than measured; §13's first open question stands.
+
+### 14.5 The WASM preview
+
+§4.4 offered "fix it or label it". Both, because `emcc` is not available here
+and `public/wasm/lvgl_wasm.wasm` is a checked-in binary that cannot be rebuilt
+in this environment:
+
+- `wasm/src/main.c` now implements `set_screen_size` with
+  `lv_sdl_window_set_size` and creates the display at 480x272 rather than the
+  480x320 that matched no board. A rebuild picks this up.
+- `_set_screen_size` was **already exported** by the checked-in binary, so
+  `wasm/shell.html` and the built host page could both be wired to a new
+  `set-screen-size` message without a rebuild.
+- `WasmPreview.tsx` measures the iframe's canvas after sending the size and
+  says plainly in the footer when the runtime ignored it. That notice clears
+  itself the moment a rebuilt `.wasm` is dropped in, so it cannot go stale.
+
+### 14.6 Still not done
+
+- **The EDT and F746G display drivers** (§8.3–§8.5). Portrait is designable and
+  previewable on both and buildable on neither. This is the large remaining
+  piece and nothing above depends on it.
+- **A rebuilt `lvgl_wasm.wasm`**, which needs `emcc`.
+- **The H747I portrait touch mapping**, which needs the board.

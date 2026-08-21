@@ -4,8 +4,8 @@
   <a href="../display-orientation.md">English</a> · <strong>繁體中文</strong>
 </p>
 
-狀態：**評估完成，還沒動工。** 在程式碼還不存在時寫下，內容對照過原始碼，也對照過一份
-真實的 linker map，不是憑印象。
+狀態：**先評估，然後做了。** §1–§13 是程式碼還不存在時寫下的評估；§14 記錄實際做了什麼，
+以及評估在哪裡是錯的。內容對照過原始碼，也對照過一份真實的 linker map，不是憑印象。
 
 提案內容：New Project 對話框在 Hardware Model Number 旁邊多一個 **Display
 Orientation** 欄位，提供 **Landscape** 與 **Portrait** 兩個選擇。目標硬體沒有註明時
@@ -54,8 +54,8 @@ Orientation** 欄位，提供 **Landscape** 與 **Portrait** 兩個選擇。目�
 
 （A）便宜到什麼程度是可以量的。編輯器裡每一個畫布消費端都是從 `editorStore` 讀
 `canvas.width`/`canvas.height`，而它只在三個地方從 `config.display` 灌進去
-（[App.tsx:101](../../src/App.tsx)、[App.tsx:297](../../src/App.tsx)、
-[ProjectListPage.tsx:116](../../src/components/ProjectManager/ProjectListPage.tsx)）。
+（`App.tsx:101`、`App.tsx:297`、
+`ProjectListPage.tsx:116`）。
 在（A）之下，這三行是**唯一**需要知道方向的地方，而且它們現在就已經做對了。在（B）之下，
 下面每一個都變成一個可能寫錯的地方：
 
@@ -558,3 +558,78 @@ weak 預設為橫向，由產生器給出強定義。三個性質讓它勝過其
    延後的那個欄位。
 4. **EDT 上 437 KB 的空閒 RAM 夠不夠放兩塊 partial buffer 加堆疊？** map 檔給的是靜態
    數字；堆疊在負載下的最高水位不在裡面。
+
+## 14. 實際做了什麼，以及 §1–§13 在哪裡錯了
+
+在 `feat/display-orientation` 上實作。上面有兩項建議沒有撐過實際接觸，而且兩項都是依使用者
+指示推翻的，不是因為出現新證據。
+
+### 14.1 建立之後可以改方向——§6 被推翻
+
+§6 建議在建立時定案，理由是轉外框會讓 widget 的**內容**維持直立。需求是無論如何都要能在
+Project Settings 改，所以就讓它能改。
+
+§6 的論證仍然是對的，而且實作沒有假裝不是。`utils/rotateLayout.ts` 只轉外框；對話框在**存檔
+之前**就顯示哪些東西不會跟著轉，而不是事後才說；整個旋轉是一筆 `saveToHistory()`，所以
+Ctrl+Z 收得回來。§6 沒提到的是遞迴那一段：子元件的座標是相對於父層的，所以每一棵子樹是在
+父層**旋轉前**的框裡轉，不是在畫布裡轉。`utils/__tests__/rotateLayout.test.ts` 用八個測試把
+這件事釘住，包含來回轉一圈。
+
+有一件不明顯但非做不可的事：**要把 `align` 清掉**。有對齊設定的 widget 是由 LVGL 從錨點定位
+而不是靠 x/y，所以轉了外框卻留著錨點，等於讓它移動兩次。
+
+### 14.2 兩個方向永遠都提供——§3 的閘門換了位置
+
+§3 原本讓 `orientations` 決定 New Project 對話框**顯示**什麼，那樣 EDT 與 F746G 就只會出現
+Landscape。這是錯的，而且理由是通訊協定那邊早就知道的那個：設計端裡面沒有硬體，一個專案在
+韌體還不存在的方向下排版與預覽，是有意義的。
+
+所以 `orientations` 現在管的是**能不能編譯**，不是能不能設計——正好是
+`ProtocolDefinition.implemented` 的那個切法。兩個方向在兩個對話框裡都出現；驅動不了的那個標上
+「— no firmware support yet」，提示文字說明專案仍然可以設計與預覽，而 Deploy 分頁會帶著具體
+理由拒絕編譯。判斷式是 `boardCanDriveOrientation()`，它讀的是 `getDrivableOrientations()`。
+
+這同時也修正了 `normalizeOrientation`：第一版會在板子驅動不了時把直向專案降級成橫向。那會在
+載入時默默把作者的畫布改掉——而那正是 §2 那條不變式存在要防的唯一一件事。
+
+### 14.3 §4.1 的修法長什麼樣
+
+跟預測的一樣：`ProjectSettings.handleSave` 直接從板子推導寬高，會在使用者只是改個名稱時把每
+一個直向專案壓平。現在改成走 `logicalResolution(boardId, orientation)`，也就是 §4.1 要的那個
+單一定義，New Project 對話框與 Project Settings 都用它。
+
+### 14.4 韌體那份契約
+
+照 §9 設計：`hmi_display_config_t` 宣告在每塊板子的 `board_display.h`，在各自的
+`board_display.c` 裡 weak 預設，再由 `codegen/displayConfigGenerator.ts` 產生的
+`hmi_display_generated.c` 給出強定義。沒有任何產生原始碼的樣板照樣連結、照樣以橫向開機。
+
+H747I 會真的照著做（§8.1）——`LCD_ORIENTATION_PORTRAIT`、把對調後的寬高傳進
+`BSP_LCD_InitEx`、`lv_display_create` 用轉過的解析度，而 render mode 與 frame buffer 完全不動。
+F746G 與 EDT 則是**拒絕**：`board_display_init` 對非橫向直接回傳 false，讓一份本來就不該存在的
+設定變成「螢幕不亮」並直接指向那一行，而不是變成一張看起來像 LVGL bug 的剪切畫面。
+
+對 §8.1 的一項更正：觸控要改的**只有**方向旗標。`touch_init.Width`/`Height` 在兩個方向都必須
+維持 800x480，因為 BSP 只把它們當成一個比例的分子，分母是固定的
+`FT6X06_MAX_X/Y_LENGTH`——它們不是夾限值，儘管看起來很像。讓它們跟著方向走，會把每一次觸控
+壓進螢幕的左半邊。旗標本身的選擇（直向用 `TS_SWAP_NONE`）仍然是推理而非量測；§13 的第一個
+待決問題依舊成立。
+
+### 14.5 WASM 預覽
+
+§4.4 給了「修掉它，或標註它」兩個選項。結果兩個都做了，因為這裡沒有 `emcc`，而
+`public/wasm/lvgl_wasm.wasm` 是簽入的二進位檔，在這個環境重建不了：
+
+- `wasm/src/main.c` 現在用 `lv_sdl_window_set_size` 實作了 `set_screen_size`，並且把顯示建成
+  480x272，而不是那個對不上任何板子的 480x320。重建之後就會生效。
+- `_set_screen_size` 在簽入的二進位檔裡**本來就已經匯出**，所以 `wasm/shell.html` 與已建置的
+  host page 都可以先接上新的 `set-screen-size` 訊息，不需要重建。
+- `WasmPreview.tsx` 在送出尺寸之後量 iframe 裡的 canvas，如果 runtime 沒有照做，就在頁尾明講。
+  那行提示會在新的 `.wasm` 換上去的瞬間自己消失，所以它不會過期。
+
+### 14.6 還沒做的
+
+- **EDT 與 F746G 的顯示驅動**（§8.3–§8.5）。直向在兩塊板子上都能設計、能預覽，都不能編譯。
+  這是剩下最大的一塊，而且上面所有東西都不依賴它。
+- **重建 `lvgl_wasm.wasm`**，需要 `emcc`。
+- **H747I 直向的觸控對應**，需要板子。

@@ -18,14 +18,17 @@ import type {
   BoardId,
   CanBusConfig,
   CommunicationConfig,
+  DisplayOrientation,
   ProtocolId,
 } from '../types/hmi';
 import {
   DEFAULT_BOARD_ID,
+  DEFAULT_ORIENTATION,
   DEFAULT_PROTOCOL_ID,
   createDefaultCanBusConfig,
   createDefaultCommunicationConfig,
   getBoardDefinition,
+  isSupportedOrientation,
   isSupportedProtocolId,
 } from '../types/hmi';
 
@@ -34,10 +37,33 @@ import {
 // ---------------------------------------------------------------------------
 
 export interface DisplayConfig {
+  /**
+   * The **logical** resolution: what the designer lays widgets out in, what the
+   * previews draw, and what the firmware tells LVGL the display is. Already
+   * rotated — a portrait project on a landscape panel stores the panel's
+   * numbers the other way round.
+   *
+   * `BoardDefinition.display.width`/`height` is the **physical** panel and does
+   * not change with orientation. The two differ exactly when `orientation` is
+   * not the board's default. Compute this pair with `logicalResolution()`
+   * rather than by hand — see docs/display-orientation.md §2.
+   */
   width: number;
   height: number;
   colorDepth: 16 | 24 | 32;
-  rotation: 0 | 90 | 180 | 270;
+  /**
+   * Chosen at creation and changeable afterwards in Project Settings, which
+   * turns the existing layout with the canvas (`rotateLayout`). What that turn
+   * cannot do is rotate what is *inside* each widget — a label's text
+   * direction, an arc's angles, a chart's axes — so the dialog warns before
+   * saving rather than pretending it is lossless. See
+   * docs/display-orientation.md §6 and utils/rotateLayout.ts.
+   *
+   * May name an orientation this project's board has no firmware for; that
+   * blocks the build, not the design. See
+   * `BoardDefinition.display.orientations`.
+   */
+  orientation: DisplayOrientation;
 }
 
 export interface LvglConfig {
@@ -130,7 +156,7 @@ export const DEFAULT_DISPLAY: DisplayConfig = {
   width: DEFAULT_BOARD.display.width,
   height: DEFAULT_BOARD.display.height,
   colorDepth: DEFAULT_BOARD.display.colorDepth,
-  rotation: 0,
+  orientation: DEFAULT_ORIENTATION,
 };
 
 export const DEFAULT_LVGL_CONFIG: LvglConfig = {
@@ -209,20 +235,43 @@ function normalizeCanBusConfig(
   };
 }
 
+/**
+ * The orientation a stored display config should be read as.
+ *
+ * Projects written before the field existed carry no value, and every one of
+ * them is landscape — the same case as `protocol` below, and handled the same
+ * way rather than with a migration step.
+ *
+ * Deliberately *not* checked against what the board can drive. A project may be
+ * designed in an orientation whose firmware does not exist yet, the same way one
+ * may be configured for an unimplemented protocol; the Deploy tab is what
+ * refuses to build it. Silently rewriting the value here would instead resize
+ * the author's canvas on load, which is the one thing this field must never do.
+ */
+function normalizeOrientation(value: unknown): DisplayOrientation {
+  return isSupportedOrientation(value) ? value : DEFAULT_ORIENTATION;
+}
+
 function normalizeProjectConfig(
   config: ProjectConfig | (Omit<
     ProjectConfig,
-    'boardId' | 'communication' | 'protocol' | 'canBus'
+    'boardId' | 'communication' | 'protocol' | 'canBus' | 'display'
   > & {
     boardId?: BoardId;
     protocol?: ProtocolId;
     communication?: Partial<CommunicationConfig>;
     canBus?: Partial<CanBusConfig>;
+    display: Omit<DisplayConfig, 'orientation'> & { orientation?: DisplayOrientation };
   }),
 ): ProjectConfig {
+  const boardId = config.boardId ?? DEFAULT_BOARD_ID;
   return {
     ...config,
-    boardId: config.boardId ?? DEFAULT_BOARD_ID,
+    boardId,
+    display: {
+      ...config.display,
+      orientation: normalizeOrientation(config.display?.orientation),
+    },
     // Projects created before the protocol split carry no value, and every one
     // of them is Modbus.
     protocol: isSupportedProtocolId(config.protocol)
@@ -706,12 +755,18 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   importProject: async (file, name) => {
     const id = uuidv4();
     const now = Date.now();
-    // Extract display config from file if available
-    const display: DisplayConfig = (file as ProjectFile & { display?: DisplayConfig }).display ?? {
+    // Extract display config from file if available. `orientation` is left to
+    // normalizeProjectConfig below, which is where every path that produces a
+    // config — create, load, import — agrees on what an absent or
+    // no-longer-supported value means.
+    const display = (file as ProjectFile & {
+      display?: Omit<DisplayConfig, 'orientation'> & { orientation?: DisplayOrientation };
+    }).display ?? {
+      // `canvasSize` is the design canvas, which is already the logical
+      // resolution under the invariant on DisplayConfig — no rotation to undo.
       width: file.canvasSize.width,
       height: file.canvasSize.height,
-      colorDepth: 32,
-      rotation: 0,
+      colorDepth: 32 as const,
     };
     const lvglConfig: LvglConfig = (file as ProjectFile & { lvglConfig?: LvglConfig }).lvglConfig ?? { ...DEFAULT_LVGL_CONFIG };
     const boardId = file.boardId ?? DEFAULT_BOARD_ID;

@@ -47,7 +47,7 @@ const projectConfig = {
     width: 480,
     height: 272,
     colorDepth: 16 as const,
-    rotation: 0 as const,
+    orientation: 'landscape' as const,
   },
   lvglConfig: {
     version: '9' as const,

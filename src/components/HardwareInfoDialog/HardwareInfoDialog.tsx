@@ -7,6 +7,7 @@ import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
 import type { ProjectConfig } from '../../store/projectStore';
 import {
+  ORIENTATION_LABELS,
   formatMemSize,
   getBoardDefinition,
   getBoardProtocols,
@@ -57,6 +58,11 @@ const HardwareInfoDialog: React.FC<HardwareInfoDialogProps> = ({ onClose }) => {
 
   const board = getBoardDefinition(config.boardId);
   const protocol = getProtocolDefinition(config.protocol);
+  /*
+   * From the panel, not from the project: a frame buffer holds the same number
+   * of pixels whichever way up the content is drawn, so this does not change
+   * with the orientation. See docs/display-orientation.md §4.3.
+   */
   const frameBufferBytes =
     board.display.width * board.display.height * (board.display.colorDepth / 8);
 
@@ -73,8 +79,17 @@ const HardwareInfoDialog: React.FC<HardwareInfoDialogProps> = ({ onClose }) => {
 
           <div className="hwinfo-section">Display</div>
           <dl className="hwinfo-meta">
-            <dt>Resolution</dt>
+            {/* Two rows, because they are two different things and a portrait
+                project makes them disagree. The panel is what the LTDC scans;
+                the design canvas is what the widgets are laid out in. */}
+            <dt>Panel</dt>
             <dd>{board.display.width} × {board.display.height}</dd>
+
+            <dt>Design canvas</dt>
+            <dd>
+              {config.display.width} × {config.display.height}{' '}
+              ({ORIENTATION_LABELS[config.display.orientation].toLowerCase()})
+            </dd>
 
             <dt>Color format</dt>
             <dd>

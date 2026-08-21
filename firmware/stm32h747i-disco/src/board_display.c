@@ -10,8 +10,19 @@
 #define HMI_LCD_INSTANCE 0U
 #define HMI_LCD_LAYER 0U
 
+/* Unchanged by the orientation: the same pixels are scanned either way, and
+   the panel rather than memory decides the order. */
 #define HMI_FRAMEBUFFER_BYTES \
     (HMI_DISPLAY_WIDTH * HMI_DISPLAY_HEIGHT * sizeof(uint32_t))
+
+/*
+ * Landscape unless the generated hmi_display_generated.c says otherwise. A
+ * firmware image built from a bare template — no project source at all — keeps
+ * this one and comes up the way the board always has.
+ */
+__weak const hmi_display_config_t hmi_display_config = {
+    .orientation = HMI_DISPLAY_ORIENTATION_LANDSCAPE,
+};
 
 /*
  * Two full frame buffers in the board's SDRAM. LVGL renders straight into the
@@ -158,6 +169,20 @@ bool board_display_init(void)
     lv_indev_t *touch_device;
     TS_Init_t touch_init = {0};
 
+    /*
+     * Portrait costs nothing on this board, which is the whole reason it is
+     * the one that has it. The OTM8009A is natively portrait and the BSP makes
+     * it landscape by writing the panel's own MADCTR register — so the scan
+     * order changes inside the display module, not in memory. The LTDC, the
+     * DSI host and LVGL all simply work in 480x800 instead of 800x480: no CPU
+     * rotation, no extra buffer, and the tear-free DIRECT render mode below is
+     * untouched. See docs/display-orientation.md §8.1.
+     */
+    const bool portrait =
+        hmi_display_config.orientation == HMI_DISPLAY_ORIENTATION_PORTRAIT;
+    const uint32_t hor_res = portrait ? HMI_DISPLAY_HEIGHT : HMI_DISPLAY_WIDTH;
+    const uint32_t ver_res = portrait ? HMI_DISPLAY_WIDTH : HMI_DISPLAY_HEIGHT;
+
     /* LCD_PIXEL_FORMAT_RGB888 is the BSP's name for a 24-bit DSI link driven
        from a 32-bit frame buffer: it configures the LTDC layer as
        LTDC_PIXEL_FORMAT_ARGB8888 and sets BppFactor to 4. There is no packed
@@ -166,13 +191,16 @@ bool board_display_init(void)
        docs/color-depth.md for the measurements.
 
        InitEx rather than Init because it takes the width and height; it brings
-       up the SDRAM controller itself. */
+       up the SDRAM controller itself. The orientation argument reaches
+       OTM8009A_Init, which is where MADCTR is written; the width and height
+       must agree with it, because they also configure the DSI host and the
+       LTDC layer. */
     if (BSP_LCD_InitEx(
             HMI_LCD_INSTANCE,
-            LCD_ORIENTATION_LANDSCAPE,
+            portrait ? LCD_ORIENTATION_PORTRAIT : LCD_ORIENTATION_LANDSCAPE,
             LCD_PIXEL_FORMAT_RGB888,
-            HMI_DISPLAY_WIDTH,
-            HMI_DISPLAY_HEIGHT) != BSP_ERROR_NONE) {
+            hor_res,
+            ver_res) != BSP_ERROR_NONE) {
         return false;
     }
 
@@ -210,15 +238,32 @@ bool board_display_init(void)
      * rawY > 479, and the unsigned result comes back as roughly 8947848 - k.
      * Those huge values in the log are the fingerprint of a missing TS_SWAP_XY.
      */
+    /*
+     * Width/Height stay 800x480 in *both* orientations, for the reason above:
+     * they are the numerators of a scale whose denominators are the fixed
+     * FT6X06_MAX_X/Y_LENGTH, and the BSP uses them for nothing else — not as a
+     * clamp. Making them follow the orientation would scale every reading by
+     * 480/800 and squash touch into the left half of the screen.
+     *
+     * Only the flags change. In portrait the panel is in its native scan order
+     * and the sensor's own frame is already the one LVGL wants, so both
+     * transforms should come off. "Should": this is reasoned, not measured, and
+     * the comment above exists precisely because reasoning about this failed
+     * once. Verify on the board — touch the four corners and read
+     * board_touch_log — before trusting it. See docs/display-orientation.md
+     * §13.
+     */
     touch_init.Width = HMI_DISPLAY_WIDTH;
     touch_init.Height = HMI_DISPLAY_HEIGHT;
-    touch_init.Orientation = TS_SWAP_XY | TS_SWAP_Y;
+    touch_init.Orientation = portrait ? TS_SWAP_NONE : (TS_SWAP_XY | TS_SWAP_Y);
     touch_init.Accuracy = 5U;
     if (BSP_TS_Init(HMI_LCD_INSTANCE, &touch_init) != BSP_ERROR_NONE) {
         return false;
     }
 
-    display = lv_display_create(HMI_DISPLAY_WIDTH, HMI_DISPLAY_HEIGHT);
+    /* The turned resolution, not the panel's. No lv_display_set_rotation here:
+       LVGL is not rotating anything, the panel already did. */
+    display = lv_display_create((int32_t)hor_res, (int32_t)ver_res);
     if (display == NULL) {
         return false;
     }

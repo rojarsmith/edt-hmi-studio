@@ -5,6 +5,36 @@ export type BoardId =
 
 export type ProtocolId = 'modbus-rtu' | 'can-bus';
 
+/**
+ * Which way up the UI is designed, chosen when the project is created.
+ *
+ * This is the *only* place the word means anything in the editor. Everything
+ * downstream reads the resolution, which is already rotated — see
+ * `logicalResolution` and the invariant on `DisplayConfig`.
+ *
+ * A string rather than a boolean because a round panel would eventually need a
+ * third piece of state (a display *shape*) alongside it, and `!landscape` reads
+ * as nonsense next to one. See docs/display-orientation.md §10.
+ */
+export type DisplayOrientation = 'landscape' | 'portrait';
+
+export const DEFAULT_ORIENTATION: DisplayOrientation = 'landscape';
+
+/** Both, always offered. What a board can *build* is a separate question. */
+export const SUPPORTED_ORIENTATIONS: readonly DisplayOrientation[] = [
+  'landscape',
+  'portrait',
+] as const;
+
+export function isSupportedOrientation(value: unknown): value is DisplayOrientation {
+  return value === 'landscape' || value === 'portrait';
+}
+
+export const ORIENTATION_LABELS: Record<DisplayOrientation, string> = {
+  landscape: 'Landscape',
+  portrait: 'Portrait',
+};
+
 export interface ProtocolDefinition {
   id: ProtocolId;
   name: string;
@@ -50,10 +80,39 @@ export interface BoardDefinition {
   name: string;
   vendor: string;
   display: {
+    /**
+     * The panel's *physical* geometry — what the LTDC scans, whichever way up
+     * the UI is designed. A portrait project does not change these; it changes
+     * `ProjectConfig.display`, which is the logical resolution. The two differ
+     * exactly when the orientation is not `defaultOrientation`. See
+     * docs/display-orientation.md §2.
+     */
     width: number;
     height: number;
     colorDepth: 16 | 24 | 32;
     colorFormat: 'RGB565' | 'RGB888' | 'ARGB8888';
+    /**
+     * Which way up this board's UI is designed when the project does not say —
+     * the orientation in which `width` x `height` above is already correct.
+     * Absent means landscape, which is what all three boards here want.
+     */
+    defaultOrientation?: DisplayOrientation;
+    /**
+     * Orientations this board's *firmware* can actually drive. Absent means
+     * landscape alone.
+     *
+     * Not a list of what the editor offers. Both orientations can always be
+     * designed in, previewed and saved — the design side has no hardware in it
+     * — but a project whose orientation is not in here cannot be built, and
+     * the Deploy tab says so rather than flashing something that renders as a
+     * sheared screen. Exactly the split `ProtocolDefinition.implemented` makes,
+     * and for the same reason.
+     *
+     * Rotating costs nothing on a board whose panel rotates itself and needs a
+     * rewritten display driver on one whose panel does not — see
+     * docs/display-orientation.md §8.
+     */
+    orientations?: readonly DisplayOrientation[];
   };
   /**
    * On-chip Flash available to the firmware image, in bytes. The generated
@@ -136,6 +195,14 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
       height: 272,
       colorDepth: 16,
       colorFormat: 'RGB565',
+      // Landscape only. The RK043FN48H is a parallel RGB panel driven straight
+      // from the LTDC — no MADCTL, no scan-direction register, and neither the
+      // LTDC nor DMA2D can rotate. Portrait here needs the display driver
+      // moved to LVGL's partial render mode with a software rotate on every
+      // flush, which is a rewrite rather than a setting. Until that lands,
+      // offering Portrait would produce a build that compiles and then draws a
+      // sheared screen. See docs/display-orientation.md §8.2.
+      orientations: ['landscape'],
     },
     flashBytes: 1024 * 1024,
     probeBoardPattern: '(?:32)?F746GDISCOVERY',
@@ -163,6 +230,12 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
       // there is no packed 24 bpp path. Matches firmware/stm32h747i-disco.
       colorDepth: 32,
       colorFormat: 'ARGB8888',
+      // The only board here that can do both, and it does the second one for
+      // free: the OTM8009A is natively *portrait* and the BSP turns it
+      // landscape by writing the panel's own MADCTR register. Portrait is
+      // therefore the panel's own scan order — no CPU, no extra RAM, no change
+      // to the render mode. See docs/display-orientation.md §8.1.
+      orientations: ['landscape', 'portrait'],
     },
     // Flash bank 1, which is the Cortex-M7's. Bank 2 belongs to the Cortex-M4
     // and is not part of this image — see docs/stm32h747i-disco-dual-core.md.
@@ -196,6 +269,12 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
       // SRAM for the two frame buffers. See docs/color-depth.md.
       colorDepth: 32,
       colorFormat: 'ARGB8888',
+      // Landscape only, for the same reason as the F746G — the ET043027 is a
+      // parallel RGB panel with no scan rotation. This board additionally has
+      // the tightest memory of the three: a third full-screen buffer is 510 KB
+      // against 437 KB of free SRAM, so even the workaround that keeps the
+      // current render mode does not fit. See docs/display-orientation.md §8.4.
+      orientations: ['landscape'],
     },
     // Bank 1 of the STM32U599NJ's two 2 MB banks. Bank 2 is left erased and out
     // of this image — see docs/edt-evk043027b.md.
@@ -446,4 +525,56 @@ export function boardSupportsProtocol(
   protocolId: ProtocolId,
 ): boolean {
   return getBoardProtocols(boardId).includes(protocolId);
+}
+
+/** The orientation a board's `display.width`/`height` are already stated in. */
+export function getBoardDefaultOrientation(boardId: BoardId): DisplayOrientation {
+  return getBoardDefinition(boardId).display.defaultOrientation ?? DEFAULT_ORIENTATION;
+}
+
+/**
+ * Orientations whose firmware exists for this board — what it can be *built*
+ * for, not what it can be designed in. Never empty: a board that declares
+ * nothing can still drive its own default orientation, which needs no rotation
+ * anywhere.
+ */
+export function getDrivableOrientations(boardId: BoardId): readonly DisplayOrientation[] {
+  const { orientations } = getBoardDefinition(boardId).display;
+  return orientations && orientations.length > 0
+    ? orientations
+    : [getBoardDefaultOrientation(boardId)];
+}
+
+/**
+ * Whether a build for this board would produce a display that actually works
+ * this way up. False does not stop the project being designed or saved — see
+ * `BoardDefinition.display.orientations`.
+ */
+export function boardCanDriveOrientation(
+  boardId: BoardId,
+  orientation: DisplayOrientation,
+): boolean {
+  return getDrivableOrientations(boardId).includes(orientation);
+}
+
+/**
+ * The resolution a project is *designed* in — the board's panel, turned if the
+ * project's orientation is not the one the panel is stated in.
+ *
+ * The single definition of "how big is this project", deliberately: the New
+ * Project dialog, Project Settings and the import path all computed this pair
+ * separately before orientation existed, and three copies that agree today are
+ * three copies that can stop agreeing. Project Settings in particular re-derives
+ * the display from the board on every save, and doing that without going
+ * through here would resize a portrait project's canvas back to landscape
+ * underneath its widgets. See docs/display-orientation.md §4.1.
+ */
+export function logicalResolution(
+  boardId: BoardId,
+  orientation: DisplayOrientation,
+): { width: number; height: number } {
+  const { width, height } = getBoardDefinition(boardId).display;
+  return orientation === getBoardDefaultOrientation(boardId)
+    ? { width, height }
+    : { width: height, height: width };
 }

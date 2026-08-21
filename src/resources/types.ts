@@ -6,6 +6,7 @@ import type {
   BoardId,
   CanBusConfig,
   CommunicationConfig,
+  DisplayOrientation,
   ProtocolId,
 } from '../types/hmi';
 
@@ -174,10 +175,12 @@ export interface ProjectFile {
   communication?: CommunicationConfig;
   canBus?: CanBusConfig;
   display?: {
+    /** Logical, already-rotated resolution — see `DisplayConfig`. */
     width: number;
     height: number;
     colorDepth: 16 | 24 | 32;
-    rotation: 0 | 90 | 180 | 270;
+    /** Absent in files written before orientation existed; those are landscape. */
+    orientation?: DisplayOrientation;
   };
   lvglConfig?: {
     version: '9';

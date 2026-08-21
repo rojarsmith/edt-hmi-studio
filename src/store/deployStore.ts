@@ -36,8 +36,10 @@ import {
 } from './deployPhases';
 import {
   DEFAULT_BOARD_ID,
+  DEFAULT_ORIENTATION,
   DEFAULT_PROTOCOL_ID,
   type BoardId,
+  type DisplayOrientation,
   type ProtocolId,
 } from '../types/hmi';
 
@@ -57,6 +59,9 @@ interface DeployState {
   /* Project context, refreshed whenever the Deploy tab mounts. */
   boardId: BoardId;
   protocol: ProtocolId;
+  /* Read alongside the board because whether a build is possible depends on
+     both — see BoardDefinition.display.orientations. */
+  orientation: DisplayOrientation;
   runtimePort: string;
   ports: HmiSerialPort[];
   capabilities: HmiCapabilities | null;
@@ -85,6 +90,7 @@ interface DeployState {
 export const useDeployStore = create<DeployState>((set, get) => ({
   boardId: DEFAULT_BOARD_ID,
   protocol: DEFAULT_PROTOCOL_ID,
+  orientation: DEFAULT_ORIENTATION,
   runtimePort: '',
   ports: [],
   capabilities: null,
@@ -145,6 +151,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         set({
           boardId: config.boardId,
           protocol: config.protocol ?? DEFAULT_PROTOCOL_ID,
+          orientation: config.display?.orientation ?? DEFAULT_ORIENTATION,
           runtimePort: config.communication?.port ?? '',
         });
       }

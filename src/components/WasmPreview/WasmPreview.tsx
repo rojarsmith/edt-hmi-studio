@@ -14,12 +14,40 @@ const WasmPreview: React.FC = () => {
   const currentScreenId = useEditorStore((s) => s.currentScreenId);
   const canvas = useEditorStore((s) => s.canvas);
 
-  // Send UI JSON to iframe
+  /*
+   * Whether the runtime actually resized itself to the project's canvas.
+   *
+   * The `.wasm` is a checked-in binary, and the build that honours
+   * `set-screen-size` is newer than some of the ones in circulation — an older
+   * one accepts the call and ignores it, which used to be invisible because its
+   * hard-coded size was landscape and close to the real panels. Rather than
+   * trust the binary, this measures the canvas it produced. It clears itself
+   * once a rebuilt runtime is dropped in. See docs/display-orientation.md §4.4.
+   */
+  const [sizeHonoured, setSizeHonoured] = useState(true);
+
+  // Send the design resolution, then the UI JSON, to the iframe.
   const sendToWasm = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe?.contentWindow || status !== 'ready') return;
+    iframe.contentWindow.postMessage(
+      { type: 'set-screen-size', width: canvas.width, height: canvas.height },
+      '*',
+    );
     const json = editorStateToJson(screens, currentScreenId, canvas);
     iframe.contentWindow.postMessage({ type: 'load-ui', json }, '*');
+
+    // Measured after the runtime has had the frame it needs to reallocate.
+    // Same origin, so the canvas element is readable.
+    requestAnimationFrame(() => {
+      const el = iframe.contentDocument?.getElementById('canvas') as
+        | HTMLCanvasElement
+        | null
+        | undefined;
+      setSizeHonoured(
+        !el || (el.width === canvas.width && el.height === canvas.height),
+      );
+    });
   }, [screens, currentScreenId, canvas, status]);
 
   // Listen for lvgl-ready from iframe
@@ -105,7 +133,17 @@ const WasmPreview: React.FC = () => {
       </div>
 
       <div className="wasm-preview-footer">
-        Rendered with the LVGL WASM runtime to match the target device
+        {sizeHonoured ? (
+          <>
+            Rendered with the LVGL WASM runtime at {canvas.width}×{canvas.height}
+          </>
+        ) : (
+          <span className="wasm-preview-warning">
+            ⚠️ This runtime does not honour the project&apos;s{' '}
+            {canvas.width}×{canvas.height} canvas — positions near an edge will
+            not match the panel. Rebuild <code>wasm/</code> to fix.
+          </span>
+        )}
       </div>
     </div>
   );

@@ -3,6 +3,8 @@ import { useAppStore } from '../../store/appStore';
 import { useDeployStore } from '../../store/deployStore';
 import { useDockStore } from '../../store/dockStore';
 import {
+  ORIENTATION_LABELS,
+  boardCanDriveOrientation,
   getBoardDefinition,
   getProtocolDefinition,
 } from '../../types/hmi';
@@ -35,6 +37,7 @@ const DeployPanel: React.FC = () => {
   // See docs/bottom-dock-panel.md §3.
   const boardId = useDeployStore((state) => state.boardId);
   const protocol = useDeployStore((state) => state.protocol);
+  const orientation = useDeployStore((state) => state.orientation);
   const ports = useDeployStore((state) => state.ports);
   const runtimePort = useDeployStore((state) => state.runtimePort);
   const capabilities = useDeployStore((state) => state.capabilities);
@@ -61,7 +64,13 @@ const DeployPanel: React.FC = () => {
       && capabilities.programmerAvailable !== false
       && capabilities.success
     : null;
-  const buildable = protocolDefinition.implemented;
+  /*
+   * Two independent reasons a project may not be buildable, and both work the
+   * same way: the editor lets it be configured, and this is where it is stopped
+   * — before a flash, rather than after one that renders wrong.
+   */
+  const orientationBuildable = boardCanDriveOrientation(boardId, orientation);
+  const buildable = protocolDefinition.implemented && orientationBuildable;
   const canBuild = buildable
     && serviceAvailable !== false
     && capabilities?.canBuild !== false;
@@ -106,7 +115,7 @@ const DeployPanel: React.FC = () => {
       </div>
 
       <div className="hmi-panel-scroll">
-        {!buildable && (
+        {!protocolDefinition.implemented && (
           <div className="hmi-panel-card">
             <div className="hmi-panel-notice" role="note">
               <strong>This project cannot be built.</strong>
@@ -114,6 +123,23 @@ const DeployPanel: React.FC = () => {
                 It uses {protocolDefinition.name}, which the binding generator
                 and the board firmware do not implement yet. Switch the project
                 to a supported protocol on the Protocol tab to build it.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {!orientationBuildable && (
+          <div className="hmi-panel-card">
+            <div className="hmi-panel-notice" role="note">
+              <strong>This project cannot be built.</strong>
+              <span>
+                It is designed in {ORIENTATION_LABELS[orientation].toLowerCase()},
+                and the {board.name} display driver cannot turn its panel — that
+                needs a software rotation the firmware does not do yet. The
+                design and the previews are unaffected; switch the project back
+                to {ORIENTATION_LABELS[
+                  orientation === 'portrait' ? 'landscape' : 'portrait'
+                ].toLowerCase()} in Project Settings to build it.
               </span>
             </div>
           </div>

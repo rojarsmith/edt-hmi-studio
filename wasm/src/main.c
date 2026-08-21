@@ -19,11 +19,25 @@ void load_ui_json(const char *json_str) {
     ui_from_json(json_str);
 }
 
+/*
+ * Resize the preview to the project's design canvas.
+ *
+ * The editor calls this on every load, so the size below is only ever what is
+ * shown before the first project arrives. It matters more than it looks: this
+ * rung of the preview ladder exists to show what *real LVGL* does with the
+ * layout, and a display of the wrong shape moves every widget that is anchored
+ * to an edge or centred. A portrait project makes that obvious; a landscape one
+ * merely made it plausible, which is how the hard-coded 480x320 survived so
+ * long. See docs/display-orientation.md §4.4.
+ */
 EMSCRIPTEN_KEEPALIVE
 void set_screen_size(int w, int h) {
-    /* For now we just recreate the display at the requested size.
-       A full implementation would resize the SDL window. */
-    (void)w; (void)h;
+    if (display == NULL || w <= 0 || h <= 0) {
+        return;
+    }
+    /* Moves both the SDL window's texture and LVGL's own resolution — the
+       driver listens for LV_EVENT_RESOLUTION_CHANGED and reallocates. */
+    lv_sdl_window_set_size(display, w, h);
 }
 
 int main(int argc, char *argv[]) {
@@ -32,7 +46,9 @@ int main(int argc, char *argv[]) {
     lv_init();
     lv_tick_set_cb(tick_get_cb);
 
-    display = lv_sdl_window_create(480, 320);
+    /* The default board's panel, so an unconfigured preview is at least a real
+       display. set_screen_size replaces it as soon as a project loads. */
+    display = lv_sdl_window_create(480, 272);
     lv_sdl_mouse_create();
 
     emscripten_set_main_loop(main_loop, 0, 1);

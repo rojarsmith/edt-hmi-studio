@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import sharp from 'sharp';
 import { generateCode } from '../../src/codegen/generator';
 import { generateHmiBindings } from '../../src/codegen/hmiBindingGenerator';
+import { generateDisplayConfig } from '../../src/codegen/displayConfigGenerator';
 import { collectUsedCustomFonts } from '../../src/codegen/fontUsage';
 import { collectGlyphs } from '../../src/codegen/collectGlyphs';
 import { buildFontCompileRequests } from '../../src/codegen/fontRequests';
@@ -17,6 +18,7 @@ import type { ImageResource } from '../../src/resources/types';
 import { BUNDLED_FONT_DIR, hydrateBundledFonts } from '../../src/resources/bundledFonts';
 import type { LvglComponent, Screen } from '../../src/types';
 import type { CommunicationConfig } from '../../src/types/hmi';
+import { DEFAULT_ORIENTATION, isSupportedOrientation } from '../../src/types/hmi';
 import { isRecord } from './validation';
 
 interface ImageGenerationPlan {
@@ -230,9 +232,17 @@ export async function writeGeneratedProjectSource(
     codeOptions,
     logicGraphs,
   );
+  // A project file written before orientation existed carries no value, and
+  // every one of them is landscape — the same fallback normalizeProjectConfig
+  // applies on the editor side.
+  const orientation = isSupportedOrientation(projectFile.display?.orientation)
+    ? projectFile.display.orientation
+    : DEFAULT_ORIENTATION;
+
   const generatedFiles: Record<string, string> = {
     ...generatedCode,
     ...generatedBindings,
+    ...generateDisplayConfig(orientation),
   };
 
   for (const plan of collectUsedImageResources(screens, imageResources)) {

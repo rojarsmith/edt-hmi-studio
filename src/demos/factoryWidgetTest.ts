@@ -74,10 +74,11 @@ export function buildFactoryWidgetTest(): ProjectFile {
     codeGenOptions: { ...DEFAULT_CODEGEN_OPTIONS },
     boardId: DEFAULT_BOARD_ID,
     display: {
+      // The board's own orientation, so these are its numbers unturned. Left
+      // absent rather than stated, which is what "landscape" means in a file.
       width: board.display.width,
       height: board.display.height,
       colorDepth: board.display.colorDepth,
-      rotation: 0,
     },
   };
 }

@@ -97,3 +97,14 @@
   text-align: center;
   flex-shrink: 0;
 }
+
+/* Shown instead of the footer's resolution line when the checked-in runtime
+   ignored the size the editor sent — see WasmPreview.tsx. */
+.wasm-preview-warning {
+  color: #dcdcaa;
+}
+
+.wasm-preview-warning code {
+  font-family: inherit;
+  opacity: 0.85;
+}

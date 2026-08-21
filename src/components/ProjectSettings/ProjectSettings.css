@@ -18,3 +18,17 @@
   max-height: 60vh;
   overflow-y: auto;
 }
+
+/* Shown while the orientation select differs from what the project is saved
+   with, so the consequence is read before Save rather than after it. */
+.ps-warning {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid #6b5a2a;
+  border-left-width: 3px;
+  border-radius: 4px;
+  background: #2a2417;
+  color: #dcdcaa;
+  font-size: 11px;
+  line-height: 1.5;
+}

@@ -19,6 +19,13 @@
     }
   };
   window.addEventListener('message', function(e) {
+    // Size first: the UI is laid out against whatever resolution LVGL has when
+    // it is built, so resizing after loading would leave every edge-anchored
+    // widget where the old resolution put it.
+    if (e.data.type === 'set-screen-size') {
+      Module._set_screen_size(e.data.width, e.data.height);
+      return;
+    }
     if (e.data.type === 'load-ui') {
       var json = e.data.json;
       var len = Module.lengthBytesUTF8(json) + 1;
