@@ -185,7 +185,9 @@ gained lists operations that outlive the tab they were started from, so hiding
 it anywhere hides the one view that is never tab-specific
 ([work-progress.md](./work-progress.md) §5). Expansion is the author's choice
 alone, and a red lamp on the tab strip covers the case the auto-show existed
-for: something is running while the dock sits collapsed.
+for: something is running while the dock sits collapsed. The lamp counts
+unfinished **Work** items, so it lights for anything that reaches that list —
+see [work-progress.md](./work-progress.md) §6.
 
 What survives from the drafts is the measurement discipline. The strip's height
 is pinned in CSS rather than derived from its contents, so it cannot shift when

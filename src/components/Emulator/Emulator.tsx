@@ -492,11 +492,14 @@ const Emulator: React.FC = () => {
           </button>
         )}
 
-        {/* Nothing to say while nothing is happening: before the first Start,
-            and again after Stop, the button beside it already reports the
-            state, and "Ready" or "Stopped" only repeats it. The emoji that used
-            to lead this line is gone for the same reason. */}
-        {status !== 'idle' && (
+        {/* Outside factory dev mode this line only ever speaks up about a
+            failure, because that is the only state nothing else reports. Idle
+            is the Start button; working is the button reading "Working…" with
+            the same sentence already over the canvas; running is the Stop
+            button. Repeating any of those beside them is noise. Factory dev
+            mode keeps the running commentary, where the exact phase and its
+            engineering wording are the point. */}
+        {(factoryDevMode ? status !== 'idle' : status === 'error') && (
           <span className={`emulator-status ${status}`}>{statusText}</span>
         )}
 

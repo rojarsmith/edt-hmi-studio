@@ -7,7 +7,7 @@
 
 import React, { useCallback, useState } from 'react';
 import PanelChevron from '../LogicEditor/PanelChevron';
-import { useDeployStore } from '../../store/deployStore';
+import { useWorkStore } from '../../store/workStore';
 import {
   useDockStore,
   DOCK_MIN_HEIGHT,
@@ -53,7 +53,16 @@ const DockPanel: React.FC<DockPanelProps> = ({ showBuildOutput = false }) => {
   const toggleExpanded = useDockStore((state) => state.toggleExpanded);
   const setActivePane = useDockStore((state) => state.setActivePane);
   const setHeight = useDockStore((state) => state.setHeight);
-  const busy = useDeployStore((state) => state.busy);
+  // Anything unfinished, not just a firmware operation: the lamp answers "is
+  // something still going?", and an Emulator build left the answer wrong until
+  // it became a Work item. Two primitive selectors rather than a filtered
+  // array, which would be a new object on every store write.
+  const runningCount = useWorkStore((state) =>
+    state.items.reduce((count, item) => count + (item.status === 'running' ? 1 : 0), 0),
+  );
+  const firstRunningName = useWorkStore(
+    (state) => state.items.find((item) => item.status === 'running')?.name ?? null,
+  );
 
   const [resizing, setResizing] = useState(false);
 
@@ -98,9 +107,11 @@ const DockPanel: React.FC<DockPanelProps> = ({ showBuildOutput = false }) => {
     [height, setHeight],
   );
 
-  const runningName = busy === 'building'
-    ? 'Build Firmware'
-    : busy === 'flashing' ? 'Flash & Reset' : null;
+  const runningLabel = runningCount === 0
+    ? null
+    : runningCount > 1
+      ? `${runningCount} operations are running`
+      : `${firstRunningName} is running`;
 
   return (
     <div
@@ -131,12 +142,12 @@ const DockPanel: React.FC<DockPanelProps> = ({ showBuildOutput = false }) => {
             {/* On the Work tab itself rather than off at the strip's end: the
                 lamp is about what Work lists, and it reads as belonging to the
                 tab that would answer it. */}
-            {pane.id === 'work' && runningName && (
+            {pane.id === 'work' && runningLabel && (
               <span
                 className="dock-running-lamp"
                 role="status"
-                aria-label={`${runningName} is running`}
-                title={`${runningName} is running`}
+                aria-label={runningLabel}
+                title={runningLabel}
               />
             )}
           </button>

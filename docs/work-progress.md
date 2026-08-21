@@ -169,6 +169,14 @@ not demand attention for two minutes — and it names what is running in its
 tooltip. It replaced a per-tab marker, which said the same thing three times and
 said nothing while collapsed.
 
+**It said "whenever anything is running" before it meant it.** The lamp was
+wired to `deployStore.busy`, which knows about a firmware build and a flash and
+nothing else, so the first operation to join Work from somewhere else — the
+Emulator's build — ran with the lamp dark. It now reads the Work list itself
+and counts the items still running, which is the same sentence this section
+already contained; the tooltip names the one that is running, or how many are
+when there is more than one.
+
 ## 7. Measured
 
 Two runs watched from the **Design** tab, to prove the dock is not tab-specific.

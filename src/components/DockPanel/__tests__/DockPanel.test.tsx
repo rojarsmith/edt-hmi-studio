@@ -76,7 +76,7 @@ describe('DockPanel', () => {
     const { container, rerender } = render(<DockPanel />);
     expect(container.querySelector('.dock-running-lamp')).not.toBeInTheDocument();
 
-    useDeployStore.setState({ busy: 'building' });
+    const id = useWorkStore.getState().start('Build Firmware');
     rerender(<DockPanel />);
     const lamp = container.querySelector('.dock-running-lamp');
     expect(lamp).toBeInTheDocument();
@@ -84,14 +84,36 @@ describe('DockPanel', () => {
     // On the Work tab itself, which is the tab that answers what it raises.
     expect(screen.getByRole('tab', { name: /Work/ })).toContainElement(lamp as HTMLElement);
 
-    useDeployStore.setState({ busy: null });
+    useWorkStore.getState().finish(id, 'succeeded');
     rerender(<DockPanel />);
     expect(container.querySelector('.dock-running-lamp')).not.toBeInTheDocument();
   });
 
+  it('lights for any unfinished operation, not only a firmware one', () => {
+    // The lamp answers "is something still going?", so it has to know about
+    // everything that reaches the Work list. It used to read deployStore, which
+    // knows about a build and a flash and nothing else — see
+    // docs/work-progress.md §6.
+    const { container, rerender } = render(<DockPanel />);
+
+    useWorkStore.getState().start('Emulator');
+    rerender(<DockPanel />);
+    expect(container.querySelector('.dock-running-lamp')).toHaveAttribute(
+      'aria-label',
+      'Emulator is running',
+    );
+
+    useWorkStore.getState().start('Build Firmware');
+    rerender(<DockPanel />);
+    expect(container.querySelector('.dock-running-lamp')).toHaveAttribute(
+      'aria-label',
+      '2 operations are running',
+    );
+  });
+
   it('shows the lamp while collapsed, which is the case it exists for', () => {
     useDockStore.setState({ expanded: false });
-    useDeployStore.setState({ busy: 'flashing' });
+    useWorkStore.getState().start('Flash & Reset');
 
     const { container } = render(<DockPanel />);
 
