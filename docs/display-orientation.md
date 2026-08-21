@@ -78,7 +78,7 @@ these becomes a site that can be wrong:
 | Design canvas | `Canvas.tsx:870`, `:978` | free |
 | Canvas centring / Ctrl+0 | `Canvas.tsx:830` → `canvasView.ts` | free |
 | Align & distribute, 10 sites | `AlignToolbar.tsx:53`–`:231` | free |
-| Quick Preview | `PreviewPanel.tsx:1121`, `:1144` | free |
+| Prototype | `PreviewPanel.tsx:1121`, `:1144` | free |
 | Emulator | `Emulator.tsx:249` | free |
 | Screen transitions (slide distance) | `PreviewPanel` transition code | free |
 | Card thumbnail | `ProjectCard.tsx:102` | free |
@@ -232,7 +232,7 @@ itself needs nothing: `.project-card-thumb-img` is `object-fit: contain`
 (`ProjectCard.css:36`), so a portrait sketch letterboxes correctly in the 140 px
 band.
 
-### 4.4 The LVGL Preview is already wrong, and portrait makes it visible
+### 4.4 The Simulator is already wrong, and portrait makes it visible
 
 `wasm/src/main.c:35`:
 

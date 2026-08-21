@@ -236,11 +236,11 @@ On the canvas a Tile View renders as:
 - Changing currentRow/currentCol while designing switches which tile is edited
 - Children belonging to other tiles are hidden on the canvas
 
-### Simple preview
+### Prototype
 
 Much like the canvas, minus the editing affordances. It shows the current tile's children and allows switching between tiles.
 
-### LVGL WASM preview
+### Simulator
 
 In `editorStateToJson.ts`, children are mapped onto tiles through virtual ids:
 

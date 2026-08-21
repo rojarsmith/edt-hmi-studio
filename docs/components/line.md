@@ -183,7 +183,7 @@ Key behaviour:
 - **No box styles are applied to the wrapper**: no fill, border, radius or padding, because a line has no box
 - Selection, hover and dragging work as for any widget; the resize handles are only the ones the line can use
 
-### 10.2 Simple preview (PreviewPanel.tsx)
+### 10.2 Prototype (PreviewPanel.tsx)
 
 The Canvas 2D preview strokes the same points:
 
@@ -206,7 +206,7 @@ Key behaviour:
 - Dashes follow `lineDashWidth` / `lineDashGap`
 - Supports animation state on top
 
-### 10.3 LVGL WASM preview
+### 10.3 Simulator
 
 #### JSON serialisation (editorStateToJson.ts)
 

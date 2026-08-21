@@ -153,7 +153,7 @@ Key points:
 - `borderRadius` is inherited from the styles; the default of 9999 gives the capsule shape
 - The `transition` animates the width smoothly when the value is changed in the property panel
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 ```typescript
 function drawBar(ctx, x, y, w, h, opts) {
@@ -174,7 +174,7 @@ Key points:
 - Draws the grey background first, then the blue fill
 - Fill width = total width × progress
 
-### LVGL WASM preview
+### Simulator
 
 **editorStateToJson.ts**: flattens the widget tree into JSON; the bar's props (min, max, value) are serialised directly.
 

@@ -168,7 +168,7 @@ disabled: {
 - 不會展開，僅作為視覺預覽
 - 背景色透明時回退為 `#ffffff`
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 使用 `drawDropdown` 函式在 Canvas 2D 上繪製：
 
@@ -196,7 +196,7 @@ function drawDropdown(ctx, x, y, w, h, opts) {
 }
 ```
 
-### LVGL WASM 預覽繪製（ui_from_json.c）
+### Simulator 繪製（ui_from_json.c）
 
 透過 JSON 傳給 WASM 端，由 `create_dropdown` 函式建立真正的 LVGL 控制項：
 
@@ -290,7 +290,7 @@ lv_dropdown_set_selected(my_dropdown, 0);
 
 1. **選項格式轉換**：編輯器內部以 `string[]` 陣列存放選項，但 LVGL API 使用 `\n` 分隔的單一字串。程式碼生成與 WASM 預覽都需要進行格式轉換。
 
-2. **展開後的清單**：LVGL 的 dropdown 展開時會建立一個浮動清單，該清單在 LVGL 內部作為獨立物件管理。編輯器畫布與簡易預覽都不模擬展開狀態。
+2. **展開後的清單**：LVGL 的 dropdown 展開時會建立一個浮動清單，該清單在 LVGL 內部作為獨立物件管理。編輯器畫布與 Prototype 都不模擬展開狀態。
 
 3. **選項數量限制**：WASM 端的選項串接緩衝區為 512 位元組，過長的清單可能被截斷。建議單一選項文字不超過 50 個字元，總選項數不超過 20 個。
 
@@ -302,4 +302,4 @@ lv_dropdown_set_selected(my_dropdown, 0);
 
 7. **執行期變更選項**：`lv_dropdown_set_options()` 會取代整份清單；`lv_dropdown_add_option()` 則可逐一加入。
 
-8. **箭頭繪製**：編輯器畫布使用 Unicode 字元 `▼`，簡易預覽以三角形路徑繪製，LVGL 原生則使用 `LV_SYMBOL_DOWN` 符號字型。三者的視覺略有差異。
+8. **箭頭繪製**：編輯器畫布使用 Unicode 字元 `▼`，Prototype 以三角形路徑繪製，LVGL 原生則使用 `LV_SYMBOL_DOWN` 符號字型。三者的視覺略有差異。

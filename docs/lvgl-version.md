@@ -66,7 +66,7 @@ it, so bumping the pin above rebuilds it on the next run with no manual step.
 | `public/lvgl-wasi/lvgl-headers.json` | `v9.2.3-dev` (see the header comment inside) |
 
 **Bumping the pin above does not touch these.** They are committed binaries and
-stay on 9.2 until someone rebuilds them, so the LVGL Preview rung runs 9.2 while
+stay on 9.2 until someone rebuilds them, so the Simulator rung runs 9.2 while
 the firmware and the Emulator run 9.5.
 
 To regenerate: run `npm run emulator:setup` if the toolchain is not already

@@ -61,7 +61,7 @@ Emulator 的靜態庫是一個建置產物，快取在 `.hmi-cache/emulator/lib/
 | `public/lvgl-wasi/lvgl-headers.json` | `v9.2.3-dev`（見檔案內的標頭註解） |
 
 **改上面的釘選不會動到這兩個檔案。** 它們是簽進版控的二進位檔，在有人重新建置之前會維持
-在 9.2；也就是說 LVGL Preview 那一階跑的是 9.2，而韌體與 Emulator 跑的是 9.5。
+在 9.2；也就是說 Simulator 那一階跑的是 9.2，而韌體與 Emulator 跑的是 9.5。
 
 重新產生方式：工具鏈還沒有的話先跑 `npm run emulator:setup`，然後執行 `wasm/build.sh`
 ——它現在會自己在任何機器上找到工具鏈——再把產出的函式庫與標頭包複製到 `public/lvgl-wasi/`。

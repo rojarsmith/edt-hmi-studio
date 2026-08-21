@@ -229,11 +229,11 @@ On the canvas a Tab View renders as:
 - Child visibility is decided by `tabChildMap[activeTab]`
 - Children belonging to other tabs are hidden on the canvas
 
-### Simple preview
+### Prototype
 
 Much like the canvas, minus the editing affordances. The tab bar is clickable and shows the matching tab's children.
 
-### LVGL WASM preview
+### Simulator
 
 In `editorStateToJson.ts`, children are mapped onto tab pages through virtual ids:
 

@@ -168,7 +168,7 @@ On the editor canvas the dropdown renders as a select box with an arrow, showing
 - It does not expand; it is a visual preview only
 - A transparent background falls back to `#ffffff`
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 Drawn by `drawDropdown` on a 2D canvas:
 
@@ -196,7 +196,7 @@ function drawDropdown(ctx, x, y, w, h, opts) {
 }
 ```
 
-### LVGL WASM preview (ui_from_json.c)
+### Simulator (ui_from_json.c)
 
 Passed to the WASM side as JSON, where `create_dropdown` builds the real LVGL widget:
 

@@ -166,7 +166,7 @@ disabled: {
 - 背景色使用 `resolvedBgColor`，確保在畫布中可見（透明時回退為 `#ffffff`）
 - 不可互動編輯，僅作為視覺預覽
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 使用 `drawTextarea` 函式在 Canvas 2D 上繪製：
 
@@ -188,7 +188,7 @@ function drawTextarea(ctx, x, y, w, h, opts) {
 - 支援背景漸層（bgGradDir／bgGradColor）
 - 有文字時以 textColor 繪製，無文字時以灰色繪製 placeholder
 
-### LVGL WASM 預覽繪製（ui_from_json.c）
+### Simulator 繪製（ui_from_json.c）
 
 序列化為 JSON 後傳給 WASM 端，由 `create_textarea` 函式建立真正的 LVGL 控制項：
 
@@ -273,7 +273,7 @@ lv_textarea_set_text(my_textarea, "Hello");
 
 2. **提示文字顏色**：LVGL 透過 `LV_PART_TEXTAREA_PLACEHOLDER` 部件設定提示文字顏色。編輯器畫布固定以灰色 `#999` 模擬，與 LVGL 預設行為一致。
 
-3. **不繪製游標**：編輯器畫布與簡易預覽都不繪製游標，只有 WASM 預覽由 LVGL 原生繪製。
+3. **不繪製游標**：編輯器畫布與 Prototype 都不繪製游標，只有 WASM 預覽由 LVGL 原生繪製。
 
 4. **多行與單行**：預設為多行模式。當 `oneLine` 為 true 時，元件行為類似單行輸入框，高度建議調整為 36～40px。
 

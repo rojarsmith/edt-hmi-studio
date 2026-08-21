@@ -198,11 +198,11 @@ On the canvas a Window renders as:
 - The header height comes from `headerHeight`
 - A child's y coordinate is relative to the top of the content area, excluding the header
 
-### Simple preview
+### Prototype
 
 Much like the canvas, minus the editing affordances. It shows the full window structure (header plus content) with the children rendered inside the content area.
 
-### LVGL WASM preview
+### Simulator
 
 In `editorStateToJson.ts`, children are mapped onto the content area through a virtual id:
 

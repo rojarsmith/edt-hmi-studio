@@ -159,9 +159,9 @@ interface ImgProps {
 - 圖片元件本身**不會**被套上不透明的背景回退：那會墊在來源影像的 alpha 通道之後，讓透明 PNG 看起來變成不透明，與 LVGL 實際繪製的結果不符。可見性改由佔位圖自行填色來確保，未解析出圖片時仍可見且可點選
 - 支援選取高亮、停留效果、拖曳、調整大小控制點
 
-### 10.2 簡易預覽繪製（PreviewPanel.tsx）
+### 10.2 Prototype 繪製（PreviewPanel.tsx）
 
-在 Canvas 2D 簡易預覽中，圖片以 `drawImage()` 函式繪製：
+在 Canvas 2D Prototype 中，圖片以 `drawImage()` 函式繪製：
 
 ```typescript
 drawImage(ctx, x, y, w, h, {
@@ -177,7 +177,7 @@ drawImage(ctx, x, y, w, h, {
 - 沒有 src 或尚未載入時，繪製灰色佔位矩形加上 🖼️ 圖示
 - 載入完成後自動觸發重繪
 
-### 10.3 LVGL WASM 預覽繪製
+### 10.3 Simulator 繪製
 
 #### JSON 序列化（editorStateToJson.ts）
 
@@ -295,7 +295,7 @@ lv_image_set_rotation(my_image, 450);  // v9，45° × 10
 
 4. **畫布上的透明處理**：圖片與 image-button 元件在設計畫布上刻意維持透明背景。不透明的回退會墊在來源影像的 alpha 通道之後，使透明 PNG 看起來變成不透明。可見性改由 `CanvasImageContent` 在尚未解析出圖片時繪製的佔位圖自行填色來確保。共用的回退表位於 `src/components/Canvas/widgetBackground.ts`。
 
-5. **圖片快取**：簡易預覽以 `imageCache`（Map）快取已載入的 `HTMLImageElement`，避免每次重繪都重新載入。
+5. **圖片快取**：Prototype 以 `imageCache`（Map）快取已載入的 `HTMLImageElement`，避免每次重繪都重新載入。
 
 6. **旋轉單位**：LVGL 以 0.1° 為旋轉單位。編輯器的 `rotation` 屬性以度為單位，生成時會自動乘以 10。
 

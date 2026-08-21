@@ -73,10 +73,15 @@ Node-based visual programming built on React Flow:
 - **One-click copy and download**
 - **Bulk export**: download every file at once
 
-### 📱 Live preview
-- Canvas renders an approximation of the LVGL widgets
-- Zoom control (50% – 200%)
-- Hover interaction
+### 📱 Preview
+The Preview tab opens the **🎛️ Emulator**: your screens compiled to real LVGL and
+running in the page, with mouse and keyboard going into the running UI. Two
+lighter rungs sit behind it — **Prototype**, the editor's own Canvas 2D drawing
+with zoom and click-through navigation, and **Simulator**, real LVGL rendering the
+screen with none of your code — and the strip that switches between the three is
+drawn in factory dev mode only, because a green result on either of the lighter
+rungs is an answer about the editor rather than about the panel. See
+[docs/preview-ladder.md](docs/preview-ladder.md).
 
 ### 📦 Resource management
 - Image upload and management

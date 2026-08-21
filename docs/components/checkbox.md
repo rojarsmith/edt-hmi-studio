@@ -161,7 +161,7 @@ On the editor canvas the checkbox renders as a square marker beside a text label
 - When unchecked, the marker is white with a grey border
 - The overall background stays transparent on the canvas, with no fallback
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 Drawn by `drawCheckbox` on a 2D canvas:
 
@@ -193,7 +193,7 @@ function drawCheckbox(ctx, x, y, w, h, opts) {
 }
 ```
 
-### LVGL WASM preview (ui_from_json.c)
+### Simulator (ui_from_json.c)
 
 Passed to the WASM side as JSON, where `create_checkbox` builds the real LVGL widget:
 

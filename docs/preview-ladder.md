@@ -4,14 +4,18 @@
   <strong>English</strong> · <a href="./zh-TW/preview-ladder.md">繁體中文</a>
 </p>
 
-Why the Preview tab has three sub-tabs, what separates them, how the
-**Emulator** relates to **Deploy**, which of the answers were already written down somewhere
-else, and — measured against what the product promises — **which single one
-would be worth keeping if only one could be** (§8). Verified against the source,
-not from memory.
+Why the Preview tab has three rungs behind it, what separates them, how the
+**Emulator** relates to **Deploy**, which of the answers were already written
+down somewhere else, and — measured against what the product promises — **which
+single one would be worth keeping if only one could be** (§8). Verified against
+the source, not from memory.
+
+§8's answer has since been acted on in the product itself: opening Preview opens
+the **Emulator**, and the strip that chooses between the three rungs is drawn
+only in factory dev mode (§1.1).
 
 Until now this was recorded only in fragments — [animation-model.md](./animation-model.md)
-knows what Quick Preview honours, [language-switching.md](./language-switching.md)
+knows what Prototype honours, [language-switching.md](./language-switching.md)
 §4.3 has a coverage matrix that omits one of the three,
 [font-integration.md](./font-integration.md) and
 [charset-trimming-design.md](./charset-trimming-design.md) describe the compile
@@ -26,7 +30,7 @@ what corrected them. Both quotations below predate the rename in
 Each rung runs *more of the real thing* than the one below it, and costs more to
 reach. That is the whole design, and it is a good one.
 
-| | 📱 Quick Preview | 🖥️ LVGL Preview | 🎛️ Emulator | 🚀 Deploy |
+| | 📱 Prototype | 🖥️ Simulator | 🎛️ Emulator | 🚀 Deploy |
 |---|---|---|---|---|
 | **What draws it** | The editor itself, HTML5 Canvas 2D | **Real LVGL**, prebuilt as WASM | **Real LVGL + the generated C**, compiled on demand | Real LVGL + the generated C, on the MCU |
 | **What it is fed** | The editor store, directly | A UI-description JSON | Every generated `.c`/`.h`, plus converted fonts and images | The whole project file |
@@ -39,7 +43,24 @@ reach. That is the whole design, and it is a good one.
 The useful way to read that table is by asking what each rung can be *wrong*
 about, which is §2 to §5.
 
-## 2. 📱 Quick Preview — the editor's own drawing
+### 1.1 Who sees the choice
+
+**Normally, nobody.** The Preview tab opens the Emulator and draws no sub-tab
+strip. The reasoning is §8's: rungs 1 and 2 are the editor's own approximations
+of LVGL, and for someone using the product to build a panel, a green result on
+either is not an answer about the panel — it is an answer about the editor's
+opinion of the panel.
+
+The strip appears in **factory dev mode**, where the audience is someone working
+on the editor and the difference between the three rungs is the thing being
+worked on ([factory-dev-mode.md](./factory-dev-mode.md)). It also appears in a
+build with the Emulator switched off, in both modes, because hiding it there
+would leave the other two rungs with no way in.
+
+Everything below describes the rungs themselves, which is unchanged by who can
+switch between them.
+
+## 2. 📱 Prototype — the editor's own drawing
 
 `PreviewPanel.tsx` renders every widget onto a `<canvas>` with 2D drawing calls
 written by hand in TypeScript (`canvasRef`, `getContext('2d')`, then two thousand
@@ -68,10 +89,10 @@ renderer again**. It draws with DOM and CSS (`Canvas/CanvasComponent.tsx`, 1074
 lines) while this rung draws with Canvas 2D (2038 lines), and the two share no
 drawing code. So the editor carries *two* independent hand-written imitations of
 LVGL's appearance, and neither can be right by construction — LVGL is in
-neither. Quick Preview's genuine addition over the Design canvas is animation
+neither. Prototype's genuine addition over the Design canvas is animation
 playback and click-through navigation.
 
-## 3. 🖥️ LVGL Preview — real LVGL, but not your code
+## 3. 🖥️ Simulator — real LVGL, but not your code
 
 `WasmPreview.tsx` is 114 lines because it does almost nothing itself: it hosts
 an `<iframe src="/wasm/lvgl_wasm.html">` and posts a message into it.
@@ -194,21 +215,22 @@ Three problems, found while checking the above. All three have been fixed; what
 follows is the record of what was wrong, and the rule that keeps it from
 recurring.
 
-**The name "WASM preview" carries two meanings, and a blanket rename would be
-wrong.** Both rung 2 and rung 3 are WASM, so the phrase looks ambiguous — but a
-survey of its ~90 occurrences across `docs/` shows it is used consistently in
-two distinct senses, and only one of them is a problem:
+**The name "WASM preview" carried two meanings, and a blanket rename would have
+been wrong.** Both rung 2 and rung 3 are WASM, so the phrase looked ambiguous —
+but a survey of its ~90 occurrences across `docs/` showed it was used
+consistently in two distinct senses, and only one of them was a problem:
 
 | Where | What it means there | Verdict |
 |---|---|---|
-| `docs/components/*` — 42 files, always spelled "LVGL WASM preview" and cited beside `ui_from_json.c` | **Rung 2, LVGL Preview** | Correct in context. Leave it |
+| `docs/components/*` — 42 files, spelled "LVGL WASM preview" and cited beside `ui_from_json.c` | **Rung 2** | Was correct in context, and left alone at the time. **Renamed since**: rung 2 is now the *Simulator*, a name that is not ambiguous with rung 3, so the reason to leave it no longer holds |
 | [lvgl-configuration.md](./lvgl-configuration.md), [lvgl-version.md](./lvgl-version.md), [color-depth.md](./color-depth.md), [text-typography-evaluation.md](./text-typography-evaluation.md) | The shared **`wasm/` build tree** — `wasm/lv_conf.h`, `wasm/build.sh` — which feeds rung 2's checked-in artifacts *and* rung 3's on-demand compile | Not renameable to either rung; it genuinely is both |
 | [logic-event-trigger.md](./logic-event-trigger.md), [factory-dev-mode.md](./factory-dev-mode.md) | Meant to be a **rung**, and named the wrong one | **Was wrong. Fixed** |
 
-The rule that follows: **name the rung when the sentence is about a rung; say
-"the `wasm/` build tree" when it is about build inputs.** The phrase "the WASM
-preview" is only a defect in the first case, which is the case both corrected
-documents were in.
+The rule that follows, and which survived the rename: **name the rung when the
+sentence is about a rung; say "the `wasm/` build tree" when it is about build
+inputs.** The four occurrences of "LVGL WASM" left in `docs/` are all the second
+kind — the checked-in `.wasm` artifact and the tree that produces it — and they
+are right to stay.
 
 **[logic-event-trigger.md](./logic-event-trigger.md) attributed rung 2's limits
 to rung 3.** It read: *"The **WASM preview** (Build & Run) ignores logic graphs
@@ -216,19 +238,19 @@ entirely — `editorStateToJson.ts` exports screens, styles and events, but no
 graphs."* Three things were wrong with that sentence:
 
 1. `editorStateToJson.ts` lives in `src/components/WasmPreview/` and belongs to
-   **LVGL Preview**. The Emulator does not use it at all.
+   **Simulator**. The Emulator does not use it at all.
 2. It exports **no events**. The file contains no occurrence of the word.
 3. The Emulator does **not** ignore logic graphs — it passes them to
    `generateCode`, compiles the resulting `ui_logic.c`, and `ui_events.c`
    includes `ui_logic.h`.
 
-The true statement is the one this document's §3 and §4 make: *LVGL Preview*
+The true statement is the one this document's §3 and §4 make: *Simulator*
 carries neither events nor graphs, and the *Emulator* is the only preview that
 runs either.
 
 Also corrected: **[factory-dev-mode.md](./factory-dev-mode.md) listed rung 2 as a
 `generateCode()` consumer.** It said generation still runs "for the WASM preview,
-the Build & Run flow and project export". LVGL Preview calls `generateCode()`
+the Build & Run flow and project export". Simulator calls `generateCode()`
 nowhere — its four callers are `CodePanel`, `CodePreview`, `Emulator.tsx` and
 `server/hmi/projectSource.ts` — and of those, the first two are the Code tab
 that the flag hides. The two that survive the flag are the Emulator and the
@@ -236,7 +258,7 @@ Deploy build, which is what it now says.
 
 **[language-switching.md](./language-switching.md) §4.3's coverage matrix has
 three columns and there are four rungs.** It compares "Canvas 🌐", the Emulator
-and Hardware, and predates or omits LVGL Preview. It is not wrong about what it
+and Hardware, and predates or omits Simulator. It is not wrong about what it
 lists; it was incomplete, and a reader using it to choose a rung would not learn
 that rung 2 exists. It now says why rung 2 is absent — a language switch is an
 event action, and rung 2 carries no events — and links here.
@@ -255,7 +277,7 @@ The three defects of §6 are fixed. What remains, in rough order of value:
    asserts the fields the previews rely on match the board's, would turn a
    discipline into a check.
 3. **Say on each rung what it cannot prove.** The ladder's danger is a green
-   result at the wrong altitude — a screen that draws correctly in Quick Preview
+   result at the wrong altitude — a screen that draws correctly in Prototype
    and has never had a line of its C compiled. One line of text per tab, taken
    from §2–§5, costs nothing and prevents the misreading the ladder invites.
 
@@ -280,19 +302,19 @@ Measured against that sentence the answer is not close.
 
 **Why the other two are the ones to lose:**
 
-*LVGL Preview is strictly dominated.* Its unique claim is "real LVGL with no
+*Simulator is strictly dominated.* Its unique claim is "real LVGL with no
 toolchain" — but the Emulator is also real LVGL, plus your code, your events and
 your graphs. Rung 2 exists to dodge the `emcc` dependency. Remove the dependency
 and the claim is empty.
 
-*Quick Preview's loop is mostly the Design tab's loop.* And there is a fact
+*Prototype's loop is mostly the Design tab's loop.* And there is a fact
 behind that worth stating plainly: the Design canvas renders with **DOM and CSS**
-(`Canvas/CanvasComponent.tsx`, 1074 lines) while Quick Preview renders with
+(`Canvas/CanvasComponent.tsx`, 1074 lines) while Prototype renders with
 **Canvas 2D** (`Preview/PreviewPanel.tsx`, 2038 lines). They share no drawing
 code. **That is two independent hand-written imitations of LVGL's appearance,
 about 3,100 lines together, neither of which can ever be right by construction**,
 because LVGL is in neither. The same screen has three answers in this tool and
-two of them are guesses. Quick Preview's genuine addition over the Design canvas
+two of them are guesses. Prototype's genuine addition over the Design canvas
 is animation playback and click-through navigation — real, and small.
 
 **The bill attached to this answer — since paid.** When this section was first
@@ -316,7 +338,7 @@ plan that did it and the list of what it still does not fix.
 
 **The one condition that flips the answer.** If that bill could not have been
 paid — shipping to end users who will never have a toolchain — then keep
-**LVGL Preview** instead, because it is the only rung that is real LVGL with a
+**Simulator** instead, because it is the only rung that is real LVGL with a
 checked-in binary and zero setup. That is second best, not first.
 
 **Deploy is not a candidate.** It is not a preview; it is the product's output

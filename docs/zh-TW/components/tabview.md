@@ -229,11 +229,11 @@ Tab View 採用 LVGL 預設主題的 **screen 樣式**，並且無內距：
 - 子元件的可見性由 `tabChildMap[activeTab]` 決定
 - 不屬於目前 activeTab 的子元件在畫布中會隱藏
 
-### 簡易預覽繪製
+### Prototype 繪製
 
 與畫布繪製類似，但移除編輯互動。標籤列仍可點擊切換，顯示對應 tab 的子元件。
 
-### LVGL WASM 預覽繪製
+### Simulator 繪製
 
 在 `editorStateToJson.ts` 中，子元件透過虛擬 ID 對應到 tab page：
 

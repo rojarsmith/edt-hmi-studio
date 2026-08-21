@@ -114,7 +114,7 @@ runtime side is sound; it is only ever handed nothing to register.
 - The **Debug** button in the Logic tab is a manual walkthrough that starts at
   the first trigger node and follows execution wires as you press Step. It
   simulates no click and evaluates no values.
-- **LVGL Preview** ignores logic graphs entirely, and events with them:
+- **Simulator** ignores logic graphs entirely, and events with them:
   `editorStateToJson.ts` exports screens and styles, and nothing else. It feeds
   real LVGL a widget tree, so it is a renderer rather than a runtime.
 - **The Emulator** is the only preview that runs a graph. `Emulator.tsx` passes

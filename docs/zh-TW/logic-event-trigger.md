@@ -95,7 +95,7 @@ lv_obj_add_event_cb(ui_run_button, logic_<name>_event_cb, LV_EVENT_CLICKED, NULL
   會明講。
 - Logic 分頁的 **Debug** 按鈕是手動的走訪 —— 從第一個 trigger 節點開始，
   按一次 Step 沿執行線走一步。它不模擬點擊，也不計算任何值。
-- **LVGL Preview** 完全忽略邏輯圖，連事件也一起忽略：`editorStateToJson.ts`
+- **Simulator** 完全忽略邏輯圖，連事件也一起忽略：`editorStateToJson.ts`
   只匯出畫面與樣式，沒有別的。它餵給真正的 LVGL 一棵元件樹，所以它是
   renderer，不是 runtime。
 - **Emulator** 是唯一會跑圖的預覽。`Emulator` 把圖傳給

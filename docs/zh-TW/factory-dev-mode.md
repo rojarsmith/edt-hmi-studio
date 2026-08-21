@@ -68,6 +68,7 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 | Logic 分頁 Properties 面板的 **Active on Screens** —— 逐圖儲存但目前沒有任何東西使用；圖暫定全域運作，一般模式改顯示單純的 **Active** 開關，而且真的有作用：關掉的圖完全不會出現在產生的程式碼裡 | 顯示 | 隱藏 |
 | Logic 調色盤的 **Custom** 架子 —— Call Function 與 C Code Block，手寫 C 是原廠工程師的領域；已放進圖裡的節點在任何模式都照常渲染與產生，藏起來的只有調色盤上的供應 | 顯示 | 隱藏 |
 | Properties 面板標題列的**收合三角形**，可把整個面板收成一條標題列。面板內各分區的收合、以及標題列的全部展開／全部收合按鈕，兩種模式都照常提供 | 顯示 | 隱藏 |
+| **預覽階切換列**——Preview 分頁上方的 Prototype／Simulator／Emulator 那一排。平常這個分頁直接打開 **Emulator**，切換列不會畫出來；因為另外兩階是編輯器自己對 LVGL 的近似，在它們身上得到綠燈並不是對面板的回答（[preview-ladder.md](preview-ladder.md) §8）。把 Emulator 在建置時關掉的版本，兩種模式都會顯示切換列——不然剩下兩階就沒有入口了 | 顯示 | 隱藏；直接開 Emulator |
 
 日後決定的項目請繼續補充於此表。
 
@@ -96,7 +97,7 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 隱藏分頁並不會停用程式碼生成本身：`generateCode()` 在 **Emulator**
 （`Emulator`）與 **Deploy** 建置時照常執行，後者是在
 `server/hmi/projectSource.ts` 裡呼叫同一個產生器。被管制的只是顯示產出原始碼的那個
-分頁。LVGL Preview 不在這份清單上，而且從來就不在——餵給它的是一棵元件樹 JSON，
+分頁。Simulator 不在這份清單上，而且從來就不在——餵給它的是一棵元件樹 JSON，
 不是產生出來的 C（[preview-ladder.md](./preview-ladder.md) §3）。
 
 ## 實作位置
@@ -107,3 +108,4 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 | About 畫面與五連點解鎖 | `src/components/AboutDialog/AboutDialog.tsx` |
 | 選單列標記 | `src/components/DesktopMenuBar/DesktopMenuBar.tsx` |
 | `Help → About` 選單項目 | `src/components/DesktopMenuBar/DesktopMenuBar.tsx` |
+| 預覽階切換列（`canChoosePreviewRung`） | `src/App.tsx` |

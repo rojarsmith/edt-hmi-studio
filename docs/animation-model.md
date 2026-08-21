@@ -260,7 +260,7 @@ for a component designed at zero.
 
 ## The preview
 
-The Quick Preview honours all of it. Entering a screen — booting into the
+The Prototype honours all of it. Entering a screen — booting into the
 entry screen, pressing a navigation button, or clicking the screen in the
 footer — plays that screen's Screen Loaded bindings, as the firmware does.
 Clicking a widget runs its Play Animation and Stop Animation bindings. The

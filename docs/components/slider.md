@@ -173,7 +173,7 @@ percentage = ((value - min) / (max - min)) * 100
 - The fill runs from the left to the knob, in theme blue
 - The knob is a 16px circle with a shadow
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 Drawn by `drawSlider` on a 2D canvas:
 
@@ -202,7 +202,7 @@ function drawSlider(ctx, x, y, w, h, opts) {
 }
 ```
 
-### LVGL WASM preview (ui_from_json.c)
+### Simulator (ui_from_json.c)
 
 Passed to the WASM side as JSON, where `create_slider` builds the real LVGL widget:
 

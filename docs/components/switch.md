@@ -155,7 +155,7 @@ On the editor canvas a Switch renders as a rounded track plus a circular knob:
 - The knob carries a shadow for depth
 - A CSS transition animates the knob (visible in the editor only)
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 Drawn by `drawSwitch` on a 2D canvas:
 
@@ -185,7 +185,7 @@ function drawSwitch(ctx, x, y, w, h, opts) {
 
 Note: the simple preview uses green `#4caf50` (Material Green) for the on state, slightly different from the canvas's blue.
 
-### LVGL WASM preview (ui_from_json.c)
+### Simulator (ui_from_json.c)
 
 Passed to the WASM side as JSON, where `create_switch` builds the real LVGL widget:
 
@@ -261,8 +261,8 @@ Common combinations:
 
 4. **Inconsistent colours**: the three rendering layers use slightly different colours for the on state:
    - Editor canvas: `#2196F3` (blue)
-   - Simple preview: `#4caf50` (green)
-   - LVGL WASM: whatever the theme says (blue by default)
+   - Prototype: `#4caf50` (green)
+   - Simulator: whatever the theme says (blue by default)
 
    Standardising on the theme colour `#2196F3` is recommended.
 

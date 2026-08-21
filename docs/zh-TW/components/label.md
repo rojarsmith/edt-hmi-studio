@@ -168,9 +168,9 @@ interface LabelProps {
 - 支援選取高亮、停留效果、拖曳、調整大小控制點
 - 支援 `textDecor` 文字裝飾（透過外層的 `textDecoration` CSS 屬性）
 
-### 10.2 簡易預覽繪製（PreviewPanel.tsx）
+### 10.2 Prototype 繪製（PreviewPanel.tsx）
 
-在 Canvas 2D 簡易預覽中，標籤以 `drawLabel()` 函式繪製：
+在 Canvas 2D Prototype 中，標籤以 `drawLabel()` 函式繪製：
 
 ```typescript
 drawLabel(ctx, x, y, w, h, {
@@ -188,7 +188,7 @@ drawLabel(ctx, x, y, w, h, {
 - 支援文字裝飾（底線／刪除線）
 - 支援疊加動畫狀態
 
-### 10.3 LVGL WASM 預覽繪製
+### 10.3 Simulator 繪製
 
 #### JSON 序列化（editorStateToJson.ts）
 

@@ -156,7 +156,7 @@ Key points:
 - The header row gets a light grey background and bold text
 - Cell text comes from `cellData`; an empty cell shows its index as a placeholder
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 ```typescript
 function drawTable(ctx, x, y, w, h, opts) {
@@ -196,7 +196,7 @@ Key points:
 - Centres the cell text
 - Uses placeholder text (`Col N` / `r,c`) in the preview
 
-### LVGL WASM preview
+### Simulator
 
 **editorStateToJson.ts**: the props (rows, cols, cellData, columnWidths, headerRow, cellAligns) are serialised in full.
 

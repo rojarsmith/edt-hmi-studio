@@ -167,7 +167,7 @@ Key points:
 - Bar height is the data value as a proportion of the maximum
 - Only the first series is drawn, to keep the preview simple
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 ```typescript
 function drawChart(ctx, x, y, w, h, opts) {
@@ -207,7 +207,7 @@ Key points:
 - Grid lines can be toggled
 - Uses the legacy `data` and `lineColor` fields
 
-### LVGL WASM preview
+### Simulator
 
 **editorStateToJson.ts**: the props are serialised in full, including the series array and the legacy data field.
 

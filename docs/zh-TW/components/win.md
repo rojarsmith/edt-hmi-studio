@@ -198,11 +198,11 @@ Window 採用 LVGL 預設主題的 **clip_corner** 樣式，header 使用灰色�
 - header 高度由 `headerHeight` 屬性控制
 - 子元件的 y 座標相對於 content 區域頂端，不含 header
 
-### 簡易預覽繪製
+### Prototype 繪製
 
 與畫布繪製類似，但移除編輯互動。顯示完整的視窗結構（header + content），子元件在 content 區域內繪製。
 
-### LVGL WASM 預覽繪製
+### Simulator 繪製
 
 在 `editorStateToJson.ts` 中，子元件透過虛擬 ID 對應到 content 區域：
 

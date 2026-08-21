@@ -196,11 +196,11 @@ Container 支援 `LvglEventType` 中定義的所有 LVGL 事件類型：
 
 Container 在畫布中顯示為白色卡片區域，子元件以絕對定位放在其內部。選取時會顯示藍色外框與 8 個調整控制點。
 
-### 簡易預覽繪製
+### Prototype 繪製
 
 `PreviewPanel.tsx` 的繪製邏輯與畫布類似，但移除了編輯互動（選取框、拖曳控制點等），只保留視覺呈現。子元件同樣遞迴繪製。
 
-### LVGL WASM 預覽繪製
+### Simulator 繪製
 
 `editorStateToJson.ts` 將 Container 序列化為：
 

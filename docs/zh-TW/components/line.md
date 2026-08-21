@@ -185,7 +185,7 @@ const placed = pointsInBox(points, box);
 - **外層不套用任何外框樣式**：沒有填色、邊框、圓角或內距，因為線條沒有框
 - 選取、hover 與拖曳與其他元件相同；調整大小的控制點只保留線條用得到的那些
 
-### 10.2 簡易預覽繪製（PreviewPanel.tsx）
+### 10.2 Prototype 繪製（PreviewPanel.tsx）
 
 Canvas 2D 預覽描的是同一組點：
 
@@ -208,7 +208,7 @@ function drawLine(ctx, x, y, w, h, opts) {
 - 虛線依 `lineDashWidth` / `lineDashGap`
 - 上層仍可疊加動畫狀態
 
-### 10.3 LVGL WASM 預覽繪製
+### 10.3 Simulator 繪製
 
 #### JSON 序列化（editorStateToJson.ts）
 

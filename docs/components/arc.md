@@ -160,7 +160,7 @@ Key points:
 - `strokeDasharray` maths: the circumference is about 2π×40 ≈ 251, so `value * 2.51` is the filled length
 - `rotate(-90)` moves the start point to 12 o'clock
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 ```typescript
 function drawArc(ctx, x, y, w, h, opts) {
@@ -201,7 +201,7 @@ Key points:
 - Draws the current value in the centre of the arc
 - `lineCap = 'round'` rounds the ends
 
-### LVGL WASM preview
+### Simulator
 
 **editorStateToJson.ts**: the props (startAngle, endAngle, value, min, max) are serialised directly.
 

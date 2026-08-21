@@ -140,7 +140,7 @@ The wrapper `<div>` every canvas component already renders paints the fill, grad
 
 `resolveFallbackBackground` returns `'transparent'` for a rectangle: clearing the fill is how an outline-only shape is drawn, so the canvas must not helpfully fill it back in.
 
-### 10.2 Simple preview (PreviewPanel.tsx)
+### 10.2 Prototype (PreviewPanel.tsx)
 
 The rectangle shares the panel drawing path:
 
@@ -164,7 +164,7 @@ case 'container':
 
 > The style fallbacks feeding this switch are nullish (`??`), not falsy (`||`): a shape asking for `borderRadius: 0` or `borderWidth: 0` means zero, and the editor canvas has always honoured that.
 
-### 10.3 LVGL WASM preview
+### 10.3 Simulator
 
 The widget is serialised like any other node:
 

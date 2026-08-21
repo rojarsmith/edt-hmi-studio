@@ -129,11 +129,11 @@ An SVG `<polygon>`, which closes itself the way the shape does:
 
 A transparent copy underneath widens the click target for an unfilled outline — editor chrome, never drawn on the panel.
 
-### 10.3 Simple preview (PreviewPanel.tsx)
+### 10.3 Prototype (PreviewPanel.tsx)
 
 `drawPolygon` traces the same points, `closePath`s them, fills when the outline is convex and strokes the outline. One path rather than the firmware's fan: over a convex outline the two cover the same pixels, and a path has no seams between triangles.
 
-### 10.4 LVGL WASM preview and generated code
+### 10.4 Simulator and generated code
 
 Both do the same two things, because both are LVGL.
 

@@ -108,7 +108,7 @@ interface HighlightedDate {
 
 ### Internal areas
 
-| Area | Editor canvas | Simple preview | LVGL part |
+| Area | Editor canvas | Prototype | LVGL part |
 |------|-----------|-----------|-----------|
 | Month header | Grey background `#f8f8f8`, bold text | Blue background `#2196F3`, white text | `LV_PART_MAIN` (calendar header) |
 | Day-name row | Grey text `#666`, 10px | Grey text `#666`, 10px | day names area |
@@ -182,7 +182,7 @@ Key points:
 - Simplified rendering: always 1–28, without working out the real day count or the starting weekday
 - The header shows `year / month`
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 ```typescript
 function drawCalendar(ctx, x, y, w, h, opts) {
@@ -240,7 +240,7 @@ Key points:
 - Draws at most 6 rows of dates
 - The cell height adapts to the widget height
 
-### LVGL WASM preview
+### Simulator
 
 **editorStateToJson.ts**: the props (year, month, showDayNames, showToday, highlightedDates and the rest) are serialised in full.
 

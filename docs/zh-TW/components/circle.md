@@ -172,11 +172,11 @@ Shadow、Transform、Gradient、Outline 與 Blend Mode 沿用與其他圖形相�
 
 `evenodd` 正是讓圓環成為圓環的關鍵：內圈以相反方向繞行，填色因而留下中間的洞。
 
-### 10.3 簡易預覽（PreviewPanel.tsx）
+### 10.3 Prototype（PreviewPanel.tsx）
 
 `drawCircle` 畫的是同樣的兩種情況：圓盤用 `ctx.arc`（有邊框時一併描邊），扇形用 `ctx.fill(new Path2D(sectorPath(...)), 'evenodd')` — 就是畫布所畫的那條路徑，兩者不可能不一致。
 
-### 10.4 LVGL WASM 預覽與程式碼生成
+### 10.4 Simulator 與程式碼生成
 
 兩者都依 `props.shape` 選擇實作：
 

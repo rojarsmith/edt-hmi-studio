@@ -155,7 +155,7 @@ disabled: {
 - 旋鈕帶有陰影，增強立體感
 - 以 CSS transition 呈現滑動動畫（僅在編輯器中可見）
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 使用 `drawSwitch` 函式在 Canvas 2D 上繪製：
 
@@ -183,9 +183,9 @@ function drawSwitch(ctx, x, y, w, h, opts) {
 }
 ```
 
-注意：簡易預覽的開啟狀態使用綠色 `#4caf50`（Material Green），與畫布繪製的藍色略有差異。
+注意：Prototype 的開啟狀態使用綠色 `#4caf50`（Material Green），與畫布繪製的藍色略有差異。
 
-### LVGL WASM 預覽繪製（ui_from_json.c）
+### Simulator 繪製（ui_from_json.c）
 
 透過 JSON 傳給 WASM 端，由 `create_switch` 函式建立真正的 LVGL 控制項：
 
@@ -261,8 +261,8 @@ Switch 沒有專屬的 set/get 函式，狀態完全透過 LVGL 通用的狀態�
 
 4. **顏色不一致**：三個繪製層的開啟狀態顏色略有差異：
    - 編輯器畫布：`#2196F3`（藍色）
-   - 簡易預覽：`#4caf50`（綠色）
-   - LVGL WASM：取決於主題設定（預設為藍色）
+   - Prototype：`#4caf50`（綠色）
+   - Simulator：取決於主題設定（預設為藍色）
 
    建議統一為主題色 `#2196F3`。
 

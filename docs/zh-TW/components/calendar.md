@@ -108,7 +108,7 @@ interface HighlightedDate {
 
 ### 內部區域
 
-| 區域 | 編輯器畫布 | 簡易預覽 | LVGL Part |
+| 區域 | 編輯器畫布 | Prototype | LVGL Part |
 |------|-----------|-----------|-----------|
 | 月份標題列 | 灰色背景 `#f8f8f8`，粗體文字 | 藍色背景 `#2196F3`，白色文字 | `LV_PART_MAIN`（calendar header） |
 | 星期標題列 | 灰色文字 `#666`，10px | 灰色文字 `#666`，10px | day names area |
@@ -116,7 +116,7 @@ interface HighlightedDate {
 | 今天 | 由 LVGL 自行高亮 | — | `lv_calendar_set_today_date` |
 | 高亮日期 | 由 LVGL 自行標記 | — | `lv_calendar_set_highlighted_dates` |
 
-兩個編輯器層刻意不同：畫布的標題列維持中性色，避免與選取高亮互相干擾；簡易預覽則使用主題的主色。
+兩個編輯器層刻意不同：畫布的標題列維持中性色，避免與選取高亮互相干擾；Prototype 則使用主題的主色。
 
 ## 9. 事件支援
 
@@ -182,7 +182,7 @@ LVGL calendar 可透過 `lv_calendar_get_pressed_date(calendar, &date)` 取得�
 - 簡化繪製：固定顯示 1–28，不計算實際天數與起始星期
 - 標題列顯示 `年 / 月`
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 ```typescript
 function drawCalendar(ctx, x, y, w, h, opts) {
@@ -240,7 +240,7 @@ function drawCalendar(ctx, x, y, w, h, opts) {
 - 最多繪製 6 列日期
 - 儲存格高度依元件高度自適應
 
-### LVGL WASM 預覽繪製
+### Simulator 繪製
 
 **editorStateToJson.ts**：props（year、month、showDayNames、showToday、highlightedDates 等）完整序列化。
 
@@ -351,7 +351,7 @@ typedef struct {
 
 1. **月份導覽標題**：LVGL v9 提供 `lv_calendar_header_arrow_create` 與 `lv_calendar_header_dropdown_create` 兩種導覽標題。編輯器未將其作為可設定選項，生成程式碼也不會自動加入，需要時請在自訂程式碼中加上。
 
-2. **畫布繪製是簡化版**：編輯器畫布固定繪製 28 天，不計算實際天數與起始星期；簡易預覽（Canvas 2D）則有計算真實的日曆版面。要看完整效果請用 WASM 預覽。
+2. **畫布繪製是簡化版**：編輯器畫布固定繪製 28 天，不計算實際天數與起始星期；Prototype（Canvas 2D）則有計算真實的日曆版面。要看完整效果請用 WASM 預覽。
 
 3. **高亮日期需要 static 陣列**：生成程式碼會輸出 `static` 陣列，因為 `lv_calendar_set_highlighted_dates` 不會複製資料，只保存指標。該陣列必須在 calendar 的生命週期內保持有效。
 
@@ -361,7 +361,7 @@ typedef struct {
 
 6. **最小尺寸**：LVGL calendar 需要足夠空間容納 7×6 的日期格狀加上標題。尺寸過小會讓日期文字重疊，建議在編輯器中設定最小尺寸限制（約 180×180）。
 
-7. **星期標題的在地化**：編輯器畫布使用單字母英文星期（`S M T W T F S`），簡易預覽使用三字母（`Sun Mon …`）。LVGL 本身的星期標題可用 `lv_calendar_set_day_names` 自訂；生成程式碼未處理在地化，會沿用 LVGL 預設的英文。
+7. **星期標題的在地化**：編輯器畫布使用單字母英文星期（`S M T W T F S`），Prototype 使用三字母（`Sun Mon …`）。LVGL 本身的星期標題可用 `lv_calendar_set_day_names` 自訂；生成程式碼未處理在地化，會沿用 LVGL 預設的英文。
 
 8. **擴充 WASM 預覽**：目前 `ui_from_json.c` 未處理 `highlightedDates` 與 `showDayNames`。要完整還原編輯器的設計，需在 C 端解析 `highlightedDates` JSON 陣列並呼叫 `lv_calendar_set_highlighted_dates`。
 

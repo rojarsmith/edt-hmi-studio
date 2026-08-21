@@ -196,11 +196,11 @@ In `CanvasComponent.tsx` the Container renders as a `<div>` with the styles mapp
 
 It appears as a white card on the canvas with children absolutely positioned inside it. When selected it gets a blue outline and 8 resize handles.
 
-### Simple preview
+### Prototype
 
 `PreviewPanel.tsx` renders it much like the canvas, minus the editing affordances (selection box, drag handles), keeping only the visuals. Children render recursively.
 
-### LVGL WASM preview
+### Simulator
 
 `editorStateToJson.ts` serialises the Container as:
 

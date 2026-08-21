@@ -129,7 +129,7 @@ tab.
 | Height persistence | `GraphManager` keeps its height in `useState`, so a reload loses it. The dock should at least use `localStorage` — the app already reads it directly (`App.tsx:92`), no wrapper needed |
 | Collapsed vs hidden | "Collapsed to just the tab strip" and "gone entirely" are different states; Visual Studio has both |
 | Small screens | The dock needs a max-height clamp so the workspace can never be squeezed to zero |
-| LVGL Preview | Its `<iframe>` re-renders on resize; dragging the dock while that tab is open needs a look |
+| Simulator | Its `<iframe>` re-renders on resize; dragging the dock while that tab is open needs a look |
 | Factory mode | The Deploy tab itself is not factory-gated (`TAB_DEFS` gates only `code` and `icon`), but parts of the panel are (`DeployPanel.tsx:218`, `:397`). The dock's rules must not accidentally expose them |
 | Keyboard and a11y | The tab strip needs keyboard switching, and the drag grip needs a keyboard alternative |
 

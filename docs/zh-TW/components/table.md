@@ -156,7 +156,7 @@ LVGL table 可透過 `lv_table_get_selected_cell(table, &row, &col)` 取得被�
 - 表頭列使用淺灰背景與加粗字體
 - 儲存格內容取自 `cellData`，空值以序號作為佔位
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 ```typescript
 function drawTable(ctx, x, y, w, h, opts) {
@@ -196,7 +196,7 @@ function drawTable(ctx, x, y, w, h, opts) {
 - 儲存格文字置中顯示
 - 預覽中使用佔位文字（`Col N` / `r,c`）
 
-### LVGL WASM 預覽繪製
+### Simulator 繪製
 
 **editorStateToJson.ts**：props（rows、cols、cellData、columnWidths、headerRow、cellAligns）完整序列化。
 

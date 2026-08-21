@@ -183,7 +183,7 @@ Key behaviour:
 - Supports `borderSide` for partial borders
 - Supports `textDecor`
 
-### 10.2 Simple preview (PreviewPanel.tsx)
+### 10.2 Prototype (PreviewPanel.tsx)
 
 In the Canvas 2D simple preview the button is drawn by `drawButton()`:
 
@@ -207,7 +207,7 @@ Key behaviour:
 - Supports animation state on top (translation, scale, opacity)
 - Supports shadow, transform (rotate/scale) and outline
 
-### 10.3 LVGL WASM preview
+### 10.3 Simulator
 
 #### JSON serialisation (editorStateToJson.ts)
 

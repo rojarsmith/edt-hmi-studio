@@ -132,8 +132,8 @@
 每個元件在編輯器中有 4 層繪製實作：
 
 1. **編輯器畫布**（`CanvasComponent.tsx`）— 以 React/HTML 近似模擬，支援拖曳、選取、調整大小
-2. **簡易預覽**（`PreviewPanel.tsx`）— 以 Canvas 2D 繪製的輕量預覽
-3. **LVGL WASM 預覽**（`ui_from_json.c`）— 真實的 LVGL 執行環境，元件樹以 JSON 傳入
+2. **Prototype**（`PreviewPanel.tsx`）— 以 Canvas 2D 繪製的輕量預覽
+3. **Simulator**（`ui_from_json.c`）— 真實的 LVGL 執行環境，元件樹以 JSON 傳入
 4. **程式碼生成**（`ui.c.ts`）— 產生可編譯的 C 程式碼，支援 LVGL v8／v9
 
 ### LVGL 版本相容性

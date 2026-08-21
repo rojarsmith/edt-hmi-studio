@@ -166,7 +166,7 @@ Key behaviour:
 - Supports selection highlight, hover, dragging and resize handles
 - Supports `textDecor` via the outer element's `textDecoration` CSS property
 
-### 10.2 Simple preview (PreviewPanel.tsx)
+### 10.2 Prototype (PreviewPanel.tsx)
 
 In the Canvas 2D simple preview the label is drawn by `drawLabel()`:
 
@@ -186,7 +186,7 @@ Key behaviour:
 - Supports text decoration (underline / strikethrough)
 - Supports animation state on top
 
-### 10.3 LVGL WASM preview
+### 10.3 Simulator
 
 #### JSON serialisation (editorStateToJson.ts)
 

@@ -167,7 +167,7 @@ const maxVal = Math.max(...chartData, 1);
 - 長條高度依資料值與最大值的比例計算
 - 只繪製第一個系列，以簡化預覽
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 ```typescript
 function drawChart(ctx, x, y, w, h, opts) {
@@ -207,7 +207,7 @@ function drawChart(ctx, x, y, w, h, opts) {
 - 支援格線開關
 - 使用舊版的 `data` 與 `lineColor` 欄位
 
-### LVGL WASM 預覽繪製
+### Simulator 繪製
 
 **editorStateToJson.ts**：props 完整序列化，包含 series 陣列與舊版的 data 欄位。
 
@@ -348,7 +348,7 @@ lv_obj_set_style_line_opa(chart_1, LV_OPA_TRANSP, LV_PART_MAIN);
 
 4. **效能考量**：在嵌入式裝置上，資料點過多（超過約 100 個）可能明顯拖慢繪製。屬性面板可提示使用者留意。
 
-5. **散佈圖支援**：程式碼生成支援 `LV_CHART_TYPE_SCATTER`，但編輯器畫布與簡易預覽都未實作散佈圖繪製，會一律退回折線形式。
+5. **散佈圖支援**：程式碼生成支援 `LV_CHART_TYPE_SCATTER`，但編輯器畫布與 Prototype 都未實作散佈圖繪製，會一律退回折線形式。
 
 6. **格線控制**：`showGrid` 是透過設定 `line_opa = LV_OPA_TRANSP` 來隱藏格線。更細緻的控制（水平／垂直分割線數量）可用 `lv_chart_set_div_line_count`，目前編輯器未開放為屬性。
 

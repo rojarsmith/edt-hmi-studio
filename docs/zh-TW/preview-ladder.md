@@ -4,12 +4,15 @@
   <a href="../preview-ladder.md">English</a> · <strong>繁體中文</strong>
 </p>
 
-Preview 分頁為什麼有三個子分頁、它們的差別在哪、**Emulator** 跟 **Deploy** 是什麼
+Preview 分頁背後為什麼有三階、它們的差別在哪、**Emulator** 跟 **Deploy** 是什麼
 關係、這些答案有哪些其實已經被寫在別的地方了，以及——用產品的承諾去量——**如果只能留
 一個，該留哪一個**（§8）。內容都對照過原始碼，不是憑印象。
 
+§8 的答案後來被落實進產品本身了：打開 Preview 就是打開 **Emulator**，而在三階之間切換的
+那一排，只有在原廠研發模式下才會畫出來（§1.1）。
+
 在此之前這件事只以碎片的形式存在：[animation-model.md](./animation-model.md) 知道
-Quick Preview 支援到什麼程度、[language-switching.md](./language-switching.md) §4.3
+Prototype 支援到什麼程度、[language-switching.md](./language-switching.md) §4.3
 有一張漏掉其中一個的涵蓋度表、[font-integration.md](./font-integration.md) 與
 [charset-trimming-design.md](./charset-trimming-design.md) 描述編譯路徑、
 [lvgl-configuration.md](./lvgl-configuration.md) 記錄預覽的 LVGL 設定跟板子在哪裡
@@ -20,7 +23,7 @@ Quick Preview 支援到什麼程度、[language-switching.md](./language-switchi
 
 每一階都比下一階跑到「更多真實的東西」，代價也更高。這就是整個設計，而且是個好設計。
 
-| | 📱 Quick Preview | 🖥️ LVGL Preview | 🎛️ Emulator | 🚀 Deploy |
+| | 📱 Prototype | 🖥️ Simulator | 🎛️ Emulator | 🚀 Deploy |
 |---|---|---|---|---|
 | **誰畫的** | 編輯器自己，HTML5 Canvas 2D | **真的 LVGL**，預先編好的 WASM | **真的 LVGL＋產生出來的 C**，當場編譯 | 真的 LVGL＋產生出來的 C，跑在 MCU 上 |
 | **餵進去什麼** | 編輯器 store，直接餵 | 一份描述 UI 的 JSON | 每一個產生的 `.c`/`.h`，加上轉好的字型與圖片 | 整個專案檔 |
@@ -32,7 +35,19 @@ Quick Preview 支援到什麼程度、[language-switching.md](./language-switchi
 
 這張表有用的讀法，是去問每一階**可能錯在哪**，那就是 §2 到 §5。
 
-## 2. 📱 Quick Preview——編輯器自己畫的那張圖
+### 1.1 誰看得到這個選擇
+
+**平常沒有人看得到。** Preview 分頁直接打開 Emulator，那一排子分頁根本不會畫出來。理由就是
+§8 講的：第一階與第二階是編輯器自己對 LVGL 的近似，對一個正在用這個產品做面板的人來說，
+在它們身上得到綠燈並不是對面板的回答——那是對「編輯器認為面板長什麼樣」的回答。
+
+那一排會在**原廠研發模式**下出現，因為那時候的使用者是在做編輯器本身的人，而三階之間的差別
+正好就是他在處理的東西（[factory-dev-mode.md](./factory-dev-mode.md)）。另外，在建置時把
+Emulator 關掉的版本裡，兩種模式都會顯示它——不然剩下兩階就沒有入口了。
+
+下面談的都是這三階本身，而那些跟「誰可以切換」無關。
+
+## 2. 📱 Prototype——編輯器自己畫的那張圖
 
 `PreviewPanel.tsx` 用 `<canvas>` 的 2D 繪圖 API 把每個元件畫出來，全部是手寫的
 TypeScript（`canvasRef`、`getContext('2d')`，然後兩千行的形狀繪製）。整個過程 LVGL
@@ -55,10 +70,10 @@ TypeScript（`canvasRef`、`getContext('2d')`，然後兩千行的形狀繪製�
 有一個結構上的註記，因為它跟 §8 有關：**Design 畫布又是另一套獨立的 renderer**。
 它是用 DOM 與 CSS 畫的（`Canvas/CanvasComponent.tsx`，1074 行），而這一階是用
 Canvas 2D 畫的（2038 行），兩者不共用任何繪圖程式碼。也就是說編輯器身上背著*兩套*
-各自手寫的 LVGL 外觀模仿，而且兩套都不可能對——因為 LVGL 兩套裡都沒有。Quick Preview
+各自手寫的 LVGL 外觀模仿，而且兩套都不可能對——因為 LVGL 兩套裡都沒有。Prototype
 真正比 Design 畫布多的，是動畫播放與點擊換頁。
 
-## 3. 🖥️ LVGL Preview——真的 LVGL，但不是你的程式碼
+## 3. 🖥️ Simulator——真的 LVGL，但不是你的程式碼
 
 `WasmPreview.tsx` 只有 114 行，因為它自己幾乎什麼都不做：掛一個
 `<iframe src="/wasm/lvgl_wasm.html">`，然後往裡面 post 一個訊息。
@@ -160,42 +175,42 @@ Deploy 這一側還有兩個小註記：
 查證上面這些的時候找到三個問題。三個都已經修好了；以下是「當初錯在哪、被什麼改正」
 的紀錄。以下兩段引文都早於 [emulator.md](./emulator.md) §2 的改名，維持原樣。
 
-**「WASM preview」這個名字帶著兩種意思，而全面改名會是錯的。** 第二階與第三階都是
-WASM，所以這個詞看起來有歧義——但把它在 `docs/` 底下約 90 處出現全部看過之後，會發現
-它其實一致地被用在兩種不同的意思上，而且只有一種是問題：
+**「WASM preview」這個名字曾經帶著兩種意思，而當時全面改名會是錯的。** 第二階與第三階
+都是 WASM，所以這個詞看起來有歧義——但把它在 `docs/` 底下約 90 處出現全部看過之後，會
+發現它其實一致地被用在兩種不同的意思上，而且只有一種是問題：
 
 | 出現在哪 | 在那裡的意思 | 判定 |
 |---|---|---|
-| `docs/components/*`——42 個檔案，一律寫成「LVGL WASM 預覽」，而且旁邊都引 `ui_from_json.c` | **第二階，LVGL Preview** | 在脈絡裡是對的。不要動 |
+| `docs/components/*`——42 個檔案，一律寫成「LVGL WASM 預覽」，而且旁邊都引 `ui_from_json.c` | **第二階** | 當時在脈絡裡是對的，所以沒有動。**後來改了**：第二階現在叫 *Simulator*，這個名字跟第三階不再有歧義，原本不動它的理由也就不成立了 |
 | [lvgl-configuration.md](./lvgl-configuration.md)、[lvgl-version.md](./lvgl-version.md)、[color-depth.md](./color-depth.md)、[text-typography-evaluation.md](./text-typography-evaluation.md) | 共用的 **`wasm/` 建置樹**——`wasm/lv_conf.h`、`wasm/build.sh`——它同時餵第二階簽進 repo 的產物**與**第三階的當場編譯 | 改成任一階都不對；它真的就是兩者 |
 | [logic-event-trigger.md](./logic-event-trigger.md)、[factory-dev-mode.md](./factory-dev-mode.md) | 本來就是要指**某一階**，卻指錯了 | **本來是錯的。已修** |
 
-由此得到規則：**句子在講某一階時就講那一階的名字；句子在講建置輸入時就講「`wasm/`
-建置樹」。**「the WASM preview」這個詞只有在前一種情況下才算缺陷，而兩份被改正的文件
-正好都屬於前一種。
+由此得到規則，而且它在改名之後仍然成立：**句子在講某一階時就講那一階的名字；句子在講
+建置輸入時就講「`wasm/` 建置樹」。** `docs/` 裡剩下的四處「LVGL WASM」全都屬於後者——
+簽進 repo 的 `.wasm` 產物，以及產生它的那棵樹——它們留著是對的。
 
 **[logic-event-trigger.md](./logic-event-trigger.md) 曾把第二階的限制安在第三階頭上。**
 它原本寫的是：*「**WASM preview**（Build & Run）完全忽略邏輯圖——`editorStateToJson.ts`
 匯出畫面、樣式與事件，但沒有圖。」* 這句話有三個地方是錯的：
 
-1. `editorStateToJson.ts` 住在 `src/components/WasmPreview/`，屬於 **LVGL Preview**。
+1. `editorStateToJson.ts` 住在 `src/components/WasmPreview/`，屬於 **Simulator**。
    Emulator 根本沒用到它。
 2. 它**沒有匯出事件**。整個檔案裡沒有出現過這個字。
 3. Emulator **並沒有**忽略邏輯圖——它把圖傳給 `generateCode`、編譯產生出來的
    `ui_logic.c`，而 `ui_events.c` 會 include `ui_logic.h`。
 
-正確的說法就是這份文件 §3 與 §4 的說法：*LVGL Preview* 既沒有事件也沒有圖，而
+正確的說法就是這份文件 §3 與 §4 的說法：*Simulator* 既沒有事件也沒有圖，而
 *Emulator* 是唯一會跑這兩者的預覽。
 
 同樣已修：**[factory-dev-mode.md](./factory-dev-mode.md) 把第二階列成
 `generateCode()` 的使用者。** 它原本說程式碼生成仍然「在 WASM 預覽、Build & Run 流程
-與專案匯出時照常執行」。LVGL Preview 根本沒有任何地方呼叫 `generateCode()`——它的四個
+與專案匯出時照常執行」。Simulator 根本沒有任何地方呼叫 `generateCode()`——它的四個
 呼叫者是 `CodePanel`、`CodePreview`、`Emulator` 與 `server/hmi/projectSource.ts`
 ——而其中前兩個正是那個旗標會藏起來的 Code 分頁。撐過那個旗標的是 Emulator 與
 Deploy 建置，而它現在就是這樣寫的。
 
 **[language-switching.md](./language-switching.md) §4.3 的涵蓋度表只有三欄，但階梯有
-四階。** 它比較的是「Canvas 🌐」、Emulator 與硬體，漏掉（或早於）LVGL Preview。
+四階。** 它比較的是「Canvas 🌐」、Emulator 與硬體，漏掉（或早於）Simulator。
 它列出來的部分沒有錯，但它是不完整的；照著它挑階的人不會知道第二階存在。它現在會說明
 第二階為什麼不在表上——語言切換是一個事件動作，而第二階不帶事件——並連到這裡。
 
@@ -210,7 +225,7 @@ Deploy 建置，而它現在就是這樣寫的。
    後面，正是會生出「可是預覽看起來是對的啊」的那種形狀。一份產生出來的 diff，或一個
    斷言「預覽依賴的那些欄位跟板子一致」的測試，就能把紀律變成檢查。
 3. **在每一階上寫明它證明不了什麼。** 這座階梯的危險是「在錯誤的高度拿到綠燈」——一個
-   在 Quick Preview 裡畫得好好的、但它的 C 一行都沒編過的畫面。每個分頁一行字，內容從
+   在 Prototype 裡畫得好好的、但它的 C 一行都沒編過的畫面。每個分頁一行字，內容從
    §2–§5 抄，不花什麼成本，卻能擋掉這座階梯天生會誘發的誤讀。
 
 ## 8. 如果只能留一個預覽
@@ -231,16 +246,16 @@ Deploy 建置，而它現在就是這樣寫的。
 
 **為什麼該被捨掉的是另外兩個：**
 
-*LVGL Preview 被嚴格支配。* 它的獨門主張是「不用工具鏈的真 LVGL」——但 Emulator
+*Simulator 被嚴格支配。* 它的獨門主張是「不用工具鏈的真 LVGL」——但 Emulator
 也是真 LVGL，還多了你的程式碼、你的事件與你的圖。第二階存在的理由是閃避 `emcc` 這個
 相依；把相依拿掉，這個主張就空了。
 
-*Quick Preview 的迴圈，大部分就是 Design 分頁的迴圈。* 而且這背後有一個值得講白的
+*Prototype 的迴圈，大部分就是 Design 分頁的迴圈。* 而且這背後有一個值得講白的
 事實：Design 畫布是用 **DOM 與 CSS** 畫的（`Canvas/CanvasComponent.tsx`，1074 行），
-Quick Preview 是用 **Canvas 2D** 畫的（`Preview/PreviewPanel.tsx`，2038 行），兩者不
+Prototype 是用 **Canvas 2D** 畫的（`Preview/PreviewPanel.tsx`，2038 行），兩者不
 共用任何繪圖程式碼。**那是兩套各自手寫、互不相干的 LVGL 外觀模仿，加起來約 3,100 行，
 而且兩套都不可能對**，因為 LVGL 兩套裡都沒有。同一個畫面在這個工具裡有三種答案，其中
-兩種是猜的。Quick Preview 真正比 Design 畫布多的是動畫播放與點擊換頁——是真的，但很小。
+兩種是猜的。Prototype 真正比 Design 畫布多的是動畫播放與點擊換頁——是真的，但很小。
 
 **這個答案附帶的一張帳單——已經付掉了。** 這一節剛寫下來的時候，價值最高的那一階同時
 也是最可能一拿到手就是壞的那一階：`vite-plugin-compile.ts:44` 把工具鏈預設成了別人的
@@ -259,7 +274,7 @@ const LVGL_ROOT = process.env.LVGL_ROOT ?? '/home/xcssa/.openclaw/workspace/tool
 沒有解決什麼的清單。
 
 **唯一會翻轉這個答案的條件。** 如果當初那張帳單真的付不起——例如要出貨給永遠不會有工具鏈
-的終端使用者——那就改留 **LVGL Preview**，因為它是唯一「真 LVGL＋簽進 repo 的二進位檔
+的終端使用者——那就改留 **Simulator**，因為它是唯一「真 LVGL＋簽進 repo 的二進位檔
 ＋零設定」的一階。那是次佳解，不是首選。
 
 **Deploy 不在候選名單裡。** 它不是預覽，它是產品的輸出路徑。順帶一提，留著 Emulator

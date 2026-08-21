@@ -161,7 +161,7 @@ disabled: {
 - 未勾選時 marker 為白色背景加灰色邊框
 - 整體背景在畫布中維持透明，不做回退
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 使用 `drawCheckbox` 函式在 Canvas 2D 上繪製：
 
@@ -193,7 +193,7 @@ function drawCheckbox(ctx, x, y, w, h, opts) {
 }
 ```
 
-### LVGL WASM 預覽繪製（ui_from_json.c）
+### Simulator 繪製（ui_from_json.c）
 
 透過 JSON 傳給 WASM 端，由 `create_checkbox` 函式建立真正的 LVGL 控制項：
 

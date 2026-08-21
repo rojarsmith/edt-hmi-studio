@@ -109,7 +109,7 @@ Output、Package Manager Console。而這裡提的兩個 pane 是用 Deploy 卡�
 | 高度持久化 | `GraphManager` 的高度放在 `useState`，重整就沒了。抽屜至少該用 `localStorage`——這個 app 本來就直接讀它（`App.tsx:92`），不需要包裝層 |
 | 收合 vs 隱藏 | 「收到只剩分頁列」跟「整個不見」是兩種狀態；Visual Studio 兩種都有 |
 | 小螢幕 | 抽屜需要 max-height 夾制，工作區永遠不能被壓到 0 |
-| LVGL Preview | 它的 `<iframe>` 在 resize 時會重繪；在那個分頁開著時拖抽屜要實際看一下 |
+| Simulator | 它的 `<iframe>` 在 resize 時會重繪；在那個分頁開著時拖抽屜要實際看一下 |
 | 工廠模式 | Deploy 分頁本身沒有被工廠模式擋（`TAB_DEFS` 只擋 `code` 與 `icon`），但面板裡有部分有擋（`DeployPanel.tsx:218`、`:397`）。抽屜的規則不能不小心把它們露出來 |
 | 鍵盤與無障礙 | 分頁列要能用鍵盤切換，拖曳把手要有鍵盤替代方案 |
 

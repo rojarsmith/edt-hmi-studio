@@ -33,7 +33,7 @@ promise can fail visibly before hardware is involved (ladder §4, §8).
 Three reasons, in increasing order of what they cost.
 
 **It named the button, not the place.** The other two sub-tabs are named for
-what they show — *Quick Preview*, *LVGL Preview*. This one was named for the
+what they show — *Prototype*, *Simulator*. This one was named for the
 verb on the button inside it. A tab strip that reads as two nouns and an
 imperative does not read as a ladder, and the ladder is the whole design.
 

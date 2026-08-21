@@ -132,8 +132,8 @@ The LVGL event types the editor supports:
 Each widget has 4 rendering implementations in the editor:
 
 1. **Editor canvas** (`CanvasComponent.tsx`) — a React/HTML approximation supporting drag, selection and resize
-2. **Simple preview** (`PreviewPanel.tsx`) — lightweight Canvas 2D drawing
-3. **LVGL WASM preview** (`ui_from_json.c`) — the real LVGL runtime, fed the widget tree as JSON
+2. **Prototype** (`PreviewPanel.tsx`) — lightweight Canvas 2D drawing
+3. **Simulator** (`ui_from_json.c`) — the real LVGL runtime, fed the widget tree as JSON
 4. **Code generation** (`ui.c.ts`) — compilable C for LVGL v8 and v9
 
 ### LVGL version compatibility

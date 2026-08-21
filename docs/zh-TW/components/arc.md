@@ -160,7 +160,7 @@ Arc 是純顯示元件，不能包含子元件。
 - `strokeDasharray` 的計算：圓周長約為 2π×40 ≈ 251，`value * 2.51` 即為填滿長度
 - `rotate(-90)` 讓起點從 12 點鐘方向開始
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 ```typescript
 function drawArc(ctx, x, y, w, h, opts) {
@@ -201,7 +201,7 @@ function drawArc(ctx, x, y, w, h, opts) {
 - 在弧線中央繪製目前數值文字
 - `lineCap = 'round'` 讓弧線端點圓潤
 
-### LVGL WASM 預覽繪製
+### Simulator 繪製
 
 **editorStateToJson.ts**：props（startAngle、endAngle、value、min、max）直接序列化。
 

@@ -185,9 +185,9 @@ interface BtnProps {
 - 支援 `borderSide` 的部分邊框繪製
 - 支援 `textDecor` 文字裝飾
 
-### 10.2 簡易預覽繪製（PreviewPanel.tsx）
+### 10.2 Prototype 繪製（PreviewPanel.tsx）
 
-在 Canvas 2D 簡易預覽中，按鈕以 `drawButton()` 函式繪製：
+在 Canvas 2D Prototype 中，按鈕以 `drawButton()` 函式繪製：
 
 ```typescript
 drawButton(ctx, x, y, w, h, {
@@ -209,7 +209,7 @@ drawButton(ctx, x, y, w, h, {
 - 支援疊加動畫狀態（位移、縮放、透明度）
 - 支援陰影、變換（旋轉／縮放）、外框
 
-### 10.3 LVGL WASM 預覽繪製
+### 10.3 Simulator 繪製
 
 #### JSON 序列化（editorStateToJson.ts）
 
@@ -332,7 +332,7 @@ lv_obj_center(my_button_label);
 
 5. **畫布可見性**：當 `bgColor` 為 transparent 時，編輯器畫布會自動回退為 `#2196F3`，確保按鈕在設計時始終可見且可互動。
 
-6. **停留回饋**：簡易預覽中，滑鼠停留時背景色自動變亮 20%，模擬互動回饋；編輯器畫布則透過 CSS hover 類別實作。
+6. **停留回饋**：Prototype 中，滑鼠停留時背景色自動變亮 20%，模擬互動回饋；編輯器畫布則透過 CSS hover 類別實作。
 
 7. **字型屬性傳遞**：`fontSize`、`textAlign`、`fontResource` 在生成程式碼時是套用到內部 label 而非按鈕本身。自訂字型資源（`fontResource`）的優先度高於 `fontSize`。
 

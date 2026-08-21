@@ -157,7 +157,7 @@ Key behaviour:
 - An image widget itself is **never** given an opaque background fallback: one would sit behind the source's alpha channel and make a transparent PNG look opaque, which is not what LVGL draws. Only the placeholder fills itself, so a widget with no image resolved stays visible and clickable
 - Supports selection highlight, hover, dragging and resize handles
 
-### 10.2 Simple preview (PreviewPanel.tsx)
+### 10.2 Prototype (PreviewPanel.tsx)
 
 In the Canvas 2D simple preview the image is drawn by `drawImage()`:
 
@@ -175,7 +175,7 @@ Key behaviour:
 - Draws a grey placeholder rectangle plus a 🖼️ icon when there is no source, or it has not loaded
 - Triggers a redraw once loading completes
 
-### 10.3 LVGL WASM preview
+### 10.3 Simulator
 
 #### JSON serialisation (editorStateToJson.ts)
 

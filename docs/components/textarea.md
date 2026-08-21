@@ -166,7 +166,7 @@ On the editor canvas the textarea renders as a bordered rectangle showing either
 - Uses `resolvedBgColor` so the widget stays visible on the canvas (transparent falls back to `#ffffff`)
 - Not editable; it is a visual preview only
 
-### Simple preview (PreviewPanel.tsx — Canvas 2D)
+### Prototype (PreviewPanel.tsx — Canvas 2D)
 
 Drawn by `drawTextarea` on a 2D canvas:
 
@@ -188,7 +188,7 @@ function drawTextarea(ctx, x, y, w, h, opts) {
 - Supports background gradients (bgGradDir / bgGradColor)
 - Renders the text with `textColor` when present, and the placeholder in grey otherwise
 
-### LVGL WASM preview (ui_from_json.c)
+### Simulator (ui_from_json.c)
 
 Serialised to JSON and passed to the WASM side, where `create_textarea` builds the real LVGL widget:
 

@@ -235,11 +235,11 @@ Tile View 採用 LVGL 預設主題的 **screen 樣式**：
 - 設計時可透過修改 currentRow／currentCol 切換要編輯的 tile
 - 不屬於目前 tile 的子元件在畫布中會隱藏
 
-### 簡易預覽繪製
+### Prototype 繪製
 
 與畫布繪製類似，但移除編輯互動。顯示目前 tile 的子元件，並可切換 tile。
 
-### LVGL WASM 預覽繪製
+### Simulator 繪製
 
 在 `editorStateToJson.ts` 中，子元件透過虛擬 ID 對應到 tile：
 

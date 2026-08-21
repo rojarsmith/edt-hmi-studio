@@ -173,7 +173,7 @@ percentage = ((value - min) / (max - min)) * 100
 - 填滿條從左側延伸到旋鈕位置，顏色為主題藍
 - 旋鈕為 16px 圓形，帶陰影效果
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 使用 `drawSlider` 函式在 Canvas 2D 上繪製：
 
@@ -202,7 +202,7 @@ function drawSlider(ctx, x, y, w, h, opts) {
 }
 ```
 
-### LVGL WASM 預覽繪製（ui_from_json.c）
+### Simulator 繪製（ui_from_json.c）
 
 透過 JSON 傳給 WASM 端，由 `create_slider` 函式建立真正的 LVGL 控制項：
 
@@ -293,7 +293,7 @@ lv_slider_set_value(my_slider, 50, LV_ANIM_OFF);
 
 6. **旋鈕大小**：編輯器畫布中旋鈕固定為 16px 直徑。在 LVGL 中，旋鈕大小由 `LV_PART_KNOB` 的 padding 控制，padding 越大旋鈕越大。
 
-7. **拖動互動**：編輯器畫布與簡易預覽中的 Slider 不可拖動，僅顯示靜態狀態；WASM 預覽則可完全互動拖動。
+7. **拖動互動**：編輯器畫布與 Prototype 中的 Slider 不可拖動，僅顯示靜態狀態；WASM 預覽則可完全互動拖動。
 
 8. **高度建議**：預設高度 20px 已含旋鈕的顯示空間。軌道本身只有 4～6px 高，旋鈕置中顯示。高度若小於約 16px，旋鈕可能被裁切。
 
@@ -302,6 +302,6 @@ lv_slider_set_value(my_slider, 50, LV_ANIM_OFF);
    - 填滿指示器：`#2196F3`（主題藍）
    - 旋鈕：`#2196F3`（主題藍）加陰影
 
-   這種層次在編輯器畫布與簡易預覽中都有呈現。
+   這種層次在編輯器畫布與 Prototype 中都有呈現。
 
 10. **範圍模式**：LVGL 支援 `LV_SLIDER_MODE_RANGE`（雙旋鈕範圍選擇），但編輯器目前不支援。若需要，請在生成的程式碼中手動加入。

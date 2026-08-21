@@ -179,11 +179,11 @@ A **sector** is the path, and the wrapper paints no box behind it:
 
 `evenodd` is what makes a ring a ring: the inner circle is wound the other way, so the fill leaves the hole.
 
-### 10.3 Simple preview (PreviewPanel.tsx)
+### 10.3 Prototype (PreviewPanel.tsx)
 
 `drawCircle` strokes the same two cases: `ctx.arc` for the disc, with the border when it has one, and `ctx.fill(new Path2D(sectorPath(...)), 'evenodd')` for the sector — literally the path the canvas draws, so the two cannot disagree.
 
-### 10.4 LVGL WASM preview and generated code
+### 10.4 Simulator and generated code
 
 Both pick the implementation from `props.shape`:
 

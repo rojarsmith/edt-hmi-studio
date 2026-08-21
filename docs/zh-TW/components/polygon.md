@@ -129,11 +129,11 @@ interface PolygonProps {
 
 底下再疊一份透明的複本來加大點擊範圍，讓沒有填色的輪廓也好點——那是編輯器的輔助，永遠不會畫到面板上。
 
-### 10.3 簡易預覽（PreviewPanel.tsx）
+### 10.3 Prototype（PreviewPanel.tsx）
 
 `drawPolygon` 走同一組點、`closePath` 起來，凸的就填、然後描邊。用的是單一路徑而不是韌體那組扇形：在凸多邊形上兩者覆蓋的像素相同，而路徑不會有三角形之間的接縫。
 
-### 10.4 LVGL WASM 預覽與產生的程式碼
+### 10.4 Simulator 與產生的程式碼
 
 兩邊做的是同兩件事，因為兩邊都是 LVGL。
 

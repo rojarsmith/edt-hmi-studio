@@ -217,7 +217,7 @@ callback 也是每種事件註冊一次，而不是每個綁定註冊一次。�
 
 ## 預覽
 
-Quick Preview 完整支援上述行為。進入畫面時——開機進入 Entry Screen、按下導覽
+Prototype 完整支援上述行為。進入畫面時——開機進入 Entry Screen、按下導覽
 按鈕、或點擊底部的畫面清單——會播放該畫面的 Screen Loaded 綁定，與韌體一致。
 點擊元件會執行它的 Play Animation 與 Stop Animation 綁定。工具列的播放鍵會重播
 目前畫面的入場；沒有任何綁定的畫面則退回播放所有指向它的動畫，讓留給按鈕的動畫

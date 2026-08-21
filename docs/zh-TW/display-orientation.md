@@ -64,7 +64,7 @@ Orientation** 欄位，提供 **Landscape** 與 **Portrait** 兩個選擇。目�
 | 設計畫布 | `Canvas.tsx:870`、`:978` | 免費 |
 | 畫布置中 / Ctrl+0 | `Canvas.tsx:830` → `canvasView.ts` | 免費 |
 | 對齊與分佈，10 處 | `AlignToolbar.tsx:53`–`:231` | 免費 |
-| Quick Preview | `PreviewPanel.tsx:1121`、`:1144` | 免費 |
+| Prototype | `PreviewPanel.tsx:1121`、`:1144` | 免費 |
 | Emulator | `Emulator.tsx:249` | 免費 |
 | 換頁轉場（滑動距離） | `PreviewPanel` 轉場程式碼 | 免費 |
 | 專案卡縮圖 | `ProjectCard.tsx:102` | 免費 |
@@ -199,7 +199,7 @@ const { width, height } = logicalResolution(board, config.display.orientation);
 東西。縮圖本身完全不用動：`.project-card-thumb-img` 是 `object-fit: contain`
 （`ProjectCard.css:36`），直向的示意圖會正確地在 140 px 的帶狀區域裡留白置中。
 
-### 4.4 LVGL Preview 本來就是錯的，直向只是讓它現形
+### 4.4 Simulator 本來就是錯的，直向只是讓它現形
 
 `wasm/src/main.c:35`：
 
@@ -538,7 +538,7 @@ weak 預設為橫向，由產生器給出強定義。三個性質讓它勝過其
   跟板子與方向有關。
 - [color-depth.md](./color-depth.md)——它那份「四個地方都得一致」的清單會多第五項，因為
   LVGL 的顯示解析度現在必須對上面板**旋轉後**的幾何，而不是它字面上的尺寸。
-- [preview-ladder.md](./preview-ladder.md)——§3 對 LVGL Preview 證明了什麼的說法，在解析度
+- [preview-ladder.md](./preview-ladder.md)——§3 對 Simulator 證明了什麼的說法，在解析度
   這件事上本來就錯（§4.4），之後會更錯。
 - [edt-evk043027b.md](./edt-evk043027b.md)——§8.4 的記憶體預算應該放在那塊板子既有的 SRAM
   帳目旁邊。

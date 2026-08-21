@@ -153,7 +153,7 @@ const barPercent = barMax > barMin
 - `borderRadius` 由樣式繼承，預設 9999 形成膠囊形狀
 - 加上 `transition`，讓屬性面板調整 value 時有平滑動畫
 
-### 簡易預覽繪製（PreviewPanel.tsx — Canvas 2D）
+### Prototype 繪製（PreviewPanel.tsx — Canvas 2D）
 
 ```typescript
 function drawBar(ctx, x, y, w, h, opts) {
@@ -174,7 +174,7 @@ function drawBar(ctx, x, y, w, h, opts) {
 - 先畫灰色背景，再畫藍色填滿
 - 填滿寬度＝總寬度 × progress
 
-### LVGL WASM 預覽繪製
+### Simulator 繪製
 
 **editorStateToJson.ts**：將元件樹扁平化為 JSON，bar 的 props（min、max、value）直接序列化傳遞。
 

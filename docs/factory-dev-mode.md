@@ -71,6 +71,7 @@ The passphrase itself is exported as `FACTORY_DEV_MODE_PASSPHRASE` from
 | **Active on Screens** in the Logic tab's Properties panel — stored per graph but consumed by nothing yet; graphs run globally for now, and normal mode shows a plain **Active** switch instead, which really switches: a graph turned off is absent from generated code entirely | shown | hidden |
 | **Custom** shelf of the Logic palette — Call Function and C Code Block, hand-written C being the factory engineer's realm; nodes already placed in a graph keep rendering and generating in every mode, only the palette offer hides | shown | hidden |
 | **Collapse twisty** on the Properties panel header, which folds the whole panel away to its header bar. Categories inside it still fold in both modes, as do the panel's expand-all and collapse-all buttons | shown | hidden |
+| **Preview rung switcher** — the Prototype / Simulator / Emulator strip at the top of the Preview tab. Normally the tab opens the **Emulator** directly and the strip is not drawn, because the other two rungs are the editor's own approximations of LVGL and a green result on either is not an answer about the panel ([preview-ladder.md](preview-ladder.md) §8). A build with the Emulator switched off shows the strip in both modes, since hiding it would leave the remaining two rungs unreachable | shown | hidden; opens the Emulator |
 
 More surfaces will be added here as they are decided.
 
@@ -105,7 +106,7 @@ so no state has to be synced back and no effect is involved.
 Hiding the tab does not disable code generation itself: `generateCode()` still
 runs for the **Emulator** (`Emulator.tsx`) and for the **Deploy** build, which
 calls the same generator server-side in `server/hmi/projectSource.ts`. Only the
-tab that displays the generated source is gated. LVGL Preview is not on that
+tab that displays the generated source is gated. Simulator is not on that
 list and never was — it is fed a widget-tree JSON rather than generated C
 ([preview-ladder.md](./preview-ladder.md) §3).
 
@@ -117,3 +118,4 @@ list and never was — it is fed a widget-tree JSON rather than generated C
 | About dialog and the five-click unlock | `src/components/AboutDialog/AboutDialog.tsx` |
 | Menu bar badge | `src/components/DesktopMenuBar/DesktopMenuBar.tsx` |
 | `Help → About` menu item | `src/components/DesktopMenuBar/DesktopMenuBar.tsx` |
+| Preview rung switcher (`canChoosePreviewRung`) | `src/App.tsx` |

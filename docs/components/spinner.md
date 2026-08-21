@@ -164,7 +164,7 @@ Key behaviour:
 
 > Requires `@keyframes spin { to { transform: rotate(360deg); } }` in the CSS.
 
-### 10.2 Simple preview (PreviewPanel.tsx)
+### 10.2 Prototype (PreviewPanel.tsx)
 
 In the Canvas 2D simple preview the spinner is drawn by `drawSpinner()`:
 
@@ -207,7 +207,7 @@ Key behaviour:
 - Line width is fixed at 4px (a rendering simplification)
 - Supports animation state on top
 
-### 10.3 LVGL WASM preview
+### 10.3 Simulator
 
 #### JSON serialisation (editorStateToJson.ts)
 
@@ -350,7 +350,7 @@ Spinner is a specialisation of Arc:
 
 2. **Three rendering layers behave differently**:
    - Editor canvas: rotates continuously via a CSS animation (closest to the real thing)
-   - Simple preview: a static arc snapshot, not animated
+   - Prototype: a static arc snapshot, not animated
    - WASM preview: rotates under LVGL's own animation (real LVGL behaviour)
 
 3. **Style mapping convention**: `borderColor` maps onto the arc indicator colour and `borderWidth` onto the arc width. In LVGL these are the `arc_color` and `arc_width` style properties applied to `LV_PART_INDICATOR`.

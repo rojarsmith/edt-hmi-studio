@@ -140,7 +140,7 @@ case 'rectangle':
 
 `resolveFallbackBackground` 對矩形回傳 `'transparent'`：把填色清掉正是繪製「只有外框」圖形的作法，畫布不能好心地又把它填回去。
 
-### 10.2 簡易預覽（PreviewPanel.tsx）
+### 10.2 Prototype（PreviewPanel.tsx）
 
 矩形共用面板的繪製路徑：
 
@@ -164,7 +164,7 @@ case 'container':
 
 > 供給這個 switch 的樣式預設值採用 nullish（`??`）而非 falsy（`||`）：圖形指定 `borderRadius: 0` 或 `borderWidth: 0` 就是要 0，編輯器畫布一直都是這樣處理的。
 
-### 10.3 LVGL WASM 預覽
+### 10.3 Simulator
 
 序列化方式與其他節點相同：
 

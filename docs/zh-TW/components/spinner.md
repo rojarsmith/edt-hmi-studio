@@ -166,9 +166,9 @@ Spinner 支援下列 LVGL 事件類型：
 
 > 需要在 CSS 中定義 `@keyframes spin { to { transform: rotate(360deg); } }`。
 
-### 10.2 簡易預覽繪製（PreviewPanel.tsx）
+### 10.2 Prototype 繪製（PreviewPanel.tsx）
 
-在 Canvas 2D 簡易預覽中，Spinner 以 `drawSpinner()` 函式繪製：
+在 Canvas 2D Prototype 中，Spinner 以 `drawSpinner()` 函式繪製：
 
 ```typescript
 drawSpinner(ctx, x, y, w, h, {
@@ -205,11 +205,11 @@ function drawSpinner(ctx, x, y, w, h, opts) {
 - 先繪製完整的灰色背景圓環
 - 在其上繪製一段彩色弧形（從 -90° 到 60°，約 150° 弧長）
 - 弧形端點為圓頭（`lineCap = 'round'`）
-- 簡易預覽中的 Spinner 是靜態的（不旋轉），只顯示一個快照狀態
+- Prototype 中的 Spinner 是靜態的（不旋轉），只顯示一個快照狀態
 - 線寬固定為 4px（繪製簡化）
 - 支援疊加動畫狀態
 
-### 10.3 LVGL WASM 預覽繪製
+### 10.3 Simulator 繪製
 
 #### JSON 序列化（editorStateToJson.ts）
 
@@ -252,7 +252,7 @@ static lv_obj_t *create_spinner(lv_obj_t *parent, const cJSON *comp) {
 - LVGL 會自行啟動旋轉動畫
 - 套用位置、尺寸、樣式
 
-> 注意：在 WASM 預覽中 Spinner 會真的旋轉（由 LVGL 內部動畫驅動），這是它與編輯器畫布、簡易預覽的主要差異。
+> 注意：在 WASM 預覽中 Spinner 會真的旋轉（由 LVGL 內部動畫驅動），這是它與編輯器畫布、Prototype 的主要差異。
 
 ### 10.4 程式碼生成輸出（ui.c.ts）
 
@@ -352,7 +352,7 @@ Spinner 是 Arc 的特殊化版本：
 
 2. **三層繪製的差異**：
    - 編輯器畫布：以 CSS 動畫持續旋轉（視覺上最接近真實）
-   - 簡易預覽：靜態弧形快照，不旋轉
+   - Prototype：靜態弧形快照，不旋轉
    - WASM 預覽：由 LVGL 內部動畫驅動旋轉（真實的 LVGL 行為）
 
 3. **樣式對應約定**：編輯器樣式系統中 `borderColor` 對應弧形指示器顏色，`borderWidth` 對應弧形線寬。在 LVGL 中，它們實際上是套用於 `LV_PART_INDICATOR` 的 `arc_color` 與 `arc_width` 樣式屬性。
