@@ -576,6 +576,34 @@ export interface ImageButtonProps {
   cycleOnClick: boolean;
 }
 
+/**
+ * The states a style can be written for. `default` is the resting one.
+ *
+ * `checked` is not decoration: LVGL draws a switch's on colour and a
+ * checkbox's tick box through `LV_PART_INDICATOR | LV_STATE_CHECKED`, and a
+ * style with a state selector beats one without whatever order they are added
+ * in — so a switch styled only in its resting state comes out with the
+ * theme's blue the moment it is turned on.
+ */
+export type LvglStyleState = 'default' | 'pressed' | 'focused' | 'disabled' | 'checked';
+
+/**
+ * A piece of a widget LVGL styles separately.
+ *
+ * LVGL draws a slider as three things — the track, the filled part and the
+ * knob — and a style reaches exactly one of them, chosen by a part selector.
+ * Without one, every style a project wrote landed on `LV_PART_MAIN` and the
+ * moving parts kept the stock theme's blue whatever palette the project used.
+ *
+ * Which parts a widget actually has is `widgetParts()` in
+ * utils/widgetParts.ts, which also names them in the widget's own words: a
+ * switch's indicator is its On colour, a slider's is its fill.
+ */
+export type LvglPart = 'main' | 'indicator' | 'knob';
+
+/** One part's styles, per state — the same four the main part carries. */
+export type PartStyles = Partial<Record<LvglStyleState, StyleProps>>;
+
 export interface LvglComponent {
   id: string;
   type: string; // 'btn', 'label', etc.
@@ -588,10 +616,18 @@ export interface LvglComponent {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   props: Record<string, any>; // Component-specific properties
   styles: {
+    /** `LV_PART_MAIN`, resting. These are the main part's states. */
     default: StyleProps;
     pressed?: StyleProps;
     focused?: StyleProps;
     disabled?: StyleProps;
+    checked?: StyleProps;
+    /**
+     * Styles on the widget's other parts. Absent means every part but the
+     * main one is left to the theme, which is what a project written before
+     * parts existed means and how it must keep rendering.
+     */
+    parts?: Partial<Record<Exclude<LvglPart, 'main'>, PartStyles>>;
   };
   events: EventBinding[];
   animations: Animation[];

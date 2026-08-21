@@ -355,7 +355,7 @@ Spinner is a specialisation of Arc:
 
 3. **Style mapping convention**: `borderColor` maps onto the arc indicator colour and `borderWidth` onto the arc width. In LVGL these are the `arc_color` and `arc_width` style properties applied to `LV_PART_INDICATOR`.
 
-4. **Background track**: the grey track colour (`#E0E0E0`) is hard-coded in the editor and not exposed through the style system. In LVGL it can be changed through `arc_color` on `LV_PART_MAIN`.
+4. **Background track**: the grey track (`#E0E0E0`) is the **Track** part — Background Color on it becomes `arc_color` on `LV_PART_MAIN`, and Border Width becomes `arc_width`. The spinning length is the **Arc** part. Both are arcs, so the box rows do not apply and the property editor hides them; taking them literally is what used to draw a square frame around the ring. See [docs/widget-parts.md](../widget-parts.md).
 
 5. **Keep it square**: a spinner should have equal width and height to stay circular. The editor does not enforce this, but prompting the user to keep it square would be a sensible improvement.
 

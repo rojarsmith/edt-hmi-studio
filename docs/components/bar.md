@@ -263,7 +263,7 @@ lv_obj_set_style_transform_angle(bar_1, 900, 0);     // LVGL v8
 
 1. **Read-only versus interactive**: Bar is read-only, unlike Slider. A slider lets the user drag to change the value; a bar's value can only be set from code, so the editor needs no drag interaction for it.
 
-2. **The indicator colour is not configurable**: the editor's `StyleProps` currently apply only to `LV_PART_MAIN`. The indicator colour (`LV_PART_INDICATOR`) is hard-coded to `#2196F3` on the canvas and in the preview. An `indicatorColor` prop would be a natural extension.
+2. **The indicator colour is a part style**: the Style section's part switcher offers **Track** and **Fill**, and Fill is `LV_PART_INDICATOR`. A bar that sets no Fill keeps the theme's `#2196F3` on the canvas, in the preview and on the panel alike. See [docs/widget-parts.md](../widget-parts.md).
 
 3. **What borderRadius = 9999 means**: both CSS and LVGL clamp an oversized radius to half the shorter side, producing the capsule shape. That is the default look for an LVGL bar.
 

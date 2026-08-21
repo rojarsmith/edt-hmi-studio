@@ -81,7 +81,7 @@ Progress Bar 是純顯示元件，不能包含子元件。
 
 ### 指示器樣式
 
-在 LVGL 中，bar 的填滿部分是 `LV_PART_INDICATOR`，顏色為 `color_primary`（`#2196F3`）。在編輯器畫布與預覽中，指示器顏色是寫死的 `#2196F3`。
+在 LVGL 中，bar 的填滿部分是 `LV_PART_INDICATOR`，顏色為 `color_primary`（`#2196F3`）。這是沒有設定填色部位時的預設值；設定之後，畫布、預覽與韌體都會採用它。
 
 ### 支援的樣式狀態
 
@@ -263,7 +263,7 @@ lv_obj_set_style_transform_angle(bar_1, 900, 0);     // LVGL v8
 
 1. **唯讀與可互動**：Bar 是唯讀顯示元件，與 Slider 不同。Slider 允許使用者拖動改變值，Bar 只能由程式設定值，因此編輯器不需要為它提供拖動互動。
 
-2. **指示器顏色無法直接設定**：目前編輯器的 `StyleProps` 只作用於 `LV_PART_MAIN`。指示器（`LV_PART_INDICATOR`）的顏色在畫布與預覽中是寫死的 `#2196F3`。未來可擴充 props 增加 `indicatorColor` 屬性。
+2. **指示器顏色是一個部位樣式**：Style 區塊的部位切換列提供**軌道**與**填色**，填色就是 `LV_PART_INDICATOR`。沒有設定填色的 bar，在畫布、預覽與面板上一律維持佈景主題的 `#2196F3`。見 [docs/widget-parts.md](../widget-parts.md)。
 
 3. **borderRadius = 9999 的意義**：在 CSS 與 LVGL 中，過大的圓角值會自動裁切為元件短邊的一半，形成膠囊／藥丸形狀，這正是 LVGL bar 的預設外觀。
 

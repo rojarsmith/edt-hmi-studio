@@ -351,6 +351,16 @@
   border-radius: 6px;
 }
 
+/*
+ * The part row sits directly above the state row and reads as the outer of the
+ * two: a part is chosen first, and its states are chosen within it. A tint and
+ * a tighter bottom margin are enough to say so without a second control style.
+ */
+.style-part-switcher {
+  margin-bottom: 4px;
+  background: #e4e7ea;
+}
+
 .style-state-btn {
   flex: 1;
   padding: 5px 4px;

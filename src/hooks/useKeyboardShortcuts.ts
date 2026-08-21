@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import type { LvglComponent } from '../types';
 import { getComponentDefinition } from '../utils/componentDefinitions';
+import { cloneStyles } from '../utils/widgetParts';
 import { v4 as uuidv4 } from 'uuid';
 
 // Clipboard storage (in-memory for now)
@@ -18,12 +19,8 @@ function cloneComponentWithNewIds(comp: LvglComponent, parentId: string | null =
     name: `${comp.name}_copy`,
     parentId,
     props: { ...comp.props },
-    styles: {
-      default: { ...comp.styles.default },
-      pressed: comp.styles.pressed ? { ...comp.styles.pressed } : undefined,
-      focused: comp.styles.focused ? { ...comp.styles.focused } : undefined,
-      disabled: comp.styles.disabled ? { ...comp.styles.disabled } : undefined,
-    },
+    // Through the shared copy so a duplicate keeps the per-part styles too.
+    styles: cloneStyles(comp.styles),
     events: comp.events.map(e => ({ ...e, id: uuidv4() })),
     children: comp.children.map(child => cloneComponentWithNewIds(child, newId)),
   };

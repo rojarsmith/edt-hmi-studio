@@ -30,6 +30,7 @@ A full-featured **visual editor for LVGL user interfaces**, with drag-and-drop d
 - **Z-order**: bring to front, send to back, move forward, move backward
 - **Hierarchy panel**: tree view of the widget structure, with drag-to-reorder
 - **Undo / redo**: 50 steps of history
+- **Widget parts**: style a slider's fill and knob, a switch's On colour, an arc's value — the pieces LVGL draws separately, in each widget's own words. See [docs/widget-parts.md](docs/widget-parts.md)
 
 ### 📄 Multi-page management
 - Create, delete and rename pages

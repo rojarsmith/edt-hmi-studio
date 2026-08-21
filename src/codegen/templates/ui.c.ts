@@ -1,6 +1,9 @@
 // ui.c template generator
 
-import type { Screen, LvglComponent, StyleProps, Theme, Animation, AnimationEasing } from '../../types';
+import type {
+  Screen, LvglComponent, StyleProps, Theme, Animation, AnimationEasing, LvglStyleState,
+} from '../../types';
+import { isArcPart, partSelector, widgetParts } from '../../utils/widgetParts';
 import type { CodeGenOptions } from '../types';
 import type { ImageResource, FontResource } from '../../resources/types';
 import { collectUsedCustomFonts } from '../fontUsage';
@@ -218,6 +221,22 @@ function withoutBoxStyles(component: LvglComponent): StyleProps {
       padding: _pad,
       ...arcRest
     } = rest;
+    return { ...arcRest, bgColor: 'transparent', borderWidth: 0 };
+  }
+  if (component.type === 'arc' || component.type === 'spinner') {
+    // An arc's box is not what anyone is styling: these rows are read as the
+    // arc's colour and thickness instead, by generateArcWidgetStyles. Left in
+    // the box styles they draw a frame around the arc, which is what a
+    // spinner given an accent colour used to come out as.
+    const {
+      bgColor: _arcBg,
+      bgGradColor: _arcGrad,
+      bgGradDir: _arcGradDir,
+      borderColor: _arcBorder,
+      borderWidth: _arcBorderWidth,
+      borderRadius: _arcRadius,
+      ...arcRest
+    } = styles;
     return { ...arcRest, bgColor: 'transparent', borderWidth: 0 };
   }
   if (component.type !== 'line' && component.type !== 'polygon') return styles;
@@ -585,7 +604,114 @@ function generateStyleCode(
       lines.push(`${indent}lv_obj_set_style_blend_mode(${varName}, ${blendVal}, ${selector});`);
     }
   }
-  
+
+  return lines;
+}
+
+/**
+ * Style code for a part LVGL draws as an arc.
+ *
+ * An arc has none of the things a box has — no fill, no border, no corners —
+ * so the box rows are read for what an arc does have. Background Color is the
+ * arc's colour and Border Width is its thickness, which is what the editor
+ * canvas has drawn all along; emitting the box properties instead is what put
+ * a square frame around a spinner.
+ */
+function generateArcStyleCode(
+  varName: string,
+  styles: StyleProps,
+  options: CodeGenOptions,
+  selector: string,
+): string[] {
+  const lines: string[] = [];
+  const indent = getIndent(options);
+
+  if (styles.bgColor && styles.bgColor.toLowerCase() !== 'transparent') {
+    lines.push(`${indent}lv_obj_set_style_arc_color(${varName}, ${colorToLvgl(styles.bgColor)}, ${selector});`);
+  }
+  if (styles.borderWidth !== undefined) {
+    lines.push(`${indent}lv_obj_set_style_arc_width(${varName}, ${styles.borderWidth}, ${selector});`);
+  }
+  if (styles.opacity !== undefined && styles.opacity < 1) {
+    lines.push(`${indent}lv_obj_set_style_arc_opa(${varName}, ${opacityToLvgl(styles.opacity)}, ${selector});`);
+  }
+
+  return lines;
+}
+
+/**
+ * The arc an arc-shaped widget's own Style section describes.
+ *
+ * `arc` and `spinner` draw two arcs — the track behind and the value in front
+ * — and neither is a box, so the box rows are read for them: Background Color
+ * is the track, Border Color the value, and Border Width the thickness of
+ * both. That reading is not new; it is what componentDefinitions' palette
+ * entry for these two has always meant and what the editor canvas has always
+ * drawn. What is new is that the firmware now agrees, instead of taking the
+ * same rows literally and framing the arc in a rectangle.
+ *
+ * A Value part states the same thing directly and wins, because it is emitted
+ * after this.
+ */
+function generateArcWidgetStyles(
+  varName: string,
+  component: LvglComponent,
+  options: CodeGenOptions,
+): string[] {
+  if (!isArcPart(component.type, 'main')) return [];
+
+  const indent = getIndent(options);
+  const styles = component.styles.default;
+  const lines: string[] = [];
+
+  if (styles.bgColor && styles.bgColor.toLowerCase() !== 'transparent') {
+    lines.push(`${indent}lv_obj_set_style_arc_color(${varName}, ${colorToLvgl(styles.bgColor)}, LV_PART_MAIN);`);
+  }
+  if (styles.borderWidth !== undefined && styles.borderWidth > 0) {
+    lines.push(`${indent}lv_obj_set_style_arc_width(${varName}, ${styles.borderWidth}, LV_PART_MAIN);`);
+    lines.push(`${indent}lv_obj_set_style_arc_width(${varName}, ${styles.borderWidth}, LV_PART_INDICATOR);`);
+  }
+  if (styles.borderColor) {
+    lines.push(`${indent}lv_obj_set_style_arc_color(${varName}, ${colorToLvgl(styles.borderColor)}, LV_PART_INDICATOR);`);
+  }
+
+  return lines;
+}
+
+/**
+ * Style code for every part of a widget except its main one.
+ *
+ * Each part is written for each state it declares, so a knob can darken while
+ * pressed the same way the widget itself can. A part the project says nothing
+ * about emits nothing and keeps the theme's own styling.
+ */
+function generatePartStyleCode(
+  varName: string,
+  component: LvglComponent,
+  options: CodeGenOptions,
+  defaultFont?: string,
+  defaultFontSize?: number,
+): string[] {
+  const lines: string[] = [];
+  const parts = component.styles.parts;
+  if (!parts) return lines;
+
+  const states: LvglStyleState[] = ['default', 'pressed', 'focused', 'disabled', 'checked'];
+
+  for (const { part } of widgetParts(component.type)) {
+    if (part === 'main') continue;
+    const perState = parts[part];
+    if (!perState) continue;
+    for (const state of states) {
+      const style = perState[state];
+      if (!style) continue;
+      const selector = partSelector(part, state);
+      lines.push(...(isArcPart(component.type, part)
+        ? generateArcStyleCode(varName, style, options, selector)
+        : generateStyleCode(varName, style, options, selector, defaultFont, defaultFontSize)));
+    }
+  }
+
   return lines;
 }
 
@@ -1598,6 +1724,7 @@ function generateComponentCode(
   // are not covered by one and keep emitting their own text properties.
   const styleLines = generateStyleCode(varName, withoutBoxStyles(component), options, '0', defaultFont, defaultFontSize, Boolean(typographyStyle));
   lines.push(...styleLines);
+  lines.push(...generateArcWidgetStyles(varName, component, options));
 
   // Ellipsis truncation, emitted after every style so the first measurement
   // already sees the font the label will render with. Size changes re-run it;
@@ -1636,6 +1763,17 @@ function generateComponentCode(
     const disabledLines = generateStyleCode(varName, component.styles.disabled, options, 'LV_STATE_DISABLED', defaultFont, defaultFontSize);
     lines.push(...disabledLines);
   }
+
+  // Checked state styles
+  if (component.styles.checked) {
+    const checkedLines = generateStyleCode(varName, component.styles.checked, options, 'LV_STATE_CHECKED', defaultFont, defaultFontSize);
+    lines.push(...checkedLines);
+  }
+
+  // The widget's other parts. Last, so a part that states a property beats the
+  // reading the main part's styles were given for it — an arc whose Value part
+  // sets a colour over the one Border Color used to stand in for.
+  lines.push(...generatePartStyleCode(varName, component, options, defaultFont, defaultFontSize));
 
   // Component-specific properties
   const propLines = generatePropsCode(varName, component.type, component.props, options, imageResources, defaultFont, defaultFontSize, Boolean(typographyStyle), componentTags?.get(component.id), component);
@@ -2664,16 +2802,30 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   }
   /** Component id → the style symbol to add, and whether its font is custom. */
   const componentStyles = new Map<string, TypographyBinding>();
-  const typographyFontById = new Map(
-    typographies.map((typography) => [typography.id, typography.fontResource]),
+  const isBuiltin = (font: string) => /^montserrat_\d+$/.test(font);
+  /**
+   * Every face a typography can resolve to, not only its Default's.
+   *
+   * `customFont` decides whether the dropdown's chevron has to be pinned to
+   * the default font, and a chevron drawn in a text face is a box whichever
+   * language put it there — so a typography that stays Montserrat by default
+   * and switches to Noto for Japanese still counts as custom.
+   */
+  const usesCustomFont = new Map(
+    typographies.map((typography) => [
+      typography.id,
+      !isBuiltin(typography.fontResource)
+        || Object.values(typography.languages ?? {}).some(
+          (style) => style.fontResource && !isBuiltin(style.fontResource),
+        ),
+    ]),
   );
   for (const [componentId, typographyId] of assignments) {
     const symbol = typographySymbols.get(typographyId);
     if (symbol) {
-      const fontResource = typographyFontById.get(typographyId) ?? '';
       componentStyles.set(componentId, {
         symbol,
-        customFont: !/^montserrat_\d+$/.test(fontResource),
+        customFont: usesCustomFont.get(typographyId) ?? false,
       });
     }
   }

@@ -38,6 +38,7 @@ import {
   getNextImageButtonStateIndex,
   normalizeImageButtonProps,
 } from '../PropertyEditor/imageButtonModel';
+import { partColor, partStyle } from '../../utils/widgetParts';
 import './PreviewPanel.css';
 
 // Image cache to avoid reloading images
@@ -719,6 +720,8 @@ const PreviewPanel: React.FC = () => {
             min: comp.props.min || 0,
             max: comp.props.max || 100,
             bgColor: bgColorStyle,
+            indicator: partColor(comp, 'indicator', '#2196f3'),
+            knob: partColor(comp, 'knob', '#2196f3'),
           });
           break;
 
@@ -728,12 +731,16 @@ const PreviewPanel: React.FC = () => {
             text: comp.props.text || 'Checkbox',
             textColor,
             textDecor: styles.textDecor,
+            indicator: partColor(comp, 'indicator', '#2196f3', 'checked'),
+            indicatorBorder: partStyle(comp.styles, 'indicator', 'checked')?.borderColor ?? '#999',
           });
           break;
 
         case 'switch':
           drawSwitch(ctx, x, y, w, h, {
             checked: comp.props.checked || false,
+            indicator: partColor(comp, 'indicator', '#4caf50', 'checked'),
+            knob: partColor(comp, 'knob', '#fff'),
           });
           break;
 
@@ -743,6 +750,7 @@ const PreviewPanel: React.FC = () => {
             min: comp.props.min || 0,
             max: comp.props.max || 100,
             bgColor: bgColorStyle,
+            indicator: partColor(comp, 'indicator', '#2196f3'),
           });
           break;
 
@@ -752,6 +760,8 @@ const PreviewPanel: React.FC = () => {
             min: comp.props.min || 0,
             max: comp.props.max || 100,
             bgColor: bgColorStyle,
+            track: partColor(comp, 'main', '#e0e0e0'),
+            indicator: partColor(comp, 'indicator', '#2196f3'),
           });
           break;
 
@@ -861,7 +871,8 @@ const PreviewPanel: React.FC = () => {
 
         case 'spinner':
           drawSpinner(ctx, x, y, w, h, {
-            borderColor: styles.borderColor || '#2196F3',
+            track: partColor(comp, 'main', '#e0e0e0'),
+            indicator: partColor(comp, 'indicator', '#2196F3'),
           });
           break;
 
@@ -1270,7 +1281,10 @@ function drawLabel(
 function drawSlider(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  opts: { value: number; min: number; max: number; bgColor: string }
+  opts: {
+    value: number; min: number; max: number; bgColor: string;
+    indicator: string; knob: string;
+  }
 ) {
   const trackHeight = 6;
   const trackY = y + (h - trackHeight) / 2;
@@ -1283,12 +1297,12 @@ function drawSlider(
   ctx.fill();
 
   // Track fill
-  ctx.fillStyle = '#2196f3';
+  ctx.fillStyle = opts.indicator;
   roundRect(ctx, x, trackY, w * progress, trackHeight, 3);
   ctx.fill();
 
   // Knob
-  ctx.fillStyle = '#2196f3';
+  ctx.fillStyle = opts.knob;
   ctx.beginPath();
   ctx.arc(knobX, y + h / 2, 8, 0, Math.PI * 2);
   ctx.fill();
@@ -1297,15 +1311,18 @@ function drawSlider(
 function drawCheckbox(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, _w: number, h: number,
-  opts: { checked: boolean; text: string; textColor: string; textDecor?: string }
+  opts: {
+    checked: boolean; text: string; textColor: string; textDecor?: string;
+    indicator: string; indicatorBorder: string;
+  }
 ) {
   const boxSize = 18;
   const boxY = y + (h - boxSize) / 2;
 
   // Box
-  ctx.strokeStyle = opts.checked ? '#2196f3' : '#999';
+  ctx.strokeStyle = opts.checked ? opts.indicator : opts.indicatorBorder;
   ctx.lineWidth = 2;
-  ctx.fillStyle = opts.checked ? '#2196f3' : '#fff';
+  ctx.fillStyle = opts.checked ? opts.indicator : '#fff';
   roundRect(ctx, x, boxY, boxSize, boxSize, 3);
   ctx.fill();
   ctx.stroke();
@@ -1340,7 +1357,7 @@ function drawCheckbox(
 function drawSwitch(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  opts: { checked: boolean }
+  opts: { checked: boolean; indicator: string; knob: string }
 ) {
   const trackWidth = Math.min(w, 50);
   const trackHeight = 24;
@@ -1348,14 +1365,14 @@ function drawSwitch(
   const trackY = y + (h - trackHeight) / 2;
 
   // Track
-  ctx.fillStyle = opts.checked ? '#4caf50' : '#ccc';
+  ctx.fillStyle = opts.checked ? opts.indicator : '#ccc';
   roundRect(ctx, trackX, trackY, trackWidth, trackHeight, trackHeight / 2);
   ctx.fill();
 
   // Knob
   const knobRadius = trackHeight / 2 - 2;
   const knobX = opts.checked ? trackX + trackWidth - knobRadius - 2 : trackX + knobRadius + 2;
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = opts.knob;
   ctx.beginPath();
   ctx.arc(knobX, trackY + trackHeight / 2, knobRadius, 0, Math.PI * 2);
   ctx.fill();
@@ -1364,7 +1381,7 @@ function drawSwitch(
 function drawBar(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  opts: { value: number; min: number; max: number; bgColor: string }
+  opts: { value: number; min: number; max: number; bgColor: string; indicator: string }
 ) {
   const progress = (opts.value - opts.min) / (opts.max - opts.min);
 
@@ -1374,7 +1391,7 @@ function drawBar(
   ctx.fill();
 
   // Fill
-  ctx.fillStyle = '#2196f3';
+  ctx.fillStyle = opts.indicator;
   roundRect(ctx, x, y, w * progress, h, 4);
   ctx.fill();
 }
@@ -1382,7 +1399,10 @@ function drawBar(
 function drawArc(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  opts: { value: number; min: number; max: number; bgColor: string }
+  opts: {
+    value: number; min: number; max: number; bgColor: string;
+    track: string; indicator: string;
+  }
 ) {
   const centerX = x + w / 2;
   const centerY = y + h / 2;
@@ -1393,7 +1413,7 @@ function drawArc(
   const currentAngle = startAngle + (endAngle - startAngle) * progress;
 
   // Background arc
-  ctx.strokeStyle = '#e0e0e0';
+  ctx.strokeStyle = opts.track;
   ctx.lineWidth = 8;
   ctx.lineCap = 'round';
   ctx.beginPath();
@@ -1401,7 +1421,7 @@ function drawArc(
   ctx.stroke();
 
   // Progress arc
-  ctx.strokeStyle = '#2196f3';
+  ctx.strokeStyle = opts.indicator;
   ctx.beginPath();
   ctx.arc(centerX, centerY, radius, startAngle, currentAngle);
   ctx.stroke();
@@ -1677,21 +1697,21 @@ function drawPolygon(
 function drawSpinner(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  opts: { borderColor: string }
+  opts: { track: string; indicator: string }
 ) {
   const centerX = x + w / 2;
   const centerY = y + h / 2;
   const radius = Math.min(w, h) / 2 - 4;
 
   // Background circle
-  ctx.strokeStyle = '#e0e0e0';
+  ctx.strokeStyle = opts.track;
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
   ctx.stroke();
 
   // Spinner arc (partial)
-  ctx.strokeStyle = opts.borderColor;
+  ctx.strokeStyle = opts.indicator;
   ctx.lineWidth = 4;
   ctx.lineCap = 'round';
   ctx.beginPath();

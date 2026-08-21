@@ -357,7 +357,7 @@ Spinner 是 Arc 的特殊化版本：
 
 3. **樣式對應約定**：編輯器樣式系統中 `borderColor` 對應弧形指示器顏色，`borderWidth` 對應弧形線寬。在 LVGL 中，它們實際上是套用於 `LV_PART_INDICATOR` 的 `arc_color` 與 `arc_width` 樣式屬性。
 
-4. **背景軌道**：Spinner 的灰色背景軌道顏色（`#E0E0E0`）在編輯器中是寫死的，不透過樣式系統開放。在 LVGL 中可透過 `LV_PART_MAIN` 的 `arc_color` 樣式修改。
+4. **背景軌道**：灰色背景軌道（`#E0E0E0`）就是**軌道**部位——它的 Background Color 會變成 `LV_PART_MAIN` 的 `arc_color`，Border Width 變成 `arc_width`；旋轉的那一段是**弧**部位。兩者都是弧，盒子那幾列不適用，屬性面板會直接藏起來；過去照字面採用它們，正是環外多一個方框的原因。見 [docs/widget-parts.md](../widget-parts.md)。
 
 5. **保持正方形**：Spinner 的寬高應相等才能維持圓形外觀。編輯器不強制此限制，但在 UI 中提示使用者保持正方形會是合理的改進。
 

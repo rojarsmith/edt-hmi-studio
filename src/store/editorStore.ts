@@ -33,6 +33,7 @@ import { synchronizeModbusBindings } from '../utils/modbusBindings';
 import { applyLineGeometry } from '../utils/lineGeometry';
 import { applyPolygonGeometry } from '../utils/polygonGeometry';
 import { squareBox } from '../utils/circleGeometry';
+import { cloneStyles } from '../utils/widgetParts';
 import { keyFromText, literalOf, resolveText } from '../codegen/textResources';
 
 // Maximum history entries for undo/redo
@@ -646,12 +647,10 @@ function cloneComponents(components: LvglComponent[]): LvglComponent[] {
   return components.map(comp => ({
     ...comp,
     props: { ...comp.props },
-    styles: {
-      default: { ...comp.styles.default },
-      pressed: comp.styles.pressed ? { ...comp.styles.pressed } : undefined,
-      focused: comp.styles.focused ? { ...comp.styles.focused } : undefined,
-      disabled: comp.styles.disabled ? { ...comp.styles.disabled } : undefined,
-    },
+    // Through the shared copy, which knows about the per-part styles: naming
+    // the four states here is what dropped a slider's fill colour on every
+    // undo step.
+    styles: cloneStyles(comp.styles),
     events: comp.events.map(e => ({ ...e, action: e.action ? { ...e.action } : undefined })),
     animations: (comp.animations || []).map(a => ({ ...a })),
     modbusBinding: comp.modbusBinding ? { ...comp.modbusBinding } : undefined,

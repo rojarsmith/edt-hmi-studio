@@ -10,6 +10,7 @@ import {
   normalizeImageButtonProps,
 } from '../PropertyEditor/imageButtonModel';
 import { resolveFallbackBackground } from './widgetBackground';
+import { partColor, partStyle } from '../../utils/widgetParts';
 import {
   DEFAULT_LINE_WIDTH,
   lineBox,
@@ -586,9 +587,11 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             <div style={{
               width: '16px',
               height: '16px',
-              border: '2px solid #666',
+              border: `2px solid ${partStyle(component.styles, 'indicator', 'checked')?.borderColor ?? '#666'}`,
               borderRadius: '2px',
-              backgroundColor: props.checked ? '#2196F3' : '#fff',
+              backgroundColor: props.checked
+                ? partColor(component, 'indicator', '#2196F3', 'checked')
+                : '#fff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -606,7 +609,9 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             width: '100%',
             height: '100%',
             borderRadius: defaultStyle.borderRadius || 13,
-            backgroundColor: props.checked ? '#2196F3' : '#ccc',
+            backgroundColor: props.checked
+              ? partColor(component, 'indicator', '#2196F3', 'checked')
+              : '#ccc',
             position: 'relative',
             minHeight: '20px',
           }}>
@@ -615,7 +620,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
               width: '20px',
               height: '20px',
               borderRadius: '50%',
-              backgroundColor: '#fff',
+              backgroundColor: partColor(component, 'knob', '#fff'),
               top: '50%',
               marginTop: '-10px',
               left: props.checked ? 'calc(100% - 23px)' : '3px',
@@ -625,7 +630,13 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
           </div>
         );
       
-      case 'slider':
+      case 'slider': {
+        // The fill and the knob are LVGL parts of their own, so each takes its
+        // colour from its part style. The fallbacks are the theme's, which is
+        // what a widget that styles no part still draws. The track is the main
+        // part and the wrapper below already paints it.
+        const sliderPercent = Math.max(0, Math.min(100,
+          ((props.value ?? 50) - (props.min ?? 0)) / ((props.max ?? 100) - (props.min ?? 0)) * 100));
         return (
           <div className="lvgl-slider" style={{
             width: '100%',
@@ -642,23 +653,24 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
               position: 'relative',
             }}>
               <div style={{
-                width: `${Math.max(0, Math.min(100, ((props.value ?? 50) - (props.min ?? 0)) / ((props.max ?? 100) - (props.min ?? 0)) * 100))}%`,
+                width: `${sliderPercent}%`,
                 height: '100%',
-                backgroundColor: '#2196F3',
+                backgroundColor: partColor(component, 'indicator', '#2196F3'),
                 borderRadius: '2px',
               }} />
             </div>
             <div style={{
               position: 'absolute',
-              left: `calc(${Math.max(0, Math.min(100, ((props.value ?? 50) - (props.min ?? 0)) / ((props.max ?? 100) - (props.min ?? 0)) * 100))}% - 8px)`,
+              left: `calc(${sliderPercent}% - 8px)`,
               width: '16px',
               height: '16px',
               borderRadius: '50%',
-              backgroundColor: '#2196F3',
+              backgroundColor: partColor(component, 'knob', '#2196F3'),
               boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
             }} />
           </div>
         );
+      }
       
       // A rectangle is nothing but its frame: the wrapper below already paints
       // the fill, border, radius, gradient and shadow from its styles, so
@@ -800,7 +812,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             <div style={{
               width: `${barPercent}%`,
               height: '100%',
-              backgroundColor: '#2196F3',
+              backgroundColor: partColor(component, 'indicator', '#2196F3'),
               borderRadius: defaultStyle.borderRadius,
               transition: 'width 0.15s',
             }} />
@@ -818,12 +830,15 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             justifyContent: 'center',
           }}>
             <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
+              {/* Both arcs are parts: the track is the main one, the value the
+                  indicator. Border Color still stands in for the indicator on
+                  a widget that names no part — see partColor. */}
               <circle
                 cx="50"
                 cy="50"
                 r="40"
                 fill="none"
-                stroke="#e0e0e0"
+                stroke={partColor(component, 'main', '#e0e0e0')}
                 strokeWidth="8"
               />
               <circle
@@ -831,7 +846,7 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
                 cy="50"
                 r="40"
                 fill="none"
-                stroke={defaultStyle.borderColor || '#2196F3'}
+                stroke={partColor(component, 'indicator', '#2196F3')}
                 strokeWidth="8"
                 strokeDasharray={`${(props.value || 60) * 2.51} 251`}
                 strokeLinecap="round"
@@ -853,8 +868,8 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
             <div style={{
               width: '80%',
               height: '80%',
-              border: '4px solid #e0e0e0',
-              borderTopColor: defaultStyle.borderColor || '#2196F3',
+              border: `4px solid ${partColor(component, 'main', '#e0e0e0')}`,
+              borderTopColor: partColor(component, 'indicator', '#2196F3'),
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
             }} />

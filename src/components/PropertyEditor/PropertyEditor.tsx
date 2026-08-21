@@ -10,7 +10,17 @@ import type {
   StyleProps,
   LvglAlign,
   LvglFlags,
+  LvglPart,
+  LvglStyleState,
 } from '../../types';
+import {
+  hasStyleParts,
+  isArcPart,
+  partStyle,
+  widgetParts,
+  withPartStyle,
+  withoutPartStyle,
+} from '../../utils/widgetParts';
 import type { ModbusRegisterTag } from '../../types/hmi';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
 import { resolveText } from '../../codegen/textResources';
@@ -239,13 +249,14 @@ const ToggleSwitch: React.FC<{
   </div>
 );
 
-type StyleState = 'default' | 'pressed' | 'focused' | 'disabled';
+type StyleState = LvglStyleState;
 
 const STYLE_STATES: { key: StyleState; label: string }[] = [
   { key: 'default', label: 'Default' },
   { key: 'pressed', label: 'Pressed' },
   { key: 'focused', label: 'Focused' },
   { key: 'disabled', label: 'Disabled' },
+  { key: 'checked', label: 'Checked' },
 ];
 
 const PropertyEditor: React.FC = () => {
@@ -264,6 +275,8 @@ const PropertyEditor: React.FC = () => {
   const projectList = useProjectStore((state) => state.projects);
   const getProjectConfig = useProjectStore((state) => state.getProjectConfig);
   const [activeStyleState, setActiveStyleState] = useState<StyleState>('default');
+  /** Which piece of the widget the Style rows are editing. See widgetParts. */
+  const [activeStylePart, setActiveStylePart] = useState<LvglPart>('main');
   const [paddingLinked, setPaddingLinked] = useState(true);
   const [loadedCommunication, setLoadedCommunication] = useState<{
     projectId: string;
@@ -395,22 +408,44 @@ const PropertyEditor: React.FC = () => {
 
   const parentLayout = parentComponent?.props?.layout as string | undefined;
 
-  // Get the current style object for the active state
+  // The parts this widget can be styled in, and the one being edited. A widget
+  // with a single part is always on it, even if a previous selection left the
+  // switcher pointing somewhere else.
+  const styleParts = useMemo(
+    () => (component ? widgetParts(component.type) : []),
+    [component],
+  );
+  const stylePart: LvglPart =
+    styleParts.some(entry => entry.part === activeStylePart) ? activeStylePart : 'main';
+
+  // Get the current style object for the active part and state. Only the main
+  // part falls back to its default: a part that says nothing is inheriting
+  // from the theme, and showing the widget's own colours in its rows would
+  // claim otherwise.
   const currentStyles: StyleProps = component
-    ? (component.styles[activeStyleState] || component.styles.default)
+    ? (stylePart === 'main'
+        ? (component.styles[activeStyleState] || component.styles.default)
+        : (partStyle(component.styles, stylePart, activeStyleState) ?? {}))
     : {};
 
-  // Whether the active state has its own overrides
-  const hasStateOverride = component ? !!component.styles[activeStyleState] : false;
+  // Whether the active part and state has its own overrides
+  const hasStateOverride = component
+    ? !!partStyle(component.styles, stylePart, activeStyleState)
+    : false;
   // Which shared Style rows the widget can actually act on. A line draws no box
   // at all; an circle's disc has a fill and a border but its radius is the
-  // shape itself, and its sector is an arc, which has only a colour. Offering
-  // a control that changes nothing on the panel is the thing to avoid.
+  // shape itself, and its sector is an arc, which has only a colour. An arc's
+  // own parts are arcs too, and take a colour and a thickness — Background
+  // Color and Border Width, read as `arc_color` and `arc_width`. Offering a
+  // control that changes nothing on the panel is the thing to avoid.
   const styleRow = (row: 'fill' | 'border' | 'radius' | 'borderSide' | 'text' | 'padding') => {
     if (!component) return true;
     if (component.type === 'line') return false;
     if (component.type === 'circle') {
       if (component.props?.shape === 'sector') return row === 'fill';
+      return row === 'fill' || row === 'border';
+    }
+    if (isArcPart(component.type, stylePart)) {
       return row === 'fill' || row === 'border';
     }
     return true;
@@ -427,26 +462,22 @@ const PropertyEditor: React.FC = () => {
   const handleStyleChange = useCallback(
     (styleKey: keyof StyleProps, value: StyleProps[keyof StyleProps]) => {
       if (!selectedId || !component) return;
-      const baseStyles = component.styles[activeStyleState] || { ...component.styles.default };
       updateComponent(selectedId, {
-        styles: {
-          ...component.styles,
-          [activeStyleState]: {
-            ...baseStyles,
-            [styleKey]: value,
-          },
-        },
+        styles: withPartStyle(component.styles, stylePart, activeStyleState, {
+          [styleKey]: value,
+        }),
       });
     },
-    [selectedId, component, updateComponent, activeStyleState]
+    [selectedId, component, updateComponent, stylePart, activeStyleState]
   );
 
   const handleClearStateOverride = useCallback(() => {
-    if (!selectedId || !component || activeStyleState === 'default') return;
-    const newStyles = { ...component.styles };
-    delete newStyles[activeStyleState];
-    updateComponent(selectedId, { styles: newStyles });
-  }, [selectedId, component, updateComponent, activeStyleState]);
+    if (!selectedId || !component) return;
+    if (stylePart === 'main' && activeStyleState === 'default') return;
+    updateComponent(selectedId, {
+      styles: withoutPartStyle(component.styles, stylePart, activeStyleState),
+    });
+  }, [selectedId, component, updateComponent, stylePart, activeStyleState]);
 
   const handlePropsChange = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -842,26 +873,51 @@ const PropertyEditor: React.FC = () => {
           <div className="section-header">Style</div>
           
           {/* Style state switcher */}
+          {/* Part switcher, for the widgets LVGL draws in more than one piece */}
+          {hasStyleParts(component.type) && (
+            <div className="style-state-switcher style-part-switcher">
+              {styleParts.map(({ part, label, hint, state }) => (
+                <button
+                  key={part}
+                  className={`style-state-btn ${stylePart === part ? 'active' : ''} ${part !== 'main' && component.styles.parts?.[part] ? 'has-override' : ''}`}
+                  title={hint}
+                  onClick={() => {
+                    setActiveStylePart(part);
+                    // Straight to the state this part is actually drawn in, so
+                    // colouring a switch's On lands where LVGL will read it.
+                    setActiveStyleState(state ?? 'default');
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="style-state-switcher">
             {STYLE_STATES.map(({ key, label }) => (
               <button
                 key={key}
-                className={`style-state-btn ${activeStyleState === key ? 'active' : ''} ${key !== 'default' && component.styles[key] ? 'has-override' : ''}`}
+                className={`style-state-btn ${activeStyleState === key ? 'active' : ''} ${partStyle(component.styles, stylePart, key) && !(stylePart === 'main' && key === 'default') ? 'has-override' : ''}`}
                 onClick={() => setActiveStyleState(key)}
               >
                 {label}
               </button>
             ))}
           </div>
-          
-          {activeStyleState !== 'default' && (
+
+          {!(stylePart === 'main' && activeStyleState === 'default') && (
             <div className="style-state-info">
               {hasStateOverride ? (
                 <button className="clear-override-btn" onClick={handleClearStateOverride}>
-                  Clear {STYLE_STATES.find(s => s.key === activeStyleState)?.label} State Style
+                  Clear this {stylePart === 'main' ? 'state' : 'part'} style
                 </button>
               ) : (
-                <span className="inherit-hint">Inherits the default style. Editing creates an independent state style.</span>
+                <span className="inherit-hint">
+                  {stylePart === 'main'
+                    ? 'Inherits the default style. Editing creates an independent state style.'
+                    : 'Left to the theme. Editing gives this part a style of its own.'}
+                </span>
               )}
             </div>
           )}
