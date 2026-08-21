@@ -119,12 +119,40 @@ export LVGL CONF OUT
 xargs -a "$OUT/objs/sources.txt" -I{} -P ${jobs} "$BASH" -c 'compile_one "$@"' _ {}
 
 echo "lvgl: archiving"
-rm -f "$OUT/liblvgl_emcc.a"
-# In batches: the object list is long enough to overrun a command line, and
-# response files are an ar extension not worth depending on.
-ls "$OUT/objs"/*.o | xargs -n 100 emar q "$OUT/liblvgl_emcc.a"
-emar s "$OUT/liblvgl_emcc.a"
-echo "lvgl: done"
+cd "$OUT"
+
+# One emar invocation over a response file, replacing rather than appending.
+#
+# The first version of this batched "emar q" a hundred objects at a time, which
+# appends -- and append is the wrong verb for building an artifact. Two runs
+# overlapping in this directory produced an archive holding 592 members, 296 of
+# them twice and 100 missing, which then linked with "undefined symbol:
+# lv_display_create" and was cached in that state. "rcs" cannot do that, and a
+# response file removes the batching that made it possible.
+ls objs/*.o > objects.rsp
+objects=$(wc -l < objects.rsp)
+sources=$(wc -l < objs/sources.txt)
+if [ "$objects" -ne "$sources" ]; then
+  echo "lvgl: compiled $objects objects from $sources sources" >&2
+  exit 1
+fi
+
+rm -f liblvgl_emcc.a.partial
+emar rcs liblvgl_emcc.a.partial @objects.rsp
+
+# Count what actually landed. An archive that is short is worse than no archive:
+# it caches, and every later build links against it.
+members=$(emar t liblvgl_emcc.a.partial | wc -l)
+if [ "$members" -ne "$objects" ]; then
+  echo "lvgl: archive holds $members of $objects objects" >&2
+  exit 1
+fi
+
+# Named last, and atomically, so a run that dies half way through leaves no
+# library rather than a broken one. Concurrent runs then overwrite each other
+# with equally complete archives instead of interleaving into one.
+mv -f liblvgl_emcc.a.partial liblvgl_emcc.a
+echo "lvgl: done, $members objects"
 `;
 }
 

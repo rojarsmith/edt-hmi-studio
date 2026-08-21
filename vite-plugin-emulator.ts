@@ -13,7 +13,7 @@
 
 import type { Plugin } from 'vite';
 import { execFile } from 'node:child_process';
-import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -202,6 +202,73 @@ function runEmcc(
   });
 }
 
+function formatBytes(bytes: number): string {
+  return bytes >= 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.round(bytes / 1024)} KB`;
+}
+
+async function artifactSizes(buildDir: string): Promise<string> {
+  const parts: string[] = [];
+  for (const name of ['output.wasm', 'output.js']) {
+    try {
+      parts.push(`${name} ${formatBytes((await stat(join(buildDir, name))).size)}`);
+    } catch {
+      // A missing artifact is the link's problem to report, not this line's.
+    }
+  }
+  return parts.join(' · ');
+}
+
+/**
+ * What the Build Output pane shows when a build works.
+ *
+ * Until this existed the client replaced the whole thing with the literal
+ * string "Build succeeded", so emcc's warnings — the entire reason a build log
+ * exists — were collected by the server and dropped. A build that succeeded is
+ * still worth a page: what it compiled, what came out, how big, and everything
+ * the compiler said on the way. See docs/emulator.md §4.5.
+ */
+async function successLog(options: {
+  elapsedMs: number;
+  toolchain: ToolchainReport;
+  libraryBuilt: boolean;
+  sources: string[];
+  fonts: string[];
+  buildDir: string;
+  emcc: { stdout: string; stderr: string };
+}): Promise<string> {
+  const { elapsedMs, toolchain, libraryBuilt, sources, fonts, buildDir, emcc } = options;
+  const lines = [
+    `Build succeeded in ${(elapsedMs / 1000).toFixed(1)} s`,
+    '',
+    `LVGL      ${toolchain.lvgl.version ?? 'unknown version'} · ${toolchain.lvgl.source}`,
+    `Library   ${libraryBuilt ? 'compiled from source for this configuration' : 'reused from the cache'}`,
+    `Compiled  ${sources.join(', ')}`,
+  ];
+  if (fonts.length > 0) {
+    lines.push(`Fonts     ${fonts.join(', ')}`);
+  }
+  const sizes = await artifactSizes(buildDir);
+  if (sizes) lines.push(`Output    ${sizes}`);
+
+  // emcc on Windows ends its lines with CRLF; the pane renders the stray CR as
+  // nothing useful, so normalise before anyone has to look at it.
+  const said = [emcc.stdout, emcc.stderr]
+    .map((part) => part.replace(/\r\n?/g, '\n').trim())
+    .filter(Boolean)
+    .join('\n');
+  // The same deprecation warning arrives once per translation unit, so the
+  // count is what makes the tail scannable rather than the tail itself.
+  const warnings = (said.match(/\bwarning:/g) ?? []).length;
+  if (warnings > 0) {
+    lines.push(`Warnings  ${warnings}`);
+  }
+
+  lines.push('', said ? `emcc said:\n${said}` : 'emcc said nothing — no warnings.');
+  return lines.join('\n');
+}
+
 function sendJson(res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (b: string) => void }, status: number, body: unknown): void {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
@@ -263,6 +330,7 @@ export default function emulatorPlugin(): Plugin {
           return;
         }
 
+        const startedAt = Date.now();
         const buildId = randomUUID();
         const buildDir = join(tmpdir(), `lvgl-build-${buildId}`);
 
@@ -271,12 +339,14 @@ export default function emulatorPlugin(): Plugin {
 
           let libPath: string;
           let confIncludeDir: string;
+          let libraryBuilt = false;
           try {
             const library = await ensureLvglLibrary(toolchain, (line) => {
               server.config.logger.info(`[emulator] ${line}`);
             });
             libPath = library.libPath;
             confIncludeDir = library.confDir;
+            libraryBuilt = library.built;
           } catch (libErr) {
             await rm(buildDir, { recursive: true, force: true }).catch(() => {});
             sendJson(res, 200, {
@@ -354,7 +424,11 @@ export default function emulatorPlugin(): Plugin {
             await rm(buildDir, { recursive: true, force: true }).catch(() => {});
             sendJson(res, 200, {
               success: false,
-              error: result.stderr || result.stdout,
+              error: [
+                `Build failed after ${((Date.now() - startedAt) / 1000).toFixed(1)} s`,
+                '',
+                result.stderr || result.stdout,
+              ].join('\n'),
               buildId: '',
             });
             return;
@@ -369,7 +443,19 @@ export default function emulatorPlugin(): Plugin {
             await rm(buildDir, { recursive: true, force: true }).catch(() => {});
           }, BUILD_TTL_MS);
 
-          sendJson(res, 200, { success: true, buildId });
+          sendJson(res, 200, {
+            success: true,
+            buildId,
+            log: await successLog({
+              elapsedMs: Date.now() - startedAt,
+              toolchain,
+              libraryBuilt,
+              sources: ['main_wrapper.c', ...cFiles],
+              fonts: fontFiles,
+              buildDir,
+              emcc: result,
+            }),
+          });
         } catch (err) {
           await rm(buildDir, { recursive: true, force: true }).catch(() => {});
           sendJson(res, 500, { success: false, error: String(err), buildId: '' });

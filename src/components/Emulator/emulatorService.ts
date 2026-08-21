@@ -39,6 +39,13 @@ interface BuildResponse {
   success: boolean;
   error?: string;
   buildId: string;
+  /**
+   * What the build did and what the compiler said, composed by the server.
+   *
+   * Present on success. It replaced a literal 'Build succeeded' written here,
+   * which threw away every warning emcc had produced — see docs/emulator.md §4.5.
+   */
+  log?: string;
 }
 
 /** One entry of the toolchain preflight, mirroring server/emulator/toolchain.ts. */
@@ -158,7 +165,7 @@ export async function buildAndRun(
       result.width = runtime.getWidth();
       result.height = runtime.getHeight();
       result.success = true;
-      result.output = 'Build succeeded';
+      result.output = data.log ?? 'Build succeeded';
       onStatus?.('done', 'Running');
     } else {
       result.output = 'Failed to load Emscripten module';

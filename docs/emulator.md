@@ -164,7 +164,7 @@ off by a default value.
 
 ## 4. The decision
 
-Four parts, in the order a person meets them.
+Five parts, in the order a person meets them.
 
 ### 4.1 Discover, do not assume
 
@@ -264,7 +264,19 @@ rebuilds, and nothing else does.
   path — which on Windows carries the drive colon, an illegal filename
   character, and is long enough to reach `MAX_PATH` on the way.
 
-The link step no longer goes through a shell at all: `emcc` is invoked directly
+One thing here was got wrong and is worth recording, because the failure mode
+is the dangerous kind. The archive was originally assembled with `emar q` in
+batches of a hundred — and `q` **appends**, which is the wrong verb for building
+an artifact. Two runs overlapping in one cache directory produced an archive of
+592 members: 296 of them twice, and a hundred missing, including
+`lv_display.c.o`. It linked with `undefined symbol: lv_display_create`, and
+because the file existed, it was cached in that state and every later build
+linked against it. The fix is three lines and no cleverness: one `emar rcs` over
+a response file, a check that the member count equals the object count and the
+object count equals the source count, and a rename into place at the end so a
+run that dies half way through leaves no library rather than a broken one.
+
+The link step does not go through a shell at all: `emcc` is invoked directly
 with an argument array, which removes the need to quote
 `-sEXPORTED_FUNCTIONS=[…]` correctly on two platforms.
 
@@ -283,6 +295,28 @@ The same report carries `libraryReady`, so the panel can say **"first run
 compiles LVGL from source — a few minutes; every run after that takes seconds"**
 exactly once, rather than leaving the first user of a fresh checkout to guess
 whether it has hung.
+
+### 4.5 Say what the build did, including when it worked
+
+The Build Output pane used to read, in full, `Build succeeded`. That was not a
+summary of anything: the server returned `{ success, buildId }` and the client
+substituted those two words, so **every warning emcc produced was collected and
+thrown away**. A build log whose only content is the word "succeeded" is a
+status light wearing a log's clothes.
+
+It now reports what the build did — how long it took, which LVGL and where it
+came from, whether the static library was compiled or reused, what was
+compiled, the size of what came out, and then everything the compiler said,
+with a count when there are warnings. The first time it was switched on it
+surfaced four warnings that had been produced on every build since LVGL 9.5
+arrived: `wasm/lv_conf.h` still spelled `LV_FS_DEFAULT_DRIVE_LETTER`, which
+9.5 deprecated in favour of `LV_FS_DEFAULT_DRIVER_LETTER` and quietly aliases.
+Renaming it silences all four, which is the point — a log nobody can read is
+one nobody checks.
+
+Where it appears is [bottom-dock-panel.md](./bottom-dock-panel.md) §11: the
+bottom dock, beside the firmware build's own log, on a tab the Preview tab
+alone offers.
 
 ## 5. What was renamed, and what was deliberately left alone
 
