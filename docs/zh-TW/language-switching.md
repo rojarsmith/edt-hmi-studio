@@ -83,16 +83,16 @@ Event 面板 → 新增事件 → **Built-in Action** → **Switch Language**：
 
 ## 4. 怎麼測
 
-### 4.1 在瀏覽器裡 —— 🔨 Build & Run
+### 4.1 在瀏覽器裡 —— 🎛️ Emulator
 
-**🔨 Build & Run** 分頁會把產生的 C 對真正的 LVGL 編譯成 WASM 執行，滑鼠與鍵盤都
+**🎛️ Emulator** 分頁會把產生的 C 對真正的 LVGL 編譯成 WASM 執行，滑鼠與鍵盤都
 會轉送進去。在那裡按下按鈕跑的就是真正的 `ui_events.c` 處理常式，所以語系切換是
 完整被執行的 —— 包含字型抽換，缺字的問題會在這一關現形。
 
-這需要編譯伺服器：`vite-plugin-compile.ts` 的 `/api/compile` 端點會呼叫 `emcc`，
-並以 `wasm/lv_conf.h`（`LV_USE_TRANSLATION 1`）從原始碼建 LVGL。該檔開頭的工具鏈
-路徑是寫死的絕對路徑，指向一個 Linux 工作區；開發伺服器所在的機器有那套工具鏈時
-這條路徑才會通，沒有時會回報編譯錯誤。
+這需要編譯伺服器：`vite-plugin-emulator.ts` 的 `/api/emulator/build` 端點會呼叫 `emcc`，
+並以 `wasm/lv_conf.h`（`LV_USE_TRANSLATION 1`）從原始碼建 LVGL。工具鏈是「找」出來的
+而不是假設的，沒有的話由 `npm run emulator:setup` 裝好 —— 見 [emulator.md](./emulator.md)。
+真的還是缺的時候，分頁會在編譯任何東西之前就講出缺什麼、以及補它的那行指令。
 
 ### 4.2 在硬體上 —— Deploy 面板
 
@@ -108,7 +108,7 @@ Event 面板 → 新增事件 → **Built-in Action** → **Switch Language**：
 ——切換是一個事件動作，而 `editorStateToJson.ts` 沒有把事件帶過去。完整的階梯以及
 四層之間的差別，見 [preview-ladder.md](./preview-ladder.md) §1。
 
-| | 畫布 🌐 | Build & Run | 硬體 |
+| | 畫布 🌐 | Emulator | 硬體 |
 | --- | --- | --- | --- |
 | 翻譯有沒有填完 | ✅ | ✅ | ✅ |
 | 事件有沒有真的接到按鈕 | ❌ | ✅ | ✅ |

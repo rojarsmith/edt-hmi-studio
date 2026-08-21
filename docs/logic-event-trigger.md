@@ -117,7 +117,7 @@ runtime side is sound; it is only ever handed nothing to register.
 - **LVGL Preview** ignores logic graphs entirely, and events with them:
   `editorStateToJson.ts` exports screens and styles, and nothing else. It feeds
   real LVGL a widget tree, so it is a renderer rather than a runtime.
-- **Build & Run** is the only preview that runs a graph. `CompilePreview` passes
+- **The Emulator** is the only preview that runs a graph. `Emulator.tsx` passes
   the graphs to `generateCode`, which emits `ui_logic.c`; every generated file
   goes to the compiler, and `ui_events.c` includes `ui_logic.h`. What runs there
   is the same C that runs on hardware. See

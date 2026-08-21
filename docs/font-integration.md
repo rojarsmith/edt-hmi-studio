@@ -36,10 +36,10 @@ User uploads a font (TTF/OTF)
   └── ui.c: emit a font setting only for widgets that differ from the default
        │
        ▼
-  Compile preview (CompilePreview)
+  Compile preview (Emulator)
   ├── Collect every custom font+size combination in use
   ├── Build a FontCompileRequest (base64 plus conversion parameters)
-  └── POST /api/compile (files + fonts)
+  └── POST /api/emulator/build (files + fonts)
        │
        ▼
   Server (vite-plugin-compile)
@@ -143,7 +143,7 @@ When `generateCode()` runs:
 
 ### 5.3 Compile preview
 
-`CompilePreview.handleCompile()`:
+`Emulator.handleCompile()`:
 
 1. `collectUsedCustomFontSizes()` collects every custom font+size combination the widgets actually use
 2. Calls `generateCode()` to produce the C sources
@@ -152,7 +152,7 @@ When `generateCode()` runs:
 
 ### 5.4 Server-side font conversion
 
-The `/api/compile` endpoint in `vite-plugin-compile.ts`:
+The `/api/emulator/build` endpoint in `vite-plugin-emulator.ts`:
 
 1. Receives the `fonts` array
 2. For each font:
@@ -187,9 +187,9 @@ Widget previews on the design canvas also reflect the default font size:
 | `src/codegen/templates/ui.h.ts` | Emits the `LV_FONT_DECLARE` declarations (only for combinations in use) |
 | `src/codegen/templates/ui.c.ts` | Per-widget font code, including the inheritance decision |
 | `src/codegen/generator.ts` | Generation entry point; passes `defaultFont` and `defaultFontSize` through |
-| `src/components/CompilePreview/CompilePreview.tsx` | Compile preview; collects the sizes and builds the font requests |
-| `src/components/CompilePreview/compilerService.ts` | Compile service client; sends the font data |
-| `vite-plugin-compile.ts` | Server-side compile plugin; runs `lv_font_conv` and compiles |
+| `src/components/Emulator/Emulator.tsx` | The Emulator panel; collects the sizes and builds the font requests |
+| `src/components/Emulator/emulatorService.ts` | The Emulator's client half; sends the font data |
+| `vite-plugin-emulator.ts` | The Emulator's dev-server half; runs `lv_font_conv` and compiles |
 
 ## 8. Using lv_font_conv
 

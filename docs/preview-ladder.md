@@ -4,8 +4,8 @@
   <strong>English</strong> · <a href="./zh-TW/preview-ladder.md">繁體中文</a>
 </p>
 
-Why the Preview tab has three sub-tabs, what separates them, how **Build & Run**
-relates to **Deploy**, which of the answers were already written down somewhere
+Why the Preview tab has three sub-tabs, what separates them, how the
+**Emulator** relates to **Deploy**, which of the answers were already written down somewhere
 else, and — measured against what the product promises — **which single one
 would be worth keeping if only one could be** (§8). Verified against the source,
 not from memory.
@@ -18,22 +18,23 @@ knows what Quick Preview honours, [language-switching.md](./language-switching.m
 path, and [lvgl-configuration.md](./lvgl-configuration.md) covers where the
 previews' LVGL config diverges from the board's. No document held the ladder
 itself, and three of those fragments were wrong; §6 records what they said and
-what corrected them.
+what corrected them. Both quotations below predate the rename in
+[emulator.md](./emulator.md) §2 and are left as they were written.
 
 ## 1. The four rungs at a glance
 
 Each rung runs *more of the real thing* than the one below it, and costs more to
 reach. That is the whole design, and it is a good one.
 
-| | 📱 Quick Preview | 🖥️ LVGL Preview | 🔨 Build & Run | 🚀 Deploy |
+| | 📱 Quick Preview | 🖥️ LVGL Preview | 🎛️ Emulator | 🚀 Deploy |
 |---|---|---|---|---|
 | **What draws it** | The editor itself, HTML5 Canvas 2D | **Real LVGL**, prebuilt as WASM | **Real LVGL + the generated C**, compiled on demand | Real LVGL + the generated C, on the MCU |
 | **What it is fed** | The editor store, directly | A UI-description JSON | Every generated `.c`/`.h`, plus converted fonts and images | The whole project file |
 | **Where the C comes from** | There is none | There is none | `generateCode()` in the browser | The same `generateCode()`, on the server |
-| **Toolchain needed** | None | None — the `.wasm` is checked in | `emcc` on the dev server | CMake + Ninja + arm-none-eabi + STM32_Programmer_CLI |
+| **Toolchain needed** | None | None — the `.wasm` is checked in | `emcc` and an LVGL checkout, both installed by `npm run emulator:setup` | CMake + Ninja + arm-none-eabi + STM32_Programmer_CLI |
 | **Latency** | Instant, live | Live, 300 ms debounce | Seconds to tens of seconds | Minutes |
 | **Interaction** | Simulated clicks, screen navigation, animations | None | Mouse and keyboard forwarded into LVGL | The panel's own touch screen |
-| **Implemented in** | `Preview/PreviewPanel.tsx`, 2038 lines | `WasmPreview/WasmPreview.tsx`, 114 lines | `CompilePreview/`, 447 lines + `compilerService.ts` | `DeployPanel.tsx` + `server/hmi/` |
+| **Implemented in** | `Preview/PreviewPanel.tsx`, 2038 lines | `WasmPreview/WasmPreview.tsx`, 114 lines | `Emulator/`, 528 lines + `emulatorService.ts`, plus `server/emulator/` | `DeployPanel.tsx` + `server/hmi/` |
 
 The useful way to read that table is by asking what each rung can be *wrong*
 about, which is §2 to §5.
@@ -104,16 +105,17 @@ actually got and says so in the footer when the runtime ignored the request —
 which a checked-in `.wasm` built before this change still does, until it is
 rebuilt.
 
-## 4. 🔨 Build & Run — the first rung that tests the product
+## 4. 🎛️ Emulator — the first rung that tests the product
 
-`CompilePreview` calls `generateCode(...)` — the same generator the export and
+`Emulator.tsx` calls `generateCode(...)` — the same generator the export and
 the firmware build use — hands **every returned file** (`ui.c`, `ui_events.c`,
 `ui_logic.c` and their headers) plus generated image C arrays and
-`lv_font_conv`-converted fonts to `POST /api/compile`, and `vite-plugin-compile.ts`
-shells out to **`emcc`** to compile all of it against LVGL built from source.
-The resulting `output.js` / `output.wasm` are loaded back into the page and
-driven through a `WasmRuntime` handle: `tick()`, `mouseEvent()`, `keyEvent()`,
-`getFramebuffer()`.
+`lv_font_conv`-converted fonts to `POST /api/emulator/build`, and
+`vite-plugin-emulator.ts` runs **`emcc`** over all of it, linked against an LVGL
+static library `server/emulator/lvglLib.ts` builds from source on first use and
+caches thereafter. The resulting `output.js` / `output.wasm` are loaded back into
+the page and driven through an `EmulatorRuntime` handle: `tick()`,
+`mouseEvent()`, `keyEvent()`, `getFramebuffer()`.
 
 **What it proves, and nothing below it can:**
 
@@ -131,34 +133,38 @@ driven through a `WasmRuntime` handle: `tick()`, `mouseEvent()`, `keyEvent()`,
 **What it cannot prove:** flash and RAM cost, real timing, anything touching the
 panel or the bus, and anything a difference in LVGL configuration hides — see §5.
 
-**What it needs:** `emcc`, on the machine running the dev server. The toolchain
-paths at the top of `vite-plugin-compile.ts` are absolute, so where the
-toolchain is absent this rung reports a compile error rather than degrading
-([language-switching.md](./language-switching.md) §4.1).
+**What it needs:** `emcc` and an LVGL checkout, on the machine running the dev
+server, both installed by `npm run emulator:setup` — and on a machine that has
+built firmware once, the LVGL half is already there and gets reused at the same
+pin. `server/emulator/toolchain.ts` searches for both rather than assuming a
+location, and the tab reports what is missing with the command that provides it
+**before** Start is pressed. It still does not degrade to another rung where the
+toolchain is absent; it declines, and says why
+([emulator.md](./emulator.md) §4.4, [language-switching.md](./language-switching.md) §4.1).
 
-## 5. 🚀 Deploy — and no, it does not make Build & Run redundant
+## 5. 🚀 Deploy — and no, it does not make the Emulator redundant
 
 The question is fair, because the two do share something real: **the same
 `generateCode()`**. `server/hmi/projectSource.ts` imports it from
-`src/codegen/generator`, exactly as `CompilePreview` does in the browser. There
+`src/codegen/generator`, exactly as `Emulator.tsx` does in the browser. There
 is one code generator in this project, called from two places. That is the
 overlap, and it is the *good* kind — the alternative would be two generators
 drifting apart.
 
 Everything after that differs:
 
-| | Build & Run | Deploy |
+| | Emulator | Deploy |
 |---|---|---|
 | Where codegen runs | In the browser | On the server, from the project file |
 | Compiler | `emcc` → WASM | CMake + Ninja + arm-none-eabi → `.elf` |
-| LVGL config | `wasm/lv_conf.h` (+ `generateCustomLvConf()`) | `firmware/<board>/include/lv_conf.h` |
+| LVGL config | `wasm/lv_conf.h`, with `LV_USE_SDL` off | `firmware/<board>/include/lv_conf.h` |
 | Where it runs | A canvas in the page | The MCU |
 | Input | Mouse and keyboard | The capacitive touch panel |
 | Protocol | Bindings compiled; nothing on the other end of a wire | The real runtime on a real COM port |
 | Failure looks like | A compile log | A board that boots, or does not |
 | Cost | Seconds | Minutes, plus a cable |
 
-So the two answer different questions. Build & Run answers *"does what I
+So the two answer different questions. The Emulator answers *"does what I
 generated work?"* in seconds, with no hardware, and it is the fastest place to
 find a codegen bug. Deploy answers *"does it work on the thing I am shipping?"*
 — memory, timing, the panel, the bus — and it is the only rung that can.
@@ -175,11 +181,12 @@ step is added to either path.
 Two smaller notes on Deploy's side:
 
 - Codegen is **not** gated by the Code tab. Hiding that tab in factory mode
-  still leaves `generateCode()` running for Build & Run and for this build
+  still leaves `generateCode()` running for the Emulator and for this build
   ([factory-dev-mode.md](./factory-dev-mode.md)) — the two rungs that call it.
-- `Build & Run` can be switched off entirely at build time —
-  `VITE_ENABLE_COMPILE_PREVIEW=false` (`App.tsx:84`) removes the tab, and a
-  project left on that mode falls back to another rung.
+- The `Emulator` can be switched off entirely at build time —
+  `VITE_ENABLE_EMULATOR=false` (or the older `VITE_ENABLE_COMPILE_PREVIEW`,
+  still honoured) removes the tab, and a project left on that mode falls back to
+  another rung.
 
 ## 6. Where the existing record leaked
 
@@ -209,26 +216,26 @@ entirely — `editorStateToJson.ts` exports screens, styles and events, but no
 graphs."* Three things were wrong with that sentence:
 
 1. `editorStateToJson.ts` lives in `src/components/WasmPreview/` and belongs to
-   **LVGL Preview**. Build & Run does not use it at all.
+   **LVGL Preview**. The Emulator does not use it at all.
 2. It exports **no events**. The file contains no occurrence of the word.
-3. Build & Run does **not** ignore logic graphs — it passes them to
+3. The Emulator does **not** ignore logic graphs — it passes them to
    `generateCode`, compiles the resulting `ui_logic.c`, and `ui_events.c`
    includes `ui_logic.h`.
 
 The true statement is the one this document's §3 and §4 make: *LVGL Preview*
-carries neither events nor graphs, and *Build & Run* is the only preview that
+carries neither events nor graphs, and the *Emulator* is the only preview that
 runs either.
 
 Also corrected: **[factory-dev-mode.md](./factory-dev-mode.md) listed rung 2 as a
 `generateCode()` consumer.** It said generation still runs "for the WASM preview,
 the Build & Run flow and project export". LVGL Preview calls `generateCode()`
-nowhere — its four callers are `CodePanel`, `CodePreview`, `CompilePreview` and
+nowhere — its four callers are `CodePanel`, `CodePreview`, `Emulator.tsx` and
 `server/hmi/projectSource.ts` — and of those, the first two are the Code tab
-that the flag hides. The two that survive the flag are Build & Run and the
+that the flag hides. The two that survive the flag are the Emulator and the
 Deploy build, which is what it now says.
 
 **[language-switching.md](./language-switching.md) §4.3's coverage matrix has
-three columns and there are four rungs.** It compares "Canvas 🌐", Build & Run
+three columns and there are four rungs.** It compares "Canvas 🌐", the Emulator
 and Hardware, and predates or omits LVGL Preview. It is not wrong about what it
 lists; it was incomplete, and a reader using it to choose a rung would not learn
 that rung 2 exists. It now says why rung 2 is absent — a language switch is an
@@ -258,7 +265,7 @@ Not a plan to remove anything — a way of ranking the three by what the product
 actually promises, which is *you do not write code and we produce C that runs*.
 Measured against that sentence the answer is not close.
 
-**Keep 🔨 Build & Run.**
+**Keep 🎛️ Emulator.**
 
 - **It is the only rung that tests the deliverable.** The product's output is
   generated C. Every other rung tests a picture of the output.
@@ -274,7 +281,7 @@ Measured against that sentence the answer is not close.
 **Why the other two are the ones to lose:**
 
 *LVGL Preview is strictly dominated.* Its unique claim is "real LVGL with no
-toolchain" — but Build & Run is also real LVGL, plus your code, your events and
+toolchain" — but the Emulator is also real LVGL, plus your code, your events and
 your graphs. Rung 2 exists to dodge the `emcc` dependency. Remove the dependency
 and the claim is empty.
 
@@ -288,9 +295,11 @@ because LVGL is in neither. The same screen has three answers in this tool and
 two of them are guesses. Quick Preview's genuine addition over the Design canvas
 is animation playback and click-through navigation — real, and small.
 
-**The bill attached to this answer.** The highest-value rung is also the one most
-likely to be broken on arrival. `vite-plugin-compile.ts:44` defaults the
-toolchain to someone else's Linux workspace:
+**The bill attached to this answer — since paid.** When this section was first
+written the highest-value rung was also the one most likely to be broken on
+arrival: `vite-plugin-compile.ts:44` defaulted the toolchain to someone else's
+Linux workspace, and two more copies of the same paths sat in `wasm/*.sh` and in
+the codegen compile tests.
 
 ```ts
 const EMSDK_ENV =
@@ -298,18 +307,19 @@ const EMSDK_ENV =
 const LVGL_ROOT = process.env.LVGL_ROOT ?? '/home/xcssa/.openclaw/workspace/tools/lvgl';
 ```
 
-Both are overridable by environment variable, so this is **configuration, not
-architecture** — but it means *"keep Build & Run"* and *"make the `emcc` path
-dependable"* are one decision, not two. Choosing the first without paying for
-the second leaves the product's only real verification rung reporting a compile
-error.
+That was **configuration, not architecture**, which is why *"keep this rung"* and
+*"make the `emcc` path dependable"* were one decision rather than two. Both are
+now made: the paths are searched for instead of assumed, `npm run emulator:setup`
+installs what is missing at a pin shared with the firmware, and the rung says
+what it needs before it is asked to build. [emulator.md](./emulator.md) is the
+plan that did it and the list of what it still does not fix.
 
-**The one condition that flips the answer.** If that bill genuinely cannot be
+**The one condition that flips the answer.** If that bill could not have been
 paid — shipping to end users who will never have a toolchain — then keep
 **LVGL Preview** instead, because it is the only rung that is real LVGL with a
 checked-in binary and zero setup. That is second best, not first.
 
 **Deploy is not a candidate.** It is not a preview; it is the product's output
-path. Worth noting in passing that keeping Build & Run also keeps Deploy honest:
-the two share `generateCode()` (§5), so **Build & Run is the only thing that
-exercises the deploy path daily.**
+path. Worth noting in passing that keeping the Emulator also keeps Deploy
+honest: the two share `generateCode()` (§5), so **the Emulator is the only thing
+that exercises the deploy path daily.**

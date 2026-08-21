@@ -22,9 +22,9 @@ The pipeline itself is fine and works end to end:
 ```
 FontResource.charset (one of four presets)
   → getCharsetRanges()          src/resources/converters/fontConverter.ts
-  → CompilePreview.tsx          joined into "0x20-0x7e,0x4e00-0x9fff"
-  → FontCompileRequest.ranges   src/components/CompilePreview/compilerService.ts
-  → convertFonts()              vite-plugin-compile.ts
+  → Emulator.tsx          joined into "0x20-0x7e,0x4e00-0x9fff"
+  → FontCompileRequest.ranges   src/components/Emulator/emulatorService.ts
+  → convertFonts()              vite-plugin-emulator.ts
   → lv_font_conv --range=… --range=…
 ```
 
@@ -150,7 +150,7 @@ ceiling is fixed by the migration rather than preserved in it.
 Writing that regression first was worth it. It failed on the first run, on the
 empty-custom-charset case, and the reason was instructive: `getCharsetRanges()`
 returns an *empty* list there, and the ASCII fallback everyone assumes is in it
-actually lives in the callers — `CompilePreview` and `convertFonts` each carry
+actually lives in the callers — `Emulator` and `convertFonts` each carry
 their own copy. Any replacement has to reproduce the caller's behaviour, not
 the function's.
 
@@ -186,7 +186,7 @@ D).
 
 That last point has a consequence worth taking: resolving the JS entry means
 `lv_font_conv` should become a **project dependency in `package.json`** rather
-than the global install `vite-plugin-compile.ts` assumes today. That also
+than the global install `vite-plugin-emulator.ts` assumes today. That also
 retires the "Server dependency" item from `docs/font-integration.md` §11 — the
 conversion stops failing on machines that never ran `npm install -g`.
 
@@ -252,7 +252,7 @@ the fix is not a runtime substitution, it is not letting the situation arise.
 
 `vite-plugin-hmi.ts` has **no font handling at all**. The WASM compile preview
 runs `lv_font_conv`; the firmware deploy path does not. If the collector lives
-inside `CompilePreview.tsx`, the preview and the real board will disagree about
+inside `Emulator.tsx`, the preview and the real board will disagree about
 which glyphs exist.
 
 So the collector belongs in `src/codegen/`, at the same level as

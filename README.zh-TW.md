@@ -106,6 +106,19 @@ npm run dev
 
 接著開啟 http://localhost:5173
 
+### Emulator 工具鏈（選用，做一次就好）
+
+Preview 分頁裡的 **🎛️ Emulator** 會把產生出來的 C 跟真正的 LVGL 一起編譯，然後直接在網頁裡
+跑起來。那需要 Emscripten 與一份 LVGL checkout，這行指令會把它們裝進 `.hmi-cache/emulator/`
+——已被 gitignore，不會裝到系統層級：
+
+```bash
+npm run emulator:setup
+```
+
+在已經建置過韌體的機器上，LVGL 那一半會被找到並沿用，pin 也相同，所以只需要下載
+Emscripten。另外兩個預覽模式完全不需要工具鏈。詳見 [docs/zh-TW/emulator.md](docs/zh-TW/emulator.md)。
+
 ### 建置正式版
 
 ```bash
@@ -113,16 +126,17 @@ npm run build
 npm run preview  # 預覽建置結果
 ```
 
-若要建置**不包含**「🔨 Build & Run」線上 WASM 編譯預覽功能的版本，可在建置時關閉開關：
+若要建置**不包含**「🎛️ Emulator」這一階（線上編譯並執行）的版本，可在建置時關閉開關
+（舊的 `VITE_ENABLE_COMPILE_PREVIEW` 仍然有效）：
 
 ```bash
-VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
+VITE_ENABLE_EMULATOR=false npm run build:web
 ```
 
 部署到 GitHub Pages 時，可另外指定儲存庫的子路徑：
 
 ```bash
-VITE_BASE_PATH=/edt-hmi-studio/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
+VITE_BASE_PATH=/edt-hmi-studio/ VITE_ENABLE_EMULATOR=false npm run build:web
 ```
 
 ### 桌面版（NativeWebHost）
@@ -199,6 +213,7 @@ src/
 │   ├── CodePreview/      # 程式碼預覽面板
 │   ├── ComponentPanel/   # 元件面板
 │   ├── ContextMenu/      # 右鍵選單
+│   ├── Emulator/         # 編譯產生出來的 C，用真正的 LVGL 跑起來
 │   ├── EventPanel/       # 事件綁定面板
 │   ├── HelpPanel/        # 快捷鍵說明
 │   ├── LogicEditor/      # 邏輯編排器

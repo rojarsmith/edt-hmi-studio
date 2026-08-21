@@ -98,7 +98,7 @@ lv_obj_add_event_cb(ui_run_button, logic_<name>_event_cb, LV_EVENT_CLICKED, NULL
 - **LVGL Preview** 完全忽略邏輯圖，連事件也一起忽略：`editorStateToJson.ts`
   只匯出畫面與樣式，沒有別的。它餵給真正的 LVGL 一棵元件樹，所以它是
   renderer，不是 runtime。
-- **Build & Run** 是唯一會跑圖的預覽。`CompilePreview` 把圖傳給
+- **Emulator** 是唯一會跑圖的預覽。`Emulator` 把圖傳給
   `generateCode`，後者產出 `ui_logic.c`；每一個產生的檔案都會送進編譯器，而
   `ui_events.c` 會 include `ui_logic.h`。在那裡跑的，就是在硬體上跑的同一份
   C。各個預覽各自涵蓋到什麼、涵蓋不到什麼，見

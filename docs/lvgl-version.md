@@ -40,30 +40,38 @@ The archive is 104 MB. An equivalent archive placed in `firmware/vendor` is used
 instead of downloading it — matched by the commit GitHub embeds in the zip rather
 than by filename, so it satisfies the same pin. See `firmware/vendor/README.md`.
 
-### 1.2 WASM preview — **not pinned, and its prebuilt artifacts are still 9.2**
+### 1.2 The `wasm/` build tree — **now pinned; the checked-in artifacts are still 9.2**
 
-This path has no version pin at all. `wasm/build_lvgl_lib.sh` compiles whatever
-happens to be checked out at a hardcoded absolute path:
+This used to have no version pin at all: `wasm/build_lvgl_lib.sh` compiled
+whatever happened to be checked out at a hardcoded absolute path inside one
+contributor's home directory, and so did the Emulator.
 
-```bash
-LVGL_DIR="/home/xcssa/.openclaw/workspace/tools/lvgl"
-```
+Both now resolve LVGL through the search in
+[emulator.md](./emulator.md) §4.1 — `LVGL_ROOT`, then
+`.hmi-cache/emulator/lvgl`, then **any firmware board's dependency cache**. The
+last of those is the interesting one: on a machine that has built firmware, the
+Emulator compiles against the very checkout §1.1 installed, at the same commit,
+so the two paths agree by construction rather than by discipline.
+`npm run emulator:setup` installs the same pin where no board cache exists.
 
-The results are committed as prebuilt artifacts:
+The Emulator's library is a build product, cached under
+`.hmi-cache/emulator/lib/<hash>/` and keyed by the configuration that produced
+it, so bumping the pin above rebuilds it on the next run with no manual step.
+
+**The prebuilt artifacts of rung 2 are a different matter, and are still 9.2:**
 
 | File | Built from |
 | --- | --- |
 | `public/lvgl-wasi/liblvgl.a` | LVGL 9.2.x |
 | `public/lvgl-wasi/lvgl-headers.json` | `v9.2.3-dev` (see the header comment inside) |
 
-**Bumping the pin above does not touch these.** They stay on 9.2 until someone
-rebuilds them on a machine with emsdk and an LVGL v9.5.0 checkout. Until then
-the in-browser preview runs 9.2 while the firmware runs 9.5.
+**Bumping the pin above does not touch these.** They are committed binaries and
+stay on 9.2 until someone rebuilds them, so the LVGL Preview rung runs 9.2 while
+the firmware and the Emulator run 9.5.
 
-To regenerate: check out LVGL v9.5.0 at the path `build_lvgl_lib.sh` expects,
-run it, and copy the resulting library and header bundle into
-`public/lvgl-wasi/`. Consider replacing the hardcoded path with a pinned
-download while you are there.
+To regenerate: run `npm run emulator:setup` if the toolchain is not already
+there, then `wasm/build.sh` — which finds its own toolchain now, on any machine
+— and copy the resulting library and header bundle into `public/lvgl-wasi/`.
 
 ## 2. What the version fields in the app do *not* mean
 

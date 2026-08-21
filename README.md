@@ -106,6 +106,20 @@ npm run dev
 
 Then open http://localhost:5173
 
+### Emulator toolchain (optional, once)
+
+The Preview tab's **🎛️ Emulator** compiles the generated C against real LVGL and
+runs it in the page. That needs Emscripten and an LVGL checkout, which this
+installs into `.hmi-cache/emulator/` — gitignored, nothing system-wide:
+
+```bash
+npm run emulator:setup
+```
+
+On a machine that has already built firmware, the LVGL half is found and reused
+at the same pin, so only Emscripten is downloaded. The other two preview modes
+need no toolchain at all. See [docs/emulator.md](docs/emulator.md).
+
 ### Production build
 
 ```bash
@@ -113,16 +127,16 @@ npm run build
 npm run preview  # preview the build output
 ```
 
-To build a version **without** the "🔨 Build & Run" in-browser WASM compile preview, turn the switch off at build time:
+To build a version **without** the "🎛️ Emulator" in-browser compile-and-run rung, turn the switch off at build time (the older `VITE_ENABLE_COMPILE_PREVIEW` is still honoured):
 
 ```bash
-VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
+VITE_ENABLE_EMULATOR=false npm run build:web
 ```
 
 When deploying to GitHub Pages, a repository sub-path can also be given:
 
 ```bash
-VITE_BASE_PATH=/edt-hmi-studio/ VITE_ENABLE_COMPILE_PREVIEW=false npm run build:web
+VITE_BASE_PATH=/edt-hmi-studio/ VITE_ENABLE_EMULATOR=false npm run build:web
 ```
 
 ### Desktop build (NativeWebHost)
@@ -199,6 +213,7 @@ src/
 │   ├── CodePreview/      # Code preview panel
 │   ├── ComponentPanel/   # Component palette
 │   ├── ContextMenu/      # Right-click menu
+│   ├── Emulator/         # Compile the generated C and run it on real LVGL
 │   ├── EventPanel/       # Event binding panel
 │   ├── HelpPanel/        # Keyboard shortcut help
 │   ├── LogicEditor/      # Logic editor

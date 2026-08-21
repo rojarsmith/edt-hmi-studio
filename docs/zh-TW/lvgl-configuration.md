@@ -68,7 +68,7 @@ LVGL v9 取得記憶體的方式有兩種，由 `LV_USE_STDLIB_MALLOC` 決定：
 **`memSize` 目前不會影響任何建置產物。** 它會跟著專案儲存、也能正確地在匯出／匯入間
 往返，但沒有任何建置路徑會讀它：
 
-- **WASM 預覽** — `vite-plugin-compile.ts` 的 `generateCustomLvConf()` 只會把
+- **WASM 預覽** — `vite-plugin-emulator.ts` 的 `generateCustomLvConf()` 只會把
   `LV_COLOR_DEPTH`、`LV_FONT_FMT_TXT_LARGE`、`LV_FONT_DEFAULT` 代入模板，從未寫入
   `LV_MEM_SIZE`。而且就算寫了也沒用：`wasm/lv_conf.h` 設定的是
   `LV_USE_STDLIB_MALLOC LV_STDLIB_CLIB`，該建置使用 C 函式庫的配置器，依定義就會

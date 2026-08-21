@@ -111,7 +111,7 @@ textarea placeholder 與 chart 軸標籤**都需要各自產生處理函式。�
 `lv_font_conv` 除了 `--range` 之外也接受 `--symbols`，直接餵一串要納入的字元。
 Texts 分頁一旦存在，輸入就是現成的：所有語系所有翻譯的字元聯集，加上作者為執行期
 替換值宣告的 Wildcard Characters。改動範圍侷限在 `generateFontConvCommand()` 與
-`vite-plugin-compile.ts` 中的伺服器端呼叫 —— LVGL、韌體、產生的 UI 程式碼都不受影響。
+`vite-plugin-emulator.ts` 中的伺服器端呼叫 —— LVGL、韌體、產生的 UI 程式碼都不受影響。
 
 這件事已經在路線圖上：`docs/font-integration.md` §11 把「Automatic charset
 extraction」列為 future work #2。
@@ -191,7 +191,7 @@ label->text[dot_begin + i] = '.';
 
 底子比看起來好：
 
-- `lv_font_conv` 的伺服器端管線已經整條打通（`vite-plugin-compile.ts`）；`--symbols`
+- `lv_font_conv` 的伺服器端管線已經整條打通（`vite-plugin-emulator.ts`）；`--symbols`
   只是在一個已經在組 `--range` 的指令上再多一個參數。
 - `lv_font_t.fallback` 這套技巧已經在 `ui.c` 中驗證過，連 WASM 唯讀記憶體那個坑
   都處理了。
@@ -209,7 +209,7 @@ label->text[dot_begin + i] = '.';
 
 ## 9. 需要的設定變更
 
-`vite-plugin-compile.ts` 中的 `generateCustomLvConf()` 只改寫三個 macro：
+`vite-plugin-emulator.ts` 中的 `generateCustomLvConf()` 只改寫三個 macro：
 `LV_COLOR_DEPTH`、`LV_FONT_FMT_TXT_LARGE` 與 `LV_FONT_DEFAULT`。下表中的任何一項
 都要先把這個函式一般化。
 

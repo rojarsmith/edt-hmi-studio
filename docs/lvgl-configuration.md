@@ -75,7 +75,7 @@ framebuffer regardless of what `LV_MEM_SIZE` says.
 with the project and round-trips through export/import, but no build path reads
 it:
 
-- **WASM preview** — `generateCustomLvConf()` in `vite-plugin-compile.ts`
+- **WASM preview** — `generateCustomLvConf()` in `vite-plugin-emulator.ts`
   substitutes only `LV_COLOR_DEPTH`, `LV_FONT_FMT_TXT_LARGE` and
   `LV_FONT_DEFAULT` into the template. `LV_MEM_SIZE` is never written. It would
   have no effect anyway: `wasm/lv_conf.h` sets

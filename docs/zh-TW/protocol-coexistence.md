@@ -38,7 +38,7 @@
 | 元件編輯器 | `ModbusBindingEditor.tsx`（404 行），掛在 `PropertyEditor.tsx:1409` | 十種元件型別都掛得到，而且不管專案選的是哪個協定 |
 | tag → binding 同步 | `src/utils/modbusBindings.ts` | `applyTagToBinding` 把六個欄位推到每個綁定的元件上，而且走 undo 堆疊 |
 | 複製元件 | `src/store/editorStore.ts:655` | 複製元件時，binding 是按欄位名稱複製的 |
-| tag 來源 | `src/hooks/useProjectModbusTags.ts` | 回傳 `config.communication.tags`；`CodePanel`、`CompilePreview`、`NodeEditDialog` 都吃它 |
+| tag 來源 | `src/hooks/useProjectModbusTags.ts` | 回傳 `config.communication.tags`；`CodePanel`、`Emulator`、`NodeEditDialog` 都吃它 |
 | 邏輯節點型別 | `src/components/LogicEditor/types.ts:38` | `tag_read`、`tag_write`，以及更早的 `modbus_holding_register` |
 | 邏輯 tag 選單 | `NodeEditDialog.tsx:414` | 依存取權過濾、拒絕非 holding register 與 32-bit 的 tag、對消失的 tag 標 `(missing)` |
 | 邏輯產碼 | `src/codegen/templates/ui_logic.c.ts:833`、`:1250` | 把 tag 解析成 `hmi_runtime_read_holding_register(address)` / `write_holding_register` / `write_coil` |

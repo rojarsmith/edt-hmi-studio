@@ -94,18 +94,19 @@ cycling in a project with a single language.
 
 ## 4. Testing it
 
-### 4.1 In the browser — 🔨 Build & Run
+### 4.1 In the browser — 🎛️ Emulator
 
-The **🔨 Build & Run** tab compiles the generated C against a real LVGL and runs
+The **🎛️ Emulator** tab compiles the generated C against a real LVGL and runs
 it as WASM, with mouse and keyboard forwarded. Clicking the button there runs
 the real `ui_events.c` handler, so a language switch is fully exercised —
 including the font swap, which is where a missing glyph range shows up.
 
-This needs the compile server: the `/api/compile` endpoint in
-`vite-plugin-compile.ts` shells out to `emcc` and builds LVGL from source with
-`wasm/lv_conf.h` (`LV_USE_TRANSLATION 1`). The toolchain paths at the top of
-that file are absolute and point at a Linux workspace, so this path works where
-the dev server has that toolchain and reports a compile error where it does not.
+This needs the compile server: the `/api/emulator/build` endpoint in
+`vite-plugin-emulator.ts` runs `emcc` against LVGL built from source with
+`wasm/lv_conf.h` (`LV_USE_TRANSLATION 1`). The toolchain is searched for rather
+than assumed, and installed by `npm run emulator:setup` where it is absent — see
+[emulator.md](./emulator.md). Where it is still missing the tab says so, with the
+command that provides it, before anything is compiled.
 
 ### 4.2 On hardware — the Deploy panel
 
@@ -125,7 +126,7 @@ action, and `editorStateToJson.ts` carries no events across to it. For the full
 ladder and what separates the four, see
 [preview-ladder.md](./preview-ladder.md) §1.
 
-| | Canvas 🌐 | Build & Run | Hardware |
+| | Canvas 🌐 | Emulator | Hardware |
 | --- | --- | --- | --- |
 | Translations complete | ✅ | ✅ | ✅ |
 | Event actually wired to the button | ❌ | ✅ | ✅ |

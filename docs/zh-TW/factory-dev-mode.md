@@ -93,8 +93,8 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 只要 `activeTab` 是 `code` 且旗標關閉，`effectiveTab` 就讀作 `design`。繪製的面板、
 分頁高亮、選單全部依據這一個值，不需要把狀態同步回去，也不需要任何 effect。
 
-隱藏分頁並不會停用程式碼生成本身：`generateCode()` 在 **Build & Run**
-（`CompilePreview`）與 **Deploy** 建置時照常執行，後者是在
+隱藏分頁並不會停用程式碼生成本身：`generateCode()` 在 **Emulator**
+（`Emulator`）與 **Deploy** 建置時照常執行，後者是在
 `server/hmi/projectSource.ts` 裡呼叫同一個產生器。被管制的只是顯示產出原始碼的那個
 分頁。LVGL Preview 不在這份清單上，而且從來就不在——餵給它的是一棵元件樹 JSON，
 不是產生出來的 C（[preview-ladder.md](./preview-ladder.md) §3）。

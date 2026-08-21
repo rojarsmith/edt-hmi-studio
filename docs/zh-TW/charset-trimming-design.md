@@ -19,9 +19,9 @@
 ```
 FontResource.charset（四個 preset 擇一）
   → getCharsetRanges()          src/resources/converters/fontConverter.ts
-  → CompilePreview.tsx          串成 "0x20-0x7e,0x4e00-0x9fff"
-  → FontCompileRequest.ranges   src/components/CompilePreview/compilerService.ts
-  → convertFonts()              vite-plugin-compile.ts
+  → Emulator.tsx          串成 "0x20-0x7e,0x4e00-0x9fff"
+  → FontCompileRequest.ranges   src/components/Emulator/emulatorService.ts
+  → convertFonts()              vite-plugin-emulator.ts
   → lv_font_conv --range=… --range=…
 ```
 
@@ -135,7 +135,7 @@ export interface FontResource {
 
 先寫這條回歸測試是值得的。它第一次跑就失敗，失敗在「custom 但字元為空」這個案例上，
 而原因很有啟發性：`getCharsetRanges()` 在該情況回傳的是**空清單**，大家以為在它裡面
-的 ASCII fallback 其實在呼叫端 —— `CompilePreview` 與 `convertFonts` 各自帶了一份。
+的 ASCII fallback 其實在呼叫端 —— `Emulator` 與 `convertFonts` 各自帶了一份。
 任何替代實作要重現的是呼叫端的行為，不是那個函式的行為。
 
 ## 5. 傳輸層：`--symbols` 與 argv spawn
@@ -164,7 +164,7 @@ export interface FontResource {
 （`lv_font_conv/lv_font_conv.js`）啟動 `process.execPath` 則可行（§11 案例 D）。
 
 最後這點有個值得順手拿下的後果：既然要解析 JS 進入點，`lv_font_conv` 就應該成為
-**`package.json` 裡的專案相依**，而不是 `vite-plugin-compile.ts` 目前假設的全域安裝。
+**`package.json` 裡的專案相依**，而不是 `vite-plugin-emulator.ts` 目前假設的全域安裝。
 這同時也了結了 `docs/font-integration.md` §11 的「Server dependency」那一項 ——
 轉換不會再在沒跑過 `npm install -g` 的機器上失敗。
 
@@ -217,7 +217,7 @@ table directory 讀取 `name` 與 `head`，延伸去讀 `cmap` 是不大的增�
 ## 8. 必須一併關閉的落差
 
 `vite-plugin-hmi.ts` **完全沒有字型處理**。WASM 編譯預覽會跑 `lv_font_conv`，韌體
-佈署路徑不會。若收集器寫在 `CompilePreview.tsx` 內，預覽與實機會對「字型裡有哪些
+佈署路徑不會。若收集器寫在 `Emulator.tsx` 內，預覽與實機會對「字型裡有哪些
 glyph」產生分歧。
 
 所以收集器應該放在 `src/codegen/`，與 `collectUsedCustomFonts` 同層級，且

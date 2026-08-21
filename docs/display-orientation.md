@@ -79,7 +79,7 @@ these becomes a site that can be wrong:
 | Canvas centring / Ctrl+0 | `Canvas.tsx:830` → `canvasView.ts` | free |
 | Align & distribute, 10 sites | `AlignToolbar.tsx:53`–`:231` | free |
 | Quick Preview | `PreviewPanel.tsx:1121`, `:1144` | free |
-| Build & Run | `CompilePreview.tsx:211` | free |
+| Emulator | `Emulator.tsx:249` | free |
 | Screen transitions (slide distance) | `PreviewPanel` transition code | free |
 | Card thumbnail | `ProjectCard.tsx:102` | free |
 | Rubber-band, drag clamping, parent sizing | `Canvas.tsx:930` | free |
@@ -265,11 +265,11 @@ to fix it, but it will be blamed for it.** Worth fixing in the same change, or
 worth an explicit note in the Preview tab that this rung does not honour the
 project's resolution.
 
-For contrast, **Build & Run needs nothing**: it passes `canvas.width` and
+For contrast, **the Emulator needs nothing**: it passes `canvas.width` and
 `canvas.height` straight through to `generateMainWrapper`
-(`CompilePreview.tsx:211` → `vite-plugin-compile.ts:197`), which substitutes
+(`Emulator.tsx:249` → `vite-plugin-emulator.ts:297`), which substitutes
 them into a `lv_display_create(disp_width, disp_height)`
-(`vite-plugin-compile.ts:289`) and sizes the framebuffer readback from the same
+(`vite-plugin-emulator.ts:289`) and sizes the framebuffer readback from the same
 pair. That rung is correct on day one, which makes it the rung that proves
 portrait works before any firmware is touched.
 
@@ -338,7 +338,7 @@ does not include the current choice.
 | WASM preview honours the sent resolution | medium, pre-existing, §4.4 |
 | Code generator | **none**, §5 |
 
-Everything above is a day or two, and Build & Run gives it a working end-to-end
+Everything above is a day or two, and the Emulator gives it a working end-to-end
 demonstration without any firmware at all.
 
 ## 8. The firmware, board by board
@@ -620,7 +620,7 @@ boolean.
 
 1. **The editor, all of §7, plus the H747I firmware change (§8.1).** This is the
    whole feature for one board, end to end, in about the same time as the editor
-   work alone. Build & Run (§4.4) proves the editor half independently of any
+   work alone. The Emulator (§4.4) proves the editor half independently of any
    board, so a failure is unambiguous about which half is wrong.
 2. **`orientations` gating from day one (§3),** so the EDT and F746G offer
    Landscape only until their drivers land. A project that builds and renders

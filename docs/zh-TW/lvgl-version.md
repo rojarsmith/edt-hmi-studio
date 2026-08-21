@@ -39,28 +39,32 @@ Install-PinnedArchive `
 —— 比對的是 GitHub 內嵌在 zip 裡的 commit 而非檔名，因此同樣受釘選約束。詳見
 `firmware/vendor/README.md`。
 
-### 1.2 WASM 預覽 — **未釘選，且 prebuilt 產物仍是 9.2**
+### 1.2 `wasm/` 建置樹 — **現在釘選了；簽進 repo 的產物仍是 9.2**
 
-這條路徑完全沒有版本釘選。`wasm/build_lvgl_lib.sh` 編譯的是某個寫死絕對路徑底下
-剛好簽出的內容：
+這條路徑本來完全沒有版本釘選：`wasm/build_lvgl_lib.sh` 編的是某位貢獻者 home 目錄底下
+一條寫死絕對路徑剛好簽出的內容，Emulator 也是。
 
-```bash
-LVGL_DIR="/home/xcssa/.openclaw/workspace/tools/lvgl"
-```
+現在兩者都改用 [emulator.md](./emulator.md) §4.1 的搜尋順序來找 LVGL——`LVGL_ROOT`、
+`.hmi-cache/emulator/lvgl`，再來是**任一塊韌體板子的相依快取**。最後那一項才是重點：在
+建置過韌體的機器上，Emulator 編譯用的就是 §1.1 裝下來的那份 checkout、同一個 commit，
+於是兩條路徑在結構上就一致，不必再靠紀律。沒有板子快取的機器，`npm run emulator:setup`
+會照同一個 pin 裝一份。
 
-編譯結果以 prebuilt 產物的形式納入版控：
+Emulator 的靜態庫是一個建置產物，快取在 `.hmi-cache/emulator/lib/<hash>/`，鍵是產生它的
+那份設定；所以改上面那個 pin，下一次執行就會自動重建，沒有手動步驟。
+
+**第二階簽進 repo 的產物則是另一回事，而且仍然是 9.2：**
 
 | 檔案 | 建置來源 |
 | --- | --- |
 | `public/lvgl-wasi/liblvgl.a` | LVGL 9.2.x |
 | `public/lvgl-wasi/lvgl-headers.json` | `v9.2.3-dev`（見檔案內的標頭註解） |
 
-**改上面的釘選不會動到這兩個檔案。** 在有人於具備 emsdk 且簽出 LVGL v9.5.0 的機器上
-重新建置之前，它們會維持在 9.2。在那之前，瀏覽器內的預覽跑的是 9.2，韌體跑的是 9.5。
+**改上面的釘選不會動到這兩個檔案。** 它們是簽進版控的二進位檔，在有人重新建置之前會維持
+在 9.2；也就是說 LVGL Preview 那一階跑的是 9.2，而韌體與 Emulator 跑的是 9.5。
 
-重新產生方式：在 `build_lvgl_lib.sh` 預期的路徑簽出 LVGL v9.5.0、執行該腳本，再把
-產出的函式庫與標頭包複製到 `public/lvgl-wasi/`。順便可以考慮把那個寫死的路徑改成
-釘選下載。
+重新產生方式：工具鏈還沒有的話先跑 `npm run emulator:setup`，然後執行 `wasm/build.sh`
+——它現在會自己在任何機器上找到工具鏈——再把產出的函式庫與標頭包複製到 `public/lvgl-wasi/`。
 
 ## 2. 應用程式裡那兩個版本欄位**不是**版本選擇器
 

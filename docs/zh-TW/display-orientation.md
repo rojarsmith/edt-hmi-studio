@@ -65,7 +65,7 @@ Orientation** 欄位，提供 **Landscape** 與 **Portrait** 兩個選擇。目�
 | 畫布置中 / Ctrl+0 | `Canvas.tsx:830` → `canvasView.ts` | 免費 |
 | 對齊與分佈，10 處 | `AlignToolbar.tsx:53`–`:231` | 免費 |
 | Quick Preview | `PreviewPanel.tsx:1121`、`:1144` | 免費 |
-| Build & Run | `CompilePreview.tsx:211` | 免費 |
+| Emulator | `Emulator.tsx:249` | 免費 |
 | 換頁轉場（滑動距離） | `PreviewPanel` 轉場程式碼 | 免費 |
 | 專案卡縮圖 | `ProjectCard.tsx:102` | 免費 |
 | 框選、拖曳夾限、父層尺寸 | `Canvas.tsx:930` | 免費 |
@@ -227,9 +227,9 @@ void set_screen_size(int w, int h) {
 一個形狀明顯不對的螢幕。**這個功能不一定要修它，但一定會被算在它頭上。** 值得在同一次
 變更裡修掉，或者至少在 Preview 分頁明確標示這一階不遵守專案的解析度。
 
-對照之下，**Build & Run 什麼都不用做**：它把 `canvas.width` 與 `canvas.height` 直接傳給
-`generateMainWrapper`（`CompilePreview.tsx:211` → `vite-plugin-compile.ts:197`），後者把
-它們代進 `lv_display_create(disp_width, disp_height)`（`vite-plugin-compile.ts:289`），
+對照之下，**Emulator 什麼都不用做**：它把 `canvas.width` 與 `canvas.height` 直接傳給
+`generateMainWrapper`（`Emulator.tsx:249` → `vite-plugin-emulator.ts:297`），後者把
+它們代進 `lv_display_create(disp_width, disp_height)`（`vite-plugin-emulator.ts:289`），
 並用同一組數字決定 framebuffer 讀回的尺寸。這一階第一天就是對的，也因此它是「在動任何
 韌體之前就能證明直向可行」的那一階。
 
@@ -289,7 +289,7 @@ Settings；而且在 New Project 對話框裡切換板子時，必須像現在�
 | WASM 預覽遵守傳過去的解析度 | 中，既有缺陷，§4.4 |
 | 程式碼產生器 | **零**，§5 |
 
-以上全部大概一到兩天，而且 Build & Run 讓它在完全不碰韌體的情況下就有一個可運作的端到端
+以上全部大概一到兩天，而且 Emulator 讓它在完全不碰韌體的情況下就有一個可運作的端到端
 展示。
 
 ## 8. 韌體，一塊板子一塊板子看
@@ -520,7 +520,7 @@ weak 預設為橫向，由產生器給出強定義。三個性質讓它勝過其
 ## 11. 如果由我來做，順序是
 
 1. **編輯器，§7 全部，加上 H747I 的韌體改動（§8.1）。** 這就是一塊板子上端到端的完整
-   功能，而花的時間跟只做編輯器差不多。Build & Run（§4.4）能獨立於任何板子驗證編輯器
+   功能，而花的時間跟只做編輯器差不多。Emulator（§4.4）能獨立於任何板子驗證編輯器
    那一半，所以出錯時可以明確知道是哪一半錯。
 2. **`orientations` 從第一天就開始擋（§3）**，讓 EDT 與 F746G 在驅動落地之前只提供
    Landscape。一個編得過但畫出雜訊的專案，比一個只有一個選項的下拉選單更糟。

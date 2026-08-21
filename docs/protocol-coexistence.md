@@ -44,7 +44,7 @@ unpick:
 | Widget editor | `ModbusBindingEditor.tsx` (404 lines), mounted at `PropertyEditor.tsx:1409` | Ten widget types get it, regardless of the project's protocol |
 | Tag → binding sync | `src/utils/modbusBindings.ts` | `applyTagToBinding` pushes six fields onto every bound widget, through the undo stack |
 | Duplication | `src/store/editorStore.ts:655` | The binding is cloned by field name when a component is copied |
-| Tag source | `src/hooks/useProjectModbusTags.ts` | Returns `config.communication.tags`; consumed by `CodePanel`, `CompilePreview` and `NodeEditDialog` |
+| Tag source | `src/hooks/useProjectModbusTags.ts` | Returns `config.communication.tags`; consumed by `CodePanel`, `Emulator.tsx` and `NodeEditDialog` |
 | Logic node types | `src/components/LogicEditor/types.ts:38` | `tag_read`, `tag_write`, and the older `modbus_holding_register` |
 | Logic tag picker | `NodeEditDialog.tsx:414` | Filters by access, refuses non-holding-register and 32-bit tags, marks a vanished tag `(missing)` |
 | Logic codegen | `src/codegen/templates/ui_logic.c.ts:833`, `:1250` | Resolves a tag to `hmi_runtime_read_holding_register(address)` / `write_holding_register` / `write_coil` |

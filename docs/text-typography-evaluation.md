@@ -126,7 +126,7 @@ of characters to include. Once the Texts tab exists, the input is free: the
 union of every character in every translation, plus the Wildcard Characters the
 author declares for runtime-substituted values. The change is confined to
 `generateFontConvCommand()` and the server-side invocation in
-`vite-plugin-compile.ts` — LVGL, the firmware and the generated UI code are all
+`vite-plugin-emulator.ts` — LVGL, the firmware and the generated UI code are all
 unaffected.
 
 This is already on the roadmap: `docs/font-integration.md` §11 lists
@@ -218,7 +218,7 @@ answer is to not expose the Bitmap/Vector switch at all for now.
 The groundwork is better than it looks:
 
 - The `lv_font_conv` server pipeline works end to end
-  (`vite-plugin-compile.ts`); `--symbols` is one more argument on a command that
+  (`vite-plugin-emulator.ts`); `--symbols` is one more argument on a command that
   already assembles `--range`.
 - The `lv_font_t.fallback` technique is already proven in `ui.c`, WASM
   read-only-memory caveat and all.
@@ -236,7 +236,7 @@ What is missing:
 
 ## 9. Configuration changes required
 
-`generateCustomLvConf()` in `vite-plugin-compile.ts` rewrites exactly three
+`generateCustomLvConf()` in `vite-plugin-emulator.ts` rewrites exactly three
 macros: `LV_COLOR_DEPTH`, `LV_FONT_FMT_TXT_LARGE` and `LV_FONT_DEFAULT`.
 Anything in the table below needs that function generalised first.
 

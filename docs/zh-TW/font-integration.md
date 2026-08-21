@@ -36,10 +36,10 @@ EDT HMI Studio 的字型系統支援 LVGL 內建字型與使用者上傳的自�
   └── ui.c：只對字型／字級與預設不同的元件產生設定程式碼
        │
        ▼
-  編譯預覽 (CompilePreview)
+  編譯預覽 (Emulator)
   ├── 動態收集所有用到的自訂字型＋字級組合
   ├── 建立 FontCompileRequest（base64 + 轉換參數）
-  └── POST /api/compile (files + fonts)
+  └── POST /api/emulator/build (files + fonts)
        │
        ▼
   伺服器端 (vite-plugin-compile)
@@ -143,7 +143,7 @@ interface LvglConfig {
 
 ### 5.3 編譯預覽
 
-`CompilePreview.handleCompile()` 會：
+`Emulator.handleCompile()` 會：
 
 1. 以 `collectUsedCustomFontSizes()` 動態收集所有元件實際用到的自訂字型＋字級組合
 2. 呼叫 `generateCode()` 產生 C 原始檔
@@ -152,7 +152,7 @@ interface LvglConfig {
 
 ### 5.4 伺服器端字型轉換
 
-`vite-plugin-compile.ts` 的 `/api/compile` 端點：
+`vite-plugin-emulator.ts` 的 `/api/emulator/build` 端點：
 
 1. 接收 `fonts` 陣列
 2. 對每個字型：
@@ -187,9 +187,9 @@ emcc 將所有 `.c` 檔（UI 程式碼＋字型 C 陣列）編譯為 `output.js`
 | `src/codegen/templates/ui.h.ts` | 產生 `LV_FONT_DECLARE` 宣告（僅限實際用到的組合） |
 | `src/codegen/templates/ui.c.ts` | 元件字型程式碼生成（含繼承判斷邏輯） |
 | `src/codegen/generator.ts` | 程式碼生成進入點，傳遞 `defaultFont` 與 `defaultFontSize` |
-| `src/components/CompilePreview/CompilePreview.tsx` | 編譯預覽，動態收集字級並建立字型請求 |
-| `src/components/CompilePreview/compilerService.ts` | 編譯服務用戶端，送出字型資料 |
-| `vite-plugin-compile.ts` | 伺服器端編譯外掛，呼叫 `lv_font_conv` 並編譯 |
+| `src/components/Emulator/Emulator.tsx` | 編譯預覽，動態收集字級並建立字型請求 |
+| `src/components/Emulator/emulatorService.ts` | 編譯服務用戶端，送出字型資料 |
+| `vite-plugin-emulator.ts` | 伺服器端編譯外掛，呼叫 `lv_font_conv` 並編譯 |
 
 ## 8. lv_font_conv 使用方式
 
