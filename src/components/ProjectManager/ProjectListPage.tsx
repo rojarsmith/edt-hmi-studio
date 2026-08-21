@@ -105,13 +105,18 @@ const ProjectListPage: React.FC = () => {
       const { data, images, fonts } = await loadProjectData(id);
       // Everything setScreens is given, or it clears it: this is the path most
       // projects are opened by, and passing only the screens dropped the screen
-      // groups, typographies, languages and texts on the way in.
+      // groups, typographies, languages and texts on the way in. The last three
+      // are on the same footing — a project opened here arrived with no
+      // animations at all, and the next autosave wrote that loss back.
       setScreens(
         data.screens as Screen[],
         data.screenGroups,
         data.typographies,
         data.languages,
         data.texts,
+        data.typographyGroups,
+        data.textGroups,
+        data.animations,
       );
       setCanvasSize(config.display.width, config.display.height);
       importResources({ images, fonts });
