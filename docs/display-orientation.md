@@ -885,9 +885,22 @@ never estimated at all — it was written as "a straight copy so the cost shows 
 in a measurement", and the measurement is 6.3 cycles **per byte**.
 
 The cause is `--specs=nano.specs`: newlib-nano is built with
-`PREFER_SIZE_OVER_SPEED`, so its `memcpy` is a byte-at-a-time loop. A word copy,
-unrolled four at a time, is the fix; DMA2D would be better still and is now a
-choice to make against a number rather than a guess.
+`PREFER_SIZE_OVER_SPEED`, so its `memcpy` is a byte-at-a-time loop.
+
+Replacing it with a word copy, unrolled four at a time, was measured on the same
+board:
+
+| | before | after |
+|---|---|---|
+| Reconcile | 3,283,727 cycles (20.5 ms) | **530,517 cycles (3.32 ms)** |
+| Per byte | 6.29 cycles | **1.02 cycles** |
+| Worst refresh, rotate included | 26.6 ms | **9.5 ms** |
+
+Which puts a full-screen portrait refresh back inside its own 16.6 ms frame,
+with room left over. The rotation was unchanged and re-measured at 982,985
+cycles (6.14 ms), so it is now the larger of the two costs and the next thing
+DMA2D or the part's GPU2D would take — a decision that can now be made against
+numbers rather than a guess.
 
 This matters beyond the frame rate. A refresh costing 6.1 + 20.5 ms overruns its
 own 16.6 ms frame, and everything else in the main loop waits — including LVGL's
