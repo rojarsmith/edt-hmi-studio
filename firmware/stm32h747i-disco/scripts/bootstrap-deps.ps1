@@ -270,6 +270,17 @@ Install-PinnedArchive `
     -Target (Join-Path $CacheRoot "Drivers\BSP\Components\mt25tl01g") `
     -Sentinel "mt25tl01g.h"
 
+# FatFs, for the Video widget: the runtime reads its file off the SD card
+# through f_open/f_read rather than through LVGL's file system layer, because
+# what it reads is an AVI to demux rather than an image to hand to a decoder.
+# Only source\ff.c and source\ffunicode.c are compiled - see CMakeLists.txt
+# and include\ffconf.h. Nothing else in the archive is reachable.
+Install-PinnedArchive `
+    -Name "stm32-mw-fatfs-4b8293c" `
+    -Uri "https://codeload.github.com/STMicroelectronics/stm32_mw_fatfs/zip/4b8293c757f18ef26236e8e97a984d887288de4f" `
+    -Target (Join-Path $CacheRoot "Middlewares\Third_Party\FatFs") `
+    -Sentinel "source\ff.c"
+
 Install-PinnedArchive `
     -Name "lvgl-85aa60d" `
     -Uri "https://codeload.github.com/lvgl/lvgl/zip/85aa60d18b3d5e5588d7b247abf90198f07c8a63" `
@@ -307,6 +318,7 @@ FT6X06 d4d40ad52b495b650222addb4549257c0b9c0059
 ADV7533 ef0f7e8782205a33560f54712ba9b2306b322d96
 BSP Common 6893c33e9a5ebbcea1b23f3137f8a1d87753947d
 MT25TL01G v2.3.0 d13cf81bba79f9cae3592dfbd9509aeffc884e40
+FatFs r0.15_stm32cube_20260403 4b8293c757f18ef26236e8e97a984d887288de4f
 LVGL v9.5.0 85aa60d18b3d5e5588d7b247abf90198f07c8a63
 "@
 Set-Content -LiteralPath (Join-Path $CacheRoot "DEPENDENCIES.txt") -Value $manifest -Encoding ASCII

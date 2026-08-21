@@ -215,23 +215,44 @@ describe('componentDefinitions', () => {
 
   // --- componentCategories ---
   describe('componentCategories', () => {
-    it('should have 5 categories', () => {
-      expect(componentCategories).toHaveLength(5);
+    it('should have 6 categories', () => {
+      expect(componentCategories).toHaveLength(6);
     });
 
-    it('should have basic, input, shape, container, display categories', () => {
+    it('should have basic, input, shape, container, display, misc categories', () => {
       const ids = componentCategories.map(c => c.id);
       expect(ids).toContain('basic');
       expect(ids).toContain('input');
       expect(ids).toContain('shape');
       expect(ids).toContain('container');
       expect(ids).toContain('display');
+      expect(ids).toContain('misc');
     });
 
     it('lists Shapes between Input and Containers, as the palette shows them', () => {
       const ids = componentCategories.map(c => c.id);
       expect(ids.indexOf('shape')).toBe(ids.indexOf('input') + 1);
       expect(ids.indexOf('container')).toBe(ids.indexOf('shape') + 1);
+    });
+
+    it('puts Miscellaneous last, because it is what belongs to no family', () => {
+      const ids = componentCategories.map(c => c.id);
+      expect(ids[ids.length - 1]).toBe('misc');
+    });
+
+    it('gives Video a home in Miscellaneous', () => {
+      const video = componentDefinitions.find(def => def.type === 'video');
+      expect(video).toBeDefined();
+      expect(video!.category).toBe('misc');
+      expect(getComponentsByCategory('misc').map(def => def.type)).toEqual(['video']);
+    });
+
+    it('starts a video pointed at nothing, playing and looping', () => {
+      const video = componentDefinitions.find(def => def.type === 'video');
+      expect(video!.defaultProps).toEqual({ fileName: '', autoPlay: true, loop: true });
+      // Black, because that is what an empty frame is — see componentDefinitions.
+      expect(video!.defaultStyles.default.bgColor).toBe('#000000');
+      expect(video!.isContainer).toBe(false);
     });
   });
 });

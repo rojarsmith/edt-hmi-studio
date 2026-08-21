@@ -1666,3 +1666,17 @@
   padding: 6px 8px;
   margin: 6px 0 0 0;
 }
+
+/* What the board will do with the named file. Informational rather than a
+   warning — the amber .shape-warning takes over when the board cannot play
+   video at all. */
+.video-board-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #4a5568;
+  background: #f4f6f8;
+  border: 1px solid #dfe3e8;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 6px 0 0 0;
+}

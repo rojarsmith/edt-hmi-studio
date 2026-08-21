@@ -2,6 +2,8 @@ import React, { useEffect, useMemo } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { useDeployStore } from '../../store/deployStore';
 import { useDockStore } from '../../store/dockStore';
+import { useEditorStore } from '../../store/editorStore';
+import { screensHaveVideo } from '../../utils/videoWidgets';
 import {
   ORIENTATION_LABELS,
   boardCanDriveOrientation,
@@ -50,6 +52,8 @@ const DeployPanel: React.FC = () => {
   const runFlash = useDeployStore((state) => state.runFlash);
   const showPane = useDockStore((state) => state.showPane);
 
+  const screens = useEditorStore((state) => state.screens);
+
   const board = useMemo(() => getBoardDefinition(boardId), [boardId]);
   const protocolDefinition = useMemo(
     () => getProtocolDefinition(protocol),
@@ -70,7 +74,16 @@ const DeployPanel: React.FC = () => {
    * — before a flash, rather than after one that renders wrong.
    */
   const orientationBuildable = boardCanDriveOrientation(boardId, orientation);
-  const buildable = protocolDefinition.implemented && orientationBuildable;
+  /*
+   * A third, for the same reason. A Video widget needs a JPEG codec to decode
+   * its frames and an SD interface to read them, and a board with neither has
+   * no slower path to fall back to — so this is stopped here rather than in the
+   * compiler, where it would surface as a missing header file.
+   */
+  const usesVideo = useMemo(() => screensHaveVideo(screens), [screens]);
+  const videoBuildable = !usesVideo || board.video !== null;
+  const buildable =
+    protocolDefinition.implemented && orientationBuildable && videoBuildable;
   const canBuild = buildable
     && serviceAvailable !== false
     && capabilities?.canBuild !== false;
@@ -140,6 +153,22 @@ const DeployPanel: React.FC = () => {
                 to {ORIENTATION_LABELS[
                   orientation === 'portrait' ? 'landscape' : 'portrait'
                 ].toLowerCase()} in Project Settings to build it.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {!videoBuildable && (
+          <div className="hmi-panel-card">
+            <div className="hmi-panel-notice" role="note">
+              <strong>This project cannot be built.</strong>
+              <span>
+                It uses a Video widget, and the {board.name} has no JPEG codec
+                to decode the frames with — every board that can play video
+                decodes it in hardware, because a Cortex-M is not going to do it
+                in software while also drawing a UI. The design and the previews
+                are unaffected; remove the Video widgets, or move the project to
+                a board that can play them, to build it.
               </span>
             </div>
           </div>

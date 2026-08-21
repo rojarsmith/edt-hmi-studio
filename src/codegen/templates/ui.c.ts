@@ -4,6 +4,7 @@ import type {
   Screen, LvglComponent, StyleProps, Theme, Animation, AnimationEasing, LvglStyleState,
 } from '../../types';
 import { isArcPart, partSelector, widgetParts } from '../../utils/widgetParts';
+import { screensHaveVideo } from '../../utils/videoWidgets';
 import type { CodeGenOptions } from '../types';
 import type { ImageResource, FontResource } from '../../resources/types';
 import { collectUsedCustomFonts } from '../fontUsage';
@@ -162,6 +163,11 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
     chart: 'lv_chart_create',
     table: 'lv_table_create',
     calendar: 'lv_calendar_create',
+    // A video is a plain object: the black frame the picture is drawn into.
+    // What fills it is the runtime's, not the widget's — hmi_video_attach puts
+    // the image and the message label inside this box. See
+    // docs/video-playback.md §5.
+    video: 'lv_obj_create',
   };
   
   const func = createFuncs[type] || 'lv_obj_create';
@@ -1187,6 +1193,24 @@ function generatePropsCode(
       }
       break;
       
+    case 'video': {
+      // Nothing to scroll: the runtime's image fills the box exactly, and a
+      // stray drag on a touch panel must not slide the picture.
+      const clearFlag = isV9 ? 'lv_obj_remove_flag' : 'lv_obj_clear_flag';
+      lines.push(`${indent}${clearFlag}(${varName}, LV_OBJ_FLAG_SCROLLABLE);`);
+      // The file is named, never linked: it lives on the SD card, and the
+      // runtime is what looks for it. A name matching nothing on the card
+      // leaves the widget reading "Video not found" — the panel's report, made
+      // at the only moment anything can actually look.
+      const fileName = typeof props.fileName === 'string' ? props.fileName.trim() : '';
+      lines.push(
+        `${indent}hmi_video_attach(${varName}, "${escapeCString(fileName)}", ` +
+          `${props.autoPlay === false ? 'false' : 'true'}, ` +
+          `${props.loop === false ? 'false' : 'true'});`,
+      );
+      break;
+    }
+
     case 'spinner':
       if (isV9) {
         // V9: speed and arc length set via lv_spinner_set_anim_params
@@ -2714,6 +2738,12 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   // Includes
   lines.push(generateInclude('ui.h'));
   lines.push(generateInclude('ui_events.h'));
+  // Only when a screen actually carries a video. The header belongs to the
+  // board's firmware rather than to LVGL, and a project with no video must not
+  // acquire a dependency on hardware it never asked for.
+  if (screensHaveVideo(screens)) {
+    lines.push(generateInclude('hmi_video.h'));
+  }
 
   // Built-in symbols note
   if (useBuiltinSymbols) {

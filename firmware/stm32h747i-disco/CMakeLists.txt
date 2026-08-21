@@ -23,6 +23,9 @@ set(HAL_ROOT "${HMI_DEPS_ROOT}/Drivers/STM32H7xx_HAL_Driver")
 set(BSP_ROOT "${HMI_DEPS_ROOT}/Drivers/BSP")
 set(BOARD_BSP_ROOT "${BSP_ROOT}/STM32H747I-Discovery")
 set(LVGL_ROOT "${HMI_DEPS_ROOT}/Middlewares/Third_Party/lvgl")
+# FatFs, read-only, over the board's microSD socket. Only the Video widget
+# reaches it — see src/hmi_sd.c and include/ffconf.h.
+set(FATFS_ROOT "${HMI_DEPS_ROOT}/Middlewares/Third_Party/FatFs")
 
 set(CPU_FLAGS
     -mcpu=cortex-m7
@@ -100,6 +103,11 @@ set(HAL_SOURCES
     "${HAL_ROOT}/Src/stm32h7xx_hal_hsem.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_i2c.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_i2c_ex.c"
+    # The JPEG codec peripheral, which is what makes video possible on this
+    # board at all. stm32h7xx_hal_jpeg.c refers to the MDMA driver from its
+    # asynchronous path whether or not we use it, so hal_mdma.c below is not
+    # optional. See src/hmi_jpeg.c.
+    "${HAL_ROOT}/Src/stm32h7xx_hal_jpeg.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_ltdc.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_ltdc_ex.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_mdma.c"
@@ -108,6 +116,10 @@ set(HAL_SOURCES
     "${HAL_ROOT}/Src/stm32h7xx_hal_pwr_ex.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_rcc.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_rcc_ex.c"
+    # The microSD socket on SDMMC1, read by the Video widget through FatFs.
+    "${HAL_ROOT}/Src/stm32h7xx_hal_sd.c"
+    "${HAL_ROOT}/Src/stm32h7xx_hal_sd_ex.c"
+    "${HAL_ROOT}/Src/stm32h7xx_ll_sdmmc.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_sdram.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_uart.c"
     "${HAL_ROOT}/Src/stm32h7xx_hal_uart_ex.c"
@@ -119,6 +131,7 @@ set(BSP_SOURCES
     "${BOARD_BSP_ROOT}/stm32h747i_discovery_bus.c"
     "${BOARD_BSP_ROOT}/stm32h747i_discovery_lcd.c"
     "${BOARD_BSP_ROOT}/stm32h747i_discovery_qspi.c"
+    "${BOARD_BSP_ROOT}/stm32h747i_discovery_sd.c"
     "${BOARD_BSP_ROOT}/stm32h747i_discovery_sdram.c"
     "${BOARD_BSP_ROOT}/stm32h747i_discovery_ts.c"
     "${BSP_ROOT}/Components/otm8009a/otm8009a.c"
@@ -134,6 +147,14 @@ set(BSP_SOURCES
     "${BSP_ROOT}/Components/mt25tl01g/mt25tl01g.c"
 )
 
+# ff.c and ffunicode.c only. The archive also ships diskio.c, ff_gen_drv.c and
+# a set of ffsystem_*.c; none is compiled here, because src/hmi_sd.c implements
+# the disk_* interface directly against the BSP and FF_FS_REENTRANT is 0.
+set(FATFS_SOURCES
+    "${FATFS_ROOT}/source/ff.c"
+    "${FATFS_ROOT}/source/ffunicode.c"
+)
+
 file(GLOB BOARD_SOURCES CONFIGURE_DEPENDS "${BOARD_ROOT}/src/*.c")
 file(GLOB GENERATED_SOURCES CONFIGURE_DEPENDS "${HMI_PROJECT_SOURCE}/*.c")
 
@@ -142,6 +163,7 @@ add_executable(firmware
     ${GENERATED_SOURCES}
     ${HAL_SOURCES}
     ${BSP_SOURCES}
+    ${FATFS_SOURCES}
     # Cortex-M7 boots, Cortex-M4 stays gated at the option bytes. This is ST's
     # standard layout for a single-application dual-core part and is what
     # docs/stm32h747i-disco-dual-core.md tells the user to configure.
@@ -171,6 +193,8 @@ target_include_directories(firmware PRIVATE
     "${BSP_ROOT}/Components/mt25tl01g"
     "${LVGL_ROOT}"
     "${LVGL_ROOT}/src"
+    # ff.c reads ffconf.h, which lives in include/ alongside lv_conf.h.
+    "${FATFS_ROOT}/source"
 )
 
 # The editor currently emits the LVGL v8 short form for buttons even when the

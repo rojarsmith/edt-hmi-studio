@@ -191,6 +191,33 @@ export interface BoardDefinition {
    */
   protocols: readonly ProtocolId[];
   /**
+   * What this board can do with a Video widget, or `null` when it can do
+   * nothing with one.
+   *
+   * Video is the first widget whose feasibility is a property of the silicon
+   * rather than of the driver. A frame is a JPEG, and decoding 24 of them a
+   * second at 800x480 is not something a Cortex-M7 does in software while also
+   * running a UI — it takes the JPEG codec peripheral, and the file it reads
+   * takes an SD interface. A board with neither has no slower path to fall
+   * back to, so the honest answer is `null` and a build that says so, exactly
+   * as an unimplemented protocol does.
+   */
+  video: {
+    /**
+     * The peripheral that turns a frame into pixels. Only the hardware codec
+     * is offered — see above for why there is no software entry here.
+     */
+    decoder: 'jpeg-hardware';
+    /** Where the runtime looks for the file the widget names. */
+    storage: 'sd-card';
+    /**
+     * Container and video codec the runtime demuxes and decodes, for the one
+     * line the property editor shows under the file name. Audio streams in the
+     * file are demuxed past and not played — see docs/video-playback.md §7.
+     */
+    format: string;
+  } | null;
+  /**
    * LVGL build settings that follow from the hardware, one-to-one with the
    * board. These mirror `firmware/<board>/include/lv_conf.h`, which is what the
    * firmware is actually compiled against; keep the two in step when either
@@ -236,6 +263,10 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     deviceId: '0x449',
     externalFlash: null,
     protocols: ['modbus-rtu'],
+    // No JPEG codec. The peripheral arrived with the STM32F76x/F77x parts;
+    // the F746NG here does not carry one, and the board's microSD socket has
+    // nothing to feed. See docs/video-playback.md §2.
+    video: null,
     lvgl: {
       fontLarge: true,
       defaultFont: 'montserrat_14',
@@ -278,6 +309,15 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
       loaderName: 'MT25TL01G_STM32H747I-DISCO.stldr',
     },
     protocols: ['modbus-rtu'],
+    // The only board here that can. The STM32H747 carries the JPEG codec
+    // peripheral, the board carries a 4-bit microSD socket on SDMMC1, and the
+    // decoded frames land in the same external SDRAM the frame buffers live
+    // in. See docs/video-playback.md.
+    video: {
+      decoder: 'jpeg-hardware',
+      storage: 'sd-card',
+      format: 'Motion JPEG in an AVI container',
+    },
     lvgl: {
       fontLarge: true,
       defaultFont: 'montserrat_14',
@@ -337,6 +377,9 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     // still cannot be built — the Protocol tab says so rather than letting the
     // build fail later.
     protocols: ['modbus-rtu', 'can-bus'],
+    // The STM32U599 has no JPEG codec, and the kit brings no SD socket out.
+    // See docs/video-playback.md §2.
+    video: null,
     lvgl: {
       fontLarge: true,
       defaultFont: 'montserrat_14',
@@ -560,6 +603,18 @@ export function boardSupportsProtocol(
   protocolId: ProtocolId,
 ): boolean {
   return getBoardProtocols(boardId).includes(protocolId);
+}
+
+/**
+ * What a board can do with a Video widget, or `null` when it can do nothing
+ * with one — the whole of the editor's video gating goes through here.
+ */
+export function getBoardVideo(boardId: BoardId): BoardDefinition['video'] {
+  return getBoardDefinition(boardId).video;
+}
+
+export function boardSupportsVideo(boardId: BoardId): boolean {
+  return getBoardVideo(boardId) !== null;
 }
 
 /** The orientation a board's `display.width`/`height` are already stated in. */

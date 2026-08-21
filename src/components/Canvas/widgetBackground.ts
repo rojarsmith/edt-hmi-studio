@@ -31,6 +31,10 @@ export function resolveFallbackBackground(type: string): string | undefined {
     case 'arc': return 'transparent';
     case 'spinner': return 'transparent';
     case 'checkbox': return 'transparent';
+    // A video ships with a black fill, and black is what an empty frame is —
+    // so there is nothing to fall back to, and clearing the fill to
+    // transparent is a deliberate choice the canvas must honour.
+    case 'video': return 'transparent';
     default: return undefined;
   }
 }

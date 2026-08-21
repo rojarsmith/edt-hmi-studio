@@ -22,6 +22,7 @@ import {
   withoutPartStyle,
 } from '../../utils/widgetParts';
 import type { ModbusRegisterTag } from '../../types/hmi';
+import { DEFAULT_BOARD_ID, SUPPORTED_BOARDS, getBoardVideo } from '../../types/hmi';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
 import { resolveText } from '../../codegen/textResources';
 import { effectiveTypographyId, standInProp } from '../../utils/componentText';
@@ -47,6 +48,7 @@ import {
   DEFAULT_START_ANGLE,
 } from '../../utils/circleGeometry';
 import ModbusBindingEditor from './ModbusBindingEditor';
+import { videoFileNameWarning } from './videoModel';
 import {
   clampImageButtonStateIndex,
   createImageButtonState,
@@ -2535,6 +2537,9 @@ function renderComponentProps(
         </div>
       );
 
+    case 'video':
+      return <VideoEditor props={props} onChange={onChange} />;
+
     case 'win':
       return <WindowEditor component={component} props={props} onChange={onChange} />;
 
@@ -2720,6 +2725,81 @@ function renderComponentProps(
 }
 
 // Image props editor with resource picker
+/**
+ * Everything a Video widget is: a file name, and what to do with it.
+ *
+ * The file is not imported. It is typed, because it lives on the SD card the
+ * panel reads at run time and the editor has no way to see the card — so this
+ * field is a promise about what will be there, and the panel checks it. A name
+ * that matches nothing on the card is drawn as "Video not found" on the panel
+ * rather than failing the build, which is the only honest place to find out.
+ *
+ * The board line at the foot is not decoration. Playing video needs a JPEG
+ * codec and an SD interface, and a board without them has no slower path to
+ * fall back to — so a project that puts this widget on such a board is told
+ * here, at the moment it is configured, and again by the Deploy tab.
+ * See docs/video-playback.md.
+ */
+function VideoEditor({
+  props,
+  onChange,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  props: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+}): React.ReactNode {
+  const currentProjectId = useAppStore((state) => state.currentProjectId);
+  const projectList = useProjectStore((state) => state.projects);
+  const boardId = projectList.find((item) => item.config.id === currentProjectId)?.config.boardId
+    ?? DEFAULT_BOARD_ID;
+  const boardName = SUPPORTED_BOARDS.find((board) => board.id === boardId)?.model ?? boardId;
+  const video = getBoardVideo(boardId);
+
+  const fileName: string = typeof props.fileName === 'string' ? props.fileName : '';
+  const trimmed = fileName.trim();
+  const fileWarning = videoFileNameWarning(trimmed);
+
+  return (
+    <div className="property-section">
+      <div className="section-header">Video</div>
+      <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+        <label>File name on the SD card</label>
+        <input
+          type="text"
+          value={fileName}
+          placeholder="name.avi"
+          spellCheck={false}
+          aria-label="Video file name"
+          onChange={(e) => onChange('fileName', e.target.value)}
+        />
+      </div>
+      {fileWarning && (
+        <p className="shape-warning" role="status">{fileWarning}</p>
+      )}
+      <div className="property-row">
+        <label>Auto Play</label>
+        <ToggleSwitch
+          checked={props.autoPlay !== false}
+          onChange={(checked) => onChange('autoPlay', checked)}
+        />
+      </div>
+      <div className="property-row">
+        <label>Loop</label>
+        <ToggleSwitch
+          checked={props.loop !== false}
+          onChange={(checked) => onChange('loop', checked)}
+        />
+      </div>
+      <p className={video ? 'video-board-note' : 'shape-warning'}>
+        {video
+          ? `${boardName} plays ${video.format} from the SD card, decoded by the JPEG codec. A name that matches no file on the card is drawn as “Video not found”.`
+          : `${boardName} cannot play video — it has no JPEG codec to decode the frames with. A project using this widget cannot be built for this board; the Deploy tab says so too.`}
+      </p>
+    </div>
+  );
+}
+
 function ImagePropsEditor({
   props,
   onChange,

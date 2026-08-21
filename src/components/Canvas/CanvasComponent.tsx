@@ -986,6 +986,16 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
           </div>
         );
       
+      case 'video':
+        return (
+          <CanvasVideoContent
+            fileName={props.fileName}
+            autoPlay={props.autoPlay !== false}
+            loop={props.loop !== false}
+            textColor={defaultStyle.textColor || '#ffffff'}
+          />
+        );
+
       default:
         return <div>{type}</div>;
     }
@@ -1082,6 +1092,78 @@ export const CanvasImageContent: React.FC<{
       }}
     >
       {placeholder || '🖼️'}
+    </div>
+  );
+});
+
+/**
+ * A video on the design canvas.
+ *
+ * There is nothing to show: the file is on the panel's SD card, and the editor
+ * has never seen it. So the widget draws what it *is* — a black frame the size
+ * the picture will be, with the file it is pointed at named across it, rather
+ * than a still that would be a fabrication. The badges say what the widget will
+ * do when the screen loads, which is the part of the configuration that is
+ * invisible in a frame.
+ *
+ * A widget pointed at nothing says so here, because that is the one case the
+ * editor can catch before the panel does. Everything else — a name that
+ * matches no file, a file that is not Motion JPEG — is the panel's to report,
+ * in the same words, at the moment it looks. See docs/video-playback.md.
+ */
+export const CanvasVideoContent: React.FC<{
+  fileName?: string;
+  autoPlay?: boolean;
+  loop?: boolean;
+  textColor?: string;
+}> = React.memo(({ fileName, autoPlay, loop, textColor }) => {
+  const named = typeof fileName === 'string' ? fileName.trim() : '';
+
+  return (
+    <div
+      className={`lvgl-video${named ? '' : ' unnamed'}`}
+      title={named ? `Plays ${named} from the SD card` : 'No file named yet'}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        width: '100%',
+        height: '100%',
+        padding: '6px',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        textAlign: 'center',
+        color: textColor || '#ffffff',
+      }}
+    >
+      <span className="lvgl-video-glyph" style={{ fontSize: '20px', lineHeight: 1, opacity: 0.85 }}>
+        ▶
+      </span>
+      <span
+        className="lvgl-video-name"
+        style={{
+          maxWidth: '100%',
+          fontSize: '11px',
+          fontFamily: 'monospace',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          opacity: named ? 0.9 : 0.6,
+        }}
+      >
+        {named || 'No file named'}
+      </span>
+      {named && (autoPlay || loop) && (
+        <span
+          className="lvgl-video-badges"
+          style={{ fontSize: '9px', letterSpacing: '0.04em', opacity: 0.6 }}
+        >
+          {[autoPlay ? 'AUTO' : null, loop ? 'LOOP' : null].filter(Boolean).join(' · ')}
+        </span>
+      )}
     </div>
   );
 });

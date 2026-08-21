@@ -71,11 +71,21 @@ function compileGenerated(
   files: GeneratedCode,
   extraCFiles: string[] = [],
   extraFlags: string[] = [],
+  /**
+   * Files the *board* supplies rather than the generator — a firmware runtime
+   * header the generated code includes. Written beside the generated files so
+   * a call into that runtime is compiled against its real prototype here,
+   * which is the only place the two are checked against each other.
+   */
+  extraFiles: Record<string, string> = {},
 ): { success: boolean; stderr: string } {
   const tmpDir = mkdtempSync(join(tmpdir(), 'lvgl-compile-'));
   try {
     // Write generated files
     for (const [name, content] of Object.entries(files)) {
+      writeFileSync(join(tmpDir, name), content, 'utf-8');
+    }
+    for (const [name, content] of Object.entries(extraFiles)) {
       writeFileSync(join(tmpDir, name), content, 'utf-8');
     }
     // Write main.c
@@ -1144,6 +1154,79 @@ describe.skipIf(missing.length > 0)('Compile verification', { timeout: 300_000 }
       const screen = createScreen({ name: 'main', components: [obj] });
       const code = generateCode([screen], defaultOptions());
       const result = compileGenerated(code);
+      expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
+    });
+  });
+
+  // Video: the one widget whose generated code calls into the board's own
+  // firmware rather than into LVGL. The runtime is not part of the emulator
+  // toolchain, so it is stubbed here from the same prototypes
+  // firmware/stm32h747i-disco/include/hmi_video.h declares — which makes this
+  // the place a generated call and the runtime that receives it are checked
+  // against each other.
+  describe('Video', () => {
+    const VIDEO_H = `#ifndef HMI_VIDEO_H
+#define HMI_VIDEO_H
+#include <stdbool.h>
+#include "lvgl.h"
+void hmi_video_attach(lv_obj_t *frame, const char *file_name, bool auto_play, bool loop);
+void hmi_video_play(lv_obj_t *frame);
+void hmi_video_pause(lv_obj_t *frame);
+void hmi_video_stop(lv_obj_t *frame);
+#endif
+`;
+
+    const VIDEO_C = `#include "hmi_video.h"
+void hmi_video_attach(lv_obj_t *frame, const char *file_name, bool auto_play, bool loop) {
+    (void)frame; (void)file_name; (void)auto_play; (void)loop;
+}
+void hmi_video_play(lv_obj_t *frame) { (void)frame; }
+void hmi_video_pause(lv_obj_t *frame) { (void)frame; }
+void hmi_video_stop(lv_obj_t *frame) { (void)frame; }
+`;
+
+    function compileWithVideoRuntime(code: GeneratedCode) {
+      return compileGenerated(code, ['hmi_video.c'], [], {
+        'hmi_video.h': VIDEO_H,
+        'hmi_video.c': VIDEO_C,
+      });
+    }
+
+    it('compiles a video that names a file', { timeout: 30_000 }, () => {
+      const video = createComponent('video', {
+        name: 'intro_clip',
+        props: { fileName: 'intro.avi', autoPlay: true, loop: true },
+      });
+      const screen = createScreen({ name: 'main', components: [video] });
+      const result = compileWithVideoRuntime(generateCode([screen], defaultOptions()));
+      expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
+    });
+
+    it('compiles a video pointed at nothing, with both switches off', { timeout: 30_000 }, () => {
+      const video = createComponent('video', {
+        name: 'held_clip',
+        props: { fileName: '', autoPlay: false, loop: false },
+      });
+      const screen = createScreen({ name: 'main', components: [video] });
+      const result = compileWithVideoRuntime(generateCode([screen], defaultOptions()));
+      expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
+    });
+
+    it('compiles a video nested in a container, beside other widgets', { timeout: 30_000 }, () => {
+      const video = createComponent('video', {
+        name: 'panel_clip',
+        props: { fileName: 'demo.avi', autoPlay: true, loop: false },
+      });
+      const label = createComponent('label', {
+        name: 'caption',
+        props: { text: 'Now playing' },
+      });
+      const container = createComponent('obj', {
+        name: 'video_panel',
+        children: [video, label],
+      });
+      const screen = createScreen({ name: 'main', components: [container] });
+      const result = compileWithVideoRuntime(generateCode([screen], defaultOptions()));
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
   });

@@ -15,7 +15,7 @@ A full-featured **visual editor for LVGL user interfaces**, with drag-and-drop d
 ## ✨ Features
 
 ### 🎨 Visual design
-- **16 LVGL widgets**: button, label, image, slider, checkbox, switch, progress bar, arc, textarea, dropdown, container, tab view, window, chart, table, calendar
+- **17 LVGL widgets**: button, label, image, slider, checkbox, switch, progress bar, arc, textarea, dropdown, container, tab view, window, chart, table, calendar, video
 - **Drag and drop**: drag from the component panel onto the canvas
 - **Nesting**: place widgets inside containers
 - **Direct manipulation**: drag to move, resize from 8 handles
@@ -31,6 +31,7 @@ A full-featured **visual editor for LVGL user interfaces**, with drag-and-drop d
 - **Hierarchy panel**: tree view of the widget structure, with drag-to-reorder
 - **Undo / redo**: 50 steps of history
 - **Widget parts**: style a slider's fill and knob, a switch's On colour, an arc's value — the pieces LVGL draws separately, in each widget's own words. See [docs/widget-parts.md](docs/widget-parts.md)
+- **Video from the SD card**: name a Motion JPEG AVI and the panel plays it, decoded by the board's JPEG codec. Nothing is compiled in, so a film of any length costs the build nothing. See [docs/video-playback.md](docs/video-playback.md)
 
 ### 📄 Multi-page management
 - Create, delete and rename pages
@@ -251,6 +252,7 @@ src/
 | **Input** | Textarea, Dropdown, Checkbox, Switch, Slider |
 | **Container** | Container (obj), Tab View, Tile View, Window |
 | **Display** | Progress Bar, Arc, Spinner, Chart, Table, Calendar |
+| **Miscellaneous** | Video |
 
 ## 🔧 Known limitations
 

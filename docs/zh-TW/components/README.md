@@ -10,7 +10,7 @@
 
 ## 元件總覽
 
-編輯器共支援 **21 個元件**，分為 5 個類別：
+編輯器共支援 **22 個元件**，分為 6 個類別：
 
 | 類別 | 圖示 | 元件數 | 說明 |
 |------|------|--------|------|
@@ -19,6 +19,7 @@
 | 圖形 (shape) | 🔷 | 3 | 裝飾用幾何圖形，只繪製、不操作 |
 | 容器 (container) | 📁 | 4 | 可容納子元件的版面容器 |
 | 顯示 (display) | 📊 | 5 | 資料呈現與視覺化元件 |
+| 雜項 (misc) | 🧩 | 1 | 不屬於以上任何一族的元件 |
 
 ---
 
@@ -93,6 +94,20 @@
 | Chart | `chart` | 📈 | 200×150 | ❌ | 圖表元件，支援折線圖與長條圖。多系列資料，可設定座標軸與格線 | [chart.md](chart.md) |
 | Table | `table` | 📋 | 200×150 | ❌ | 表格元件，可設定行列、儲存格資料、欄寬與對齊方式 | [table.md](table.md) |
 | Calendar | `calendar` | 📅 | 220×220 | ❌ | 日曆元件，支援年月顯示、今日標記、日期高亮與範圍選取 | [calendar.md](calendar.md) |
+
+---
+
+## 雜項元件 (Miscellaneous)
+
+不屬於以上任何一族的元件。
+
+| 元件 | 類型 | 圖示 | 預設尺寸 | 容器 | 說明 | 文件 |
+|------|------|------|----------|------|------|------|
+| Video | `video` | 🎬 | 400×240 | ❌ | 從面板的 SD 卡播放 AVI 容器裡的 Motion JPEG，由板子的 JPEG 硬體解碼。唯一一個**指名**內容而不是帶著內容的元件，所以任何長度的片子都不佔建置空間 | [video.md](video.md) |
+
+> Video 是唯一一個「能不能用」取決於板子的元件：它需要 JPEG 硬體與 SD 介面，所以用到
+> 它的專案只能為 STM32H747I-DISCO 建置。見
+> [docs/zh-TW/video-playback.md](../video-playback.md)。
 
 ---
 
@@ -178,5 +193,6 @@ docs/components/
 ├── arc.md             ← Arc 弧形
 ├── chart.md           ← Chart 圖表
 ├── table.md           ← Table 表格
-└── calendar.md        ← Calendar 日曆
+├── calendar.md        ← Calendar 日曆
+└── video.md           ← Video 影片
 ```

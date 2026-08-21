@@ -7,6 +7,10 @@ export const componentCategories: ComponentCategory[] = [
   { id: 'shape', name: 'Shapes', icon: '🔷', collapsed: false },
   { id: 'container', name: 'Containers', icon: '📁', collapsed: false },
   { id: 'display', name: 'Display', icon: '📊', collapsed: false },
+  // Last, and named for what it is: the widgets that belong to no family
+  // above. A video is not a control, not a shape and not a chart — it is a
+  // panel showing something the firmware plays. See docs/video-playback.md.
+  { id: 'misc', name: 'Miscellaneous', icon: '🧩', collapsed: false },
 ];
 
 // LVGL default theme colors (Light mode)
@@ -637,6 +641,42 @@ export const componentDefinitions: ComponentDefinition[] = [
         borderWidth: 2,
         borderRadius: 8,
         textColor: '#212121',
+        opacity: 1,
+        padding: 0,
+      },
+    },
+    isContainer: false,
+  },
+
+  // Miscellaneous
+  {
+    type: 'video',
+    name: 'Video',
+    icon: '🎬',
+    category: 'misc',
+    // 800x480 halved: the panel's own aspect, at a size that leaves room on
+    // the canvas to place anything beside it.
+    defaultWidth: 400,
+    defaultHeight: 240,
+    defaultProps: {
+      // Named rather than imported: the file lives on the SD card and never
+      // enters the firmware image. See VideoProps.
+      fileName: '',
+      autoPlay: true,
+      loop: true,
+    },
+    defaultStyles: {
+      default: {
+        // Black, because that is what an empty video frame is — a letterboxed
+        // frame that did not fill the widget must not show the theme's white
+        // through it. No border and square corners, so the widget is exactly
+        // the picture.
+        bgColor: '#000000',
+        borderColor: 'transparent',
+        borderWidth: 0,
+        borderRadius: 0,
+        // The colour the panel writes "Video not found" in, over that black.
+        textColor: '#ffffff',
         opacity: 1,
         padding: 0,
       },

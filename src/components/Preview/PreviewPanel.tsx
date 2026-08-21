@@ -869,6 +869,16 @@ const PreviewPanel: React.FC = () => {
           });
           break;
 
+        case 'video':
+          drawVideo(ctx, x, y, w, h, {
+            fileName: comp.props.fileName,
+            autoPlay: comp.props.autoPlay !== false,
+            loop: comp.props.loop !== false,
+            bgColor: bgColorStyle,
+            textColor,
+          });
+          break;
+
         case 'spinner':
           drawSpinner(ctx, x, y, w, h, {
             track: partColor(comp, 'main', '#e0e0e0'),
@@ -2053,6 +2063,57 @@ function drawWindow(
   ctx.font = '14px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('✕', x + w - 18, y + titleH / 2);
+}
+
+/**
+ * The prototype's video frame.
+ *
+ * Deliberately not a still. The file is on the panel's SD card and no part of
+ * the editor has ever read it, so the prototype draws the frame the picture
+ * will occupy and names the file inside it. Inventing a thumbnail here would
+ * be the one thing in this preview that is not derived from the project.
+ */
+function drawVideo(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  opts: { fileName?: string; autoPlay: boolean; loop: boolean; bgColor: string; textColor: string }
+) {
+  const named = typeof opts.fileName === 'string' ? opts.fileName.trim() : '';
+
+  ctx.fillStyle = opts.bgColor && opts.bgColor !== 'transparent' ? opts.bgColor : '#000000';
+  ctx.fillRect(x, y, w, h);
+
+  const centreX = x + w / 2;
+  const centreY = y + h / 2;
+
+  // A play triangle sized off the shorter side, so it stays inside a widget
+  // that has been resized down to a strip.
+  const size = Math.max(6, Math.min(w, h) * 0.18);
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = opts.textColor || '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(centreX - size * 0.4, centreY - size - 4);
+  ctx.lineTo(centreX + size * 0.75, centreY - 4);
+  ctx.lineTo(centreX - size * 0.4, centreY + size - 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = opts.textColor || '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.globalAlpha = named ? 0.9 : 0.6;
+  ctx.font = '11px monospace';
+  ctx.fillText(named || 'No file named', centreX, centreY + size + 8, Math.max(0, w - 12));
+  const badges = [opts.autoPlay ? 'AUTO' : null, opts.loop ? 'LOOP' : null].filter(Boolean);
+  if (named && badges.length > 0) {
+    ctx.globalAlpha = 0.6;
+    ctx.font = '9px sans-serif';
+    ctx.fillText(badges.join(' · '), centreX, centreY + size + 22, Math.max(0, w - 12));
+  }
+  ctx.restore();
 }
 
 export default PreviewPanel;

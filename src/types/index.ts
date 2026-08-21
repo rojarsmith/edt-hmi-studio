@@ -577,6 +577,28 @@ export interface ImageButtonProps {
 }
 
 /**
+ * Canonical props for the `video` component.
+ *
+ * A video is the one widget whose content the editor never holds: the file
+ * lives on the panel's SD card and is named here, not imported. Nothing is
+ * linked into the firmware image, so a two-hour film costs the build nothing —
+ * and a name that matches no file on the card is a runtime fact the panel
+ * reports for itself. See docs/video-playback.md.
+ */
+export interface VideoProps {
+  /**
+   * The file to play, as it is named in the root of the SD card — for example
+   * `intro.avi`. Empty means the widget has not been pointed at anything yet,
+   * which the panel reports the same way it reports a missing file.
+   */
+  fileName: string;
+  /** Start playing as soon as the screen carrying this widget is loaded. */
+  autoPlay: boolean;
+  /** Start again from the first frame when the last one has been shown. */
+  loop: boolean;
+}
+
+/**
  * The states a style can be written for. `default` is the resting one.
  *
  * `checked` is not decoration: LVGL draws a switch's on colour and a

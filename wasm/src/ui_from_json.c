@@ -449,6 +449,36 @@ static lv_obj_t *create_win(lv_obj_t *parent, const cJSON *comp) {
     return win;
 }
 
+/*
+ * A video, in a browser tab that has no SD card.
+ *
+ * The Emulator runs the real LVGL against the real screen definition, but the
+ * one thing it cannot have is the panel's card reader — so it draws the frame
+ * the picture will occupy and says, in the widget itself, that the file is not
+ * read here. Showing "Video not found" would be a different claim: that the
+ * card was looked at and came back empty. Only the panel can say that.
+ */
+static lv_obj_t *create_video(lv_obj_t *parent, const cJSON *comp) {
+    lv_obj_t *frame = lv_obj_create(parent);
+    lv_obj_remove_flag(frame, LV_OBJ_FLAG_SCROLLABLE);
+
+    const cJSON *props = cJSON_GetObjectItemCaseSensitive(comp, "props");
+    const char *file = props ? cjson_get_string(props, "fileName") : NULL;
+    if (file && file[0] == 0) file = NULL;
+
+    lv_obj_t *text = lv_label_create(frame);
+    lv_label_set_long_mode(text, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_width(text, lv_pct(90));
+    lv_obj_set_style_text_align(text, LV_TEXT_ALIGN_CENTER, 0);
+    if (file) {
+        lv_label_set_text_fmt(text, LV_SYMBOL_VIDEO " %s\nNot played in the Emulator", file);
+    } else {
+        lv_label_set_text(text, LV_SYMBOL_VIDEO " No file named");
+    }
+    lv_obj_center(text);
+    return frame;
+}
+
 static lv_obj_t *create_spinner(lv_obj_t *parent, const cJSON *comp) {
     (void)comp;
     return lv_spinner_create(parent);
@@ -737,6 +767,7 @@ static const type_entry_t type_table[] = {
     { "tileview",  create_tileview },
     { "win",       create_win },
     { "spinner",   create_spinner },
+    { "video",     create_video },
     { "line",      create_line },
     { "polygon",   create_polygon },
     { "img",       create_img },
