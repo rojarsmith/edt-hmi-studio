@@ -328,6 +328,31 @@ describe('collectGlyphs — per-language typography fonts', () => {
     expect(rajdhani?.codePoints.has('H'.codePointAt(0)!)).toBe(true);
   });
 
+  /**
+   * A reading, a clock, a unit: text nothing translates. The words stay put
+   * when the language changes but the face does not, so the override font has
+   * to be able to draw them — or the panel shows a box the moment it switches.
+   */
+  it('gives the override font the widget\'s own literal too', () => {
+    const label = createComponent('label', {
+      name: 'temp', props: { text: '92°C' }, typographyId: 'typo1',
+    });
+    const result = collectGlyphs({
+      screens: [createScreen({ components: [label] })],
+      fontResources: [
+        createFontResource({ cFontName: 'font_rajdhani' }),
+        createFontResource({ cFontName: 'font_noto' }),
+      ],
+      typographies: [{
+        id: 'typo1', name: 'Numeric', fontResource: 'font_rajdhani', fontSize: 28,
+        languages: { 'zh-TW': { fontResource: 'font_noto', fontSize: 24 } },
+      }],
+    });
+    const noto = result.byFontSize.get(glyphSetKey('font_noto', 24));
+    expect(noto?.codePoints.has(0xb0)).toBe(true); // the degree sign
+    expect(noto?.codePoints.has('9'.codePointAt(0)!)).toBe(true);
+  });
+
   it('keeps a language without an override on the base font', () => {
     const label = createComponent('label', {
       name: 'title', props: { text: 'Hello' }, textId: 't1', typographyId: 'typo1',

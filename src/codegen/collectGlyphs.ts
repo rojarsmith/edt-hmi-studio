@@ -271,11 +271,40 @@ export function collectGlyphs(input: CollectGlyphsInput): GlyphCollection {
   const typographyById = new Map(typographies.map((typography) => [typography.id, typography]));
   const textById = new Map(texts.map((text) => [text.id, text]));
 
+  /**
+   * The other faces this widget's own words can be drawn with.
+   *
+   * A literal does not change when the language does, but the face that draws
+   * it does: a typography with a per-language font renders the same string
+   * through it. Collecting only the Default's face leaves those fonts without
+   * the characters — which is how a degree sign came out as a box the moment
+   * a Chinese screen was shown.
+   */
+  const languageFonts = (comp: LvglComponent): { cFontName: string; size: number }[] => {
+    const typographyId = effectiveTypographyId(comp, texts);
+    const typography = typographyId ? typographyById.get(typographyId) : undefined;
+    if (!typography?.languages) return [];
+
+    const out: { cFontName: string; size: number }[] = [];
+    for (const language of Object.keys(typography.languages)) {
+      if (!hasLanguageOverride(typography, language)) continue;
+      const resolved = resolveTypographyStyle(typography, language);
+      if (isBuiltinFont(resolved.fontResource)) continue;
+      if (!customFontNames.has(resolved.fontResource)) continue;
+      out.push({ cFontName: resolved.fontResource, size: resolved.fontSize || IMPLIED_FONT_SIZE });
+    }
+    return out;
+  };
+
   // 1. Static text on widgets
   const walk = (components: LvglComponent[]) => {
     for (const comp of components) {
       for (const { field, text } of textsOfComponent(comp)) {
         record(comp, { kind: 'widget', owner: comp.name, field, text });
+        const others = languageFonts(comp);
+        if (others.length > 0) {
+          record(comp, { kind: 'widget', owner: comp.name, field, text }, others);
+        }
       }
 
       // A linked widget renders its text resource, and the device can switch
