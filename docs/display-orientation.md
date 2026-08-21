@@ -454,9 +454,10 @@ Concretely, per board:
   lands, then `lv_draw_sw_rotate(px_map, first_pixel, w, h, src_stride,
   fb_stride, rotation, cf)`. Both `LV_COLOR_FORMAT_ARGB8888` (EDT) and
   `LV_COLOR_FORMAT_RGB565` (F746G) are supported by that function.
-- A touch transform, because **LVGL does not rotate input**. `lv_indev.c`
-  contains no display-rotation handling at all; the driver's read callback must
-  hand LVGL already-rotated coordinates.
+- **No touch transform.** LVGL rotates the point itself —
+  `indev_pointer_proc` calls `lv_display_rotate_point` before hit-testing
+  (`lv_indev.c:742`). The driver hands it *panel* coordinates, unrotated, in
+  both orientations. §15.6 records how this was got backwards and what it cost.
 - Tear avoidance, which is the part that is not mechanical (§8.5).
 
 The rotation itself is a scalar per-pixel loop with a strided read
@@ -850,12 +851,10 @@ into next would otherwise hold the frame before last. So the tear-free property
 the direct-mode driver was built around is preserved.
 
 Touch is turned in `touch_read` rather than in the vendored driver, which goes on
-mapping onto the panel's own frame in both orientations. LVGL rotates no input at
-all — `lv_indev.c` has no notion of display rotation — so the driver owes it
-already-turned coordinates. The transform is the inverse of
-`lv_display_rotate_area`'s: panel `(x, y)` becomes logical `(271 - y, x)`. The
-bring-up log deliberately records the **raw** reading, since recording the
-transformed one would hide the thing it exists to check.
+mapping onto the panel's own frame in both orientations — and the driver passes
+that straight through, because LVGL turns the point itself. §15.6 records the
+mistake this sentence used to contain. The bring-up log records the raw reading
+and, beside it, the point LVGL will hit-test after its own rotation.
 
 ### 15.3 Cost, measured where it can be
 
@@ -936,3 +935,53 @@ canvas instead of claiming to have handled them.
 `rotateLayout.ts`, its tests, and the `rotateLayout` store action are gone
 rather than left unused — the transform itself is written down in §6 for
 whenever a real "rotate this project" command is designed.
+
+### 15.6 The touch transform was applied twice
+
+Portrait touch landed in the wrong place, and the cause was a claim in §8.3 and
+§15.2 that was simply false: **LVGL rotates the input point itself.**
+
+`indev_pointer_proc` calls `lv_display_rotate_point(i->disp, &data->point)`
+before hit-testing (`lv_indev.c:742`), and for `ROTATION_90` that function
+computes `point->x = ver_res - y - 1; point->y = x` — the *same* transform the
+driver was applying in `touch_read`. Two applications of a quarter turn is a
+half turn, so a press at panel `(x, y)` reached LVGL as `(271 - x, 271 - y)`:
+off the display for most of the panel, and on the widget only when the opposite
+corner was pressed. That is exactly the reported symptom — "touch responds
+immediately, but at an offset position".
+
+The claim entered the document because the search that produced it was for
+`"rotation"`, and the function is called `rotate_point`. A grep that misses is
+indistinguishable from a grep that finds nothing, and this one was written down
+as a positive fact in two places rather than as an absence of evidence.
+
+The fix is to delete the driver's transform: `touch_read` now hands LVGL panel
+coordinates in both orientations, clamped to the panel because the vendored
+chain reports outside it (§15.1's `- 10` scale fudge and `size - brute_y`
+off-by-one). The clamp is the only correction the driver still owes.
+
+**What made this hard to see** is worth recording, because none of the obvious
+checks caught it:
+
+- The render was verified correct against the frame buffer — the button really
+  is drawn where the mapping says.
+- The driver's own transform was verified correct — the log showed
+  `panel(143,77) -> logical(194,143)`, arithmetically exact.
+- Both were right *in isolation*. Nothing in either half hinted that a third
+  party was applying the same rotation again.
+
+What finally located it was reading `disp->act_scr` off the running target and
+finding it still pointed at the screen that was already displayed: the press
+was arriving, the coordinates were self-consistent, and the click was not
+firing — which ruled out everything except the point being moved after the
+driver handed it over.
+
+One check would have caught it far earlier, and is the lesson: **a driver that
+transforms coordinates should verify against what the framework hit-tests, not
+against its own arithmetic.** The log now records both the panel reading and
+the post-`lv_display_rotate_point` result, so the two can be compared against
+widget coordinates directly.
+
+The H747I is unaffected: there the panel rotates itself through MADCTR and
+`lv_display_set_rotation` is never called, so `lv_display_rotate_point` is a
+no-op and the BSP's `TS_SWAP_*` flags remain the only transform.

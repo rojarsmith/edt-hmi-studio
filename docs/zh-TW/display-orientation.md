@@ -389,8 +389,9 @@ partial 模式那條路徑上處理（`lv_st_ltdc_create_partial`，`lv_draw_sw_
 - 一個 flush callback，先用 `lv_display_rotate_area` 算出橫帶落在哪裡，再呼叫
   `lv_draw_sw_rotate(px_map, first_pixel, w, h, src_stride, fb_stride, rotation, cf)`。
   `LV_COLOR_FORMAT_ARGB8888`（EDT）與 `LV_COLOR_FORMAT_RGB565`（F746G）該函式都支援。
-- 一個觸控轉換，因為 **LVGL 不會轉輸入**。`lv_indev.c` 裡完全沒有處理顯示旋轉的程式碼；
-  驅動的 read callback 必須交給 LVGL 已經轉好的座標。
+- **不需要觸控轉換。** LVGL 自己會轉——`indev_pointer_proc` 在 hit-test 之前會呼叫
+  `lv_display_rotate_point`（`lv_indev.c:742`）。驅動在兩個方向都交給它**面板**座標、
+  不要轉。§15.6 記錄了這件事怎麼被搞反，以及代價。
 - 撕裂的處理，而那是唯一不機械的部分（§8.5）。
 
 旋轉本身是一個純量的逐像素迴圈，而且讀取是跨步的（`lv_draw_sw_utils.c`，
@@ -702,10 +703,8 @@ weak 定義摺掉了，所以那份韌體不論專案怎麼寫都會以橫向開
 上一幀。所以 direct mode 驅動當初繞著它設計的那個「不撕裂」性質被保住了。
 
 觸控是在 `touch_read` 裡轉的，不是在 vendored 驅動裡——後者在兩個方向都照樣映射到面板自己
-的座標系。LVGL 完全不轉輸入（`lv_indev.c` 裡沒有顯示旋轉這個概念），所以驅動有義務交給它
-已經轉好的座標。這個轉換是 `lv_display_rotate_area` 的反函數：面板的 `(x, y)` 變成邏輯的
-`(271 - y, x)`。bring-up 記錄刻意存**原始**讀值，因為存轉換後的值會把它存在要檢查的那件事
-藏起來。
+的座標系，而驅動就這樣原封不動傳下去，因為 LVGL 自己會轉。§15.6 記錄了這段話原本錯在哪裡。
+bring-up 記錄存原始讀值，旁邊再存一份 LVGL 轉完之後真正拿去 hit-test 的點。
 
 ### 15.3 成本，能量的都量了
 
@@ -771,3 +770,39 @@ Project Settings 原本在方向改變時把整個版面轉四分之一圈——
 
 `rotateLayout.ts`、它的測試、以及 `rotateLayout` 這個 store action 都直接刪掉而不是留著不
 用——轉換公式本身記在 §6，等哪天真的要設計一個「旋轉這個專案」指令時再拿出來。
+
+### 15.6 觸控轉換被套用了兩次
+
+直向的觸控點會落在錯的位置，原因是 §8.3 與 §15.2 裡一句根本不成立的斷言：**LVGL 自己會轉
+輸入點。**
+
+`indev_pointer_proc` 在 hit-test 之前會呼叫 `lv_display_rotate_point(i->disp, &data->point)`
+（`lv_indev.c:742`），而該函式對 `ROTATION_90` 算的是 `point->x = ver_res - y - 1;
+point->y = x`——跟驅動在 `touch_read` 裡做的是**同一個**轉換。轉兩次四分之一圈就是半圈，所以
+面板上 `(x, y)` 的按壓，到了 LVGL 手上變成 `(271 - x, 271 - y)`：面板上大部分位置都落到畫面
+外，只有按下**對角**時才會壓到 widget。這正是回報的症狀——「馬上有反應，但位置是偏的」。
+
+這句斷言會寫進文件，是因為當初的搜尋字串是 `"rotation"`，而那個函式叫 `rotate_point`。一次
+搜不到的 grep，和一次真的不存在的 grep，看起來一模一樣——而這一次它被當成肯定的事實寫進了
+兩個地方，而不是被當成「沒有證據」。
+
+修法是把驅動裡的轉換刪掉：`touch_read` 現在在兩個方向都交給 LVGL 面板座標，只做夾限，因為
+vendored 那條鏈確實會回報到面板之外（§15.1 的 `- 10` 縮放與 `size - brute_y` 少減一）。夾限
+是驅動現在唯一還欠的修正。
+
+**為什麼這件事很難看出來**，值得記下來，因為所有顯而易見的檢查都沒抓到它：
+
+- 顯示對照 framebuffer 驗證過是對的——按鈕確實畫在映射所說的位置。
+- 驅動自己的轉換也驗證過是對的——記錄顯示 `panel(143,77) -> logical(194,143)`，算術上分毫不差。
+- 兩邊**各自**都對。而任一邊都沒有任何跡象暗示還有第三方會再轉一次。
+
+最後定位到它的，是從執行中的目標讀出 `disp->act_scr`，發現它仍然指著當下已經顯示的那個畫面：
+按壓有進來、座標自洽、而 click 沒有觸發——這就排除掉了除「驅動交出去之後點又被移動」以外的
+所有可能。
+
+有一個檢查本來可以早得多抓到它，而那就是教訓：**會轉換座標的驅動，該驗證的是框架真正拿去
+hit-test 的東西，不是自己的算術。** 記錄現在同時存面板讀值與 `lv_display_rotate_point` 之後
+的結果，兩者可以直接跟 widget 座標對照。
+
+H747I 不受影響：那裡是面板自己透過 MADCTR 轉，`lv_display_set_rotation` 從未被呼叫，所以
+`lv_display_rotate_point` 是 no-op，BSP 的 `TS_SWAP_*` 旗標仍是唯一的轉換。

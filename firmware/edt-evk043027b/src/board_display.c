@@ -495,65 +495,48 @@ static void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 
     if ((EDT_TS_GetState(&touch) == TS_OK) && (touch.touchDetected > 0U)) {
         /*
-         * The vendor driver maps a reading onto the panel's own landscape
-         * frame, and is left doing exactly that in both orientations — it is
-         * vendored code, and EDT_LCD_GetXSize/GetYSize below still answer with
-         * the panel. The rotation is undone here instead.
+         * Panel coordinates, unrotated, in both orientations — LVGL turns the
+         * point itself.
          *
-         * LVGL does not rotate input at all: lv_indev.c has no notion of
-         * display rotation, so a driver on a turned display must hand it
-         * already-turned coordinates. This is the inverse of what
-         * lv_display_rotate_area does to an area for ROTATION_90 — that maps
-         * logical to panel as (x, y) -> (y, ver_res - x - 1), so panel to
-         * logical is (x, y) -> (ver_res - y - 1, x).
+         * This driver used to turn it here as well, on the belief that LVGL
+         * did not. It does: indev_pointer_proc calls lv_display_rotate_point
+         * before hit-testing (lv_indev.c), and for ROTATION_90 that computes
+         * exactly `(ver_res - y - 1, x)` — the same transform. Applying it in
+         * both places rotates 180 degrees in total, so a press landed at
+         * (271 - x, 271 - y): off the screen entirely for most of the panel,
+         * and on the widget only when the *opposite* corner was pressed. That
+         * is what "touch responds, but in the wrong place" looked like.
+         *
+         * The reading is clamped to the panel, because the vendored chain
+         * genuinely reports outside it. mxt336u_TS_GetXY scales onto the panel
+         * less a fudge of ten, and edt_bsp_ctp applies TS_SWAP_Y as
+         * `EDT_LCD_GetYSize() - brute_y` where it should be `- 1 - brute_y`, so
+         * Y arrives as 10..272 when the last valid row is 271. Both files are
+         * vendored and stay unedited, so the correction belongs here.
          */
-        lv_display_t *display = lv_display_get_default();
-        const int32_t panel_x = (int32_t)touch.touchX[0];
-        const int32_t panel_y = (int32_t)touch.touchY[0];
+        int32_t panel_x = (int32_t)touch.touchX[0];
+        int32_t panel_y = (int32_t)touch.touchY[0];
 
-        if (lv_display_get_rotation(display) != LV_DISPLAY_ROTATION_0) {
-            last_x = (int32_t)HMI_DISPLAY_HEIGHT - 1 - panel_y;
-            last_y = panel_x;
-        } else {
-            last_x = panel_x;
-            last_y = panel_y;
+        if (panel_x < 0) panel_x = 0;
+        if (panel_y < 0) panel_y = 0;
+        if (panel_x > (int32_t)HMI_DISPLAY_WIDTH - 1) {
+            panel_x = (int32_t)HMI_DISPLAY_WIDTH - 1;
+        }
+        if (panel_y > (int32_t)HMI_DISPLAY_HEIGHT - 1) {
+            panel_y = (int32_t)HMI_DISPLAY_HEIGHT - 1;
         }
 
-        /*
-         * Clamped, because the vendored chain genuinely produces values outside
-         * the panel and one of them lands *negative* once turned.
-         *
-         * mxt336u_TS_GetXY scales the controller's range onto the panel less a
-         * fudge of ten (`(lcdw - 10) / max_y`), so a reading spans 0..470 by
-         * 0..262 rather than 0..479 by 0..271. edt_bsp_ctp then applies
-         * TS_SWAP_Y as `EDT_LCD_GetYSize() - brute_y`, which is one too many —
-         * it should be size - 1 - brute_y — so panel Y comes back as 10..272
-         * when the last valid row is 271. Turned for portrait that becomes
-         * logical X = 271 - 272 = -1.
-         *
-         * Both are in vendored files, which this board deliberately does not
-         * edit, so the correction belongs here. It is a clamp rather than a
-         * rescale: the ten-pixel dead band at two edges is the vendor's
-         * calibration and not ours to invent a fix for, but a point outside the
-         * display is simply wrong and LVGL should never see one.
-         */
-        {
-            const int32_t max_x = lv_display_get_horizontal_resolution(display) - 1;
-            const int32_t max_y = lv_display_get_vertical_resolution(display) - 1;
+        last_x = panel_x;
+        last_y = panel_y;
 
-            if (last_x < 0) last_x = 0;
-            if (last_y < 0) last_y = 0;
-            if (last_x > max_x) last_x = max_x;
-            if (last_y > max_y) last_y = max_y;
-        }
-
-        /* One entry per press, not per poll, so the log stays readable. Both
-           frames are recorded: the raw reading is what the mapping has to be
-           worked out from, and the logical one is what LVGL actually hit-tests
-           against, so a single dump answers "is it the transform or the
-           panel?" without a second flash. */
+        /* One entry per press, not per poll, so the log stays readable. The
+           second pair is what LVGL will hit-test after its own rotation, so a
+           dump can be compared straight against widget coordinates without
+           redoing the arithmetic by hand. */
         if (!was_pressed) {
-            record_touch(panel_x, panel_y, last_x, last_y);
+            lv_point_t hit = { .x = panel_x, .y = panel_y };
+            lv_display_rotate_point(lv_display_get_default(), &hit);
+            record_touch(panel_x, panel_y, hit.x, hit.y);
             was_pressed = true;
         }
         data->state = LV_INDEV_STATE_PRESSED;
