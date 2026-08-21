@@ -33,8 +33,6 @@ import { synchronizeModbusBindings } from '../utils/modbusBindings';
 import { applyLineGeometry } from '../utils/lineGeometry';
 import { applyPolygonGeometry } from '../utils/polygonGeometry';
 import { squareBox } from '../utils/circleGeometry';
-import type { QuarterTurn } from '../utils/rotateLayout';
-import { rotateScreens } from '../utils/rotateLayout';
 import { keyFromText, literalOf, resolveText } from '../codegen/textResources';
 
 // Maximum history entries for undo/redo
@@ -302,16 +300,6 @@ interface EditorState {
   
   // Actions - Canvas
   setCanvasSize: (width: number, height: number) => void;
-  /**
-   * Turn the whole design a quarter turn and transpose the canvas with it, for
-   * a project whose orientation changed after it already had widgets.
-   *
-   * One history entry, so it undoes as a single step — which matters, because
-   * it moves every widget on every screen and the author has to be able to
-   * take it back. Boxes only; see utils/rotateLayout.ts for what that leaves
-   * untouched.
-   */
-  rotateLayout: (turn: QuarterTurn) => void;
   setZoom: (zoom: number) => void;
   setPan: (x: number, y: number) => void;
   toggleGrid: () => void;
@@ -1925,20 +1913,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  rotateLayout: (turn) => {
-    get().saveToHistory();
-    set(state => ({
-      // Measured against the canvas the layout was authored in, so this reads
-      // the pre-rotation size and writes the transpose in the same update.
-      screens: rotateScreens(state.screens, state.canvas.width, state.canvas.height, turn),
-      canvas: {
-        ...state.canvas,
-        width: state.canvas.height,
-        height: state.canvas.width,
-      },
-    }));
-  },
-  
   setZoom: (zoom) => {
     const clampedZoom = Math.max(0.1, Math.min(3, zoom));
     set(state => ({

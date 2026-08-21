@@ -53,11 +53,12 @@ export interface DisplayConfig {
   colorDepth: 16 | 24 | 32;
   /**
    * Chosen at creation and changeable afterwards in Project Settings, which
-   * turns the existing layout with the canvas (`rotateLayout`). What that turn
-   * cannot do is rotate what is *inside* each widget — a label's text
-   * direction, an arc's angles, a chart's axes — so the dialog warns before
-   * saving rather than pretending it is lossless. See
-   * docs/display-orientation.md §6 and utils/rotateLayout.ts.
+   * reshapes the canvas and leaves every widget's coordinates alone. Turning
+   * the widgets too was built and then deliberately taken out: it moves a
+   * layout the author placed by hand, and it cannot rotate what is *inside* a
+   * widget — a label's text direction, an arc's angles, a chart's axes — so it
+   * was never the lossless operation it looked like. The dialog says what will
+   * end up off-canvas instead. See docs/display-orientation.md §6.
    *
    * May name an orientation this project's board has no firmware for; that
    * blocks the build, not the design. See

@@ -917,3 +917,22 @@ is `271 - 220` and `23`. The mapping was right the whole time.
 refresh (§8.3 estimated 5–8 ms worst case), whether the swap-and-reconcile keeps
 up at 60 Hz, and whether the touch transform is right, all need the board. The
 EDT now offers Portrait in the editor precisely so that can be tried.
+
+### 15.5 Orientation changes stop moving widgets
+
+Project Settings turned the whole layout a quarter turn when the orientation
+changed — §6's box transform, built and shipped in `utils/rotateLayout.ts`. It
+has been taken out on the author's instruction, and the reasoning is worth
+keeping because it is the same reasoning §6 used to argue against the feature in
+the first place.
+
+Rotating boxes moves a layout somebody placed by hand, and it cannot rotate what
+is *inside* a box: a 100x40 label becomes 40x100 with its text still running
+left to right. So the operation looked lossless and was not. Changing the
+orientation now reshapes the canvas and leaves every widget's coordinates
+exactly as they were; the dialog says which widgets will end up outside the new
+canvas instead of claiming to have handled them.
+
+`rotateLayout.ts`, its tests, and the `rotateLayout` store action are gone
+rather than left unused — the transform itself is written down in §6 for
+whenever a real "rotate this project" command is designed.

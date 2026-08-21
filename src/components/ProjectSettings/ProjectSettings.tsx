@@ -19,7 +19,7 @@ import './ProjectSettings.css';
 const ProjectSettings: React.FC = () => {
   const { currentProjectId, setShowProjectSettings, setDefaultFontSize } = useAppStore();
   const { getProjectConfig, updateProjectConfig } = useProjectStore();
-  const { setCanvasSize, rotateLayout } = useEditorStore();
+  const { setCanvasSize } = useEditorStore();
   const fonts = useResourceStore((s) => s.fonts);
 
   const [config, setConfig] = useState<ProjectConfig | null>(null);
@@ -66,18 +66,13 @@ const ProjectSettings: React.FC = () => {
     };
 
     /*
-     * Turning an existing design, not just resizing the canvas under it. The
-     * direction is the one that takes the widgets with the canvas: clockwise
-     * into portrait, back the other way out of it.
-     *
-     * rotateLayout transposes the canvas itself as part of the same history
-     * entry, so the setCanvasSize below is a no-op in that case and the one
-     * that matters when nothing turned.
+     * Only the canvas turns. Widgets keep the coordinates they were given, by
+     * explicit request: rotating their boxes moves a layout the author placed
+     * by hand, and rotating what is *inside* them is a different answer for
+     * each widget type (a label's text direction, an arc's angles) rather than
+     * a geometric one. See docs/display-orientation.md §6.
      */
     const turned = orientation !== config.display.orientation;
-    if (turned) {
-      rotateLayout(orientation === 'portrait' ? 'cw' : 'ccw');
-    }
     const lvglConfig = {
       ...config.lvglConfig,
       colorFormat: board.display.colorFormat,
@@ -112,12 +107,12 @@ const ProjectSettings: React.FC = () => {
     setShowProjectSettings(false);
     toast.success('Project settings saved');
     if (turned) {
-      // Says what moved and what did not, because the second half is the part
-      // that surprises people — see utils/rotateLayout.ts.
+      // Says what changed and what deliberately did not, because a canvas that
+      // changes shape under an unchanged layout is the surprising half.
       toast.info(
-        `Layout turned to ${ORIENTATION_LABELS[orientation].toLowerCase()} `
-        + `(${display.width}×${display.height}). Widget positions and sizes were `
-        + 'rotated; text direction and arc angles were not. Ctrl+Z undoes it.',
+        `Design canvas is now ${display.width}×${display.height} `
+        + `(${ORIENTATION_LABELS[orientation].toLowerCase()}). Widgets kept their `
+        + 'positions — any that now sit outside the canvas need moving.',
       );
     }
     if (resynced) {
@@ -143,10 +138,10 @@ const ProjectSettings: React.FC = () => {
             <input className="npd-input" type="text" value={name} onChange={e => setName(e.target.value)} />
           </label>
 
-          {/* Changeable here, unlike the board and the protocol, because the
-              layout can be turned with the canvas. What cannot be turned is
-              what is *inside* each widget, which is why the warning below
-              appears before the change rather than after it. See
+          {/* Changeable here, unlike the board and the protocol. Only the
+              canvas turns; the widgets on it are left exactly where the author
+              put them, which is why the note below is about what will end up
+              off-canvas rather than about what moved. See
               docs/display-orientation.md §6. */}
           <label className="npd-label">
             Display Orientation
@@ -171,9 +166,9 @@ const ProjectSettings: React.FC = () => {
             </span>
             {willTurn && (
               <span className="ps-warning">
-                ⚠️ Saving turns every widget on every screen a quarter turn.
-                Positions and sizes rotate; text direction, arc angles and
-                chart axes do not. Undo with Ctrl+Z.
+                ⚠️ Saving reshapes the canvas to {design.width}×{design.height}.
+                Widgets are not moved, so anything lying outside the new canvas
+                will need repositioning.
               </span>
             )}
           </label>
