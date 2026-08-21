@@ -95,6 +95,51 @@ static uint32_t fb_drawing = HMI_FRAMEBUFFER_1;
 static lv_area_t dirty_area;
 static bool dirty_valid;
 
+/*
+ * What a portrait refresh actually costs, in CPU cycles at 160 MHz — divide by
+ * 160 for microseconds.
+ *
+ * Here because the estimate it replaces (docs/display-orientation.md §8.3 put
+ * a full-screen turn at 5–8 ms) is the input to a decision that has not been
+ * taken yet: whether the rotate belongs on DMA2D or the part's GPU2D, and
+ * whether the reconcile copy should be handed to DMA2D as well. Guessing at it
+ * from the front of the panel is how "the display feels slow" turns into a
+ * week of the wrong optimisation.
+ *
+ * Dump it with
+ *
+ *   x/5dw &board_display_stats
+ *
+ * `worst_*` is what matters; a full-screen change is the worst case and a
+ * button repainting itself is not.
+ */
+typedef struct {
+    int32_t refreshes;
+    int32_t last_rotate_cycles;
+    int32_t worst_rotate_cycles;
+    int32_t last_reconcile_cycles;
+    int32_t worst_reconcile_cycles;
+} board_display_stats_t;
+
+board_display_stats_t board_display_stats;
+
+/*
+ * DWT's cycle counter, which is free to read and costs nothing to leave
+ * running. It needs enabling once: the debug block powers up with the counter
+ * halted, and unlike a HAL timer it is not claimed by anything else.
+ */
+static void cycle_counter_start(void)
+{
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0U;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+static uint32_t cycles_since(uint32_t started)
+{
+    return DWT->CYCCNT - started;
+}
+
 /* A frame is ~16 ms; well beyond that means the LTDC is not scanning and we
    must not block the main loop, which also drives Modbus. */
 #define HMI_RELOAD_TIMEOUT_MS 100U
@@ -207,6 +252,9 @@ static void copy_between_framebuffers(
  * Portrait: turn one rendered band into the frame buffer the LTDC is not
  * scanning, and swap once the last band of the refresh is in.
  */
+/** Rotation cycles accumulated across the bands of the refresh in progress. */
+static uint32_t rotate_cycles;
+
 static void display_flush_rotated(
     lv_display_t *display,
     const lv_area_t *area,
@@ -225,15 +273,23 @@ static void display_flush_rotated(
         + (stride * (uint32_t)panel.y1)
         + (HMI_DISPLAY_BYTES_PER_PIXEL * (uint32_t)panel.x1);
 
-    lv_draw_sw_rotate(
-        pixel_map,
-        first_pixel,
-        width,
-        height,
-        width * (int32_t)HMI_DISPLAY_BYTES_PER_PIXEL,
-        (int32_t)stride,
-        LV_DISPLAY_ROTATION_90,
-        LV_COLOR_FORMAT_ARGB8888);
+    {
+        const uint32_t started = DWT->CYCCNT;
+
+        lv_draw_sw_rotate(
+            pixel_map,
+            first_pixel,
+            width,
+            height,
+            width * (int32_t)HMI_DISPLAY_BYTES_PER_PIXEL,
+            (int32_t)stride,
+            LV_DISPLAY_ROTATION_90,
+            LV_COLOR_FORMAT_ARGB8888);
+
+        /* Accumulated across the bands of one refresh, then latched below —
+           a single band is not the number anyone needs. */
+        rotate_cycles += cycles_since(started);
+    }
 
     if (dirty_valid) {
         if (panel.x1 < dirty_area.x1) dirty_area.x1 = panel.x1;
@@ -260,9 +316,28 @@ static void display_flush_rotated(
     }
 
     if (dirty_valid) {
+        const uint32_t started = DWT->CYCCNT;
+
         copy_between_framebuffers(fb_scanning, fb_drawing, &dirty_area);
+        board_display_stats.last_reconcile_cycles = (int32_t)cycles_since(started);
         dirty_valid = false;
+    } else {
+        board_display_stats.last_reconcile_cycles = 0;
     }
+
+    board_display_stats.last_rotate_cycles = (int32_t)rotate_cycles;
+    if (board_display_stats.last_rotate_cycles
+            > board_display_stats.worst_rotate_cycles) {
+        board_display_stats.worst_rotate_cycles =
+            board_display_stats.last_rotate_cycles;
+    }
+    if (board_display_stats.last_reconcile_cycles
+            > board_display_stats.worst_reconcile_cycles) {
+        board_display_stats.worst_reconcile_cycles =
+            board_display_stats.last_reconcile_cycles;
+    }
+    board_display_stats.refreshes++;
+    rotate_cycles = 0U;
 
     lv_display_flush_ready(display);
 }
@@ -304,10 +379,18 @@ static void display_flush(
  * actually arrives lets a debugger read the mapping off the running board:
  * touch the four corners, then dump board_touch_log with
  *
- *   x/12dw &board_touch_log
+ *   x/21dw &board_touch_log
  *
- * `min`/`max` bound the reachable range (they should approach 0 and the panel
- * size), and `recent` holds the last four points in the order they were seen.
+ * `min`/`max` bound the reachable range in the *panel's* frame (they should
+ * approach 0 and the panel size), and `recent` holds the last four points in
+ * the order they were seen — each as the panel reported it and again as the
+ * logical point LVGL was handed, which are the same thing in landscape and a
+ * quarter turn apart in portrait.
+ *
+ * Reading the two side by side is what separates the two failure modes that
+ * look identical from the front: a touch that lands in the wrong place (the
+ * transform is wrong) from a touch that lands in the right place but rarely
+ * arrives (the panel or the refresh rate is at fault).
  */
 typedef struct {
     int32_t presses;
@@ -315,7 +398,10 @@ typedef struct {
     int32_t max_x;
     int32_t min_y;
     int32_t max_y;
+    /** Panel frame, as the vendored driver reported it. */
     int32_t recent[4][2];
+    /** The same presses after the rotation, as LVGL hit-tests them. */
+    int32_t recent_logical[4][2];
 } board_touch_log_t;
 
 board_touch_log_t board_touch_log = {
@@ -325,17 +411,24 @@ board_touch_log_t board_touch_log = {
     .max_y = INT32_MIN,
 };
 
-static void record_touch(int32_t x, int32_t y)
+static void record_touch(
+    int32_t panel_x,
+    int32_t panel_y,
+    int32_t logical_x,
+    int32_t logical_y)
 {
     board_touch_log_t *log = &board_touch_log;
+    const uint32_t slot = (uint32_t)log->presses & 3U;
 
-    if (x < log->min_x) log->min_x = x;
-    if (x > log->max_x) log->max_x = x;
-    if (y < log->min_y) log->min_y = y;
-    if (y > log->max_y) log->max_y = y;
+    if (panel_x < log->min_x) log->min_x = panel_x;
+    if (panel_x > log->max_x) log->max_x = panel_x;
+    if (panel_y < log->min_y) log->min_y = panel_y;
+    if (panel_y > log->max_y) log->max_y = panel_y;
 
-    log->recent[(uint32_t)log->presses & 3U][0] = x;
-    log->recent[(uint32_t)log->presses & 3U][1] = y;
+    log->recent[slot][0] = panel_x;
+    log->recent[slot][1] = panel_y;
+    log->recent_logical[slot][0] = logical_x;
+    log->recent_logical[slot][1] = logical_y;
     log->presses++;
 }
 
@@ -382,20 +475,53 @@ static void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
          * logical to panel as (x, y) -> (y, ver_res - x - 1), so panel to
          * logical is (x, y) -> (ver_res - y - 1, x).
          */
-        if (lv_display_get_rotation(lv_display_get_default())
-                != LV_DISPLAY_ROTATION_0) {
-            last_x = (int32_t)HMI_DISPLAY_HEIGHT - 1 - (int32_t)touch.touchY[0];
-            last_y = (int32_t)touch.touchX[0];
+        lv_display_t *display = lv_display_get_default();
+        const int32_t panel_x = (int32_t)touch.touchX[0];
+        const int32_t panel_y = (int32_t)touch.touchY[0];
+
+        if (lv_display_get_rotation(display) != LV_DISPLAY_ROTATION_0) {
+            last_x = (int32_t)HMI_DISPLAY_HEIGHT - 1 - panel_y;
+            last_y = panel_x;
         } else {
-            last_x = (int32_t)touch.touchX[0];
-            last_y = (int32_t)touch.touchY[0];
+            last_x = panel_x;
+            last_y = panel_y;
         }
-        /* One entry per press, not per poll, so the log stays readable. The
-           *raw* reading, deliberately: the log exists to work out the mapping,
-           and recording what the transform above already produced would hide
-           the very thing being checked. */
+
+        /*
+         * Clamped, because the vendored chain genuinely produces values outside
+         * the panel and one of them lands *negative* once turned.
+         *
+         * mxt336u_TS_GetXY scales the controller's range onto the panel less a
+         * fudge of ten (`(lcdw - 10) / max_y`), so a reading spans 0..470 by
+         * 0..262 rather than 0..479 by 0..271. edt_bsp_ctp then applies
+         * TS_SWAP_Y as `EDT_LCD_GetYSize() - brute_y`, which is one too many —
+         * it should be size - 1 - brute_y — so panel Y comes back as 10..272
+         * when the last valid row is 271. Turned for portrait that becomes
+         * logical X = 271 - 272 = -1.
+         *
+         * Both are in vendored files, which this board deliberately does not
+         * edit, so the correction belongs here. It is a clamp rather than a
+         * rescale: the ten-pixel dead band at two edges is the vendor's
+         * calibration and not ours to invent a fix for, but a point outside the
+         * display is simply wrong and LVGL should never see one.
+         */
+        {
+            const int32_t max_x = lv_display_get_horizontal_resolution(display) - 1;
+            const int32_t max_y = lv_display_get_vertical_resolution(display) - 1;
+
+            if (last_x < 0) last_x = 0;
+            if (last_y < 0) last_y = 0;
+            if (last_x > max_x) last_x = max_x;
+            if (last_y > max_y) last_y = max_y;
+        }
+
+        /* One entry per press, not per poll, so the log stays readable. Both
+           frames are recorded: the raw reading is what the mapping has to be
+           worked out from, and the logical one is what LVGL actually hit-tests
+           against, so a single dump answers "is it the transform or the
+           panel?" without a second flash. */
         if (!was_pressed) {
-            record_touch((int32_t)touch.touchX[0], (int32_t)touch.touchY[0]);
+            record_touch(panel_x, panel_y, last_x, last_y);
             was_pressed = true;
         }
         data->state = LV_INDEV_STATE_PRESSED;
@@ -721,6 +847,10 @@ bool board_display_init(void)
 
     const bool portrait =
         hmi_display_config.orientation == HMI_DISPLAY_ORIENTATION_PORTRAIT;
+
+    /* Costs nothing to leave running, and board_display_stats is worthless
+       without it. */
+    cycle_counter_start();
 
     panel_power_init();
     board_init_stage = BOARD_STAGE_PANEL_POWER;
