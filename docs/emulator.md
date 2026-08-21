@@ -300,9 +300,10 @@ whether it has hung.
 factory-dev-mode wording. Outside it the same panel says *Preparing your panel*,
 *Running — click the screen to try it*, and — when the toolchain is missing —
 who to ask and what to do meanwhile, rather than a list naming Emscripten and a
-POSIX shell. The Build Output pane is filtered through the same allow-list the
-Work pane uses ([work-progress.md](./work-progress.md) §3), so a compiler
-transcript never reaches someone who did not ask for one. The words themselves
+POSIX shell. The Build Output pane is the exception and keeps its detail in both
+modes: it is the engineering view by definition, the place to look when the Work
+pane's phase is not enough, and the whole tab is expected to move behind the
+flag later rather than being reworded now. The words themselves
 live in `src/store/emulatorPhases.ts`, beside the phases, because they are the
 same decision: naming LVGL to a person laying out an HMI tells them nothing they
 can act on. See [factory-dev-mode.md](./factory-dev-mode.md).

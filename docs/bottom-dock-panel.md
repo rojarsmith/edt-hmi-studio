@@ -269,6 +269,13 @@ deliberately, so nothing raw from a compiler can surface in the product's view
 of the operation — the same rule `deployPhases.ts` follows and for the same
 reason ([work-progress.md](./work-progress.md) §3).
 
+**It keeps its detail in both modes, for now.** The pane is the engineering
+view by definition — the place to look when the Work pane's phase is not enough
+— so it is not reworded for factory dev mode the way the Emulator's own chrome
+is ([factory-dev-mode.md](./factory-dev-mode.md)). The intended end state is the
+whole tab behind that flag, which answers the question rather than translating
+a compiler transcript into words it does not have.
+
 **Still not done.** Arrow-key navigation of the tab strip and a keyboard
 alternative to the drag grip. Four panes make that more pressing than three
 did, not less.

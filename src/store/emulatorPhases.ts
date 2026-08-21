@@ -52,7 +52,10 @@ export function emulatorPhaseFor(line: string): string | null {
  * person laying out an HMI has not asked for LVGL, Emscripten or a compiler,
  * and naming them tells them nothing they can act on. Factory dev mode keeps
  * the engineering wording, which is where it is worth reading.
- * See docs/factory-dev-mode.md.
+ *
+ * The Build Output pane is not on this list: it is the engineering view by
+ * definition and keeps its detail in both modes, being the place to look when
+ * Work's phase is not enough. See docs/factory-dev-mode.md.
  */
 export const EMULATOR_WORDS = {
   preparing: 'Preparing your panel…',
@@ -65,6 +68,4 @@ export const EMULATOR_WORDS = {
   unavailable: 'The Emulator is not available on this machine',
   unavailableDetail:
     'Whoever installed EDT HMI Studio here can switch it on. Until then, use the Deploy tab to try your panel on the board itself.',
-  outputHeading: 'What the last run did',
-  outputEmpty: 'Press Start and the steps appear here.',
 } as const;

@@ -68,7 +68,7 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 | Logic 分頁 Properties 面板的 **Active on Screens** —— 逐圖儲存但目前沒有任何東西使用；圖暫定全域運作，一般模式改顯示單純的 **Active** 開關，而且真的有作用：關掉的圖完全不會出現在產生的程式碼裡 | 顯示 | 隱藏 |
 | Logic 調色盤的 **Custom** 架子 —— Call Function 與 C Code Block，手寫 C 是原廠工程師的領域；已放進圖裡的節點在任何模式都照常渲染與產生，藏起來的只有調色盤上的供應 | 顯示 | 隱藏 |
 | Properties 面板標題列的**收合三角形**，可把整個面板收成一條標題列。面板內各分區的收合、以及標題列的全部展開／全部收合按鈕，兩種模式都照常提供 | 顯示 | 隱藏 |
-| **Emulator 的用語**——狀態列、畫布上的提示、第一次執行的說明、「尚未設定」面板，以及 Build Output pane。在原廠研發模式下它們會直接講 LVGL、Emscripten、emcc 與編譯器的原始輸出，因為在做編輯器的時候那才是值得讀的東西。平常它們講的是產品的話——*Preparing your panel*、*Running — click the screen to try it*——而 Build Output pane 會經過 Work pane 用的同一份白名單過濾，所以編譯器的逐字稿不會落到沒有要求它的人眼前。「尚未設定」面板也會換對象：工程師拿到的是缺了哪些東西的名字與安裝指令，做面板的人拿到的是「該找誰」以及「在那之前可以做什麼」 | 工程用語 | 產品的話 |
+| **Emulator 的用語**——狀態列、畫布上的提示、第一次執行的說明，以及「尚未設定」面板。在原廠研發模式下它們會直接講 LVGL、Emscripten 與 emcc，因為在做編輯器的時候那才是值得讀的東西。平常它們講的是產品的話——*Preparing your panel*、*Running — click the screen to try it*——而「尚未設定」面板也跟著換對象：工程師拿到的是缺了哪些東西的名字與安裝指令，做面板的人拿到的是「該找誰」以及「在那之前可以做什麼」。**Build Output** pane 刻意不在這份清單上；它兩種模式都保留完整內容，而且預計整個頁簽之後會移到這個旗標後面（[bottom-dock-panel.md](bottom-dock-panel.md) §11） | 工程用語 | 產品的話 |
 | **Emulator 底部資訊列**——Emulator 畫布下方那一條，寫著 LVGL 版本與編譯它的編譯器。它回答的是「為什麼這裡跟板子不一樣」，而那是只有在做編輯器的人才會問的問題；上方的面板已經講完使用者需要知道的一切，包含缺什麼、以及怎麼裝 | 顯示 | 隱藏 |
 | **預覽階切換列**——Preview 分頁上方的 Prototype／Simulator／Emulator 那一排。平常這個分頁直接打開 **Emulator**，切換列不會畫出來；因為另外兩階是編輯器自己對 LVGL 的近似，在它們身上得到綠燈並不是對面板的回答（[preview-ladder.md](preview-ladder.md) §8）。把 Emulator 在建置時關掉的版本，兩種模式都會顯示切換列——不然剩下兩階就沒有入口了 | 顯示 | 隱藏；直接開 Emulator |
 

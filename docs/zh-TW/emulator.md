@@ -250,8 +250,8 @@ Start 是停用的，不會把人帶進一次注定不會發生的編譯。缺�
 **而且它會用兩種語域各講一次。** 上面引的每一句都是原廠研發模式下的用語。在那之外，同一個
 面板講的是 *Preparing your panel*、*Running — click the screen to try it*；工具鏈缺席時講的
 則是「該找誰」以及「在那之前可以做什麼」，而不是一串點名 Emscripten 與 POSIX shell 的清單。
-Build Output pane 也經過 Work pane 用的同一份白名單過濾（[work-progress.md](./work-progress.md)
-§3），所以編譯器的逐字稿不會落到沒有要求它的人眼前。這些字就放在
+Build Output pane 是例外，兩種模式都保留完整內容：它按定義就是工程視圖，是「Work 那一行階段
+不夠用時」該去看的地方，而且整個頁簽預計之後會整個移到旗標後面，而不是現在把它改寫。這些字就放在
 `src/store/emulatorPhases.ts`，跟那些階段名放在一起，因為它們是同一個決定：對一個正在排版
 HMI 的人講 LVGL，並沒有告訴他任何他做得了的事。見
 [factory-dev-mode.md](./factory-dev-mode.md)。

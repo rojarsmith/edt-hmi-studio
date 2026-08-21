@@ -282,27 +282,19 @@ const Emulator: React.FC = () => {
         // from the compiler reaches Work. See emulatorPhases.ts.
         const phase = emulatorPhaseFor(line);
         if (phase) useWorkStore.getState().note(workId, { label: phase });
-        // And outside factory dev mode the same allow-list decides what reaches
-        // the Build Output pane: the steps, in the product's words, rather than
-        // a compiler transcript nobody in that mode can act on.
-        if (factoryDevMode) {
-          appendOutput(line);
-        } else if (phase) {
-          appendOutput(phase);
-        }
+        // The pane itself is the engineering view and keeps every line in both
+        // modes: Work next door is where the product's words live, and this is
+        // the place to look when Work's phase is not enough. The tab is
+        // expected to move behind factory dev mode later, at which point the
+        // question stops arising — see docs/bottom-dock-panel.md §11.
+        appendOutput(line);
       },
     );
 
-    // In factory dev mode the server streamed the transcript and then the
-    // summary, so there is nothing left to write; setOutput is the fallback for
-    // a build that produced no stream at all. Outside it, the transcript was
-    // filtered down to the steps and the outcome is the last of them.
-    if (!factoryDevMode) {
-      appendOutput('');
-      appendOutput(result.success ? EMULATOR_OUTCOMES.running : EMULATOR_WORDS.failed);
-    } else if (!useEmulatorStore.getState().output) {
-      setOutput(result.output);
-    }
+    // Nothing to write: the server streamed the transcript and then the summary
+    // into the pane as they happened. setOutput is the fallback for a build
+    // that produced no stream at all — a failure before the POST was answered.
+    if (!useEmulatorStore.getState().output) setOutput(result.output);
 
     if (result.success && result.runtime) {
       runtimeRef.current = result.runtime;
@@ -337,7 +329,7 @@ const Emulator: React.FC = () => {
       setStatusMessage('Build succeeded (no runtime)');
       useWorkStore.getState().finish(workId, 'failed', EMULATOR_OUTCOMES.failed);
     }
-  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, checkToolchain, factoryDevMode, setOutput, appendOutput, clearOutput, showDockPane, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
+  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, checkToolchain, setOutput, appendOutput, clearOutput, showDockPane, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
 
   // Handle stop button
   const handleStop = useCallback(() => {
@@ -560,7 +552,11 @@ const Emulator: React.FC = () => {
           {isWorking && (
             <div className="emulator-overlay">
               <div className="emulator-spinner" />
-              <div className="emulator-overlay-text">{statusMessage}</div>
+              {/* statusText, not statusMessage: this is the same sentence as the
+                  status line and has to be in the same register. Reading it
+                  straight from the service is what left "Compiling your screens
+                  with LVGL…" on the canvas of someone who never asked. */}
+              <div className="emulator-overlay-text">{statusText}</div>
             </div>
           )}
           <canvas
