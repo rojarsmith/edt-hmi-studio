@@ -4,11 +4,12 @@
  * This validates that the generated code is syntactically and semantically correct C.
  */
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { getToolchain } from '../../../server/emulator/toolchain';
+import { lvglLibraryLocation } from '../../../server/emulator/lvglLib';
 import { generateCode } from '../generator';
 import type { GeneratedCode } from '../types';
 import {
@@ -26,47 +27,24 @@ import {
   createLogicPort,
 } from './helpers';
 
-// Paths — overridable via env vars; lib and lv_conf.h default to the repo's wasm/ dir.
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const EMSDK_ENV =
-  process.env.EMSDK_ENV ?? '/home/xcssa/.openclaw/workspace/tools/emsdk/emsdk_env.sh';
-const LVGL_ROOT = process.env.LVGL_ROOT ?? '/home/xcssa/.openclaw/workspace/tools/lvgl';
-const LVGL_LIB = process.env.LVGL_LIB ?? join(REPO_ROOT, 'wasm', 'build', 'liblvgl_emcc.a');
-const LV_CONF_DIR = process.env.LV_CONF_DIR ?? join(REPO_ROOT, 'wasm');
-const BASH = '/bin/bash';
+// The toolchain comes from the Emulator's resolver rather than from paths
+// written here. Before that, this block held a fourth copy of one contributor's
+// absolute Linux paths, so these 48 tests skipped themselves on every machine —
+// and what they verify is the product's core claim, that the C it generates
+// compiles. See docs/emulator.md §3.5.
+const toolchain = await getToolchain();
+const library = toolchain.ready ? await lvglLibraryLocation(toolchain) : null;
 
-/**
- * Detect whether the emcc toolchain and LVGL artifacts are available.
- * emcc can come from PATH directly, or from sourcing emsdk_env.sh in bash.
- */
-function detectToolchain(): { emccMode: 'path' | 'emsdk' | null; missing: string[] } {
-  const missing: string[] = [];
-  let emccMode: 'path' | 'emsdk' | null = null;
-  try {
-    execSync('emcc --version', { stdio: 'ignore', timeout: 30_000 });
-    emccMode = 'path';
-  } catch {
-    if (existsSync(EMSDK_ENV) && existsSync(BASH)) {
-      emccMode = 'emsdk';
-    } else {
-      missing.push(
-        `emcc is not on PATH and no emsdk env script at ${EMSDK_ENV} (set EMSDK_ENV to your emsdk_env.sh)`,
-      );
-    }
-  }
-  if (!existsSync(LVGL_ROOT)) {
-    missing.push(`LVGL checkout not found at ${LVGL_ROOT} (set LVGL_ROOT)`);
-  }
-  if (!existsSync(LVGL_LIB)) {
-    missing.push(`liblvgl_emcc.a not found at ${LVGL_LIB} (run wasm/build_lvgl_lib.sh or set LVGL_LIB)`);
-  }
-  if (!existsSync(join(LV_CONF_DIR, 'lv_conf.h'))) {
-    missing.push(`lv_conf.h not found in ${LV_CONF_DIR} (set LV_CONF_DIR)`);
-  }
-  return { emccMode, missing };
+const missing: string[] = [...toolchain.problems];
+if (toolchain.ready && !(library && existsSync(library.libPath))) {
+  // Deliberately not built here. It takes minutes, and `npm test` should not
+  // silently turn into a compiler run; pressing Start once in the Emulator tab
+  // produces it, and every run afterwards is a cache hit.
+  missing.push(
+    'LVGL has not been compiled for the Emulator yet — press Start once in the Emulator tab, then re-run.',
+  );
 }
 
-const { emccMode, missing } = detectToolchain();
 if (missing.length > 0) {
   console.warn(
     `[compile.test] Skipping compile verification tests:\n  - ${missing.join('\n  - ')}`,
@@ -105,30 +83,34 @@ function compileGenerated(
 
     const sourceFiles = ['main.c', 'ui.c', 'ui_events.c', 'ui_logic.c', ...extraCFiles];
 
-    const emccCmd = [
-      `emcc ${sourceFiles.join(' ')}`,
-      `-O0 -DLV_CONF_INCLUDE_SIMPLE`,
-      `"-I${dirname(LVGL_ROOT)}"`,
-      `"-I${LVGL_ROOT}"`,
-      `"-I${join(LVGL_ROOT, 'src')}"`,
-      `"-I${LV_CONF_DIR}"`,
-      `-I.`,
-      `"${LVGL_LIB}"`,
-      `-sALLOW_MEMORY_GROWTH=1`,
-      `-Wno-unused-function`,
-      `-Wno-implicit-function-declaration`,
-      `-Wno-unused-variable`,
+    const lvglRoot = toolchain.lvgl.path!;
+    const args = [
+      ...sourceFiles,
+      '-O0',
+      '-DLV_CONF_INCLUDE_SIMPLE',
+      `-I${join(lvglRoot, '..')}`,
+      `-I${lvglRoot}`,
+      `-I${join(lvglRoot, 'src')}`,
+      `-I${library!.confDir}`,
+      '-I.',
+      library!.libPath,
+      '-sALLOW_MEMORY_GROWTH=1',
+      '-Wno-unused-function',
+      '-Wno-implicit-function-declaration',
+      '-Wno-unused-variable',
       ...extraFlags,
-      `-o output.js`,
-    ].join(' ');
-    const cmd =
-      emccMode === 'emsdk' ? `source ${EMSDK_ENV} 2>/dev/null && ${emccCmd}` : emccCmd;
+      '-o',
+      'output.js',
+    ];
 
-    execSync(cmd, {
+    // emcc directly, with the environment the resolver produced. No shell, so
+    // no quoting differences between platforms and no emsdk_env.sh to source.
+    execFileSync(toolchain.emscripten.path!, args, {
       cwd: tmpDir,
+      env: { ...process.env, ...toolchain.emscripten.env },
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 60_000,
-      ...(emccMode === 'emsdk' ? { shell: BASH } : {}),
+      timeout: 120_000,
+      windowsHide: true,
     });
     return { success: true, stderr: '' };
   } catch (err) {

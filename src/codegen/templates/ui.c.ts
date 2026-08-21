@@ -2034,7 +2034,7 @@ function styleAssignments(
   symbol: string,
   style: ResolvedTypographyStyle,
   touched: ReadonlySet<string>,
-  fontExpr?: string,
+  fontExpr?: string | null,
 ): string[] {
   const lines: string[] = [];
   const alignMap: Record<string, string> = {
@@ -2049,7 +2049,18 @@ function styleAssignments(
   // fontSize has no setter of its own: an lv_font_t carries its size, so the
   // font and the size are one assignment
   if (touched.has('fontResource') || touched.has('fontSize')) {
-    lines.push(`lv_style_set_text_font(&${symbol}, ${fontExpr ?? `&${fontSymbol(style.fontResource, style.fontSize)}`});`);
+    // With no font chosen anywhere there is no symbol to name, and building one
+    // out of an empty resource name emitted `&_16` — C that cannot compile. The
+    // widget-level path has always guarded this the same way (`else if
+    // (styles.textFont)`); a text style that names no font leaves the inherited
+    // font alone. Found by the codegen compile tests once they stopped skipping
+    // themselves — see docs/emulator.md §3.5.
+    const symbol_ = fontSymbol(style.fontResource, style.fontSize);
+    const fontReference =
+      fontExpr !== undefined ? fontExpr : symbol_ ? `&${symbol_}` : null;
+    if (fontReference) {
+      lines.push(`lv_style_set_text_font(&${symbol}, ${fontReference});`);
+    }
   }
   if (touched.has('letterSpace')) {
     lines.push(`lv_style_set_text_letter_space(&${symbol}, ${style.letterSpace ?? 0});`);
@@ -2074,7 +2085,16 @@ function styleAssignments(
 }
 
 /** The C symbol for a font, as `LV_FONT_DECLARE` and lv_font_conv name it. */
-function fontSymbol(fontResource: string, fontSize: number): string {
+/**
+ * The C symbol for a font, or null when no font was chosen.
+ *
+ * Null matters: an empty resource name used to compose to `_16`, and
+ * `lv_style_set_text_font(&style, &_16)` is C that does not compile. A text
+ * style that names no font should leave the inherited font alone, which is what
+ * the widget-level path has always done. See docs/emulator.md §3.5.
+ */
+function fontSymbol(fontResource: string, fontSize: number): string | null {
+  if (!fontResource) return null;
   const builtin = fontResource.match(/^montserrat_(\d+)$/);
   return builtin ? `lv_font_montserrat_${builtin[1]}` : `${fontResource}_${fontSize}`;
 }
@@ -2341,6 +2361,10 @@ function generateTypographyStyles(
       const style = resolveTypographyStyle(typography, language);
       const char = style.fallbackCharacter?.codePointAt(0);
       if (char === undefined) continue;
+      // A fallback chain is a copy of a named font; with no font named there is
+      // nothing to copy, and the typography sets no font at all.
+      const source = fontSymbol(style.fontResource, style.fontSize);
+      if (!source) continue;
       const key = `${style.fontResource}@${style.fontSize}@${char}`;
       if (byFont.has(key)) continue;
       if (!wrappers.has(char)) {
@@ -2350,7 +2374,7 @@ function generateTypographyStyles(
       byFont.set(key, {
         copySymbol: `${symbol}_fb${index}`,
         substSymbol: `${symbol}_fbsub${index}`,
-        source: fontSymbol(style.fontResource, style.fontSize),
+        source,
         wrapper: wrappers.get(char)!,
       });
     }
@@ -2358,12 +2382,17 @@ function generateTypographyStyles(
   }
 
   /** The font a style assignment points at: the fallback copy when one exists. */
-  const fontExprFor = (typography: Typography, style: ResolvedTypographyStyle): string => {
+  const fontExprFor = (
+    typography: Typography,
+    style: ResolvedTypographyStyle,
+  ): string | null => {
     const char = style.fallbackCharacter?.codePointAt(0);
     const entry = char === undefined
       ? undefined
       : fallback.get(typography.id)?.byFont.get(`${style.fontResource}@${style.fontSize}@${char}`);
-    return entry ? `&${entry.copySymbol}` : `&${fontSymbol(style.fontResource, style.fontSize)}`;
+    if (entry) return `&${entry.copySymbol}`;
+    const named = fontSymbol(style.fontResource, style.fontSize);
+    return named ? `&${named}` : null;
   };
 
   if (options.generateComments) {
@@ -2483,9 +2512,10 @@ function generateTypographyStyles(
       init.push(`${indent}${generateComment(typography.name, options)}`);
     }
     init.push(`${indent}lv_style_init(&${symbol});`);
-    init.push(
-      `${indent}lv_style_set_text_font(&${symbol}, ${fontExprFor(typography, resolveTypographyStyle(typography))});`,
-    );
+    const fontReference = fontExprFor(typography, resolveTypographyStyle(typography));
+    if (fontReference) {
+      init.push(`${indent}lv_style_set_text_font(&${symbol}, ${fontReference});`);
+    }
 
     if (typography.letterSpace) {
       init.push(`${indent}lv_style_set_text_letter_space(&${symbol}, ${typography.letterSpace});`);
