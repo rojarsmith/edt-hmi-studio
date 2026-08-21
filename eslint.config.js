@@ -6,7 +6,10 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // .hmi-cache holds installed toolchains — emsdk alone is tens of thousands of
+  // files, many of them deliberately malformed JS test fixtures. Nothing in
+  // there is this project's source. See docs/emulator.md §4.2.
+  globalIgnores(['dist', '.hmi-cache', '.hmi-builds']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

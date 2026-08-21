@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "emulator:setup": "node tools/bootstrap-emulator.mjs",
     "build": "tsc -b && vite build",
     "build:web": "vite build",
     "build:desktop-web": "vite build",
