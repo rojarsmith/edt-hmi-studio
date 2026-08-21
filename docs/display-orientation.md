@@ -871,6 +871,35 @@ alternative — giving up the second frame buffer to free 510 KB in the frame
 buffer region — which would have made portrait free but reintroduced tearing.
 334.7 KB still free says the trade is affordable.
 
+### 15.4 What the board said, and the one number that was wrong
+
+Measured on hardware, full-screen refresh, cycles from DWT at 160 MHz:
+
+| | cycles | ms |
+|---|---|---|
+| Rotation (`lv_draw_sw_rotate`, 130,560 px) | 976,238 | **6.1** |
+| Reconcile copy (522,240 B) | 3,283,727 | **20.5** |
+
+The rotation landed inside §8.3's 5–8 ms estimate. The copy did not, and it was
+never estimated at all — it was written as "a straight copy so the cost shows up
+in a measurement", and the measurement is 6.3 cycles **per byte**.
+
+The cause is `--specs=nano.specs`: newlib-nano is built with
+`PREFER_SIZE_OVER_SPEED`, so its `memcpy` is a byte-at-a-time loop. A word copy,
+unrolled four at a time, is the fix; DMA2D would be better still and is now a
+choice to make against a number rather than a guess.
+
+This matters beyond the frame rate. A refresh costing 6.1 + 20.5 ms overruns its
+own 16.6 ms frame, and everything else in the main loop waits — including LVGL's
+input polling. **A display too slow to poll its own touch screen presents as a
+touch screen that needs pressing twice**, which is where this investigation
+started, and nothing about the touch path was wrong.
+
+The touch log confirmed that separately: 358 presses recorded, panel X spanning
+4..466 and Y spanning 18..260, and every logical point exactly the transform of
+its panel point — a press at panel (23, 220) arriving as logical (51, 23), which
+is `271 - 220` and `23`. The mapping was right the whole time.
+
 **What is not measured is anything that runs.** The rotate loop's cost per
 refresh (§8.3 estimated 5–8 ms worst case), whether the swap-and-reconcile keeps
 up at 60 Hz, and whether the touch transform is right, all need the board. The

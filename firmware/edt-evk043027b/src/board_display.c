@@ -231,20 +231,52 @@ static void copy_between_framebuffers(
     const uint32_t stride = HMI_DISPLAY_WIDTH * HMI_DISPLAY_BYTES_PER_PIXEL;
     const uint32_t offset = (stride * (uint32_t)area->y1)
         + (HMI_DISPLAY_BYTES_PER_PIXEL * (uint32_t)area->x1);
-    const uint32_t row_bytes =
-        (uint32_t)lv_area_get_width(area) * HMI_DISPLAY_BYTES_PER_PIXEL;
-    const uint8_t *source = (const uint8_t *)from + offset;
-    uint8_t *destination = (uint8_t *)to + offset;
+    const uint32_t row_words = (uint32_t)lv_area_get_width(area);
+    const uint32_t stride_words = stride / sizeof(uint32_t);
+    const uint32_t *source = (const uint32_t *)(from + offset);
+    uint32_t *destination = (uint32_t *)(to + offset);
     int32_t rows = lv_area_get_height(area);
     int32_t row;
 
-    /* DMA2D is fitted and could do this without the CPU. Left as a straight
-       copy so the cost shows up in a measurement before it is optimised away —
-       see docs/display-orientation.md §8.5. */
+    /*
+     * Words, unrolled, rather than memcpy — this is measured, not taste.
+     *
+     * The firmware links --specs=nano.specs, and newlib-nano is built with
+     * PREFER_SIZE_OVER_SPEED, which makes memcpy a byte-at-a-time loop. On a
+     * full-screen refresh that cost 3,283,727 cycles for 522,240 bytes: 6.3
+     * cycles per byte, or 20.5 ms at 160 MHz, against 6.1 ms for the rotation
+     * it exists to support. A refresh that overruns its own 16.6 ms frame
+     * starves everything else in the main loop, LVGL's input polling included,
+     * which is what a touch screen that needs pressing twice actually is.
+     *
+     * Every address here is word-aligned by construction: ARGB8888 is four
+     * bytes, so both the row stride and the x offset are multiples of four,
+     * and the frame buffers start on a 4-byte boundary.
+     *
+     * DMA2D is fitted and would take this off the CPU entirely. It is the next
+     * step if this is still the tallest cost — see docs/display-orientation.md
+     * §8.5 — and the numbers to decide with are in board_display_stats.
+     */
     for (row = 0; row < rows; row++) {
-        (void)memcpy(destination, source, row_bytes);
-        source += stride;
-        destination += stride;
+        uint32_t remaining = row_words;
+        const uint32_t *src = source;
+        uint32_t *dst = destination;
+
+        while (remaining >= 4U) {
+            dst[0] = src[0];
+            dst[1] = src[1];
+            dst[2] = src[2];
+            dst[3] = src[3];
+            dst += 4;
+            src += 4;
+            remaining -= 4U;
+        }
+        while (remaining-- > 0U) {
+            *dst++ = *src++;
+        }
+
+        source += stride_words;
+        destination += stride_words;
     }
 }
 
