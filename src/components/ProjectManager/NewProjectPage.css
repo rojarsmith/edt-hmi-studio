@@ -1,0 +1,420 @@
+/* New Project — the full-width page that replaces the project list body.
+   Two columns: hardware on the left, the project's own settings on the right. */
+
+.npp {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 32px 24px;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.npp-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+
+.npp-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.npp-close {
+  border: none;
+  background: transparent;
+  color: #8a8aa8;
+  font-size: 16px;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.npp-close:hover {
+  background: #2a2a3e;
+  color: #e0e0e0;
+}
+
+.npp-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* The hardware side is the wider one: it holds a scanned list and a
+     specification block, against a short column of form fields. */
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  gap: 24px;
+}
+
+/* --- left: hardware ------------------------------------------------------ */
+
+.npp-hardware {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.npp-search {
+  flex-shrink: 0;
+  padding: 9px 12px;
+  border: 1px solid #3a3a5c;
+  border-radius: 6px;
+  background: #23233a;
+  color: #e0e0e0;
+  font-size: 13px;
+  outline: none;
+}
+
+.npp-search:focus {
+  border-color: #5c6bc0;
+}
+
+.npp-list-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7c7c96;
+}
+
+.npp-list-count {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.npp-list {
+  /* Takes the slack, so the detail block below keeps its natural height and the
+     list is what shrinks on a short window. */
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a5c transparent;
+}
+
+.npp-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.npp-list::-webkit-scrollbar-thumb {
+  background: #3a3a5c;
+  border-radius: 999px;
+  border: 2px solid #1a1a2e;
+}
+
+.npp-list-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #7c7c96;
+  font-size: 13px;
+}
+
+.npp-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid #2f2f47;
+  border-radius: 8px;
+  background: #20203a;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.npp-row:hover {
+  border-color: #4a4a6c;
+  background-color: #262642;
+}
+
+.npp-row.selected {
+  border-color: #5c6bc0;
+  background-color: #2a2c52;
+}
+
+.npp-row-image {
+  width: 92px;
+  height: 69px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  object-fit: cover;
+  display: block;
+}
+
+.npp-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Name and model share the first line: the name is what the right-hand field
+   reads back, the model is what the list is scanned by. */
+.npp-row-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.npp-row-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.npp-row-model {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #8f9bd6;
+  font-variant-numeric: tabular-nums;
+}
+
+.npp-row-spec {
+  font-size: 12px;
+  color: #9aa4b0;
+}
+
+.npp-row-vendor {
+  font-size: 11px;
+  color: #7c7c96;
+}
+
+/* --- lower left: the selected board -------------------------------------- */
+
+.npp-detail {
+  flex-shrink: 0;
+  border: 1px solid #2f2f47;
+  border-radius: 8px;
+  background: #1d1d33;
+  padding: 12px 14px;
+}
+
+.npp-detail-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.npp-detail-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.npp-detail-vendor {
+  font-size: 11px;
+  color: #7c7c96;
+}
+
+.npp-detail-grid {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.npp-detail-grid dt {
+  color: #7c7c96;
+}
+
+.npp-detail-grid dd {
+  margin: 0;
+  color: #c8c8d8;
+}
+
+.npp-detail-image-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #2f2f47;
+}
+
+.npp-detail-image-label {
+  font-size: 11px;
+  color: #7c7c96;
+  margin-right: auto;
+}
+
+.npp-mini-btn {
+  padding: 3px 10px;
+  border: 1px solid #3a3a5c;
+  border-radius: 5px;
+  background: #262642;
+  color: #c8c8d8;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.npp-mini-btn:hover {
+  background: #303055;
+  color: #e0e0e0;
+}
+
+/* --- right: project settings --------------------------------------------- */
+
+.npp-settings {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid #2f2f47;
+  border-radius: 8px;
+  background: #1d1d33;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a5c transparent;
+}
+
+.npp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: #a8a8c0;
+}
+
+.npp-input,
+.npp-select {
+  padding: 8px 10px;
+  border: 1px solid #3a3a5c;
+  border-radius: 6px;
+  background: #23233a;
+  color: #e0e0e0;
+  font-size: 13px;
+  outline: none;
+}
+
+.npp-input:focus,
+.npp-select:focus {
+  border-color: #5c6bc0;
+}
+
+/* A read-back of the hardware chosen on the left, not an input. Styled as flat
+   as it behaves so it does not invite a click. */
+.npp-input.readonly {
+  background: #1a1a2e;
+  color: #9aa4b0;
+  cursor: default;
+}
+
+.npp-select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.npp-hint {
+  color: #7c7c96;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.npp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.npp-btn {
+  padding: 8px 20px;
+  border: 1px solid #3a3a5c;
+  border-radius: 6px;
+  background: #2a2a44;
+  color: #c8c8d8;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.npp-btn:hover {
+  background: #34345a;
+}
+
+.npp-btn.primary {
+  background: #5c6bc0;
+  border-color: #5c6bc0;
+  color: #fff;
+}
+
+.npp-btn.primary:hover {
+  background: #6b7ad0;
+}
+
+/* --- the board's description -------------------------------------------- */
+
+.npp-detail-summary {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #2f2f47;
+}
+
+.npp-detail-summary-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9aa4b0;
+}
+
+.npp-textarea {
+  padding: 7px 10px;
+  border: 1px solid #3a3a5c;
+  border-radius: 6px;
+  background: #23233a;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.npp-textarea:focus {
+  border-color: #5c6bc0;
+}
+
+/* Below this the two columns stop being readable side by side. */
+@media (max-width: 900px) {
+  .npp-body {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: auto;
+  }
+
+  .npp-list {
+    max-height: 320px;
+  }
+}
+
+.npp-list-head-right {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}

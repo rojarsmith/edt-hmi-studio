@@ -102,7 +102,7 @@ const DeployLogPane: React.FC<DeployLogPaneProps> = ({ pane }) => {
 
         <span className="dock-pane-meta">
           {isBuild
-            ? `${getBoardDefinition(boardId).name} · ${protocolDefinition.name}`
+            ? `${getBoardDefinition(boardId).model} · ${protocolDefinition.name}`
             : `ST-LINK: ${probeSerial || 'selected automatically'}`}
         </span>
         <span className="dock-pane-meta">

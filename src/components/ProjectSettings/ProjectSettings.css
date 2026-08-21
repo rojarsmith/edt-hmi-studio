@@ -32,3 +32,36 @@
   font-size: 11px;
   line-height: 1.5;
 }
+
+/* Field styles, inherited from the New Project dialog this outlived. Kept here
+   because Project Settings is now their only user. */
+.ps-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.ps-hint {
+  color: #7c7c96;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.ps-input,
+.ps-select {
+  padding: 7px 10px;
+  background: #1a1a2e;
+  border: 1px solid #3a3a5c;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ps-input:focus,
+.ps-select:focus {
+  border-color: #5c6bc0;
+}

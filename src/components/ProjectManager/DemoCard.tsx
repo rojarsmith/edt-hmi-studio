@@ -52,7 +52,7 @@ const DemoCard: React.FC<DemoCardProps> = ({ entry, file, onUse, onEdit }) => {
       <div className="project-card-info">
         <div className="project-card-name">{entry.name}</div>
         <div className="project-card-desc" title={entry.description}>{entry.description}</div>
-        <div className="project-card-meta">{board.name}</div>
+        <div className="project-card-meta">{board.model}</div>
         <div className="project-card-meta">{width} × {height}</div>
       </div>
 

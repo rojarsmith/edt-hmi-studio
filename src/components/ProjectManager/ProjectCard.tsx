@@ -158,7 +158,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ item, onOpen, onDelete }) => 
         {config.description && (
           <div className="project-card-desc" title={config.description}>{config.description}</div>
         )}
-        <div className="project-card-meta">{board.name}</div>
+        <div className="project-card-meta">{board.model}</div>
         <div className="project-card-meta">
           {config.display.width} × {config.display.height} · {config.display.colorDepth}bit
         </div>

@@ -10,7 +10,7 @@ import { modal } from '../Modal';
 import { toast } from '../Toast';
 import ProjectCard from './ProjectCard';
 import DemoCard from './DemoCard';
-import NewProjectDialog from './NewProjectDialog';
+import NewProjectPage from './NewProjectPage';
 import AboutDialog from '../AboutDialog';
 import { DEMO_PROJECTS, type DemoEntry } from '../../demos';
 import type { ProjectFile } from '../../resources/types';
@@ -292,6 +292,12 @@ const ProjectListPage: React.FC = () => {
         )}
       </div>
 
+      {showNewDialog ? (
+        <NewProjectPage
+          onCancel={() => setShowNewDialog(false)}
+          onCreate={handleCreate}
+        />
+      ) : (
       <div className="plp-content">
         <div className="plp-tabs">
           <button
@@ -365,6 +371,7 @@ const ProjectListPage: React.FC = () => {
           )}
         </div>
       </div>
+      )}
 
       <input
         ref={fileInputRef}
@@ -373,13 +380,6 @@ const ProjectListPage: React.FC = () => {
         onChange={handleImportFile}
         style={{ display: 'none' }}
       />
-
-      {showNewDialog && (
-        <NewProjectDialog
-          onClose={() => setShowNewDialog(false)}
-          onCreate={handleCreate}
-        />
-      )}
 
       {showAboutDialog && <AboutDialog onClose={() => setShowAboutDialog(false)} />}
     </div>

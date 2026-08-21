@@ -77,8 +77,32 @@ export function isSupportedProtocolId(value: unknown): value is ProtocolId {
 
 export interface BoardDefinition {
   id: BoardId;
+  /**
+   * The board's full product name, as its vendor writes it. Used where there is
+   * room to be unambiguous — the hardware picker, the Hardware Name field, and
+   * prose that names the target.
+   */
   name: string;
+  /**
+   * The short model number, which is what people actually say and what fits on
+   * a project card or a status chip. Split from `name` because the New Project
+   * picker needs both at once: the list is scanned by model, the confirmation
+   * field reads back the full name.
+   */
+  model: string;
+  /**
+   * The vendor, which the hardware picker shows only in Factory Mode. A
+   * no-code author picks a board their organisation already chose; whose logo
+   * is on it is not their decision to make.
+   */
   vendor: string;
+  /**
+   * One line describing the board, for the picker's detail block. A factory
+   * engineer can replace it per installation — see resources/boardProfile.ts —
+   * because the useful sentence differs between a distributor and a factory
+   * that fits one variant.
+   */
+  summary: string;
   display: {
     /**
      * The panel's *physical* geometry — what the LTDC scans, whichever way up
@@ -188,7 +212,10 @@ export const DEFAULT_BOARD_ID: BoardId = 'stm32f746g-disco';
 export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
   {
     id: 'stm32f746g-disco',
-    name: 'STM32F746G-DISCO',
+    name: 'STM32F746G Discovery Kit',
+    model: 'STM32F746G-DISCO',
+    summary:
+      'ST Discovery kit with a 4.3-inch 480x272 panel, capacitive touch and external SDRAM.',
     vendor: 'STMicroelectronics',
     display: {
       width: 480,
@@ -221,7 +248,10 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
   },
   {
     id: 'stm32h747i-disco',
-    name: 'STM32H747I-DISCO',
+    name: 'STM32H747I Discovery Kit',
+    model: 'STM32H747I-DISCO',
+    summary:
+      'Dual-core Cortex-M7/M4 Discovery kit driving a 4.3-inch 800x480 DSI panel from SDRAM.',
     vendor: 'STMicroelectronics',
     display: {
       width: 800,
@@ -258,7 +288,10 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
   },
   {
     id: 'edt-evk043027b',
-    name: 'EDT EVK043027B',
+    name: 'EDT EVK043027B Evaluation Kit',
+    model: 'EVK043027B',
+    summary:
+      'A 4.3-inch evaluation kit on an STM32U599, with maXTouch capacitive touch, RS-485 and CAN.',
     vendor: 'Emerging Display Technologies',
     display: {
       width: 480,

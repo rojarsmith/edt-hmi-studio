@@ -75,7 +75,7 @@ const HardwareInfoDialog: React.FC<HardwareInfoDialogProps> = ({ onClose }) => {
         <div className="ps-title">Hardware Information</div>
         <div className="hwinfo-body">
           <p className="hwinfo-board">{board.name}</p>
-          <p className="hwinfo-vendor">{board.vendor}</p>
+          <p className="hwinfo-vendor">{board.model} · {board.vendor}</p>
 
           <div className="hwinfo-section">Display</div>
           <dl className="hwinfo-meta">

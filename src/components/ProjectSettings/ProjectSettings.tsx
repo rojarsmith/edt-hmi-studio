@@ -133,9 +133,9 @@ const ProjectSettings: React.FC = () => {
       <div className="modal-dialog project-settings-dialog" onClick={e => e.stopPropagation()}>
         <div className="ps-title">Project Settings</div>
         <div className="ps-body">
-          <label className="npd-label">
+          <label className="ps-label">
             Project Name
-            <input className="npd-input" type="text" value={name} onChange={e => setName(e.target.value)} />
+            <input className="ps-input" type="text" value={name} onChange={e => setName(e.target.value)} />
           </label>
 
           {/* Changeable here, unlike the board and the protocol. Only the
@@ -143,10 +143,10 @@ const ProjectSettings: React.FC = () => {
               put them, which is why the note below is about what will end up
               off-canvas rather than about what moved. See
               docs/display-orientation.md §6. */}
-          <label className="npd-label">
+          <label className="ps-label">
             Display Orientation
             <select
-              className="npd-select"
+              className="ps-select"
               value={orientation}
               onChange={e => setOrientation(e.target.value as DisplayOrientation)}
             >
@@ -157,7 +157,7 @@ const ProjectSettings: React.FC = () => {
                 </option>
               ))}
             </select>
-            <span className="npd-hint">
+            <span className="ps-hint">
               Design canvas {design.width}×{design.height}.
               {orientationBuildable
                 ? ''

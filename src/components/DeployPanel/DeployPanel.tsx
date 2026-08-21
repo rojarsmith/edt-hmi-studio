@@ -192,7 +192,7 @@ const DeployPanel: React.FC = () => {
           </div>
 
           <div className="deploy-target">
-            <span>Target: {board.name}</span>
+            <span>Target: {board.model}</span>
             <span>Protocol: {protocolDefinition.name}</span>
             <span>Build ID: {buildId || 'Not built yet'}</span>
             <span>ST-LINK: {selectedPort?.probeSerial || 'Selected automatically by the local service'}</span>

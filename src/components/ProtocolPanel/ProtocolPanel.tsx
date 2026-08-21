@@ -494,8 +494,8 @@ const ProtocolPanel: React.FC = () => {
                  dropped one — and saying "fixed by" there would be a lie. */
               <span className="protocol-badge">
                 {boardSupportsProtocol(boardId, protocol)
-                  ? `${protocolDefinition.name} · fixed by ${board.name}`
-                  : `${protocolDefinition.name} · not offered by ${board.name}`}
+                  ? `${protocolDefinition.name} · fixed by ${board.model}`
+                  : `${protocolDefinition.name} · not offered by ${board.model}`}
               </span>
             )}
           </div>
