@@ -1024,6 +1024,20 @@ function generatePropsCode(
       }
       // Series
       if (props.series && Array.isArray(props.series) && props.series.length > 0) {
+        // How many points the chart holds, before any are pushed into it.
+        // LVGL keeps 10 whatever the series carries, so a seven-value series
+        // left three empty columns on the left and drew nothing where the
+        // author put the seventh — see the legacy branch below, which has
+        // always said this. The longest series wins: a shorter one simply
+        // leaves its tail unset.
+        const points = Math.max(
+          ...props.series.map((ser: { data?: unknown[] }) =>
+            Array.isArray(ser.data) ? ser.data.length : 0,
+          ),
+        );
+        if (points > 0) {
+          lines.push(`${indent}lv_chart_set_point_count(${varName}, ${points});`);
+        }
         for (let si = 0; si < props.series.length; si++) {
           const ser = props.series[si];
           const serVar = `${varName}_ser_${si}`;
