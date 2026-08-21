@@ -442,13 +442,20 @@ const Emulator: React.FC = () => {
   return (
     <div className="emulator">
       <div className="emulator-toolbar">
-        <button
-          className={`emulator-btn ${isWorking ? 'working' : ''}`}
-          onClick={handleStart}
-          disabled={isWorking || blocked}
-        >
-          {isWorking ? '⏳ Working…' : '▶ Start'}
-        </button>
+        {/* Start goes away once there is something running: the emulator is
+            started, and a button offering to start it again says otherwise.
+            Stop is the only move left, and Start comes back with it. While a
+            build is in flight the button stays, disabled, because that is
+            where the "working" state is read from. */}
+        {!running && (
+          <button
+            className={`emulator-btn ${isWorking ? 'working' : ''}`}
+            onClick={handleStart}
+            disabled={isWorking || blocked}
+          >
+            {isWorking ? '⏳ Working…' : '▶ Start'}
+          </button>
+        )}
 
         {running && (
           <button className="emulator-stop-btn" onClick={handleStop}>
