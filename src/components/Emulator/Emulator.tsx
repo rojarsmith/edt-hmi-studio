@@ -6,13 +6,20 @@ import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useProjectModbusTags } from '../../hooks/useProjectModbusTags';
 import { generateCode } from '../../codegen';
-import { compileCode, type CompileStatus, type WasmRuntime, type FontCompileRequest } from './compilerService';
+import {
+  buildAndRun,
+  fetchToolchain,
+  type EmulatorStatus,
+  type EmulatorRuntime,
+  type FontCompileRequest,
+  type ToolchainReport,
+} from './emulatorService';
 import { collectGlyphs } from '../../codegen/collectGlyphs';
 import { collectUsedCustomFonts } from '../../codegen/fontUsage';
 import { buildFontCompileRequests } from '../../codegen/fontRequests';
 import type { LvglComponent } from '../../types';
 import { loadImageFromBase64, generateImageCCode, DEFAULT_IMAGE_OPTIONS } from '../../resources/converters/imageConverter';
-import './CompilePreview.css';
+import './Emulator.css';
 
 
 /** Map JS keyboard event.key to LVGL key codes */
@@ -30,18 +37,22 @@ const LV_KEY_MAP: Record<string, number> = {
   End:        3,    // LV_KEY_END
 };
 
-const CompilePreview: React.FC = () => {
+const Emulator: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const runtimeRef = useRef<WasmRuntime | null>(null);
+  const runtimeRef = useRef<EmulatorRuntime | null>(null);
   const rafIdRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
   const mousePressedRef = useRef(false);
+  /** Read inside handleStart without making the callback depend on it. */
+  const firstBuildRef = useRef(false);
 
-  const [status, setStatus] = useState<CompileStatus>('idle');
+  const [status, setStatus] = useState<EmulatorStatus>('idle');
   const [statusMessage, setStatusMessage] = useState('');
   const [compileOutput, setCompileOutput] = useState('');
   const [showOutput, setShowOutput] = useState(false);
   const [running, setRunning] = useState(false);
+  const [toolchain, setToolchain] = useState<ToolchainReport | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const screens = useEditorStore((s) => s.screens);
   const animations = useEditorStore((s) => s.animations);
@@ -72,6 +83,33 @@ const CompilePreview: React.FC = () => {
       }
     });
   }, [currentProjectId, getProjectConfig]);
+
+  // Ask the dev server what it can build with, before anything is generated.
+  // A machine without a toolchain should learn that from this panel, not from a
+  // build log — see docs/emulator.md §4.3.
+  const checkToolchain = useCallback(async (refresh: boolean) => {
+    setChecking(true);
+    const report = await fetchToolchain(refresh);
+    setToolchain(report);
+    setChecking(false);
+    return report;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchToolchain(false).then((report) => {
+      if (!cancelled) setToolchain(report);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Mirrored into a ref so handleStart can read it without listing it as a
+  // dependency, which would rebuild the callback on every preflight.
+  useEffect(() => {
+    firstBuildRef.current = toolchain?.ready === true && !toolchain.libraryReady;
+  }, [toolchain]);
 
   // Generate C code from current editor state
   const generateCCode = useCallback(() => {
@@ -117,7 +155,7 @@ const CompilePreview: React.FC = () => {
   }, []);
 
   // Start the requestAnimationFrame event loop
-  const startEventLoop = useCallback((runtime: WasmRuntime) => {
+  const startEventLoop = useCallback((runtime: EmulatorRuntime) => {
     lastTimeRef.current = performance.now();
 
     const loop = (now: number) => {
@@ -140,7 +178,7 @@ const CompilePreview: React.FC = () => {
   }, [renderFramebuffer]);
 
   // Handle compile & run
-  const handleCompile = useCallback(async () => {
+  const handleStart = useCallback(async () => {
     if (status === 'compiling' || status === 'loading' || status === 'running') {
       return;
     }
@@ -206,7 +244,7 @@ const CompilePreview: React.FC = () => {
       typographies,
     );
 
-    const result = await compileCode(
+    const result = await buildAndRun(
       userFiles,
       canvas.width,
       canvas.height,
@@ -236,6 +274,10 @@ const CompilePreview: React.FC = () => {
 
       // Focus canvas for keyboard input
       canvasRef.current?.focus();
+
+      // The LVGL library exists now if it did not before; re-ask so the
+      // first-build warning stops claiming otherwise.
+      if (firstBuildRef.current) void checkToolchain(true);
     } else if (!result.success) {
       setShowOutput(true);
       setStatus('error');
@@ -243,7 +285,7 @@ const CompilePreview: React.FC = () => {
       setStatus('done');
       setStatusMessage('Build succeeded (no runtime)');
     }
-  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
+  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, checkToolchain, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
 
   // Handle stop button
   const handleStop = useCallback(() => {
@@ -340,7 +382,7 @@ const CompilePreview: React.FC = () => {
       ctx.fillStyle = '#666';
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Click "Build & Run" to view the LVGL output', canvas.width / 2, canvas.height / 2);
+      ctx.fillText('Press Start to run this screen on real LVGL', canvas.width / 2, canvas.height / 2);
     }
   }, [canvas.width, canvas.height]);
 
@@ -367,30 +409,35 @@ const CompilePreview: React.FC = () => {
 
   const isWorking = ['compiling', 'loading', 'running'].includes(status);
 
+  // Reported by the dev server, so a production build with no compile endpoint
+  // (fetchToolchain returns null) is never treated as a broken machine.
+  const blocked = toolchain !== null && !toolchain.ready;
+  const firstBuild = toolchain?.ready === true && !toolchain.libraryReady;
+
   return (
-    <div className="compile-preview">
-      <div className="compile-preview-toolbar">
+    <div className="emulator">
+      <div className="emulator-toolbar">
         <button
-          className={`compile-btn ${isWorking ? 'working' : ''}`}
-          onClick={handleCompile}
-          disabled={isWorking}
+          className={`emulator-btn ${isWorking ? 'working' : ''}`}
+          onClick={handleStart}
+          disabled={isWorking || blocked}
         >
-          {isWorking ? '⏳ Processing...' : '🔨 Build & Run'}
+          {isWorking ? '⏳ Working…' : '▶ Start'}
         </button>
 
         {running && (
-          <button className="compile-stop-btn" onClick={handleStop}>
+          <button className="emulator-stop-btn" onClick={handleStop}>
             ⏹ Stop
           </button>
         )}
 
-        <span className="compile-status">
+        <span className="emulator-status">
           {statusIcon} {statusMessage || (status === 'idle' ? 'Ready' : '')}
         </span>
 
-        <div className="compile-toolbar-right">
+        <div className="emulator-toolbar-right">
           <button
-            className={`compile-output-toggle ${showOutput ? 'active' : ''}`}
+            className={`emulator-output-toggle ${showOutput ? 'active' : ''}`}
             onClick={() => setShowOutput(!showOutput)}
           >
             📋 {showOutput ? 'Hide Output' : 'Build Output'}
@@ -398,20 +445,52 @@ const CompilePreview: React.FC = () => {
         </div>
       </div>
 
-      <div className="compile-preview-body">
+      {blocked && toolchain && (
+        <div className="emulator-setup">
+          <h3>The Emulator is not set up on this machine yet</h3>
+          <ul>
+            {toolchain.problems.map((problem) => (
+              <li key={problem}>{problem}</li>
+            ))}
+          </ul>
+          {toolchain.remedy && (
+            <>
+              <p>Run this once in the project folder, then check again:</p>
+              <pre>{toolchain.remedy}</pre>
+              <p className="emulator-setup-note">
+                It installs Emscripten {toolchain.pins.emscripten} and LVGL {toolchain.pins.lvgl}
+                {' '}into <code>.hmi-cache/emulator/</code>, which is ignored by git. Nothing is
+                installed system-wide, and deleting that folder undoes it.
+              </p>
+            </>
+          )}
+          <button onClick={() => void checkToolchain(true)} disabled={checking}>
+            {checking ? 'Checking…' : 'Check again'}
+          </button>
+        </div>
+      )}
+
+      {firstBuild && (
+        <div className="emulator-note">
+          First run compiles LVGL from source — a few minutes. Every run after that
+          reuses it and takes seconds.
+        </div>
+      )}
+
+      <div className="emulator-body">
         <div
-          className="compile-canvas-wrapper"
+          className="emulator-canvas-wrapper"
           style={{ width: canvas.width, height: canvas.height }}
         >
           {isWorking && (
-            <div className="compile-overlay">
-              <div className="compile-spinner" />
-              <div className="compile-overlay-text">{statusMessage}</div>
+            <div className="emulator-overlay">
+              <div className="emulator-spinner" />
+              <div className="emulator-overlay-text">{statusMessage}</div>
             </div>
           )}
           <canvas
             ref={canvasRef}
-            className={`compile-canvas ${running ? 'interactive' : ''}`}
+            className={`emulator-canvas ${running ? 'interactive' : ''}`}
             width={canvas.width}
             height={canvas.height}
             tabIndex={running ? 0 : undefined}
@@ -425,23 +504,25 @@ const CompilePreview: React.FC = () => {
         </div>
 
         {showOutput && (
-          <div className="compile-output-panel">
-            <div className="compile-output-header">
+          <div className="emulator-output-panel">
+            <div className="emulator-output-header">
               <span>Build Output</span>
               <button onClick={() => setCompileOutput('')}>Clear</button>
             </div>
-            <pre className="compile-output-content">
+            <pre className="emulator-output-content">
               {compileOutput || '(No output)'}
             </pre>
           </div>
         )}
       </div>
 
-      <div className="compile-preview-footer">
-        Server-side emcc build with real LVGL rendering · Mouse and keyboard input supported
+      <div className="emulator-footer">
+        {toolchain?.ready
+          ? `Real LVGL ${toolchain.lvgl.version ?? ''} compiled with emcc · mouse and keyboard go into the running UI`
+          : 'Real LVGL compiled with emcc · mouse and keyboard go into the running UI'}
       </div>
     </div>
   );
 };
 
-export default CompilePreview;
+export default Emulator;

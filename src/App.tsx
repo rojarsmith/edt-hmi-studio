@@ -27,7 +27,7 @@ import DesktopMenuBar from './components/DesktopMenuBar/DesktopMenuBar';
 import { LogicEditor } from './components/LogicEditor';
 import PreviewPanel from './components/Preview';
 import WasmPreview from './components/WasmPreview';
-import CompilePreview from 'virtual:compile-preview';
+import Emulator from 'virtual:emulator';
 import { HierarchyPanel } from './components/HierarchyPanel';
 // ThemeSelector is intentionally unmounted for now — see the toolbar below.
 import { ResourceWorkspace, useResourceStore } from './resources';
@@ -82,7 +82,12 @@ const TAB_DEFS: {
   { id: 'code', icon: '💻', label: 'Code', description: 'Inspect the generated C code', factoryOnly: true },
 ];
 
-const isCompilePreviewEnabled = import.meta.env.VITE_ENABLE_COMPILE_PREVIEW !== 'false';
+// VITE_ENABLE_COMPILE_PREVIEW is the name this switch shipped under; it is still
+// honoured so an existing CI script or deployment does not break on a rename.
+// See docs/emulator.md §5.
+const isEmulatorEnabled =
+  import.meta.env.VITE_ENABLE_EMULATOR !== 'false' &&
+  import.meta.env.VITE_ENABLE_COMPILE_PREVIEW !== 'false';
 
 const App: React.FC = () => {
   const { currentView, currentProjectId, showProjectSettings, openProject, goToProjectList, setShowProjectSettings, setLastSaveTime, setDefaultFontSize } = useAppStore();
@@ -195,8 +200,8 @@ const EditorView: React.FC<EditorViewProps> = ({
   const effectiveTab: TabType = (activeTab === 'code' || activeTab === 'icon') && !factoryDevMode
     ? 'design'
     : activeTab;
-  const [previewMode, setPreviewMode] = useState<'simple' | 'wasm' | 'compile'>('simple');
-  const resolvedPreviewMode = !isCompilePreviewEnabled && previewMode === 'compile'
+  const [previewMode, setPreviewMode] = useState<'simple' | 'wasm' | 'emulator'>('simple');
+  const resolvedPreviewMode = !isEmulatorEnabled && previewMode === 'emulator'
     ? 'simple'
     : previewMode;
   const [projectName, setProjectName] = useState('');
@@ -557,12 +562,12 @@ const EditorView: React.FC<EditorViewProps> = ({
               >
                 🖥️ LVGL Preview
               </button>
-              {isCompilePreviewEnabled && (
+              {isEmulatorEnabled && (
                 <button
-                  className={`preview-sub-tab ${resolvedPreviewMode === 'compile' ? 'active' : ''}`}
-                  onClick={() => setPreviewMode('compile')}
+                  className={`preview-sub-tab ${resolvedPreviewMode === 'emulator' ? 'active' : ''}`}
+                  onClick={() => setPreviewMode('emulator')}
                 >
-                  🔨 Build & Run
+                  🎛️ Emulator
                 </button>
               )}
             </div>
@@ -571,7 +576,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                 ? <PreviewPanel />
                 : resolvedPreviewMode === 'wasm'
                   ? <WasmPreview />
-                  : <CompilePreview />}
+                  : <Emulator />}
             </div>
           </div>
         );

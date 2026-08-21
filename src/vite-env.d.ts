@@ -3,17 +3,21 @@
 interface ImportMetaEnv {
   /** Injected by Vite from package.json — see `define` in vite.config.ts. */
   readonly VITE_APP_VERSION?: string;
+  /** `false` removes the Emulator sub-tab and its dev-server endpoints. */
+  readonly VITE_ENABLE_EMULATOR?: string;
+  /** The name the switch above shipped under; still honoured. */
+  readonly VITE_ENABLE_COMPILE_PREVIEW?: string;
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-declare module 'virtual:compile-preview' {
+declare module 'virtual:emulator' {
   import type { FC } from 'react';
 
-  const CompilePreview: FC;
-  export default CompilePreview;
+  const Emulator: FC;
+  export default Emulator;
 }
 
 interface NativeWebHostWindowApi {

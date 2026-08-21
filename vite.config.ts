@@ -3,33 +3,33 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
-import compilePlugin from './vite-plugin-compile'
+import emulatorPlugin from './vite-plugin-emulator'
 import hmiPlugin from './vite-plugin-hmi'
 import pkg from './package.json' with { type: 'json' }
 
-const compilePreviewModuleId = 'virtual:compile-preview'
-const compilePreviewModulePath = fileURLToPath(new URL('./src/components/CompilePreview/index.ts', import.meta.url))
+const emulatorModuleId = 'virtual:emulator'
+const emulatorModulePath = fileURLToPath(new URL('./src/components/Emulator/index.ts', import.meta.url))
 
-function compilePreviewModulePlugin(enableCompilePreview: boolean): Plugin {
-  const resolvedCompilePreviewModuleId = `\0${compilePreviewModuleId}`
+function emulatorModulePlugin(enableEmulator: boolean): Plugin {
+  const resolvedEmulatorModuleId = `\0${emulatorModuleId}`
 
   return {
-    name: 'compile-preview-module',
+    name: 'emulator-module',
     resolveId(id) {
-      if (id === compilePreviewModuleId) {
-        return resolvedCompilePreviewModuleId
+      if (id === emulatorModuleId) {
+        return resolvedEmulatorModuleId
       }
     },
     load(id) {
-      if (id !== resolvedCompilePreviewModuleId) {
+      if (id !== resolvedEmulatorModuleId) {
         return null
       }
 
-      if (enableCompilePreview) {
-        return `export { default } from ${JSON.stringify(compilePreviewModulePath)}`
+      if (enableEmulator) {
+        return `export { default } from ${JSON.stringify(emulatorModulePath)}`
       }
 
-      return 'const CompilePreview = () => null\nexport default CompilePreview'
+      return 'const Emulator = () => null\nexport default Emulator'
     },
   }
 }
@@ -51,7 +51,10 @@ function appVersionHtmlPlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const enableCompilePreview = env.VITE_ENABLE_COMPILE_PREVIEW !== 'false'
+  // Either name switches the Emulator off; VITE_ENABLE_COMPILE_PREVIEW is the
+  // one this shipped under and is kept working. See docs/emulator.md §5.
+  const enableEmulator =
+    env.VITE_ENABLE_EMULATOR !== 'false' && env.VITE_ENABLE_COMPILE_PREVIEW !== 'false'
 
   return {
     base: env.VITE_BASE_PATH || '/',
@@ -65,14 +68,18 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       appVersionHtmlPlugin(),
-      compilePreviewModulePlugin(enableCompilePreview),
+      emulatorModulePlugin(enableEmulator),
       hmiPlugin(),
-      ...(enableCompilePreview ? [compilePlugin()] : []),
+      ...(enableEmulator ? [emulatorPlugin()] : []),
     ],
     test: {
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./src/setupTests.ts'],
+      // The Emulator's toolchain is installed under .hmi-cache; emsdk ships its
+      // own test suite, and without this the project's `npm test` runs
+      // Emscripten's. See docs/emulator.md §4.2.
+      exclude: ['**/node_modules/**', '**/dist/**', '.hmi-cache/**', '.hmi-builds/**'],
     },
     server: {
       host: '127.0.0.1',

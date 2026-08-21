@@ -1,4 +1,4 @@
-.compile-preview {
+.emulator {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -6,7 +6,7 @@
   color: #c9d1d9;
 }
 
-.compile-preview-toolbar {
+.emulator-toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -16,7 +16,7 @@
   flex-shrink: 0;
 }
 
-.compile-btn {
+.emulator-btn {
   padding: 6px 16px;
   border: none;
   border-radius: 6px;
@@ -28,18 +28,18 @@
   transition: background 0.15s;
 }
 
-.compile-btn:hover:not(:disabled) {
+.emulator-btn:hover:not(:disabled) {
   background: #2ea043;
 }
 
-.compile-btn:disabled,
-.compile-btn.working {
+.emulator-btn:disabled,
+.emulator-btn.working {
   background: #21262d;
   color: #8b949e;
   cursor: not-allowed;
 }
 
-.compile-stop-btn {
+.emulator-stop-btn {
   padding: 6px 16px;
   border: none;
   border-radius: 6px;
@@ -51,22 +51,22 @@
   transition: background 0.15s;
 }
 
-.compile-stop-btn:hover {
+.emulator-stop-btn:hover {
   background: #f85149;
 }
 
-.compile-status {
+.emulator-status {
   font-size: 13px;
   color: #8b949e;
   flex: 1;
 }
 
-.compile-toolbar-right {
+.emulator-toolbar-right {
   display: flex;
   gap: 8px;
 }
 
-.compile-output-toggle {
+.emulator-output-toggle {
   padding: 4px 10px;
   border: 1px solid #30363d;
   border-radius: 4px;
@@ -76,18 +76,18 @@
   cursor: pointer;
 }
 
-.compile-output-toggle:hover {
+.emulator-output-toggle:hover {
   background: #21262d;
   color: #c9d1d9;
 }
 
-.compile-output-toggle.active {
+.emulator-output-toggle.active {
   background: #1f2937;
   border-color: #58a6ff;
   color: #58a6ff;
 }
 
-.compile-preview-body {
+.emulator-body {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -97,7 +97,7 @@
   gap: 16px;
 }
 
-.compile-canvas-wrapper {
+.emulator-canvas-wrapper {
   position: relative;
   border: 1px solid #30363d;
   border-radius: 8px;
@@ -106,20 +106,20 @@
   flex-shrink: 0;
 }
 
-.compile-canvas {
+.emulator-canvas {
   display: block;
 }
 
-.compile-canvas.interactive {
+.emulator-canvas.interactive {
   cursor: pointer;
   outline: none;
 }
 
-.compile-canvas.interactive:focus {
+.emulator-canvas.interactive:focus {
   box-shadow: 0 0 0 2px #58a6ff;
 }
 
-.compile-overlay {
+.emulator-overlay {
   position: absolute;
   inset: 0;
   display: flex;
@@ -131,25 +131,25 @@
   gap: 12px;
 }
 
-.compile-spinner {
+.emulator-spinner {
   width: 32px;
   height: 32px;
   border: 3px solid #30363d;
   border-top-color: #58a6ff;
   border-radius: 50%;
-  animation: compile-spin 0.8s linear infinite;
+  animation: emulator-spin 0.8s linear infinite;
 }
 
-@keyframes compile-spin {
+@keyframes emulator-spin {
   to { transform: rotate(360deg); }
 }
 
-.compile-overlay-text {
+.emulator-overlay-text {
   font-size: 13px;
   color: #8b949e;
 }
 
-.compile-output-panel {
+.emulator-output-panel {
   width: 100%;
   max-width: 800px;
   border: 1px solid #30363d;
@@ -158,7 +158,7 @@
   flex-shrink: 0;
 }
 
-.compile-output-header {
+.emulator-output-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -169,7 +169,7 @@
   color: #8b949e;
 }
 
-.compile-output-header button {
+.emulator-output-header button {
   padding: 2px 8px;
   border: 1px solid #30363d;
   border-radius: 3px;
@@ -179,11 +179,11 @@
   cursor: pointer;
 }
 
-.compile-output-header button:hover {
+.emulator-output-header button:hover {
   background: #21262d;
 }
 
-.compile-output-content {
+.emulator-output-content {
   padding: 12px;
   margin: 0;
   font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
@@ -197,12 +197,97 @@
   word-break: break-all;
 }
 
-.compile-preview-footer {
+.emulator-footer {
   padding: 6px 16px;
   text-align: center;
   font-size: 11px;
   color: #484f58;
   background: #161b22;
   border-top: 1px solid #30363d;
+  flex-shrink: 0;
+}
+
+/* The preflight panel: what is missing, and the one command that provides it.
+   Shown instead of a compile log, because a compile never started. */
+.emulator-setup {
+  margin: 16px;
+  padding: 16px 20px;
+  border: 1px solid #30363d;
+  border-left: 3px solid #d29922;
+  border-radius: 6px;
+  background: #161b22;
+  color: #c9d1d9;
+  font-size: 13px;
+  line-height: 1.6;
+  flex-shrink: 0;
+}
+
+.emulator-setup h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.emulator-setup ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+.emulator-setup p {
+  margin: 8px 0;
+}
+
+.emulator-setup pre {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+  color: #7ee787;
+  user-select: all;
+}
+
+.emulator-setup-note {
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.emulator-setup code {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  color: #c9d1d9;
+}
+
+.emulator-setup button {
+  margin-top: 12px;
+  padding: 6px 14px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #21262d;
+  color: #c9d1d9;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.emulator-setup button:hover:not(:disabled) {
+  background: #30363d;
+}
+
+.emulator-setup button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Said once, before the first Start: the wait is LVGL compiling, not a hang. */
+.emulator-note {
+  margin: 12px 16px 0;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  font-size: 12px;
   flex-shrink: 0;
 }

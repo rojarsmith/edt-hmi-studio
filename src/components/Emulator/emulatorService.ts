@@ -1,12 +1,14 @@
 /**
- * Server-side C compiler service
- * Sends user code to the Vite dev server for emcc compilation,
- * then loads the Emscripten module in the browser.
+ * The Emulator's client half.
+ *
+ * Sends the generated C to the dev server, which compiles it against real LVGL
+ * with emcc, then loads the resulting Emscripten module in the page and hands
+ * back a handle the panel can tick and click. See docs/emulator.md.
  */
 
 import type { FontCompileRequest } from '../../codegen/types';
 
-export type CompileStatus =
+export type EmulatorStatus =
   | 'idle'
   | 'compiling'
   | 'loading'
@@ -14,8 +16,8 @@ export type CompileStatus =
   | 'done'
   | 'error';
 
-/** Runtime handle for interactive WASM execution */
-export interface WasmRuntime {
+/** Handle on the running emulator: drive it, read its screen, shut it down. */
+export interface EmulatorRuntime {
   tick(ms: number): void;
   mouseEvent(x: number, y: number, pressed: boolean): void;
   keyEvent(key: number, pressed: boolean): void;
@@ -25,18 +27,60 @@ export interface WasmRuntime {
   destroy(): void;
 }
 
-export interface CompileResult {
+export interface EmulatorBuildResult {
   success: boolean;
   output: string;
-  runtime: WasmRuntime | null;
+  runtime: EmulatorRuntime | null;
   width: number;
   height: number;
 }
 
-interface CompileResponse {
+interface BuildResponse {
   success: boolean;
   error?: string;
   buildId: string;
+}
+
+/** One entry of the toolchain preflight, mirroring server/emulator/toolchain.ts. */
+export interface ToolReport {
+  found: boolean;
+  path: string | null;
+  source: string;
+  detail?: string;
+}
+
+export interface ToolchainReport {
+  ready: boolean;
+  bash: ToolReport;
+  emscripten: ToolReport;
+  lvgl: ToolReport & { pinned: boolean; version: string | null };
+  problems: string[];
+  remedy: string | null;
+  pins: { lvgl: string; emscripten: string };
+  /**
+   * False until LVGL has been compiled once for this configuration. The panel
+   * uses it to warn that the first Start takes minutes rather than seconds,
+   * which is the difference between patience and a bug report.
+   */
+  libraryReady: boolean;
+}
+
+/**
+ * Ask the dev server what it can build with.
+ *
+ * Answered before anything is compiled, so a machine without a toolchain says
+ * so up front instead of after a build that was never going to start. Returns
+ * null when there is no dev server to ask — a static production build has no
+ * compile endpoint, and that is not an error worth showing.
+ */
+export async function fetchToolchain(refresh = false): Promise<ToolchainReport | null> {
+  try {
+    const resp = await fetch(`/api/emulator/toolchain${refresh ? '?refresh=1' : ''}`);
+    if (!resp.ok) return null;
+    return (await resp.json()) as ToolchainReport;
+  } catch {
+    return null;
+  }
 }
 
 // Emscripten module type
@@ -55,16 +99,16 @@ interface EmscriptenModule {
 export type { FontCompileRequest };
 
 /**
- * Compile C code on the server and return a WasmRuntime for interactive use.
+ * Build the generated C on the server and return a running emulator.
  */
-export async function compileCode(
+export async function buildAndRun(
   userFiles: Record<string, string>,
   width: number,
   height: number,
-  onStatus?: (status: CompileStatus, message: string) => void,
+  onStatus?: (status: EmulatorStatus, message: string) => void,
   fonts?: FontCompileRequest[],
-): Promise<CompileResult> {
-  const result: CompileResult = {
+): Promise<EmulatorBuildResult> {
+  const result: EmulatorBuildResult = {
     success: false,
     output: '',
     runtime: null,
@@ -74,7 +118,7 @@ export async function compileCode(
 
   try {
     // Step 1: Send code to server for compilation
-    onStatus?.('compiling', 'Compiling on server...');
+    onStatus?.('compiling', 'Compiling your screen with LVGL…');
 
     // Strip "include/" prefix — server expects flat file names
     const files: Record<string, string> = {};
@@ -85,7 +129,7 @@ export async function compileCode(
       }
     }
 
-    const resp = await fetch('/api/compile', {
+    const resp = await fetch('/api/emulator/build', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ files, fonts: fonts ?? [], width, height }),
@@ -95,7 +139,7 @@ export async function compileCode(
       throw new Error(`Server error: ${resp.status} ${resp.statusText}`);
     }
 
-    const data: CompileResponse = await resp.json();
+    const data: BuildResponse = await resp.json();
 
     if (!data.success) {
       result.output = data.error ?? 'Build failed (unknown error)';
@@ -104,7 +148,7 @@ export async function compileCode(
     }
 
     // Step 2: Load the Emscripten JS glue
-    onStatus?.('loading', 'Loading build output...');
+    onStatus?.('loading', 'Starting the emulator…');
 
     const buildId = data.buildId;
     const runtime = await loadEmscriptenModule(buildId, width, height);
@@ -132,15 +176,15 @@ export async function compileCode(
 
 /**
  * Load the Emscripten JS glue via dynamic script injection,
- * initialize the module, and return a WasmRuntime.
+ * initialize the module, and return an EmulatorRuntime.
  */
 async function loadEmscriptenModule(
   buildId: string,
   width: number,
   height: number,
-): Promise<WasmRuntime | null> {
-  const jsUrl = `/api/build/${buildId}/output.js`;
-  const wasmUrl = `/api/build/${buildId}/output.wasm`;
+): Promise<EmulatorRuntime | null> {
+  const jsUrl = `/api/emulator/build/${buildId}/output.js`;
+  const wasmUrl = `/api/emulator/build/${buildId}/output.wasm`;
 
   // Fetch the JS glue as text and evaluate it
   const jsResp = await fetch(jsUrl);

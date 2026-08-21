@@ -24,7 +24,7 @@
   },
   "include": [
     "vite.config.ts",
-    "vite-plugin-compile.ts",
+    "vite-plugin-emulator.ts",
     "vite-plugin-hmi.ts",
     "server/**/*.ts"
   ]
