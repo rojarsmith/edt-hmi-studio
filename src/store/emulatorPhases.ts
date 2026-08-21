@@ -44,3 +44,27 @@ export function emulatorPhaseFor(line: string): string | null {
   }
   return null;
 }
+
+/**
+ * What the Emulator says outside factory dev mode.
+ *
+ * The same rule as the phases above, applied to the panel's own chrome: a
+ * person laying out an HMI has not asked for LVGL, Emscripten or a compiler,
+ * and naming them tells them nothing they can act on. Factory dev mode keeps
+ * the engineering wording, which is where it is worth reading.
+ * See docs/factory-dev-mode.md.
+ */
+export const EMULATOR_WORDS = {
+  preparing: 'Preparing your panel…',
+  starting: 'Starting your panel…',
+  running: 'Running — click the screen to try it',
+  failed: 'Could not prepare your panel',
+  pressStart: 'Press Start to run your panel',
+  firstRun:
+    'The first run takes a few minutes to prepare. After that it starts in seconds.',
+  unavailable: 'The Emulator is not available on this machine',
+  unavailableDetail:
+    'Whoever installed EDT HMI Studio here can switch it on. Until then, use the Deploy tab to try your panel on the board itself.',
+  outputHeading: 'What the last run did',
+  outputEmpty: 'Press Start and the steps appear here.',
+} as const;

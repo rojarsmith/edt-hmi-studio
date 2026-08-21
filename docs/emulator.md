@@ -296,6 +296,17 @@ compiles LVGL from source — a few minutes; every run after that takes seconds"
 exactly once, rather than leaving the first user of a fresh checkout to guess
 whether it has hung.
 
+**And it says it twice, in two registers.** Everything quoted above is the
+factory-dev-mode wording. Outside it the same panel says *Preparing your panel*,
+*Running — click the screen to try it*, and — when the toolchain is missing —
+who to ask and what to do meanwhile, rather than a list naming Emscripten and a
+POSIX shell. The Build Output pane is filtered through the same allow-list the
+Work pane uses ([work-progress.md](./work-progress.md) §3), so a compiler
+transcript never reaches someone who did not ask for one. The words themselves
+live in `src/store/emulatorPhases.ts`, beside the phases, because they are the
+same decision: naming LVGL to a person laying out an HMI tells them nothing they
+can act on. See [factory-dev-mode.md](./factory-dev-mode.md).
+
 ### 4.5 Say what the build did, including when it worked
 
 The Build Output pane used to read, in full, `Build succeeded`. That was not a

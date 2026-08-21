@@ -7,12 +7,15 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useEmulatorStore } from '../../store/emulatorStore';
+import { useAppStore } from '../../store/appStore';
+import { EMULATOR_WORDS } from '../../store/emulatorPhases';
 
 type CopyFeedback = { kind: 'success' | 'error'; message: string } | null;
 
 const EmulatorOutputPane: React.FC = () => {
   const output = useEmulatorStore((state) => state.output);
   const clearOutput = useEmulatorStore((state) => state.clearOutput);
+  const factoryDevMode = useAppStore((state) => state.factoryDevMode);
 
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>(null);
   const logRef = useRef<HTMLPreElement>(null);
@@ -50,7 +53,9 @@ const EmulatorOutputPane: React.FC = () => {
     <div className="dock-pane">
       <div className="dock-pane-toolbar">
         <span className="dock-pane-meta">
-          Emscripten output from the Emulator&apos;s last build
+          {factoryDevMode
+            ? "Emscripten output from the Emulator's last build"
+            : EMULATOR_WORDS.outputHeading}
         </span>
 
         <div className="dock-pane-toolbar-end">
@@ -81,7 +86,10 @@ const EmulatorOutputPane: React.FC = () => {
       </div>
 
       <pre className="dock-pane-log" ref={logRef}>
-        {output || 'Press Start on the Emulator and the compiler’s output appears here.'}
+        {output ||
+          (factoryDevMode
+            ? 'Press Start on the Emulator and the compiler’s output appears here.'
+            : EMULATOR_WORDS.outputEmpty)}
       </pre>
     </div>
   );

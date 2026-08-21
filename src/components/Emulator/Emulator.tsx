@@ -7,7 +7,12 @@ import { useProjectStore } from '../../store/projectStore';
 import { useEmulatorStore } from '../../store/emulatorStore';
 import { useDockStore } from '../../store/dockStore';
 import { useWorkStore } from '../../store/workStore';
-import { EMULATOR_OUTCOMES, EMULATOR_PHASES, emulatorPhaseFor } from '../../store/emulatorPhases';
+import {
+  EMULATOR_OUTCOMES,
+  EMULATOR_PHASES,
+  EMULATOR_WORDS,
+  emulatorPhaseFor,
+} from '../../store/emulatorPhases';
 import { useProjectModbusTags } from '../../hooks/useProjectModbusTags';
 import { generateCode } from '../../codegen';
 import {
@@ -273,18 +278,31 @@ const Emulator: React.FC = () => {
       },
       fontRequests.length > 0 ? fontRequests : undefined,
       (line) => {
-        appendOutput(line);
         // Only lines the server announces itself become phases; nothing raw
         // from the compiler reaches Work. See emulatorPhases.ts.
         const phase = emulatorPhaseFor(line);
         if (phase) useWorkStore.getState().note(workId, { label: phase });
+        // And outside factory dev mode the same allow-list decides what reaches
+        // the Build Output pane: the steps, in the product's words, rather than
+        // a compiler transcript nobody in that mode can act on.
+        if (factoryDevMode) {
+          appendOutput(line);
+        } else if (phase) {
+          appendOutput(phase);
+        }
       },
     );
 
-    // Nothing to write: the server streamed the transcript and then the summary
-    // into the pane as they happened. setOutput is the fallback for a build
-    // that produced no stream at all — a failure before the POST was answered.
-    if (!useEmulatorStore.getState().output) setOutput(result.output);
+    // In factory dev mode the server streamed the transcript and then the
+    // summary, so there is nothing left to write; setOutput is the fallback for
+    // a build that produced no stream at all. Outside it, the transcript was
+    // filtered down to the steps and the outcome is the last of them.
+    if (!factoryDevMode) {
+      appendOutput('');
+      appendOutput(result.success ? EMULATOR_OUTCOMES.running : EMULATOR_WORDS.failed);
+    } else if (!useEmulatorStore.getState().output) {
+      setOutput(result.output);
+    }
 
     if (result.success && result.runtime) {
       runtimeRef.current = result.runtime;
@@ -319,7 +337,7 @@ const Emulator: React.FC = () => {
       setStatusMessage('Build succeeded (no runtime)');
       useWorkStore.getState().finish(workId, 'failed', EMULATOR_OUTCOMES.failed);
     }
-  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, checkToolchain, setOutput, appendOutput, clearOutput, showDockPane, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
+  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, checkToolchain, factoryDevMode, setOutput, appendOutput, clearOutput, showDockPane, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
 
   // Handle stop button
   const handleStop = useCallback(() => {
@@ -416,9 +434,13 @@ const Emulator: React.FC = () => {
       ctx.fillStyle = '#666';
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Press Start to run this screen on real LVGL', canvas.width / 2, canvas.height / 2);
+      ctx.fillText(
+        factoryDevMode ? 'Press Start to run this screen on real LVGL' : EMULATOR_WORDS.pressStart,
+        canvas.width / 2,
+        canvas.height / 2,
+      );
     }
-  }, [canvas.width, canvas.height]);
+  }, [canvas.width, canvas.height, factoryDevMode]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -433,6 +455,21 @@ const Emulator: React.FC = () => {
   }, []);
 
   const isWorking = ['compiling', 'loading', 'running'].includes(status);
+
+  // Outside factory dev mode the status is said in the product's words. The
+  // engineering message names LVGL and the compiler, which is the right thing
+  // to read when working on the editor and noise to everyone else.
+  const statusText = factoryDevMode
+    ? statusMessage
+    : status === 'compiling'
+      ? EMULATOR_WORDS.preparing
+      : status === 'loading' || status === 'running'
+        ? EMULATOR_WORDS.starting
+        : status === 'error'
+          ? EMULATOR_WORDS.failed
+          : running
+            ? EMULATOR_WORDS.running
+            : EMULATOR_WORDS.failed;
 
   // Reported by the dev server, so a production build with no compile endpoint
   // (fetchToolchain returns null) is never treated as a broken machine.
@@ -463,24 +500,34 @@ const Emulator: React.FC = () => {
           </button>
         )}
 
-        {/* The word alone. The emoji that used to lead this line was decorative
-            at best — ⚡ for "idle" read as a warning — and the state it stood
-            for is carried by colour, which does not have to be decoded. */}
-        <span className={`emulator-status ${status}`}>
-          {statusMessage || (status === 'idle' ? 'Ready' : '')}
-        </span>
+        {/* Nothing to say while nothing is happening: before the first Start,
+            and again after Stop, the button beside it already reports the
+            state, and "Ready" or "Stopped" only repeats it. The emoji that used
+            to lead this line is gone for the same reason. */}
+        {status !== 'idle' && (
+          <span className={`emulator-status ${status}`}>{statusText}</span>
+        )}
 
       </div>
 
       {blocked && toolchain && (
         <div className="emulator-setup">
-          <h3>The Emulator is not set up on this machine yet</h3>
-          <ul>
-            {toolchain.problems.map((problem) => (
-              <li key={problem}>{problem}</li>
-            ))}
-          </ul>
-          {toolchain.remedy && (
+          {/* Two audiences, two panels. The engineer gets the missing pieces by
+              name and the command that installs them; the panel designer gets
+              the one fact they can act on, which is who to ask and what to do
+              meanwhile. A list naming Emscripten and a POSIX shell is not
+              advice to someone who did not install this. */}
+          <h3>{factoryDevMode ? 'The Emulator is not set up on this machine yet' : EMULATOR_WORDS.unavailable}</h3>
+          {factoryDevMode ? (
+            <ul>
+              {toolchain.problems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>{EMULATOR_WORDS.unavailableDetail}</p>
+          )}
+          {factoryDevMode && toolchain.remedy && (
             <>
               <p>Run this once in the project folder, then check again:</p>
               <pre>{toolchain.remedy}</pre>
@@ -499,8 +546,9 @@ const Emulator: React.FC = () => {
 
       {firstBuild && (
         <div className="emulator-note">
-          First run compiles LVGL from source — a few minutes. Every run after that
-          reuses it and takes seconds.
+          {factoryDevMode
+            ? 'First run compiles LVGL from source — a few minutes. Every run after that reuses it and takes seconds.'
+            : EMULATOR_WORDS.firstRun}
         </div>
       )}
 
