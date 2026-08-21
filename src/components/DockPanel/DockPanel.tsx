@@ -15,6 +15,7 @@ import {
   type DockPaneId,
 } from '../../store/dockStore';
 import DeployLogPane from './DeployLogPane';
+import EmulatorOutputPane from './EmulatorOutputPane';
 import WorkPane from './WorkPane';
 import './DockPanel.css';
 
@@ -22,16 +23,30 @@ const PANES: { id: DockPaneId; label: string }[] = [
   // Work first: it is the one pane that says something about every operation,
   // and the two log panes are candidates for factory mode later.
   { id: 'work', label: 'Work' },
+  // Between Work and the firmware log, which is where it belongs in the
+  // ladder: the Emulator compiles before Deploy does.
+  { id: 'output', label: 'Build Output' },
   { id: 'build', label: 'Build Firmware' },
   { id: 'flash', label: 'Flash & Reset' },
 ];
 
+interface DockPanelProps {
+  /**
+   * Whether to offer the Emulator's Build Output pane. Unlike the others it is
+   * tab-specific — it describes what the Preview tab just did, and on the
+   * Design tab it would be a log for something not on screen. The caller knows
+   * both facts that decide it: which tab is open, and whether the Emulator was
+   * built into this app at all.
+   */
+  showBuildOutput?: boolean;
+}
+
 /**
- * The dock is available on every tab: Work lists operations that outlive the
- * tab they were started from, so hiding it somewhere would hide the one view
- * that is never tab-specific. Expansion is the author's choice alone.
+ * The rest of the dock is available on every tab: Work lists operations that
+ * outlive the tab they were started from, so hiding it somewhere would hide the
+ * one view that is never tab-specific. Expansion is the author's choice alone.
  */
-const DockPanel: React.FC = () => {
+const DockPanel: React.FC<DockPanelProps> = ({ showBuildOutput = false }) => {
   const expanded = useDockStore((state) => state.expanded);
   const activePane = useDockStore((state) => state.activePane);
   const height = useDockStore((state) => state.height);
@@ -41,6 +56,13 @@ const DockPanel: React.FC = () => {
   const busy = useDeployStore((state) => state.busy);
 
   const [resizing, setResizing] = useState(false);
+
+  const panes = PANES.filter((pane) => pane.id !== 'output' || showBuildOutput);
+  // Derived rather than synced, the way App resolves its own factory-only tabs:
+  // leaving Preview while Build Output is in front should immediately read as
+  // Work, without a write that would then have to be undone on the way back.
+  const visiblePane: DockPaneId =
+    activePane === 'output' && !showBuildOutput ? 'work' : activePane;
 
   const handleResizeStart = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -96,13 +118,13 @@ const DockPanel: React.FC = () => {
       )}
 
       <div className="dock-tabs" role="tablist">
-        {PANES.map((pane) => (
+        {panes.map((pane) => (
           <button
             key={pane.id}
             type="button"
             role="tab"
-            aria-selected={activePane === pane.id}
-            className={`dock-tab ${activePane === pane.id ? 'active' : ''}`}
+            aria-selected={visiblePane === pane.id}
+            className={`dock-tab ${visiblePane === pane.id ? 'active' : ''}`}
             onClick={() => setActivePane(pane.id)}
           >
             {pane.label}
@@ -135,9 +157,11 @@ const DockPanel: React.FC = () => {
 
       {expanded && (
         <div className="dock-body" role="tabpanel">
-          {activePane === 'work'
+          {visiblePane === 'work'
             ? <WorkPane />
-            : <DeployLogPane pane={activePane} />}
+            : visiblePane === 'output'
+              ? <EmulatorOutputPane />
+              : <DeployLogPane pane={visiblePane} />}
         </div>
       )}
     </div>

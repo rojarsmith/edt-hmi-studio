@@ -254,6 +254,7 @@ Start 是停用的，不會把人帶進一次注定不會發生的編譯。缺�
 | 產物端點 | `GET /api/build/:id/output.{js,wasm}` | `GET /api/emulator/build/:id/output.{js,wasm}` |
 | 預檢 | — | `GET /api/emulator/toolchain` |
 | 沒人用的端點 | `POST /api/project/build-lvgl` | 移除——沒有任何呼叫者（§3.4） |
+| 建置輸出 | 一顆 `📋 Build Output` 開關，在畫布上方開一個框 | 底部抽屜的 **Build Output** pane，就在韌體建置 log 旁邊（[bottom-dock-panel.md](./bottom-dock-panel.md) §11） |
 | 沒人用的模組 | `CompilePreview/cTemplates.ts` | 移除——伺服器端 `main_wrapper.c` 的第二份拷貝，沒有任何地方引用 |
 
 **`VITE_ENABLE_COMPILE_PREVIEW` 仍然有效。** 它出現在 README 的說明裡，也可能出現在讀者

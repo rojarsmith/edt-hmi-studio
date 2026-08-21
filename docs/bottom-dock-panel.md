@@ -166,6 +166,7 @@ amended visibility rule. What landed:
 | `src/store/dockStore.ts` | Dock chrome only — expanded, active pane, height (in `localStorage`) |
 | `src/components/DockPanel/DockPanel.tsx` | The shell: tab strip, collapse, drag-resize |
 | `src/components/DockPanel/DeployLogPane.tsx` | One pane, parameterised by which log it shows and which operation its toolbar runs |
+| `src/components/DockPanel/EmulatorOutputPane.tsx` | The Emulator's build log (§11) |
 | `src/App.tsx` | Renders the dock between `renderMainContent()` and `<StatusBar />`, and owns the visibility rule |
 
 Three things worth recording because they are not obvious from §1–§9.
@@ -212,3 +213,46 @@ keyboard alternative to the drag grip (§7) are still open — the panes carry
 `role="tab"` / `role="tabpanel"` and the grip carries `role="separator"`, but
 arrow-key navigation is not wired. That is the first thing to add if this dock
 grows a third pane.
+
+## 11. The fourth pane: the Emulator's Build Output
+
+§10 ended by saying keyboard navigation was the first thing to add "if this dock
+grows a third pane". It grew a fourth instead, and the note still stands — see
+the bottom of this section.
+
+**Where it came from.** The Emulator kept its compiler output in local state
+behind a `📋 Build Output` toggle that opened a box **over its own canvas**.
+That is the wrong shape twice over: it is a build log, which this dock already
+holds two of, and the moment you most want to read it — a build has just failed
+— is the moment you also want to see what is on the screen behind it.
+
+**Where it sits.** Between **Work** and **Build Firmware**. That is ladder
+order, not alphabetical: the Emulator compiles before Deploy does
+([preview-ladder.md](./preview-ladder.md)), so the two build logs read
+left-to-right in the order a project passes through them.
+
+**It is the first tab-specific pane, and that needed a rule.** §10 replaced the
+original per-tab visibility with "available on every tab", because Work lists
+operations that outlive the tab that started them. Build Output is the
+exception that does not contradict it: it describes what the *Preview* tab just
+did, and on the Design tab it would be a log for something not on screen. So the
+strip is filtered rather than hidden — `App.tsx` passes
+`showBuildOutput={effectiveTab === 'preview' && isEmulatorEnabled}`, the caller
+being the only place that knows both facts.
+
+Leaving Preview while Build Output is in front resolves to **Work**, and the
+resolution is *derived, not written*: `dockStore` keeps `activePane` as the
+author left it and `DockPanel` renders `visiblePane`. Coming back to Preview
+therefore lands on Build Output again, which is the behaviour someone switching
+between Design and Preview during a debugging session wants. It is the same
+pattern `App.tsx` uses for the factory-only tabs, for the same reason — a write
+on the way out is a write you have to undo on the way back.
+
+**A failed build opens it.** `showPane('output')` brings the pane forward and
+expands the dock if it was collapsed, so the log arrives without being asked
+for. A successful build changes nothing about the dock; the panel above already
+says it is running.
+
+**Still not done.** Arrow-key navigation of the tab strip and a keyboard
+alternative to the drag grip. Four panes make that more pressing than three
+did, not less.

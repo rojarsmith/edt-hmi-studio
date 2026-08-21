@@ -4,6 +4,8 @@ import { useLogicEditorStore } from '../LogicEditor';
 import { useResourceStore } from '../../resources';
 import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
+import { useEmulatorStore } from '../../store/emulatorStore';
+import { useDockStore } from '../../store/dockStore';
 import { useProjectModbusTags } from '../../hooks/useProjectModbusTags';
 import { generateCode } from '../../codegen';
 import {
@@ -48,8 +50,6 @@ const Emulator: React.FC = () => {
 
   const [status, setStatus] = useState<EmulatorStatus>('idle');
   const [statusMessage, setStatusMessage] = useState('');
-  const [compileOutput, setCompileOutput] = useState('');
-  const [showOutput, setShowOutput] = useState(false);
   const [running, setRunning] = useState(false);
   const [toolchain, setToolchain] = useState<ToolchainReport | null>(null);
   const [checking, setChecking] = useState(false);
@@ -64,6 +64,12 @@ const Emulator: React.FC = () => {
   const { images: imageResources, fonts: fontResources } = useResourceStore();
   const modbusTags = useProjectModbusTags();
   const currentProjectId = useAppStore((s) => s.currentProjectId);
+  // The build log goes to the bottom dock beside the firmware one, so the
+  // output and the running screen are on screen at the same time rather than
+  // one covering the other. See docs/bottom-dock-panel.md §10.
+  const setOutput = useEmulatorStore((s) => s.setOutput);
+  const clearOutput = useEmulatorStore((s) => s.clearOutput);
+  const showDockPane = useDockStore((s) => s.showPane);
   const factoryDevMode = useAppStore((s) => s.factoryDevMode);
   const getProjectConfig = useProjectStore((s) => s.getProjectConfig);
 
@@ -187,8 +193,7 @@ const Emulator: React.FC = () => {
     // Stop any previous runtime
     stopRuntime();
 
-    setCompileOutput('');
-    setShowOutput(false);
+    clearOutput();
 
     const code = generateCCode();
 
@@ -256,7 +261,7 @@ const Emulator: React.FC = () => {
       fontRequests.length > 0 ? fontRequests : undefined,
     );
 
-    setCompileOutput(result.output);
+    setOutput(result.output);
 
     if (result.success && result.runtime) {
       runtimeRef.current = result.runtime;
@@ -280,13 +285,15 @@ const Emulator: React.FC = () => {
       // first-build warning stops claiming otherwise.
       if (firstBuildRef.current) void checkToolchain(true);
     } else if (!result.success) {
-      setShowOutput(true);
+      // A failed build has something to say, so bring the pane that says it to
+      // the front and open the dock if it was collapsed.
+      showDockPane('output');
       setStatus('error');
     } else {
       setStatus('done');
       setStatusMessage('Build succeeded (no runtime)');
     }
-  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, checkToolchain, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
+  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, checkToolchain, setOutput, clearOutput, showDockPane, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
 
   // Handle stop button
   const handleStop = useCallback(() => {
@@ -436,14 +443,6 @@ const Emulator: React.FC = () => {
           {statusIcon} {statusMessage || (status === 'idle' ? 'Ready' : '')}
         </span>
 
-        <div className="emulator-toolbar-right">
-          <button
-            className={`emulator-output-toggle ${showOutput ? 'active' : ''}`}
-            onClick={() => setShowOutput(!showOutput)}
-          >
-            📋 {showOutput ? 'Hide Output' : 'Build Output'}
-          </button>
-        </div>
       </div>
 
       {blocked && toolchain && (
@@ -503,18 +502,6 @@ const Emulator: React.FC = () => {
             onKeyUp={running ? handleKeyUp : undefined}
           />
         </div>
-
-        {showOutput && (
-          <div className="emulator-output-panel">
-            <div className="emulator-output-header">
-              <span>Build Output</span>
-              <button onClick={() => setCompileOutput('')}>Clear</button>
-            </div>
-            <pre className="emulator-output-content">
-              {compileOutput || '(No output)'}
-            </pre>
-          </div>
-        )}
       </div>
 
       {/* Which LVGL, built by which compiler: the answer to "why does this

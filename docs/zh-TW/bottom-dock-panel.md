@@ -142,6 +142,7 @@ Output、Package Manager Console。而這裡提的兩個 pane 是用 Deploy 卡�
 | `src/store/dockStore.ts` | 只管抽屜的外觀狀態——展開與否、哪個 pane 在前、高度（存在 `localStorage`） |
 | `src/components/DockPanel/DockPanel.tsx` | 外殼：分頁列、收合、拖曳改高度 |
 | `src/components/DockPanel/DeployLogPane.tsx` | 一個 pane，用參數決定它顯示哪份 log、它的工具列跑哪個操作 |
+| `src/components/DockPanel/EmulatorOutputPane.tsx` | Emulator 的建置 log（§11） |
 | `src/App.tsx` | 把抽屜畫在 `renderMainContent()` 與 `<StatusBar />` 之間，並持有顯示規則 |
 
 有三件事值得記下來，因為從 §1–§9 看不出來。
@@ -177,3 +178,37 @@ Output、Package Manager Console。而這裡提的兩個 pane 是用 Deploy 卡�
 **沒有做，而且是刻意的。** §7 提的「分頁列的鍵盤切換」與「拖曳把手的鍵盤替代方案」還
 沒做——pane 帶著 `role="tab"` / `role="tabpanel"`、把手帶著 `role="separator"`，但方向鍵
 導航還沒接。如果這個抽屜要長出第三個 pane，那就是第一件該補的事。
+
+## 11.第四個 pane：Emulator 的 Build Output
+
+§10 的結尾說「如果這個抽屜要長出第三個 pane」，鍵盤導航就是第一件該補的事。它長出的是
+第四個，而那句話仍然成立——見本節結尾。
+
+**它從哪裡來。** Emulator 原本把編譯器輸出放在自己的 local state 裡，藏在一顆
+`📋 Build Output` 開關後面，按下去會在**它自己的畫布上方**打開一個框。這個形狀錯了兩次：
+它是一份建置 log，而這個抽屜已經放著兩份；而你最想讀它的那一刻——一次建置剛剛失敗——
+正好也是你想同時看見背後畫面的那一刻。
+
+**它放在哪裡。** **Work** 與 **Build Firmware** 之間。這是階梯的順序，不是字母順序：
+Emulator 的編譯發生在 Deploy 之前（[preview-ladder.md](./preview-ladder.md)），所以兩份
+建置 log 由左至右，正好就是一個專案經過它們的順序。
+
+**它是第一個綁分頁的 pane，而那需要一條規則。** §10 把原本「跟著 Deploy 分頁」的顯示規則
+換成了「每個分頁都可用」，理由是 Work 列的是活得比分頁還久的操作。Build Output 是那個
+不與之矛盾的例外：它描述的是 *Preview* 分頁剛剛做了什麼，而在 Design 分頁上，它會是一份
+「畫面上根本沒有那個東西」的 log。所以做法是**過濾頁簽列**而不是隱藏整個抽屜——`App.tsx`
+傳的是 `showBuildOutput={effectiveTab === 'preview' && isEmulatorEnabled}`，因為呼叫端是
+唯一同時知道這兩件事的地方。
+
+在 Build Output 在前面時離開 Preview，會解析成 **Work**，而這個解析是**推導出來的，不是
+寫進去的**：`dockStore` 的 `activePane` 維持作者離開時的樣子，`DockPanel` 畫的是
+`visiblePane`。所以回到 Preview 會再度落在 Build Output 上——那正是一個在 Design 與
+Preview 之間來回除錯的人想要的行為。這跟 `App.tsx` 處理原廠專屬分頁用的是同一個模式，
+理由也一樣：出去的時候寫一次，回來的時候就得再改回來。
+
+**失敗的建置會自己打開它。** `showPane('output')` 會把這個 pane 帶到前面，抽屜收著的話
+順便展開，於是那份 log 不用去要就會出現。成功的建置則完全不動抽屜；上面的面板已經說了
+它正在跑。
+
+**仍然沒做。** 頁簽列的方向鍵導航，以及拖曳把手的鍵盤替代方案。四個 pane 只會讓這件事
+比三個更急，不會更不急。

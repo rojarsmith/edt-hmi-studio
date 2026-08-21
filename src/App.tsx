@@ -675,7 +675,10 @@ const EditorView: React.FC<EditorViewProps> = ({
 
       {renderMainContent()}
 
-      <DockPanel />
+      {/* Build Output belongs to Preview: it is what the Emulator's last build
+          said, and on any other tab it would be a log for something not on
+          screen. See docs/bottom-dock-panel.md §10. */}
+      <DockPanel showBuildOutput={effectiveTab === 'preview' && isEmulatorEnabled} />
 
       <StatusBar />
 

@@ -299,6 +299,7 @@ whether it has hung.
 | Artifact endpoint | `GET /api/build/:id/output.{js,wasm}` | `GET /api/emulator/build/:id/output.{js,wasm}` |
 | Preflight | — | `GET /api/emulator/toolchain` |
 | Unused endpoint | `POST /api/project/build-lvgl` | removed — it had no caller (§3.4) |
+| Build output | A `📋 Build Output` toggle opening a box over the canvas | The bottom dock's **Build Output** pane, beside the firmware build's log ([bottom-dock-panel.md](./bottom-dock-panel.md) §11) |
 | Unused module | `CompilePreview/cTemplates.ts` | removed — a second copy of the server's `main_wrapper.c`, referenced by nothing |
 
 **`VITE_ENABLE_COMPILE_PREVIEW` still works.** It is in the README's

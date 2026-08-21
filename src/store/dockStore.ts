@@ -7,7 +7,11 @@
 
 import { create } from 'zustand';
 
-export type DockPaneId = 'work' | 'build' | 'flash';
+/**
+ * 'output' is the Emulator's build log and is offered only on the Preview tab;
+ * the rest are available everywhere. DockPanel decides which are on show.
+ */
+export type DockPaneId = 'work' | 'output' | 'build' | 'flash';
 
 const HEIGHT_KEY = 'dockPanelHeight';
 export const DOCK_MIN_HEIGHT = 120;
