@@ -1088,7 +1088,7 @@ const PreviewPanel: React.FC = () => {
   return (
     <div className="preview-panel">
       <div className="preview-header">
-        <h3>📱 Live Preview</h3>
+        <h3>📱 Prototype</h3>
         <div className="preview-controls">
           {!animPlaying ? (
             <button className="preview-btn" onClick={startAnimation} title="Play animation">▶</button>

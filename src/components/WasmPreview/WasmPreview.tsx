@@ -125,7 +125,7 @@ const WasmPreview: React.FC = () => {
             ref={iframeRef}
             className="wasm-preview-iframe"
             src="/wasm/lvgl_wasm.html"
-            title="LVGL WASM Preview"
+            title="Simulator — real LVGL"
             width={canvas.width}
             height={canvas.height}
           />
@@ -135,7 +135,7 @@ const WasmPreview: React.FC = () => {
       <div className="wasm-preview-footer">
         {sizeHonoured ? (
           <>
-            Rendered with the LVGL WASM runtime at {canvas.width}×{canvas.height}
+            Real LVGL, drawing this screen at {canvas.width}×{canvas.height} · no code compiled
           </>
         ) : (
           <span className="wasm-preview-warning">

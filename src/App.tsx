@@ -59,6 +59,9 @@ type TabType =
   | 'deploy'
   | 'code';
 
+/** The three preview rungs, named as docs/preview-ladder.md names them. */
+type PreviewMode = 'prototype' | 'simulator' | 'emulator';
+
 /** The main feature tabs, in row order. The description is the hover tooltip. */
 const TAB_DEFS: {
   id: TabType;
@@ -76,7 +79,7 @@ const TAB_DEFS: {
   { id: 'icon', icon: '⭐', label: 'Icon', description: 'Browse the built-in icon library', factoryOnly: true },
   { id: 'logic', icon: '🔗', label: 'Logic', description: 'Wire up no-code logic graphs' },
   { id: 'protocol', icon: '🔌', label: 'Protocol', description: 'Configure field-bus communication and tags' },
-  { id: 'preview', icon: '📱', label: 'Preview', description: 'Run the UI in the built-in simulator' },
+  { id: 'preview', icon: '📱', label: 'Preview', description: 'Run your screens on real LVGL, compiled from this project' },
   { id: 'deploy', icon: '🚀', label: 'Deploy', description: 'Build firmware and flash the board' },
   // Factory-dev only, kept last so the normal tab order is undisturbed.
   { id: 'code', icon: '💻', label: 'Code', description: 'Inspect the generated C code', factoryOnly: true },
@@ -200,10 +203,19 @@ const EditorView: React.FC<EditorViewProps> = ({
   const effectiveTab: TabType = (activeTab === 'code' || activeTab === 'icon') && !factoryDevMode
     ? 'design'
     : activeTab;
-  const [previewMode, setPreviewMode] = useState<'simple' | 'wasm' | 'emulator'>('simple');
-  const resolvedPreviewMode = !isEmulatorEnabled && previewMode === 'emulator'
-    ? 'simple'
-    : previewMode;
+  // Opening Preview means opening the Emulator. The other two rungs are the
+  // editor's own approximations of LVGL — useful for working on the editor,
+  // misleading as an answer about the panel (docs/preview-ladder.md §8) — so
+  // the choice between rungs belongs with the rest of the factory-dev tools.
+  // The exception is a build with the Emulator switched off, where hiding the
+  // strip would leave the two remaining rungs unreachable.
+  const canChoosePreviewRung = factoryDevMode || !isEmulatorEnabled;
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('emulator');
+  const resolvedPreviewMode: PreviewMode = !canChoosePreviewRung
+    ? 'emulator'
+    : !isEmulatorEnabled && previewMode === 'emulator'
+      ? 'prototype'
+      : previewMode;
   const [projectName, setProjectName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -549,32 +561,34 @@ const EditorView: React.FC<EditorViewProps> = ({
       case 'preview':
         return (
           <div className="app-body full-panel">
-            <div className="preview-sub-tabs">
-              <button
-                className={`preview-sub-tab ${resolvedPreviewMode === 'simple' ? 'active' : ''}`}
-                onClick={() => setPreviewMode('simple')}
-              >
-                📱 Quick Preview
-              </button>
-              <button
-                className={`preview-sub-tab ${resolvedPreviewMode === 'wasm' ? 'active' : ''}`}
-                onClick={() => setPreviewMode('wasm')}
-              >
-                🖥️ LVGL Preview
-              </button>
-              {isEmulatorEnabled && (
+            {canChoosePreviewRung && (
+              <div className="preview-sub-tabs">
                 <button
-                  className={`preview-sub-tab ${resolvedPreviewMode === 'emulator' ? 'active' : ''}`}
-                  onClick={() => setPreviewMode('emulator')}
+                  className={`preview-sub-tab ${resolvedPreviewMode === 'prototype' ? 'active' : ''}`}
+                  onClick={() => setPreviewMode('prototype')}
                 >
-                  🎛️ Emulator
+                  📱 Prototype
                 </button>
-              )}
-            </div>
+                <button
+                  className={`preview-sub-tab ${resolvedPreviewMode === 'simulator' ? 'active' : ''}`}
+                  onClick={() => setPreviewMode('simulator')}
+                >
+                  🖥️ Simulator
+                </button>
+                {isEmulatorEnabled && (
+                  <button
+                    className={`preview-sub-tab ${resolvedPreviewMode === 'emulator' ? 'active' : ''}`}
+                    onClick={() => setPreviewMode('emulator')}
+                  >
+                    🎛️ Emulator
+                  </button>
+                )}
+              </div>
+            )}
             <div className="preview-sub-content">
-              {resolvedPreviewMode === 'simple'
+              {resolvedPreviewMode === 'prototype'
                 ? <PreviewPanel />
-                : resolvedPreviewMode === 'wasm'
+                : resolvedPreviewMode === 'simulator'
                   ? <WasmPreview />
                   : <Emulator />}
             </div>
