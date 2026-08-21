@@ -64,6 +64,7 @@ const Emulator: React.FC = () => {
   const { images: imageResources, fonts: fontResources } = useResourceStore();
   const modbusTags = useProjectModbusTags();
   const currentProjectId = useAppStore((s) => s.currentProjectId);
+  const factoryDevMode = useAppStore((s) => s.factoryDevMode);
   const getProjectConfig = useProjectStore((s) => s.getProjectConfig);
 
   const [projectDefaultFont, setProjectDefaultFont] = useState<string | undefined>();
@@ -516,11 +517,16 @@ const Emulator: React.FC = () => {
         )}
       </div>
 
-      <div className="emulator-footer">
-        {toolchain?.ready
-          ? `Real LVGL ${toolchain.lvgl.version ?? ''} compiled with emcc · mouse and keyboard go into the running UI`
-          : 'Real LVGL compiled with emcc · mouse and keyboard go into the running UI'}
-      </div>
+      {/* Which LVGL, built by which compiler: the answer to "why does this
+          differ from the board", and noise to anyone not asking that. Factory
+          dev mode only — see docs/factory-dev-mode.md. */}
+      {factoryDevMode && (
+        <div className="emulator-footer">
+          {toolchain?.ready
+            ? `Real LVGL ${toolchain.lvgl.version ?? ''} compiled with emcc · mouse and keyboard go into the running UI`
+            : 'Real LVGL compiled with emcc · mouse and keyboard go into the running UI'}
+        </div>
+      )}
     </div>
   );
 };

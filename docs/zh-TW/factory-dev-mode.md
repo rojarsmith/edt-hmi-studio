@@ -68,6 +68,7 @@ return factoryDevMode ? <InternalDiagnostics /> : null;
 | Logic 分頁 Properties 面板的 **Active on Screens** —— 逐圖儲存但目前沒有任何東西使用；圖暫定全域運作，一般模式改顯示單純的 **Active** 開關，而且真的有作用：關掉的圖完全不會出現在產生的程式碼裡 | 顯示 | 隱藏 |
 | Logic 調色盤的 **Custom** 架子 —— Call Function 與 C Code Block，手寫 C 是原廠工程師的領域；已放進圖裡的節點在任何模式都照常渲染與產生，藏起來的只有調色盤上的供應 | 顯示 | 隱藏 |
 | Properties 面板標題列的**收合三角形**，可把整個面板收成一條標題列。面板內各分區的收合、以及標題列的全部展開／全部收合按鈕，兩種模式都照常提供 | 顯示 | 隱藏 |
+| **Emulator 底部資訊列**——Emulator 畫布下方那一條，寫著 LVGL 版本與編譯它的編譯器。它回答的是「為什麼這裡跟板子不一樣」，而那是只有在做編輯器的人才會問的問題；上方的面板已經講完使用者需要知道的一切，包含缺什麼、以及怎麼裝 | 顯示 | 隱藏 |
 | **預覽階切換列**——Preview 分頁上方的 Prototype／Simulator／Emulator 那一排。平常這個分頁直接打開 **Emulator**，切換列不會畫出來；因為另外兩階是編輯器自己對 LVGL 的近似，在它們身上得到綠燈並不是對面板的回答（[preview-ladder.md](preview-ladder.md) §8）。把 Emulator 在建置時關掉的版本，兩種模式都會顯示切換列——不然剩下兩階就沒有入口了 | 顯示 | 隱藏；直接開 Emulator |
 
 日後決定的項目請繼續補充於此表。
