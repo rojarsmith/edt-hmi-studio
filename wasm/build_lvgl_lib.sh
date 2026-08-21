@@ -1,46 +1,55 @@
 #!/bin/bash
+# Builds an LVGL static library for this directory's lv_conf.h.
+#
+# The Emulator no longer needs this script — it builds and caches its own
+# library on demand, with SDL off, from server/emulator/lvglLib.ts. This one
+# remains for the CMake build in build.sh and for building by hand.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-source /home/xcssa/.openclaw/workspace/tools/emsdk/emsdk_env.sh
+# shellcheck source=./toolchain.sh
+source "$SCRIPT_DIR/toolchain.sh"
+hmi_require_toolchain
 
-LVGL_DIR="/home/xcssa/.openclaw/workspace/tools/lvgl"
 CONF_DIR="$SCRIPT_DIR"
+JOBS="$(nproc 2>/dev/null || echo 4)"
 
 echo "=== Building LVGL static library (emcc) ==="
+echo "LVGL:   $LVGL_DIR"
+echo "Config: $CONF_DIR"
 
-# Collect all LVGL .c files
-find "$LVGL_DIR/src" -name "*.c" > /tmp/lvgl_sources.txt
-TOTAL=$(wc -l < /tmp/lvgl_sources.txt)
-echo "Found $TOTAL source files"
-
-# Compile each file
 mkdir -p build/lvgl_objs
-COUNT=0
-while IFS= read -r src; do
-  COUNT=$((COUNT + 1))
-  # Create a unique .o name by replacing / with _
-  obj="build/lvgl_objs/$(echo "$src" | sed 's|/|_|g').o"
-  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
-    emcc -O2 -c "$src" -o "$obj" \
-      -I"$CONF_DIR" \
-      -I"$LVGL_DIR/.." \
-      -DLV_CONF_INCLUDE_SIMPLE \
-      -Wno-unused-function \
-      -Wno-implicit-function-declaration
-  fi
-  if [ $((COUNT % 50)) -eq 0 ]; then
-    echo "  Compiled $COUNT / $TOTAL"
-  fi
-done < /tmp/lvgl_sources.txt
+find "$LVGL_DIR/src" -name "*.c" | sort > build/lvgl_sources.txt
+echo "Found $(wc -l < build/lvgl_sources.txt) source files, $JOBS at a time"
 
-echo "  Compiled $COUNT / $TOTAL (done)"
+compile_one() {
+  src="$1"
+  # Named by the path below src/: a flattened absolute path carries the drive
+  # colon on Windows, which is not a legal filename character.
+  rel="${src#$LVGL_DIR/src/}"
+  obj="build/lvgl_objs/$(printf '%s' "$rel" | tr -c 'A-Za-z0-9._-' '_').o"
+  if [ -f "$obj" ] && [ "$obj" -nt "$src" ]; then
+    return 0
+  fi
+  emcc -O2 -c "$src" -o "$obj" \
+    -I"$CONF_DIR" \
+    -I"$LVGL_DIR/.." \
+    -DLV_CONF_INCLUDE_SIMPLE \
+    -Wno-unused-function \
+    -Wno-implicit-function-declaration
+}
+export -f compile_one
+export LVGL_DIR CONF_DIR
 
-# Archive
+xargs -a build/lvgl_sources.txt -I{} -P "$JOBS" "$BASH" -c 'compile_one "$@"' _ {}
+
 echo "=== Archiving liblvgl_emcc.a ==="
-emar rcs build/liblvgl_emcc.a build/lvgl_objs/*.o
+rm -f build/liblvgl_emcc.a
+# In batches: the object list is long enough to overrun a command line.
+ls build/lvgl_objs/*.o | xargs -n 100 emar q build/liblvgl_emcc.a
+emar s build/liblvgl_emcc.a
 
 echo "=== Done: build/liblvgl_emcc.a ==="
 ls -lh build/liblvgl_emcc.a

@@ -1,15 +1,20 @@
 #!/bin/bash
+# Builds the LVGL Preview artifacts (rung 2) into public/wasm/.
+#
+# Its toolchain is resolved rather than assumed — see toolchain.sh.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-source /home/xcssa/.openclaw/workspace/tools/emsdk/emsdk_env.sh
+# shellcheck source=./toolchain.sh
+source "$SCRIPT_DIR/toolchain.sh"
+hmi_require_toolchain
 
 mkdir -p build
 cd build
 emcmake cmake ..
-emmake make -j$(nproc)
+emmake make -j"$(nproc)"
 
 # Copy output to editor public directory
 mkdir -p ../../public/wasm
