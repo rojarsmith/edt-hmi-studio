@@ -20,6 +20,7 @@ A full-featured **visual editor for LVGL user interfaces**, with drag-and-drop d
 - **Nesting**: place widgets inside containers
 - **Direct manipulation**: drag to move, resize from 8 handles
 - **Grid alignment**: configurable grid size and snapping
+- **Landscape or portrait**: chosen with the board when the project is created, and changeable later — Project Settings turns the whole layout a quarter turn with the canvas, in one undoable step. See [docs/display-orientation.md](docs/display-orientation.md)
 
 ### ✏️ Advanced editing
 - **Rubber-band selection**: drag a rectangle to select

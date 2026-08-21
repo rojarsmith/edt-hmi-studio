@@ -757,7 +757,25 @@ in this environment:
   says plainly in the footer when the runtime ignored it. That notice clears
   itself the moment a rebuilt `.wasm` is dropped in, so it cannot go stale.
 
-### 14.6 Still not done
+### 14.6 Verified with the ARM toolchain
+
+The evaluation was written believing the firmware could only be reasoned about;
+`C:\ST\STM32CubeCLT_1.22.0` is installed on this machine, so all of it was
+actually built:
+
+| Check | Result |
+|---|---|
+| EDT builds with a generated landscape config | 293,032 B text, links clean |
+| The generated strong definition wins | `hmi_display_config` resolves to `hmi_display_generated.c.obj` |
+| A template with *no* generated config still links | resolves to `board_display.c.obj`, same image size |
+| H747I builds with a **portrait** config | 283,952 B text, no warnings from `board_display.c` under `-Wall -Wextra` |
+
+So §9's contract holds in both directions, which was the part most able to fail
+silently. What is still unverified is behaviour, not linkage: nothing here says
+the H747I actually comes up in portrait, and §13's touch question is untouched
+by a successful build.
+
+### 14.7 Still not done
 
 - **The EDT and F746G display drivers** (§8.3–§8.5). Portrait is designable and
   previewable on both and buildable on neither. This is the large remaining

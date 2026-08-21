@@ -91,6 +91,19 @@ one specific thing worth stating because a document elsewhere gets it backwards:
 styles cross the bridge; event bindings do not, and logic graphs do not. This
 rung is a renderer, not a runtime.
 
+**And, until recently, not at your resolution either.** `wasm/src/main.c` created
+its display with a hard-coded `lv_sdl_window_create(480, 320)` — a size matching
+no board here — and `set_screen_size` was a stub that took the editor's numbers
+and dropped them. So every claim above was being made about a screen the wrong
+size, which moves anything anchored to an edge or centred. It survived because
+480x320 is landscape and close enough to 480x272 to look plausible; adding
+portrait projects is what made it obvious (see
+[display-orientation.md](./display-orientation.md) §4.4). `main.c` now resizes
+through `lv_sdl_window_set_size`, and `WasmPreview.tsx` measures the canvas it
+actually got and says so in the footer when the runtime ignored the request —
+which a checked-in `.wasm` built before this change still does, until it is
+rebuilt.
+
 ## 4. 🔨 Build & Run — the first rung that tests the product
 
 `CompilePreview` calls `generateCode(...)` — the same generator the export and

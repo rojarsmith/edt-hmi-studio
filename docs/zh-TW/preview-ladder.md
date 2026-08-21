@@ -76,6 +76,16 @@ Canvas 2D 畫的（2038 行），兩者不共用任何繪圖程式碼。也就�
 可以自己 grep。過橋的是畫面與樣式；事件綁定沒有過去，邏輯圖也沒有。這一階是個
 renderer，不是 runtime。
 
+**而且直到最近，它連解析度都不是你的。** `wasm/src/main.c` 建立顯示時寫死
+`lv_sdl_window_create(480, 320)` —— 一個對不上這裡任何一塊板子的尺寸 —— 而
+`set_screen_size` 是個空殼，收下編輯器傳來的數字然後丟掉。所以上面每一句宣稱，都是在
+一個尺寸錯誤的螢幕上做出來的，而那會讓任何靠邊或置中的東西跑位。它能活這麼久，是因為
+480x320 是橫向、而且離 480x272 近到看起來很合理；直向專案出現之後才變得一眼可見（見
+[display-orientation.md](./display-orientation.md) §4.4）。`main.c` 現在會透過
+`lv_sdl_window_set_size` 調整尺寸，而 `WasmPreview.tsx` 會量它實際拿到的 canvas，在
+runtime 沒有照做時直接在頁尾講明白 —— 在這項變更之前建置的簽入 `.wasm` 就是沒照做，
+直到它被重建為止。
+
 ## 4. 🔨 Build & Run——第一階真正在測產品的
 
 `CompilePreview` 呼叫 `generateCode(...)`——跟匯出、跟韌體建置用的是同一個產生器——
