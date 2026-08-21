@@ -55,6 +55,16 @@
   background: #f85149;
 }
 
+/* The state the removed emoji used to stand for. Error is the only one worth
+   a colour a reader has to notice; the rest stay in the toolbar's own grey. */
+.emulator-status.error {
+  color: #ff8f8f;
+}
+
+.emulator-status.done {
+  color: #3fb27f;
+}
+
 .emulator-status {
   font-size: 13px;
   color: #8b949e;

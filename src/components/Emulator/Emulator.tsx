@@ -6,6 +6,8 @@ import { useAppStore } from '../../store/appStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useEmulatorStore } from '../../store/emulatorStore';
 import { useDockStore } from '../../store/dockStore';
+import { useWorkStore } from '../../store/workStore';
+import { EMULATOR_OUTCOMES, EMULATOR_PHASES, emulatorPhaseFor } from '../../store/emulatorPhases';
 import { useProjectModbusTags } from '../../hooks/useProjectModbusTags';
 import { generateCode } from '../../codegen';
 import {
@@ -68,6 +70,7 @@ const Emulator: React.FC = () => {
   // output and the running screen are on screen at the same time rather than
   // one covering the other. See docs/bottom-dock-panel.md §10.
   const setOutput = useEmulatorStore((s) => s.setOutput);
+  const appendOutput = useEmulatorStore((s) => s.appendOutput);
   const clearOutput = useEmulatorStore((s) => s.clearOutput);
   const showDockPane = useDockStore((s) => s.showPane);
   const factoryDevMode = useAppStore((s) => s.factoryDevMode);
@@ -195,6 +198,13 @@ const Emulator: React.FC = () => {
 
     clearOutput();
 
+    // A build runs for seconds at best and minutes on a first run, which makes
+    // it exactly the kind of operation the Work pane exists to list — and it
+    // outlives the tab, so switching to Design mid-build still shows it.
+    const work = useWorkStore.getState();
+    const workId = work.start('Emulator');
+    work.note(workId, { label: EMULATOR_PHASES.preparing });
+
     const code = generateCCode();
 
     const userFiles: Record<string, string> = {};
@@ -257,17 +267,31 @@ const Emulator: React.FC = () => {
       (newStatus, message) => {
         setStatus(newStatus);
         setStatusMessage(message);
+        if (newStatus === 'loading') {
+          useWorkStore.getState().note(workId, { label: EMULATOR_PHASES.starting });
+        }
       },
       fontRequests.length > 0 ? fontRequests : undefined,
+      (line) => {
+        appendOutput(line);
+        // Only lines the server announces itself become phases; nothing raw
+        // from the compiler reaches Work. See emulatorPhases.ts.
+        const phase = emulatorPhaseFor(line);
+        if (phase) useWorkStore.getState().note(workId, { label: phase });
+      },
     );
 
-    setOutput(result.output);
+    // Nothing to write: the server streamed the transcript and then the summary
+    // into the pane as they happened. setOutput is the fallback for a build
+    // that produced no stream at all — a failure before the POST was answered.
+    if (!useEmulatorStore.getState().output) setOutput(result.output);
 
     if (result.success && result.runtime) {
       runtimeRef.current = result.runtime;
       setRunning(true);
       setStatus('done');
       setStatusMessage('Running — click the canvas to interact');
+      useWorkStore.getState().finish(workId, 'succeeded', EMULATOR_OUTCOMES.running);
 
       // Render initial frame
       const fb = result.runtime.getFramebuffer();
@@ -289,11 +313,13 @@ const Emulator: React.FC = () => {
       // the front and open the dock if it was collapsed.
       showDockPane('output');
       setStatus('error');
+      useWorkStore.getState().finish(workId, 'failed', EMULATOR_OUTCOMES.failed);
     } else {
       setStatus('done');
       setStatusMessage('Build succeeded (no runtime)');
+      useWorkStore.getState().finish(workId, 'failed', EMULATOR_OUTCOMES.failed);
     }
-  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, checkToolchain, setOutput, clearOutput, showDockPane, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
+  }, [status, generateCCode, canvas.width, canvas.height, renderFramebuffer, stopRuntime, startEventLoop, checkToolchain, setOutput, appendOutput, clearOutput, showDockPane, screens, logicGraphs, typographies, projectTexts, imageResources, fontResources, projectDefaultFont, projectDefaultFontSize]);
 
   // Handle stop button
   const handleStop = useCallback(() => {
@@ -406,15 +432,6 @@ const Emulator: React.FC = () => {
     };
   }, []);
 
-  const statusIcon = {
-    idle: '⚡',
-    compiling: '🔨',
-    loading: '📦',
-    running: '▶️',
-    done: running ? '🟢' : '✅',
-    error: '❌',
-  }[status];
-
   const isWorking = ['compiling', 'loading', 'running'].includes(status);
 
   // Reported by the dev server, so a production build with no compile endpoint
@@ -439,8 +456,11 @@ const Emulator: React.FC = () => {
           </button>
         )}
 
-        <span className="emulator-status">
-          {statusIcon} {statusMessage || (status === 'idle' ? 'Ready' : '')}
+        {/* The word alone. The emoji that used to lead this line was decorative
+            at best — ⚡ for "idle" read as a warning — and the state it stood
+            for is carried by colour, which does not have to be decoded. */}
+        <span className={`emulator-status ${status}`}>
+          {statusMessage || (status === 'idle' ? 'Ready' : '')}
         </span>
 
       </div>

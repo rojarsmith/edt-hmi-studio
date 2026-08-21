@@ -6,6 +6,7 @@
  * back a handle the panel can tick and click. See docs/emulator.md.
  */
 
+import { subscribeBuildLog } from '../../services/hmiApi';
 import type { FontCompileRequest } from '../../codegen/types';
 
 export type EmulatorStatus =
@@ -114,6 +115,14 @@ export async function buildAndRun(
   height: number,
   onStatus?: (status: EmulatorStatus, message: string) => void,
   fonts?: FontCompileRequest[],
+  /**
+   * Called for each line the build produces while it produces it.
+   *
+   * The subscription opens before the POST, so the channel is being listened
+   * to before there is anything on it — the same order the firmware build uses
+   * and the reason a line is never missed. See docs/streaming-build-log.md.
+   */
+  onLine?: (line: string) => void,
 ): Promise<EmulatorBuildResult> {
   const result: EmulatorBuildResult = {
     success: false,
@@ -123,9 +132,12 @@ export async function buildAndRun(
     height,
   };
 
+  const runId = crypto.randomUUID();
+  const unsubscribe = onLine ? subscribeBuildLog(runId, (line) => onLine(line)) : () => {};
+
   try {
     // Step 1: Send code to server for compilation
-    onStatus?.('compiling', 'Compiling your screen with LVGL…');
+    onStatus?.('compiling', 'Compiling your screens with LVGL…');
 
     // Strip "include/" prefix — server expects flat file names
     const files: Record<string, string> = {};
@@ -139,7 +151,7 @@ export async function buildAndRun(
     const resp = await fetch('/api/emulator/build', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files, fonts: fonts ?? [], width, height }),
+      body: JSON.stringify({ files, fonts: fonts ?? [], width, height, runId }),
     });
 
     if (!resp.ok) {
@@ -178,6 +190,10 @@ export async function buildAndRun(
     result.output = 'Error: ' + msg;
     onStatus?.('error', msg);
     return result;
+  } finally {
+    // The server closes the channel when the build ends, but a build that
+    // never reached the server has nobody to close it.
+    unsubscribe();
   }
 }
 

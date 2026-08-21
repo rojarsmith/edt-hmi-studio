@@ -13,14 +13,25 @@
 import { create } from 'zustand';
 
 interface EmulatorState {
-  /** stdout and stderr of the last build, or '' when nothing has run. */
+  /** Everything the last build said, or '' when nothing has run. */
   output: string;
+  /** Replaces the whole log. Used for the summary a finished build composes. */
   setOutput: (output: string) => void;
+  /**
+   * Adds one line as it arrives.
+   *
+   * The build streams over the same SSE channel the firmware build uses, so the
+   * pane fills while the compiler works instead of appearing all at once when
+   * it stops. See docs/streaming-build-log.md.
+   */
+  appendOutput: (line: string) => void;
   clearOutput: () => void;
 }
 
 export const useEmulatorStore = create<EmulatorState>((set) => ({
   output: '',
   setOutput: (output) => set({ output }),
+  appendOutput: (line) =>
+    set((state) => ({ output: state.output ? `${state.output}\n${line}` : line })),
   clearOutput: () => set({ output: '' }),
 }));

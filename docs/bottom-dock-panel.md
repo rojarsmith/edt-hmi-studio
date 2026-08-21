@@ -253,6 +253,22 @@ expands the dock if it was collapsed, so the log arrives without being asked
 for. A successful build changes nothing about the dock; the panel above already
 says it is running.
 
+**It fills while the build runs.** The pane subscribes to the same SSE channel
+the firmware build streams over — `/api/hmi/build-log/:runId`, one endpoint and
+one `buildLog.ts` for both ([streaming-build-log.md](./streaming-build-log.md))
+— so the phases arrive as they happen and the summary lands at the end of the
+same transcript rather than replacing it. The compiler's own output is streamed
+once and the summary omits it, so nothing is printed twice.
+
+**And it feeds the Work pane next door.** An Emulator build is a Work item like
+any other, moving through *Preparing your screens*, *Compiling the display
+engine* on a first run, *Compiling your screens*, and finishing as *Running in
+the Emulator* or *Could not build your screens*. The phases come from an
+allow-list in `emulatorPhases.ts` matched against markers the server emits
+deliberately, so nothing raw from a compiler can surface in the product's view
+of the operation — the same rule `deployPhases.ts` follows and for the same
+reason ([work-progress.md](./work-progress.md) §3).
+
 **Still not done.** Arrow-key navigation of the tab strip and a keyboard
 alternative to the drag grip. Four panes make that more pressing than three
 did, not less.

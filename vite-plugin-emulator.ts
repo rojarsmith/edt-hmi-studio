@@ -12,7 +12,7 @@
  */
 
 import type { Plugin } from 'vite';
-import { execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdir, writeFile, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -25,6 +25,7 @@ import {
   type ToolchainReport,
 } from './server/emulator/toolchain';
 import { ensureLvglLibrary, lvglLibraryReady } from './server/emulator/lvglLib';
+import { closeBuildLog, openBuildLog, pushBuildLog } from './server/hmi/buildLog';
 
 // Font data sent from the client for server-side conversion
 interface FontRequest {
@@ -179,26 +180,42 @@ int main(void) {
  * The argument list carries `-sEXPORTED_FUNCTIONS="['_main',...]"` and a file
  * list that grows with the project; handing that to a shell means quoting it
  * correctly on two platforms, and there is nothing here a shell is needed for.
+ *
+ * Spawned rather than buffered, so its lines reach the page while it works. On
+ * a first run emcc builds Emscripten's own system libraries and says so for
+ * half a minute, which is exactly the stretch that looks like a hang.
  */
 function runEmcc(
   toolchain: ToolchainReport,
   args: string[],
   cwd: string,
-): Promise<{ stdout: string; stderr: string; code: number }> {
+  onLine: (line: string) => void,
+): Promise<{ output: string; code: number }> {
   return new Promise((resolve) => {
-    execFile(
-      toolchain.emscripten.path ?? 'emcc',
-      args,
-      {
-        cwd,
-        env: { ...process.env, ...toolchain.emscripten.env },
-        maxBuffer: 10 * 1024 * 1024,
-        windowsHide: true,
-      },
-      (err, stdout, stderr) => {
-        resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: err ? 1 : 0 });
-      },
-    );
+    const child = spawn(toolchain.emscripten.path ?? 'emcc', args, {
+      cwd,
+      env: { ...process.env, ...toolchain.emscripten.env },
+      windowsHide: true,
+    });
+
+    let output = '';
+    let pending = '';
+    const consume = (chunk: Buffer) => {
+      const text = chunk.toString();
+      output += text;
+      pending += text;
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop() ?? '';
+      for (const line of lines) onLine(line);
+    };
+
+    child.stdout.on('data', consume);
+    child.stderr.on('data', consume);
+    child.on('error', (err) => resolve({ output: `${output}${err.message}`, code: 1 }));
+    child.on('close', (code) => {
+      if (pending) onLine(pending);
+      resolve({ output, code: code ?? 1 });
+    });
   });
 }
 
@@ -236,7 +253,12 @@ async function successLog(options: {
   sources: string[];
   fonts: string[];
   buildDir: string;
-  emcc: { stdout: string; stderr: string };
+  emcc: string;
+  /**
+   * False when the compiler's output has already been streamed line by line,
+   * in which case repeating it under a heading would print it twice.
+   */
+  includeCompilerOutput: boolean;
 }): Promise<string> {
   const { elapsedMs, toolchain, libraryBuilt, sources, fonts, buildDir, emcc } = options;
   const lines = [
@@ -254,10 +276,7 @@ async function successLog(options: {
 
   // emcc on Windows ends its lines with CRLF; the pane renders the stray CR as
   // nothing useful, so normalise before anyone has to look at it.
-  const said = [emcc.stdout, emcc.stderr]
-    .map((part) => part.replace(/\r\n?/g, '\n').trim())
-    .filter(Boolean)
-    .join('\n');
+  const said = emcc.replace(/\r\n?/g, '\n').trim();
   // The same deprecation warning arrives once per translation unit, so the
   // count is what makes the tail scannable rather than the tail itself.
   const warnings = (said.match(/\bwarning:/g) ?? []).length;
@@ -265,7 +284,11 @@ async function successLog(options: {
     lines.push(`Warnings  ${warnings}`);
   }
 
-  lines.push('', said ? `emcc said:\n${said}` : 'emcc said nothing — no warnings.');
+  if (options.includeCompilerOutput) {
+    lines.push('', said ? `emcc said:\n${said}` : 'emcc said nothing — no warnings.');
+  } else if (!said) {
+    lines.push('', 'emcc said nothing — no warnings.');
+  }
   return lines.join('\n');
 }
 
@@ -312,153 +335,179 @@ export default function emulatorPlugin(): Plugin {
           fonts?: FontRequest[];
           width: number;
           height: number;
+          /** Names the SSE channel the client is already listening to. */
+          runId?: string;
         };
 
-        const { files, fonts, width, height } = body;
+        const { files, fonts, width, height, runId } = body;
+        // The same channel and the same endpoint the firmware build streams
+        // over — /api/hmi/build-log/:runId, see docs/streaming-build-log.md.
+        // Without a runId the build still works and simply says nothing until
+        // it finishes, which is what an older client would do.
+        const say = (line: string) => {
+          if (runId) pushBuildLog(runId, line);
+        };
+        if (runId) openBuildLog(runId);
 
-        // Re-detected on every build rather than cached for the server's life:
-        // someone who just ran the setup command should not have to restart the
-        // dev server to be believed.
-        const toolchain = await refreshToolchain();
-        if (!toolchain.ready) {
-          sendJson(res, 200, {
-            success: false,
-            error: toolchainProblemText(toolchain),
-            toolchain,
-            buildId: '',
-          });
-          return;
-        }
-
-        const startedAt = Date.now();
-        const buildId = randomUUID();
-        const buildDir = join(tmpdir(), `lvgl-build-${buildId}`);
-
+        // Every exit below is an end of the stream, and a channel left open is
+        // a client left waiting, so the close is a finally rather than a line
+        // repeated at each return.
         try {
-          await mkdir(buildDir, { recursive: true });
-
-          let libPath: string;
-          let confIncludeDir: string;
-          let libraryBuilt = false;
-          try {
-            const library = await ensureLvglLibrary(toolchain, (line) => {
-              server.config.logger.info(`[emulator] ${line}`);
-            });
-            libPath = library.libPath;
-            confIncludeDir = library.confDir;
-            libraryBuilt = library.built;
-          } catch (libErr) {
-            await rm(buildDir, { recursive: true, force: true }).catch(() => {});
+          // Re-detected on every build rather than cached for the server's
+          // life: someone who just ran the setup command should not have to
+          // restart the dev server to be believed.
+          const toolchain = await refreshToolchain();
+          if (!toolchain.ready) {
             sendJson(res, 200, {
               success: false,
-              error: String(libErr instanceof Error ? libErr.message : libErr),
+              error: toolchainProblemText(toolchain),
               toolchain,
               buildId: '',
             });
             return;
           }
 
-          // Write user files
-          for (const [name, content] of Object.entries(files)) {
-            await writeFile(join(buildDir, name), content, 'utf-8');
-          }
+          const startedAt = Date.now();
+          const buildId = randomUUID();
+          const buildDir = join(tmpdir(), `lvgl-build-${buildId}`);
 
-          // Write main_wrapper.c
-          await writeFile(join(buildDir, 'main_wrapper.c'), generateMainWrapper(width, height), 'utf-8');
+          try {
+            await mkdir(buildDir, { recursive: true });
 
-          // Convert font resources via lv_font_conv
-          let fontCFiles: Record<string, string> = {};
-          if (fonts && fonts.length > 0) {
+            let libPath: string;
+            let confIncludeDir: string;
+            let libraryBuilt = false;
             try {
-              fontCFiles = await convertFonts(fonts, buildDir);
-              // Write generated font .c files into buildDir
-              for (const [name, content] of Object.entries(fontCFiles)) {
-                await writeFile(join(buildDir, name), content, 'utf-8');
-              }
-            } catch (fontErr) {
+              const library = await ensureLvglLibrary(toolchain, (line) => {
+                server.config.logger.info(`[emulator] ${line}`);
+                say(line);
+              });
+              libPath = library.libPath;
+              confIncludeDir = library.confDir;
+              libraryBuilt = library.built;
+            } catch (libErr) {
               await rm(buildDir, { recursive: true, force: true }).catch(() => {});
               sendJson(res, 200, {
                 success: false,
-                error: `Font conversion failed: ${String(fontErr)}`,
+                error: String(libErr instanceof Error ? libErr.message : libErr),
+                toolchain,
                 buildId: '',
               });
               return;
             }
-          }
 
-          // Collect .c files from user
-          const cFiles = Object.keys(files).filter(f => f.endsWith('.c'));
-          const fontFiles = Object.keys(fontCFiles);
-          const lvglRoot = toolchain.lvgl.path!;
+            // Write user files
+            for (const [name, content] of Object.entries(files)) {
+              await writeFile(join(buildDir, name), content, 'utf-8');
+            }
 
-          const args = [
-            'main_wrapper.c',
-            ...cFiles,
-            ...fontFiles,
-            '-O2',
-            '-DLV_CONF_INCLUDE_SIMPLE',
-            `-I${join(lvglRoot, '..')}`,
-            `-I${lvglRoot}`,
-            `-I${join(lvglRoot, 'src')}`,
-            `-I${confIncludeDir}`,
-            '-I.',
-            libPath,
-            '-sALLOW_MEMORY_GROWTH=1',
-            '-sINITIAL_MEMORY=33554432',
-            "-sEXPORTED_FUNCTIONS=['_main','_app_tick','_app_mouse_event','_app_key_event','_wasi_get_framebuffer','_wasi_get_fb_ready','_wasi_clear_fb_ready','_wasi_get_width','_wasi_get_height']",
-            "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAPU32']",
-            '-sNO_EXIT_RUNTIME=1',
-            '-sMODULARIZE=1',
-            '-sEXPORT_NAME=LvglModule',
-            '-sENVIRONMENT=web',
-            '-Wno-unused-function',
-            '-Wno-implicit-function-declaration',
-            '-o',
-            'output.js',
-          ];
+            // Write main_wrapper.c
+            await writeFile(join(buildDir, 'main_wrapper.c'), generateMainWrapper(width, height), 'utf-8');
 
-          const result = await runEmcc(toolchain, args, buildDir);
+            // Convert font resources via lv_font_conv
+            let fontCFiles: Record<string, string> = {};
+            if (fonts && fonts.length > 0) {
+              say(`Converting ${fonts.length} font${fonts.length === 1 ? '' : 's'}`);
+              try {
+                fontCFiles = await convertFonts(fonts, buildDir);
+                // Write generated font .c files into buildDir
+                for (const [name, content] of Object.entries(fontCFiles)) {
+                  await writeFile(join(buildDir, name), content, 'utf-8');
+                }
+              } catch (fontErr) {
+                await rm(buildDir, { recursive: true, force: true }).catch(() => {});
+                sendJson(res, 200, {
+                  success: false,
+                  error: `Font conversion failed: ${String(fontErr)}`,
+                  buildId: '',
+                });
+                return;
+              }
+            }
 
-          if (result.code !== 0) {
-            // Cleanup on failure
-            await rm(buildDir, { recursive: true, force: true }).catch(() => {});
-            sendJson(res, 200, {
-              success: false,
-              error: [
-                `Build failed after ${((Date.now() - startedAt) / 1000).toFixed(1)} s`,
-                '',
-                result.stderr || result.stdout,
-              ].join('\n'),
-              buildId: '',
-            });
-            return;
-          }
+            // Collect .c files from user
+            const cFiles = Object.keys(files).filter(f => f.endsWith('.c'));
+            const fontFiles = Object.keys(fontCFiles);
+            const lvglRoot = toolchain.lvgl.path!;
 
-          // Store build directory
-          builds.set(buildId, buildDir);
+            const args = [
+              'main_wrapper.c',
+              ...cFiles,
+              ...fontFiles,
+              '-O2',
+              '-DLV_CONF_INCLUDE_SIMPLE',
+              `-I${join(lvglRoot, '..')}`,
+              `-I${lvglRoot}`,
+              `-I${join(lvglRoot, 'src')}`,
+              `-I${confIncludeDir}`,
+              '-I.',
+              libPath,
+              '-sALLOW_MEMORY_GROWTH=1',
+              '-sINITIAL_MEMORY=33554432',
+              "-sEXPORTED_FUNCTIONS=['_main','_app_tick','_app_mouse_event','_app_key_event','_wasi_get_framebuffer','_wasi_get_fb_ready','_wasi_clear_fb_ready','_wasi_get_width','_wasi_get_height']",
+              "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAPU32']",
+              '-sNO_EXIT_RUNTIME=1',
+              '-sMODULARIZE=1',
+              '-sEXPORT_NAME=LvglModule',
+              '-sENVIRONMENT=web',
+              '-Wno-unused-function',
+              '-Wno-implicit-function-declaration',
+              '-o',
+              'output.js',
+            ];
 
-          // Schedule cleanup
-          setTimeout(async () => {
-            builds.delete(buildId);
-            await rm(buildDir, { recursive: true, force: true }).catch(() => {});
-          }, BUILD_TTL_MS);
+            say(`Compiling your screens with emcc (${['main_wrapper.c', ...cFiles, ...fontFiles].length} files)`);
+            const result = await runEmcc(toolchain, args, buildDir, say);
 
-          sendJson(res, 200, {
-            success: true,
-            buildId,
-            log: await successLog({
+            if (result.code !== 0) {
+              // Cleanup on failure
+              await rm(buildDir, { recursive: true, force: true }).catch(() => {});
+              const failure = `Build failed after ${((Date.now() - startedAt) / 1000).toFixed(1)} s`;
+              // The compiler's own words already streamed; only the verdict is new.
+              if (runId) {
+                say('');
+                say(failure);
+              }
+              sendJson(res, 200, {
+                success: false,
+                error: runId ? failure : [failure, '', result.output].join('\n'),
+                buildId: '',
+              });
+              return;
+            }
+
+            // Store build directory
+            builds.set(buildId, buildDir);
+
+            // Schedule cleanup
+            setTimeout(async () => {
+              builds.delete(buildId);
+              await rm(buildDir, { recursive: true, force: true }).catch(() => {});
+            }, BUILD_TTL_MS);
+
+            const summary = await successLog({
               elapsedMs: Date.now() - startedAt,
               toolchain,
               libraryBuilt,
               sources: ['main_wrapper.c', ...cFiles],
               fonts: fontFiles,
               buildDir,
-              emcc: result,
-            }),
-          });
-        } catch (err) {
-          await rm(buildDir, { recursive: true, force: true }).catch(() => {});
-          sendJson(res, 500, { success: false, error: String(err), buildId: '' });
+              emcc: result.output,
+              includeCompilerOutput: !runId,
+            });
+            // Streamed too, so the pane ends with the summary rather than
+            // having the transcript it just watched replaced by one.
+            if (runId) {
+              say('');
+              for (const line of summary.split('\n')) say(line);
+            }
+            sendJson(res, 200, { success: true, buildId, log: summary });
+          } catch (err) {
+            await rm(buildDir, { recursive: true, force: true }).catch(() => {});
+            sendJson(res, 500, { success: false, error: String(err), buildId: '' });
+          }
+        } finally {
+          if (runId) closeBuildLog(runId);
         }
       });
 

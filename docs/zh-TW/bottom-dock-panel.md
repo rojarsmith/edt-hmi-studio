@@ -210,5 +210,17 @@ Preview 之間來回除錯的人想要的行為。這跟 `App.tsx` 處理原廠�
 順便展開，於是那份 log 不用去要就會出現。成功的建置則完全不動抽屜；上面的面板已經說了
 它正在跑。
 
+**它會在建置進行中就填進去。** 這個 pane 訂閱的是韌體建置在用的同一條 SSE 通道
+——`/api/hmi/build-log/:runId`，兩者共用一個端點與一份 `buildLog.ts`
+（[streaming-build-log.md](./streaming-build-log.md））——所以各階段是即時到達的，而最後的
+摘要是接在同一份逐字稿後面，而不是把它換掉。編譯器自己的輸出只串一次，摘要就不再重複它。
+
+**而且它會餵旁邊的 Work pane。** 一次 Emulator 建置就是一個 Work 項目，會依序經過
+*Preparing your screens*、第一次執行時的 *Compiling the display engine*、
+*Compiling your screens*，最後結束在 *Running in the Emulator* 或
+*Could not build your screens*。這些階段來自 `emulatorPhases.ts` 的白名單，比對的是伺服器
+刻意送出的標記行，所以編譯器的原始輸出不可能從產品視圖裡冒出來——這跟 `deployPhases.ts`
+遵守的是同一條規則、同一個理由（[work-progress.md](./work-progress.md) §3）。
+
 **仍然沒做。** 頁簽列的方向鍵導航，以及拖曳把手的鍵盤替代方案。四個 pane 只會讓這件事
 比三個更急，不會更不急。
