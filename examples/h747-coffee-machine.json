@@ -184,7 +184,9 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_caption_c"
+          "typographyId": "ty_caption_c",
+          "textId": "txt_water_level",
+          "textProp": "text"
         },
         {
           "id": "home_pill_beans",
@@ -235,7 +237,9 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_caption_c"
+          "typographyId": "ty_caption_c",
+          "textId": "txt_bean_level",
+          "textProp": "text"
         },
         {
           "id": "home_greeting",
@@ -261,7 +265,9 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_display"
+          "typographyId": "ty_display",
+          "textId": "txt_good_morning",
+          "textProp": "text"
         },
         {
           "id": "home_sub",
@@ -287,7 +293,9 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_body"
+          "typographyId": "ty_body",
+          "textId": "txt_usual_ready",
+          "textProp": "text"
         },
         {
           "id": "home_hero",
@@ -322,7 +330,9 @@
               "parentId": "home_hero",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_overline"
+              "typographyId": "ty_overline",
+              "textId": "txt_your_usual",
+              "textProp": "text"
             },
             {
               "id": "home_hero_name",
@@ -348,7 +358,9 @@
               "parentId": "home_hero",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_title"
+              "typographyId": "ty_title",
+              "textId": "txt_flat_white",
+              "textProp": "text"
             },
             {
               "id": "home_hero_meta",
@@ -374,7 +386,9 @@
               "parentId": "home_hero",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label"
+              "typographyId": "ty_label",
+              "textId": "txt_dose_180_double",
+              "textProp": "text"
             },
             {
               "id": "home_hero_btn",
@@ -436,7 +450,9 @@
                 "pollIntervalMs": 250,
                 "writeBehavior": "set",
                 "writeValue": 1
-              }
+              },
+              "textId": "txt_brew_now",
+              "textProp": "text"
             },
             {
               "id": "home_cup",
@@ -773,7 +789,9 @@
               "parentId": "home_status",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading_c"
+              "typographyId": "ty_heading_c",
+              "textId": "txt_ready_to_brew",
+              "textProp": "text"
             },
             {
               "id": "home_status_note",
@@ -799,7 +817,9 @@
               "parentId": "home_status",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption_c"
+              "typographyId": "ty_caption_c",
+              "textId": "txt_boiler_at_temp",
+              "textProp": "text"
             }
           ],
           "props": {},
@@ -869,7 +889,9 @@
               "parentId": "home_tabbar",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_tab_home",
+              "textProp": "text"
             },
             {
               "id": "home_tab_drinks",
@@ -911,7 +933,9 @@
               "parentId": "home_tabbar",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_tab_drinks",
+              "textProp": "text"
             },
             {
               "id": "home_tab_settings",
@@ -953,7 +977,9 @@
               "parentId": "home_tabbar",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_tab_settings",
+              "textProp": "text"
             }
           ],
           "props": {},
@@ -1139,7 +1165,9 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_display"
+          "typographyId": "ty_display",
+          "textId": "txt_tab_drinks",
+          "textProp": "text"
         },
         {
           "id": "drinks_sub",
@@ -1165,7 +1193,9 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_caption"
+          "typographyId": "ty_caption",
+          "textId": "txt_six_ways",
+          "textProp": "text"
         },
         {
           "id": "drinks_seg",
@@ -1206,7 +1236,9 @@
               "parentId": "drinks_seg",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption_c"
+              "typographyId": "ty_caption_c",
+              "textId": "txt_seg_hot",
+              "textProp": "text"
             },
             {
               "id": "drinks_seg_iced",
@@ -1235,7 +1267,9 @@
               "parentId": "drinks_seg",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption_c"
+              "typographyId": "ty_caption_c",
+              "textId": "txt_seg_iced",
+              "textProp": "text"
             },
             {
               "id": "drinks_seg_milk",
@@ -1264,7 +1298,9 @@
               "parentId": "drinks_seg",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption_c"
+              "typographyId": "ty_caption_c",
+              "textId": "txt_seg_milk",
+              "textProp": "text"
             }
           ],
           "props": {},
@@ -1382,7 +1418,9 @@
               "parentId": "drink_espresso",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_espresso",
+              "textProp": "text"
             },
             {
               "id": "drink_espresso_meta",
@@ -1408,7 +1446,9 @@
               "parentId": "drink_espresso",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_dose_30_1",
+              "textProp": "text"
             },
             {
               "id": "drink_espresso_go",
@@ -1580,7 +1620,9 @@
               "parentId": "drink_americano",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_americano",
+              "textProp": "text"
             },
             {
               "id": "drink_americano_meta",
@@ -1606,7 +1648,9 @@
               "parentId": "drink_americano",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_dose_180_1",
+              "textProp": "text"
             },
             {
               "id": "drink_americano_go",
@@ -1778,7 +1822,9 @@
               "parentId": "drink_cappuccino",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_cappuccino",
+              "textProp": "text"
             },
             {
               "id": "drink_cappuccino_meta",
@@ -1804,7 +1850,9 @@
               "parentId": "drink_cappuccino",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_dose_220_2",
+              "textProp": "text"
             },
             {
               "id": "drink_cappuccino_go",
@@ -1976,7 +2024,9 @@
               "parentId": "drink_flatwhite",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_flat_white",
+              "textProp": "text"
             },
             {
               "id": "drink_flatwhite_meta",
@@ -2002,7 +2052,9 @@
               "parentId": "drink_flatwhite",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_dose_180_2",
+              "textProp": "text"
             },
             {
               "id": "drink_flatwhite_go",
@@ -2174,7 +2226,9 @@
               "parentId": "drink_latte",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_latte",
+              "textProp": "text"
             },
             {
               "id": "drink_latte_meta",
@@ -2200,7 +2254,9 @@
               "parentId": "drink_latte",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_dose_250_1",
+              "textProp": "text"
             },
             {
               "id": "drink_latte_go",
@@ -2372,7 +2428,9 @@
               "parentId": "drink_mocha",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_mocha",
+              "textProp": "text"
             },
             {
               "id": "drink_mocha_meta",
@@ -2398,7 +2456,9 @@
               "parentId": "drink_mocha",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_dose_250_2",
+              "textProp": "text"
             },
             {
               "id": "drink_mocha_go",
@@ -2532,7 +2592,9 @@
               "parentId": "drinks_tabbar",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_tab_home",
+              "textProp": "text"
             },
             {
               "id": "drinks_tab_drinks",
@@ -2564,7 +2626,9 @@
               "parentId": "drinks_tabbar",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_tab_drinks",
+              "textProp": "text"
             },
             {
               "id": "drinks_tab_settings",
@@ -2606,7 +2670,9 @@
               "parentId": "drinks_tabbar",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_tab_settings",
+              "textProp": "text"
             }
           ],
           "props": {},
@@ -2835,7 +2901,43 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_label_c"
+          "typographyId": "ty_label_c",
+          "textId": "txt_back",
+          "textProp": "text"
+        },
+        {
+          "id": "brew_spin",
+          "type": "spinner",
+          "name": "brew_spin",
+          "x": 258,
+          "y": 34,
+          "width": 28,
+          "height": 28,
+          "children": [],
+          "props": {
+            "speed": 1400,
+            "arcLength": 70
+          },
+          "styles": {
+            "default": {
+              "bgColor": "#3A2E25",
+              "borderWidth": 4,
+              "padding": 0
+            },
+            "parts": {
+              "indicator": {
+                "default": {
+                  "bgColor": "#F0A94C",
+                  "borderWidth": 4
+                }
+              }
+            }
+          },
+          "events": [],
+          "animations": [],
+          "parentId": null,
+          "locked": false,
+          "visible": true
         },
         {
           "id": "brew_title",
@@ -2861,7 +2963,9 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_title_c"
+          "typographyId": "ty_title_c",
+          "textId": "txt_brewing",
+          "textProp": "text"
         },
         {
           "id": "brew_stop",
@@ -2915,7 +3019,9 @@
             "pollIntervalMs": 250,
             "writeBehavior": "set",
             "writeValue": 1
-          }
+          },
+          "textId": "txt_stop",
+          "textProp": "text"
         },
         {
           "id": "brew_cup_card",
@@ -2950,7 +3056,9 @@
               "parentId": "brew_cup_card",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading_c"
+              "typographyId": "ty_heading_c",
+              "textId": "txt_flat_white",
+              "textProp": "text"
             },
             {
               "id": "brew_drink_meta",
@@ -2976,7 +3084,9 @@
               "parentId": "brew_cup_card",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption_c"
+              "typographyId": "ty_caption_c",
+              "textId": "txt_dose_180_double",
+              "textProp": "text"
             },
             {
               "id": "brew_steam1",
@@ -3310,7 +3420,9 @@
               "parentId": "brew_ring",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_extracting",
+              "textProp": "text"
             },
             {
               "id": "brew_eta",
@@ -3336,7 +3448,9 @@
               "parentId": "brew_ring",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption_c"
+              "typographyId": "ty_caption_c",
+              "textId": "txt_time_left",
+              "textProp": "text"
             }
           ],
           "props": {},
@@ -3390,7 +3504,9 @@
               "parentId": "brew_stats",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_live",
+              "textProp": "text"
             },
             {
               "id": "brew_pressure_lbl",
@@ -3416,7 +3532,9 @@
               "parentId": "brew_stats",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_pressure",
+              "textProp": "text"
             },
             {
               "id": "brew_pressure_val",
@@ -3514,7 +3632,9 @@
               "parentId": "brew_stats",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_temperature",
+              "textProp": "text"
             },
             {
               "id": "brew_temp_val",
@@ -3612,7 +3732,9 @@
               "parentId": "brew_stats",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_flow_rate",
+              "textProp": "text"
             },
             {
               "id": "brew_flow_val",
@@ -3775,7 +3897,9 @@
               "parentId": "brew_steps",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label"
+              "typographyId": "ty_label",
+              "textId": "txt_grinding",
+              "textProp": "text"
             },
             {
               "id": "brew_step_extract_dot",
@@ -3828,7 +3952,9 @@
               "parentId": "brew_steps",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label"
+              "typographyId": "ty_label",
+              "textId": "txt_extracting",
+              "textProp": "text"
             },
             {
               "id": "brew_step_milk_dot",
@@ -3881,7 +4007,9 @@
               "parentId": "brew_steps",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label"
+              "typographyId": "ty_label",
+              "textId": "txt_milk_foam",
+              "textProp": "text"
             },
             {
               "id": "brew_step_link1",
@@ -4161,7 +4289,9 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_display"
+          "typographyId": "ty_display",
+          "textId": "txt_tab_settings",
+          "textProp": "text"
         },
         {
           "id": "set_sub",
@@ -4187,15 +4317,58 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_caption"
+          "typographyId": "ty_caption",
+          "textId": "txt_machine_prefs",
+          "textProp": "text"
+        },
+        {
+          "id": "set_language",
+          "type": "btn",
+          "name": "set_language",
+          "x": 300,
+          "y": 44,
+          "width": 120,
+          "height": 38,
+          "children": [],
+          "props": {
+            "text": "Language"
+          },
+          "styles": {
+            "default": {
+              "bgColor": "#221C19",
+              "borderColor": "#382E27",
+              "borderWidth": 1,
+              "borderRadius": 19,
+              "textColor": "#F7F2ED",
+              "padding": 0
+            }
+          },
+          "events": [
+            {
+              "id": "evt-038",
+              "eventType": "LV_EVENT_CLICKED",
+              "handlerType": "builtin",
+              "action": {
+                "type": "setLanguage",
+                "language": "__next__"
+              }
+            }
+          ],
+          "animations": [],
+          "parentId": null,
+          "locked": false,
+          "visible": true,
+          "typographyId": "ty_label_c",
+          "textId": "txt_language",
+          "textProp": "text"
         },
         {
           "id": "set_water_lbl",
           "type": "label",
           "name": "set_water_lbl",
-          "x": 420,
+          "x": 436,
           "y": 54,
-          "width": 130,
+          "width": 110,
           "height": 18,
           "children": [],
           "props": {
@@ -4213,15 +4386,17 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_label_r"
+          "typographyId": "ty_label_r",
+          "textId": "txt_water_hardness",
+          "textProp": "text"
         },
         {
           "id": "set_water",
           "type": "dropdown",
           "name": "set_water",
-          "x": 562,
+          "x": 556,
           "y": 44,
-          "width": 198,
+          "width": 204,
           "height": 38,
           "children": [],
           "props": {
@@ -4236,6 +4411,13 @@
               "borderRadius": 19,
               "textColor": "#F7F2ED",
               "padding": 0
+            },
+            "parts": {
+              "indicator": {
+                "default": {
+                  "textColor": "#B3A498"
+                }
+              }
             }
           },
           "events": [],
@@ -4243,7 +4425,9 @@
           "parentId": null,
           "locked": false,
           "visible": true,
-          "typographyId": "ty_label"
+          "typographyId": "ty_label",
+          "textId": "txt_hardness_options",
+          "textProp": "options"
         },
         {
           "id": "set_brew",
@@ -4278,7 +4462,9 @@
               "parentId": "set_brew",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_brew",
+              "textProp": "text"
             },
             {
               "id": "set_strength_lbl",
@@ -4304,7 +4490,9 @@
               "parentId": "set_brew",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_strength",
+              "textProp": "text"
             },
             {
               "id": "set_strength_val",
@@ -4330,7 +4518,9 @@
               "parentId": "set_brew",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_r"
+              "typographyId": "ty_label_r",
+              "textId": "txt_strong",
+              "textProp": "text"
             },
             {
               "id": "set_strength",
@@ -4348,10 +4538,24 @@
               },
               "styles": {
                 "default": {
-                  "bgColor": "#2E2620",
+                  "bgColor": "#3A2E25",
                   "borderWidth": 0,
                   "borderRadius": 9999,
                   "padding": 0
+                },
+                "parts": {
+                  "indicator": {
+                    "default": {
+                      "bgColor": "#F0A94C",
+                      "borderRadius": 9999
+                    }
+                  },
+                  "knob": {
+                    "default": {
+                      "bgColor": "#F7F2ED",
+                      "borderRadius": 9999
+                    }
+                  }
                 }
               },
               "events": [],
@@ -4397,7 +4601,9 @@
               "parentId": "set_brew",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_temperature",
+              "textProp": "text"
             },
             {
               "id": "set_temp_val",
@@ -4441,10 +4647,24 @@
               },
               "styles": {
                 "default": {
-                  "bgColor": "#2E2620",
+                  "bgColor": "#3A2E25",
                   "borderWidth": 0,
                   "borderRadius": 9999,
                   "padding": 0
+                },
+                "parts": {
+                  "indicator": {
+                    "default": {
+                      "bgColor": "#F0A94C",
+                      "borderRadius": 9999
+                    }
+                  },
+                  "knob": {
+                    "default": {
+                      "bgColor": "#F7F2ED",
+                      "borderRadius": 9999
+                    }
+                  }
                 }
               },
               "events": [],
@@ -4490,7 +4710,9 @@
               "parentId": "set_brew",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption"
+              "typographyId": "ty_caption",
+              "textId": "txt_cup_size",
+              "textProp": "text"
             },
             {
               "id": "set_cup_val",
@@ -4534,10 +4756,24 @@
               },
               "styles": {
                 "default": {
-                  "bgColor": "#2E2620",
+                  "bgColor": "#3A2E25",
                   "borderWidth": 0,
                   "borderRadius": 9999,
                   "padding": 0
+                },
+                "parts": {
+                  "indicator": {
+                    "default": {
+                      "bgColor": "#F0A94C",
+                      "borderRadius": 9999
+                    }
+                  },
+                  "knob": {
+                    "default": {
+                      "bgColor": "#F7F2ED",
+                      "borderRadius": 9999
+                    }
+                  }
                 }
               },
               "events": [],
@@ -4621,7 +4857,9 @@
               "parentId": "set_machine",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_machine",
+              "textProp": "text"
             },
             {
               "id": "set_rinse_lbl",
@@ -4647,7 +4885,9 @@
               "parentId": "set_machine",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_body"
+              "typographyId": "ty_body",
+              "textId": "txt_auto_rinse",
+              "textProp": "text"
             },
             {
               "id": "set_rinse",
@@ -4663,10 +4903,24 @@
               },
               "styles": {
                 "default": {
-                  "bgColor": "#2E2620",
+                  "bgColor": "#3A2E25",
                   "borderWidth": 0,
                   "borderRadius": 9999,
                   "padding": 0
+                },
+                "parts": {
+                  "indicator": {
+                    "checked": {
+                      "bgColor": "#4FD1A5",
+                      "borderRadius": 9999
+                    }
+                  },
+                  "knob": {
+                    "default": {
+                      "bgColor": "#F7F2ED",
+                      "borderRadius": 9999
+                    }
+                  }
                 }
               },
               "events": [],
@@ -4750,7 +5004,9 @@
               "parentId": "set_machine",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_body"
+              "typographyId": "ty_body",
+              "textId": "txt_cup_warmer",
+              "textProp": "text"
             },
             {
               "id": "set_warmer",
@@ -4766,10 +5022,24 @@
               },
               "styles": {
                 "default": {
-                  "bgColor": "#2E2620",
+                  "bgColor": "#3A2E25",
                   "borderWidth": 0,
                   "borderRadius": 9999,
                   "padding": 0
+                },
+                "parts": {
+                  "indicator": {
+                    "checked": {
+                      "bgColor": "#4FD1A5",
+                      "borderRadius": 9999
+                    }
+                  },
+                  "knob": {
+                    "default": {
+                      "bgColor": "#F7F2ED",
+                      "borderRadius": 9999
+                    }
+                  }
                 }
               },
               "events": [],
@@ -4853,7 +5123,9 @@
               "parentId": "set_machine",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_body"
+              "typographyId": "ty_body",
+              "textId": "txt_eco_standby",
+              "textProp": "text"
             },
             {
               "id": "set_eco",
@@ -4869,10 +5141,24 @@
               },
               "styles": {
                 "default": {
-                  "bgColor": "#2E2620",
+                  "bgColor": "#3A2E25",
                   "borderWidth": 0,
                   "borderRadius": 9999,
                   "padding": 0
+                },
+                "parts": {
+                  "indicator": {
+                    "checked": {
+                      "bgColor": "#4FD1A5",
+                      "borderRadius": 9999
+                    }
+                  },
+                  "knob": {
+                    "default": {
+                      "bgColor": "#F7F2ED",
+                      "borderRadius": 9999
+                    }
+                  }
                 }
               },
               "events": [],
@@ -4912,6 +5198,15 @@
                   "bgColor": "transparent",
                   "borderWidth": 0,
                   "textColor": "#B3A498"
+                },
+                "parts": {
+                  "indicator": {
+                    "checked": {
+                      "bgColor": "#F0A94C",
+                      "borderColor": "#F0A94C",
+                      "borderRadius": 6
+                    }
+                  }
                 }
               },
               "events": [],
@@ -4919,7 +5214,9 @@
               "parentId": "set_machine",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label"
+              "typographyId": "ty_label",
+              "textId": "txt_descale_alert",
+              "textProp": "text"
             }
           ],
           "props": {},
@@ -4983,7 +5280,9 @@
               "parentId": "set_usage",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_heading"
+              "typographyId": "ty_heading",
+              "textId": "txt_this_week",
+              "textProp": "text"
             },
             {
               "id": "set_usage_chart",
@@ -5068,7 +5367,9 @@
               "parentId": "set_usage",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_numeric"
+              "typographyId": "ty_numeric",
+              "textId": "txt_cups_total",
+              "textProp": "text"
             },
             {
               "id": "set_usage_note",
@@ -5094,7 +5395,9 @@
               "parentId": "set_usage",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_caption_c"
+              "typographyId": "ty_caption_c",
+              "textId": "txt_since_monday",
+              "textProp": "text"
             }
           ],
           "props": {},
@@ -5158,7 +5461,7 @@
               },
               "events": [
                 {
-                  "id": "evt-038",
+                  "id": "evt-039",
                   "eventType": "LV_EVENT_CLICKED",
                   "handlerType": "builtin",
                   "action": {
@@ -5174,7 +5477,9 @@
               "parentId": "set_tabbar",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_tab_home",
+              "textProp": "text"
             },
             {
               "id": "set_tab_drinks",
@@ -5200,7 +5505,7 @@
               },
               "events": [
                 {
-                  "id": "evt-039",
+                  "id": "evt-040",
                   "eventType": "LV_EVENT_CLICKED",
                   "handlerType": "builtin",
                   "action": {
@@ -5216,7 +5521,9 @@
               "parentId": "set_tabbar",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_tab_drinks",
+              "textProp": "text"
             },
             {
               "id": "set_tab_settings",
@@ -5248,7 +5555,9 @@
               "parentId": "set_tabbar",
               "locked": false,
               "visible": true,
-              "typographyId": "ty_label_c"
+              "typographyId": "ty_label_c",
+              "textId": "txt_tab_settings",
+              "textProp": "text"
             }
           ],
           "props": {},
@@ -5282,7 +5591,7 @@
       ],
       "events": [
         {
-          "id": "evt-040",
+          "id": "evt-041",
           "eventType": "LV_EVENT_SCREEN_LOADED",
           "handlerType": "builtin",
           "action": {
@@ -5291,7 +5600,7 @@
           }
         },
         {
-          "id": "evt-041",
+          "id": "evt-042",
           "eventType": "LV_EVENT_SCREEN_LOADED",
           "handlerType": "builtin",
           "action": {
@@ -5300,7 +5609,7 @@
           }
         },
         {
-          "id": "evt-042",
+          "id": "evt-043",
           "eventType": "LV_EVENT_SCREEN_LOADED",
           "handlerType": "builtin",
           "action": {
@@ -5309,7 +5618,7 @@
           }
         },
         {
-          "id": "evt-043",
+          "id": "evt-044",
           "eventType": "LV_EVENT_SCREEN_LOADED",
           "handlerType": "builtin",
           "action": {
@@ -5318,7 +5627,7 @@
           }
         },
         {
-          "id": "evt-044",
+          "id": "evt-045",
           "eventType": "LV_EVENT_SCREEN_LOADED",
           "handlerType": "builtin",
           "action": {
@@ -5350,7 +5659,17 @@
       "groupId": "tg_headings",
       "fontResource": "montserrat_32",
       "fontSize": 32,
-      "align": "left"
+      "align": "left",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 28
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 28
+        }
+      }
     },
     {
       "id": "ty_display_c",
@@ -5358,7 +5677,17 @@
       "groupId": "tg_headings",
       "fontResource": "montserrat_32",
       "fontSize": 32,
-      "align": "center"
+      "align": "center",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 28
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 28
+        }
+      }
     },
     {
       "id": "ty_title",
@@ -5366,7 +5695,17 @@
       "groupId": "tg_headings",
       "fontResource": "montserrat_24",
       "fontSize": 24,
-      "align": "left"
+      "align": "left",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 24
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 24
+        }
+      }
     },
     {
       "id": "ty_title_c",
@@ -5374,7 +5713,17 @@
       "groupId": "tg_headings",
       "fontResource": "montserrat_24",
       "fontSize": 24,
-      "align": "center"
+      "align": "center",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 24
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 24
+        }
+      }
     },
     {
       "id": "ty_heading",
@@ -5382,7 +5731,17 @@
       "groupId": "tg_headings",
       "fontResource": "montserrat_20",
       "fontSize": 20,
-      "align": "left"
+      "align": "left",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 20
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 20
+        }
+      }
     },
     {
       "id": "ty_heading_c",
@@ -5390,7 +5749,17 @@
       "groupId": "tg_headings",
       "fontResource": "montserrat_20",
       "fontSize": 20,
-      "align": "center"
+      "align": "center",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 20
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 20
+        }
+      }
     },
     {
       "id": "ty_numeric",
@@ -5398,7 +5767,17 @@
       "groupId": "tg_headings",
       "fontResource": "montserrat_28",
       "fontSize": 28,
-      "align": "center"
+      "align": "center",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 24
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 24
+        }
+      }
     },
     {
       "id": "ty_body",
@@ -5406,7 +5785,17 @@
       "groupId": "tg_body",
       "fontResource": "montserrat_16",
       "fontSize": 16,
-      "align": "left"
+      "align": "left",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 16
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 16
+        }
+      }
     },
     {
       "id": "ty_body_c",
@@ -5414,7 +5803,17 @@
       "groupId": "tg_body",
       "fontResource": "montserrat_16",
       "fontSize": 16,
-      "align": "center"
+      "align": "center",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 16
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 16
+        }
+      }
     },
     {
       "id": "ty_label",
@@ -5422,7 +5821,17 @@
       "groupId": "tg_body",
       "fontResource": "montserrat_14",
       "fontSize": 14,
-      "align": "left"
+      "align": "left",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 14
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 14
+        }
+      }
     },
     {
       "id": "ty_label_c",
@@ -5430,7 +5839,17 @@
       "groupId": "tg_body",
       "fontResource": "montserrat_14",
       "fontSize": 14,
-      "align": "center"
+      "align": "center",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 14
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 14
+        }
+      }
     },
     {
       "id": "ty_label_r",
@@ -5438,7 +5857,17 @@
       "groupId": "tg_body",
       "fontResource": "montserrat_14",
       "fontSize": 14,
-      "align": "right"
+      "align": "right",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 14
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 14
+        }
+      }
     },
     {
       "id": "ty_caption",
@@ -5446,7 +5875,17 @@
       "groupId": "tg_body",
       "fontResource": "montserrat_12",
       "fontSize": 12,
-      "align": "left"
+      "align": "left",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 14
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 14
+        }
+      }
     },
     {
       "id": "ty_caption_c",
@@ -5454,7 +5893,17 @@
       "groupId": "tg_body",
       "fontResource": "montserrat_12",
       "fontSize": 12,
-      "align": "center"
+      "align": "center",
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 14
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 14
+        }
+      }
     },
     {
       "id": "ty_overline",
@@ -5463,7 +5912,19 @@
       "fontResource": "montserrat_12",
       "fontSize": 12,
       "align": "left",
-      "letterSpace": 3
+      "letterSpace": 3,
+      "languages": {
+        "zh-TW": {
+          "fontResource": "ui_font_noto_sans_tc",
+          "fontSize": 14,
+          "letterSpace": 0
+        },
+        "ja": {
+          "fontResource": "ui_font_noto_sans_jp",
+          "fontSize": 14,
+          "letterSpace": 0
+        }
+      }
     }
   ],
   "typographyGroups": [
@@ -5478,8 +5939,572 @@
       "parentId": null
     }
   ],
-  "languages": [],
-  "texts": [],
+  "languages": [
+    {
+      "code": "en",
+      "name": "English"
+    },
+    {
+      "code": "zh-TW",
+      "name": "繁體中文"
+    },
+    {
+      "code": "ja",
+      "name": "日本語"
+    }
+  ],
+  "texts": [
+    {
+      "id": "txt_water_level",
+      "key": "water_level",
+      "values": {
+        "en": "WATER 82%",
+        "zh-TW": "水量 82%",
+        "ja": "給水 82%"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_bean_level",
+      "key": "bean_level",
+      "values": {
+        "en": "BEANS 64%",
+        "zh-TW": "豆量 64%",
+        "ja": "豆 64%"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_good_morning",
+      "key": "good_morning",
+      "values": {
+        "en": "Good morning",
+        "zh-TW": "早安",
+        "ja": "おはようございます"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_usual_ready",
+      "key": "usual_ready",
+      "values": {
+        "en": "Your usual is ready when you are",
+        "zh-TW": "您的常點隨時可以沖煎",
+        "ja": "いつものをすぐにお作りします"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_your_usual",
+      "key": "your_usual",
+      "values": {
+        "en": "YOUR USUAL",
+        "zh-TW": "您的常點",
+        "ja": "いつもの"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_flat_white",
+      "key": "flat_white",
+      "values": {
+        "en": "Flat White",
+        "zh-TW": "平白咖啡",
+        "ja": "フラットホワイト"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_dose_180_double",
+      "key": "dose_180_double",
+      "values": {
+        "en": "180 ml • Double shot",
+        "zh-TW": "180 ml • 雙份濃縮",
+        "ja": "180 ml • ダブルショット"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_brew_now",
+      "key": "brew_now",
+      "values": {
+        "en": "Brew now",
+        "zh-TW": "開始沖煎",
+        "ja": "いま淹れる"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_ready_to_brew",
+      "key": "ready_to_brew",
+      "values": {
+        "en": "Ready to brew",
+        "zh-TW": "可以沖煎",
+        "ja": "準備完了"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_boiler_at_temp",
+      "key": "boiler_at_temp",
+      "values": {
+        "en": "Boiler at temperature",
+        "zh-TW": "鍋爐已達溫",
+        "ja": "ボイラー適温"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_tab_home",
+      "key": "tab_home",
+      "values": {
+        "en": "Home",
+        "zh-TW": "首頁",
+        "ja": "ホーム"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_tab_drinks",
+      "key": "tab_drinks",
+      "values": {
+        "en": "Drinks",
+        "zh-TW": "飲品",
+        "ja": "ドリンク"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_tab_settings",
+      "key": "tab_settings",
+      "values": {
+        "en": "Settings",
+        "zh-TW": "設定",
+        "ja": "設定"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_six_ways",
+      "key": "six_ways",
+      "values": {
+        "en": "Six ways to start the day",
+        "zh-TW": "六種開啟一天的方式",
+        "ja": "一日の始まりに六つの選択"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_seg_hot",
+      "key": "seg_hot",
+      "values": {
+        "en": "Hot",
+        "zh-TW": "熱飲",
+        "ja": "ホット"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_seg_iced",
+      "key": "seg_iced",
+      "values": {
+        "en": "Iced",
+        "zh-TW": "冰飲",
+        "ja": "アイス"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_seg_milk",
+      "key": "seg_milk",
+      "values": {
+        "en": "Milk",
+        "zh-TW": "奶類",
+        "ja": "ミルク"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_espresso",
+      "key": "espresso",
+      "values": {
+        "en": "Espresso",
+        "zh-TW": "義式濃縮",
+        "ja": "エスプレッソ"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_dose_30_1",
+      "key": "dose_30_1",
+      "values": {
+        "en": "30 ml • 1 shot",
+        "zh-TW": "30 ml • 單份",
+        "ja": "30 ml • シングル"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_americano",
+      "key": "americano",
+      "values": {
+        "en": "Americano",
+        "zh-TW": "美式咖啡",
+        "ja": "アメリカーノ"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_dose_180_1",
+      "key": "dose_180_1",
+      "values": {
+        "en": "180 ml • 1 shot",
+        "zh-TW": "180 ml • 單份",
+        "ja": "180 ml • シングル"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_cappuccino",
+      "key": "cappuccino",
+      "values": {
+        "en": "Cappuccino",
+        "zh-TW": "卡布奇諾",
+        "ja": "カプチーノ"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_dose_220_2",
+      "key": "dose_220_2",
+      "values": {
+        "en": "220 ml • 2 shots",
+        "zh-TW": "220 ml • 雙份",
+        "ja": "220 ml • ダブル"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_dose_180_2",
+      "key": "dose_180_2",
+      "values": {
+        "en": "180 ml • 2 shots",
+        "zh-TW": "180 ml • 雙份",
+        "ja": "180 ml • ダブル"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_latte",
+      "key": "latte",
+      "values": {
+        "en": "Latte",
+        "zh-TW": "拿鐵",
+        "ja": "ラテ"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_dose_250_1",
+      "key": "dose_250_1",
+      "values": {
+        "en": "250 ml • 1 shot",
+        "zh-TW": "250 ml • 單份",
+        "ja": "250 ml • シングル"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_mocha",
+      "key": "mocha",
+      "values": {
+        "en": "Mocha",
+        "zh-TW": "摩卡",
+        "ja": "モカ"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_dose_250_2",
+      "key": "dose_250_2",
+      "values": {
+        "en": "250 ml • 2 shots",
+        "zh-TW": "250 ml • 雙份",
+        "ja": "250 ml • ダブル"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_back",
+      "key": "back",
+      "values": {
+        "en": "Back",
+        "zh-TW": "返回",
+        "ja": "戻る"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_brewing",
+      "key": "brewing",
+      "values": {
+        "en": "Brewing",
+        "zh-TW": "沖煎中",
+        "ja": "抽出中"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_stop",
+      "key": "stop",
+      "values": {
+        "en": "Stop",
+        "zh-TW": "停止",
+        "ja": "停止"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_extracting",
+      "key": "extracting",
+      "values": {
+        "en": "Extracting",
+        "zh-TW": "萊取中",
+        "ja": "抽出"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_time_left",
+      "key": "time_left",
+      "values": {
+        "en": "12 s left",
+        "zh-TW": "剩 12 秒",
+        "ja": "残り 12 秒"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_live",
+      "key": "live",
+      "values": {
+        "en": "Live",
+        "zh-TW": "即時",
+        "ja": "リアルタイム"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_pressure",
+      "key": "pressure",
+      "values": {
+        "en": "Pressure",
+        "zh-TW": "壓力",
+        "ja": "圧力"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_temperature",
+      "key": "temperature",
+      "values": {
+        "en": "Temperature",
+        "zh-TW": "溫度",
+        "ja": "温度"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_flow_rate",
+      "key": "flow_rate",
+      "values": {
+        "en": "Flow rate",
+        "zh-TW": "流速",
+        "ja": "流量"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_grinding",
+      "key": "grinding",
+      "values": {
+        "en": "Grinding",
+        "zh-TW": "研磨中",
+        "ja": "粉砎中"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_milk_foam",
+      "key": "milk_foam",
+      "values": {
+        "en": "Milk foam",
+        "zh-TW": "奶泡",
+        "ja": "ミルクフォーム"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_machine_prefs",
+      "key": "machine_prefs",
+      "values": {
+        "en": "Machine preferences",
+        "zh-TW": "機器偏好設定",
+        "ja": "マシンの設定"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_language",
+      "key": "language",
+      "values": {
+        "en": "Language",
+        "zh-TW": "語言",
+        "ja": "言語"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_water_hardness",
+      "key": "water_hardness",
+      "values": {
+        "en": "Water hardness",
+        "zh-TW": "水質硬度",
+        "ja": "水の硬度"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_hardness_options",
+      "key": "hardness_options",
+      "values": {
+        "en": "Soft\nMedium\nHard\nVery hard",
+        "zh-TW": "軟水\n中等\n硬水\n極硬水",
+        "ja": "軟水\n中程度\n硬水\n非常に硬い"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_brew",
+      "key": "brew",
+      "values": {
+        "en": "Brew",
+        "zh-TW": "沖煎",
+        "ja": "抽出"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_strength",
+      "key": "strength",
+      "values": {
+        "en": "Strength",
+        "zh-TW": "濃度",
+        "ja": "濃さ"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_strong",
+      "key": "strong",
+      "values": {
+        "en": "Strong",
+        "zh-TW": "濃",
+        "ja": "濃いめ"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_cup_size",
+      "key": "cup_size",
+      "values": {
+        "en": "Cup size",
+        "zh-TW": "杯量",
+        "ja": "カップ容量"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_machine",
+      "key": "machine",
+      "values": {
+        "en": "Machine",
+        "zh-TW": "機器",
+        "ja": "マシン"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_auto_rinse",
+      "key": "auto_rinse",
+      "values": {
+        "en": "Auto rinse",
+        "zh-TW": "自動沖洗",
+        "ja": "自動リンス"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_cup_warmer",
+      "key": "cup_warmer",
+      "values": {
+        "en": "Cup warmer",
+        "zh-TW": "溫杯盤",
+        "ja": "カップ保温"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_eco_standby",
+      "key": "eco_standby",
+      "values": {
+        "en": "Eco standby",
+        "zh-TW": "節能待機",
+        "ja": "エコ待機"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_descale_alert",
+      "key": "descale_alert",
+      "values": {
+        "en": "Descale alert",
+        "zh-TW": "除垢提醒",
+        "ja": "脱灰アラート"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_this_week",
+      "key": "this_week",
+      "values": {
+        "en": "This week",
+        "zh-TW": "本週",
+        "ja": "今週"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_cups_total",
+      "key": "cups_total",
+      "values": {
+        "en": "34 cups",
+        "zh-TW": "34 杯",
+        "ja": "34 杯"
+      },
+      "groupId": null
+    },
+    {
+      "id": "txt_since_monday",
+      "key": "since_monday",
+      "values": {
+        "en": "since Monday",
+        "zh-TW": "自週一起",
+        "ja": "月曜日から"
+      },
+      "groupId": null
+    }
+  ],
   "textGroups": [],
   "animations": [
     {
