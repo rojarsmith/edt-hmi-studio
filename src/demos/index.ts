@@ -41,6 +41,14 @@ export const DEMO_PROJECTS: DemoEntry[] = [
     load: () => loadExample('/examples/f746-modbus-hmi.json'),
   },
   {
+    id: 'h747-coffee-machine',
+    name: 'STM32H747I-DISCO Coffee Machine',
+    description:
+      'Four-screen coffee machine HMI for the H747I Discovery: flat dark styling, staged entry animations and a different screen transition on every route.',
+    factoryOnly: false,
+    load: () => loadExample('/examples/h747-coffee-machine.json'),
+  },
+  {
     id: 'factory-widget-exerciser',
     name: 'Factory Widget Exerciser',
     description:
