@@ -61,6 +61,15 @@ describe('reading a widget’s props into a playlist', () => {
     expect(playlist.shuffle).toBe(false);
   });
 
+  it('reads shuffle as off while a named list holds at most one file', () => {
+    // One file has no order to shuffle; the folder's count only the panel knows.
+    expect(normalizeVideoProps({ source: 'list', files: ['a.avi'], shuffle: true }).shuffle).toBe(false);
+    expect(normalizeVideoProps({ source: 'list', files: [], shuffle: true }).shuffle).toBe(false);
+    expect(normalizeVideoProps({ source: 'list', files: ['a.avi', 'b.avi'], shuffle: true }).shuffle).toBe(true);
+    expect(normalizeVideoProps({ source: 'folder', folder: 'clips', shuffle: true }).shuffle).toBe(true);
+    expect(normalizeVideoProps({ fileName: 'legacy.avi', shuffle: true }).shuffle).toBe(false);
+  });
+
   it('defaults the flags on for auto play and loop, off for shuffle', () => {
     const playlist = normalizeVideoProps({ source: 'list', files: ['a.avi'] });
     expect(playlist.autoPlay).toBe(true);

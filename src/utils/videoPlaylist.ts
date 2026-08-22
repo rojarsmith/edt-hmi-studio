@@ -87,7 +87,14 @@ export function normalizeVideoProps(props: Record<string, any> | undefined): Vid
     folder,
     autoPlay: p.autoPlay !== false,
     loop: p.loop !== false,
-    shuffle: p.shuffle === true,
+    /**
+     * One named file has no order to shuffle, so the switch reads off however
+     * it was stored — here rather than in each reader, so the canvas badge,
+     * the generated table and the property editor's toggle cannot disagree.
+     * A folder scan keeps the setting: how many files the folder holds is the
+     * panel's to find out.
+     */
+    shuffle: p.shuffle === true && !(source === 'list' && files.length <= 1),
   };
 }
 

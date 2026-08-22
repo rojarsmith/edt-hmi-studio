@@ -150,16 +150,45 @@ describe('video properties', () => {
     expect(current().props.loop).toBe(false);
   });
 
-  it('switches random order on, and explains it', () => {
-    const first = setUp();
+  it('switches random order on for a real list, and explains it', () => {
+    const first = setUp({ ...DEFAULT_PROPS, files: ['a.avi', 'b.avi'] });
 
     fireEvent.click(screen.getByText('Random order').closest('.property-row')!
       .querySelector('.toggle-switch-wrapper')!);
     expect(current().props.shuffle).toBe(true);
     first.unmount();
 
-    setUp({ ...DEFAULT_PROPS, shuffle: true });
+    setUp({ ...DEFAULT_PROPS, files: ['a.avi', 'b.avi'], shuffle: true });
     expect(screen.getByText(/never the one that just/)).toBeTruthy();
+  });
+
+  it('makes random order inert while the list holds one file', () => {
+    setUp();
+
+    const toggle = screen.getByText('Random order').closest('.property-row')!
+      .querySelector('.toggle-switch-wrapper')!;
+    expect(toggle.className).toContain('disabled');
+
+    // Clicking a switch with nothing to shuffle changes nothing.
+    fireEvent.click(toggle);
+    expect(current().props.shuffle).toBe(false);
+  });
+
+  it('reads a stored shuffle as off while only one file is named', () => {
+    setUp({ ...DEFAULT_PROPS, shuffle: true });
+
+    const knob = screen.getByText('Random order').closest('.property-row')!
+      .querySelector('.toggle-switch')!;
+    expect(knob.className).not.toContain('on');
+    expect(screen.queryByText(/never the one that just/)).toBeNull();
+  });
+
+  it('keeps random order available for a folder scan', () => {
+    setUp({ ...DEFAULT_PROPS, source: 'folder', folder: 'clips' });
+
+    const toggle = screen.getByText('Random order').closest('.property-row')!
+      .querySelector('.toggle-switch-wrapper')!;
+    expect(toggle.className).not.toContain('disabled');
   });
 
   it('reads a project written before playlists as its one file', () => {

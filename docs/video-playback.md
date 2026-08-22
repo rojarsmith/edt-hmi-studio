@@ -30,7 +30,7 @@ nothing else:
 | **Folder on the SD card** | *(empty — the top level)* | For a folder scan: every `.avi` in it plays, in name order. |
 | **Auto Play** | On | Start playing as soon as the screen carrying the widget is loaded. |
 | **Loop** | On | After the last file, start the playlist again. With one file that is the film looping. |
-| **Random order** | Off | The next file is drawn at random — from a software random sequence seeded differently every run — and is **never the one that just played**. With Loop off, as many files play as the list holds, then it stops. |
+| **Random order** | Off | The next file is drawn at random — from a software random sequence seeded differently every run — and is **never the one that just played**. With Loop off, as many files play as the list holds, then it stops. Inert while the list names one file: one file has no order to shuffle. |
 
 A playlist of one behaves exactly as the single file always did, and a project
 written before playlists carries its old `fileName` and plays it unchanged.

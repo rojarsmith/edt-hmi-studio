@@ -84,7 +84,7 @@ isContainer: false
 | `folder` | `string` | `''` | `source` 是 `'folder'` 時要掃描的資料夾。空白是卡片最上層。 |
 | `autoPlay` | `boolean` | `true` | 載入帶著這個元件的畫面時就開始播。 |
 | `loop` | `boolean` | `true` | 播完最後一個檔案之後，整份清單從頭再來。 |
-| `shuffle` | `boolean` | `false` | 亂數順序——下一個絕不會是剛播完的那一個。 |
+| `shuffle` | `boolean` | `false` | 亂數順序——下一個絕不會是剛播完的那一個。指名清單只有一個檔案以下時一律讀成關。 |
 | `fileName` | `string` | — | **已棄用。** 播放清單之前的單檔形狀；讀成只有一項的 `files`。 |
 
 ### props 型別

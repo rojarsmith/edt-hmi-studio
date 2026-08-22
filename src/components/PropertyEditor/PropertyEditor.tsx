@@ -243,8 +243,15 @@ const ToggleSwitch: React.FC<{
   checked: boolean;
   onChange: (checked: boolean) => void;
   label?: string;
-}> = ({ checked, onChange, label }) => (
-  <div className="toggle-switch-wrapper" onClick={() => onChange(!checked)}>
+  /** Shown but inert, with the reason in the tooltip. */
+  disabled?: boolean;
+  disabledReason?: string;
+}> = ({ checked, onChange, label, disabled = false, disabledReason }) => (
+  <div
+    className={`toggle-switch-wrapper ${disabled ? 'disabled' : ''}`}
+    title={disabled ? disabledReason : undefined}
+    onClick={disabled ? undefined : () => onChange(!checked)}
+  >
     {label && <span className="toggle-switch-label">{label}</span>}
     <div className={`toggle-switch ${checked ? 'on' : ''}`}>
       <div className="toggle-switch-knob" />
@@ -2867,6 +2874,12 @@ function VideoEditor({
         <ToggleSwitch
           checked={playlist.shuffle}
           onChange={(checked) => onChange('shuffle', checked)}
+          /* One named file has no order to shuffle. A folder scan keeps the
+             switch: how many files the folder holds is the panel's to find
+             out. The normaliser reads the switch as off in the same case, so
+             the stored value cannot show through anywhere else either. */
+          disabled={playlist.source === 'list' && playlist.files.length <= 1}
+          disabledReason="One file has no order to shuffle — name a second file to enable this."
         />
       </div>
       {playlist.shuffle && (

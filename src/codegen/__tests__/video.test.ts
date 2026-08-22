@@ -34,12 +34,17 @@ describe('video code generation', () => {
 
   it('carries the flags through as they were switched', () => {
     const source = sourceFor({
-      source: 'list', files: ['intro.avi'],
+      source: 'list', files: ['intro.avi', 'other.avi'],
       autoPlay: false, loop: false, shuffle: true,
     });
     expect(source).toContain('.auto_play = false,');
     expect(source).toContain('.loop = false,');
     expect(source).toContain('.shuffle = true,');
+  });
+
+  it('emits shuffle off for a one-file list whatever was stored', () => {
+    const source = sourceFor({ source: 'list', files: ['only.avi'], shuffle: true });
+    expect(source).toContain('.shuffle = false,');
   });
 
   it('emits a folder scan as a folder and no file array', () => {

@@ -94,7 +94,7 @@ Nothing.
 | `folder` | `string` | `''` | The folder scanned when `source` is `'folder'`. Empty is the card's top level. |
 | `autoPlay` | `boolean` | `true` | Start playing as soon as the screen carrying the widget is loaded. |
 | `loop` | `boolean` | `true` | After the last file, start the playlist again. |
-| `shuffle` | `boolean` | `false` | Random order — the next file is never the one that just played. |
+| `shuffle` | `boolean` | `false` | Random order — the next file is never the one that just played. Read as off while a named list holds at most one file. |
 | `fileName` | `string` | — | **Deprecated.** The one-file shape from before playlists; read as a one-entry `files`. |
 
 ### props type
