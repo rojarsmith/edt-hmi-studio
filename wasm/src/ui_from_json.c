@@ -534,6 +534,7 @@ static lv_obj_t *create_qrcode(lv_obj_t *parent, const cJSON *comp) {
     const char *content = props ? cjson_get_string(props, "content") : NULL;
     int version = props ? cjson_get_int(props, "version", 0) : 0;
     int scale = props ? cjson_get_int(props, "scale", 2) : 2;
+    int quiet = props ? cjson_get_bool(props, "quietZone", 1) : 1;
     const char *ecc_name = props ? cjson_get_string(props, "ecc") : NULL;
     enum qrcodegen_Ecc ecc = qrcodegen_Ecc_MEDIUM;
     uint32_t dark = qr_style_color(comp, "textColor", 0x000000);
@@ -559,7 +560,8 @@ static lv_obj_t *create_qrcode(lv_obj_t *parent, const cJSON *comp) {
 
     {
         int qr_size = qrcodegen_getSize(qr_modules);
-        int32_t px = (int32_t)(qr_size + 8) * scale;
+        int margin = quiet ? 4 : 0;
+        int32_t px = (int32_t)(qr_size + 2 * margin) * scale;
         lv_draw_buf_t *draw_buf =
             lv_draw_buf_create((uint32_t)px, (uint32_t)px, LV_COLOR_FORMAT_I1, LV_STRIDE_AUTO);
         uint8_t *pixels;
@@ -584,10 +586,10 @@ static lv_obj_t *create_qrcode(lv_obj_t *parent, const cJSON *comp) {
                 int y0;
                 if (!qrcodegen_getModule(qr_modules, module_x, module_y)) continue;
                 for (y0 = 0; y0 < scale; y0++) {
-                    int32_t y = ((int32_t)module_y + 4) * scale + y0;
+                    int32_t y = ((int32_t)module_y + margin) * scale + y0;
                     int x0;
                     for (x0 = 0; x0 < scale; x0++) {
-                        int32_t x = ((int32_t)module_x + 4) * scale + x0;
+                        int32_t x = ((int32_t)module_x + margin) * scale + x0;
                         pixels[(uint32_t)y * stride + ((uint32_t)x >> 3)] |=
                             (uint8_t)(0x80U >> ((uint32_t)x & 7U));
                     }

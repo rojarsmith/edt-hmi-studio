@@ -36,6 +36,11 @@ describe('qrcode code generation', () => {
     expect(source).toContain('.scale = 4U,');
   });
 
+  it('carries the quiet zone switch into the context', () => {
+    expect(sourceFor({ source: 'literal', literal: 'x' })).toContain('.quiet = true,');
+    expect(sourceFor({ source: 'literal', literal: 'x', quietZone: false })).toContain('.quiet = false,');
+  });
+
   it('spans the full range on auto version', () => {
     const source = sourceFor({ source: 'literal', literal: 'x', version: 0 });
     expect(source).toContain('.min_version = 1U,');

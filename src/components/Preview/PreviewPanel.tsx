@@ -2121,9 +2121,10 @@ function drawQrcode(
   }
 
   const { moduleCount, isDark } = encoded.render;
-  const px = qrcodePixelSize(moduleCount, settings.scale);
-  const originX = x + Math.floor((w - px) / 2) + 4 * settings.scale;
-  const originY = y + Math.floor((h - px) / 2) + 4 * settings.scale;
+  const px = qrcodePixelSize(moduleCount, settings.scale, settings.quietZone);
+  const margin = settings.quietZone ? 4 * settings.scale : 0;
+  const originX = x + Math.floor((w - px) / 2) + margin;
+  const originY = y + Math.floor((h - px) / 2) + margin;
 
   ctx.save();
   ctx.beginPath();

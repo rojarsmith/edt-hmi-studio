@@ -1704,3 +1704,19 @@
   opacity: 0.45;
   cursor: default;
 }
+
+/* One click to make the widget exactly the code's own size — the way to no
+   margin at all beyond what the quiet zone itself draws. */
+.qrcode-fit-button {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #c8d2de;
+  border-radius: 4px;
+  background: #f4f6f8;
+  color: #2b3a4e;
+  font-size: 11px;
+  cursor: pointer;
+}
+.qrcode-fit-button:hover {
+  background: #e8edf3;
+}

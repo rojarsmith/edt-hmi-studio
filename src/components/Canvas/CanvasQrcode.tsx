@@ -12,7 +12,6 @@ import { useEditorStore } from '../../store/editorStore';
 import {
   encodeQrcode,
   normalizeQrcodeProps,
-  qrcodePixelSize,
   resolveQrcodeContent,
 } from '../../utils/qrcodeModel';
 
@@ -45,13 +44,14 @@ export const CanvasQrcodeContent: React.FC<{
   } else {
     const { moduleCount, isDark } = encoded.render;
     // One SVG path for every dark module, at 1 unit per module; the quiet
-    // zone is the 4-unit offset. Scaling to the widget is the viewBox's job.
-    const size = moduleCount + 8;
+    // zone, when on, is the 4-unit offset. Scaling is the viewBox's job.
+    const margin = settings.quietZone ? 4 : 0;
+    const size = moduleCount + 2 * margin;
     let path = '';
     for (let row = 0; row < moduleCount; row++) {
       for (let col = 0; col < moduleCount; col++) {
         if (isDark(row, col)) {
-          path += `M${col + 4} ${row + 4}h1v1h-1z`;
+          path += `M${col + margin} ${row + margin}h1v1h-1z`;
         }
       }
     }
@@ -86,7 +86,7 @@ export const CanvasQrcodeContent: React.FC<{
   // out; the box around it stays the widget's background. When the box is too
   // small the code is clipped — which is the truth, and the property editor
   // says so in words.
-  const px = qrcodePixelSize(svg.size - 8, settings.scale);
+  const px = svg.size * settings.scale;
 
   return (
     <div

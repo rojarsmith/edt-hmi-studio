@@ -152,6 +152,7 @@ export function editorStateToJson(
         version: settings.version,
         scale: settings.scale,
         ecc: settings.ecc,
+        quietZone: settings.quietZone,
       };
     }
   }

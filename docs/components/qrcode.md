@@ -85,6 +85,20 @@ picture computed from its content.
   light ones** — the same two rows every widget's Style section has. Keep the
   contrast high; a scanner needs it.
 
+### The white around the code
+
+Two different things, one look. The **quiet zone** is the standard's 4-module
+clear margin, drawn in the light colour on every side — scanners rely on it,
+and it is on by default. Everything beyond that is the **widget's own
+background** filling the rest of the box.
+
+To shrink the white: the property editor's *Shrink the widget to the code*
+button sizes the box to the code's exact pixels, leaving only the quiet zone.
+To remove even that, switch **Quiet zone** off — the right move only when the
+widget already sits on a plain, light background that provides the clearance
+instead; on a dark or busy background the code may stop scanning, and the
+editor says so when the switch goes off.
+
 ## 6. Communication
 
 Bind the widget in its Communication section: a **string** read from

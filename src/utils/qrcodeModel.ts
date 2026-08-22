@@ -64,6 +64,13 @@ export interface QrcodeSettings {
   /** Pixels per module. The widget box does not stretch the code. */
   scale: number;
   ecc: QrcodeEcc;
+  /**
+   * The standard's 4-module clear margin, drawn in the light colour on every
+   * side. On by default because scanners rely on it. Turning it off removes
+   * the drawn margin — the right move only when the widget already sits on a
+   * plain, light background that provides the clearance instead.
+   */
+  quietZone: boolean;
 }
 
 export const QRCODE_DEFAULT_LITERAL = 'https://bitdove.net';
@@ -83,6 +90,7 @@ export function normalizeQrcodeProps(props: Record<string, any> | undefined): Qr
     version: clampInt(p.version, QRCODE_VERSION_AUTO, QRCODE_VERSION_MAX, QRCODE_VERSION_AUTO),
     scale: clampInt(p.scale, QRCODE_SCALE_MIN, QRCODE_SCALE_MAX, 2),
     ecc: p.ecc === 'L' || p.ecc === 'Q' || p.ecc === 'H' ? p.ecc : 'M',
+    quietZone: p.quietZone !== false,
   };
 }
 
@@ -157,10 +165,15 @@ export function encodeQrcode(
 }
 
 /**
- * The pixel square the code needs: modules plus the standard's 4-module quiet
- * zone each side, at the widget's scale. What the property editor compares
- * against the widget box, and what the panel will actually draw.
+ * The pixel square the code needs: the modules, plus the standard's 4-module
+ * quiet zone each side when it is on, at the widget's scale. What the
+ * property editor compares against the widget box, and what the panel will
+ * actually draw.
  */
-export function qrcodePixelSize(moduleCount: number, scale: number): number {
-  return (moduleCount + 8) * scale;
+export function qrcodePixelSize(
+  moduleCount: number,
+  scale: number,
+  quietZone: boolean = true,
+): number {
+  return (moduleCount + (quietZone ? 8 : 0)) * scale;
 }

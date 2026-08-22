@@ -2774,6 +2774,7 @@ function QrcodeEditor({
 }): React.ReactNode {
   const texts = useEditorStore((state) => state.texts);
   const languages = useEditorStore((state) => state.languages);
+  const updateComponent = useEditorStore((state) => state.updateComponent);
 
   const settings = normalizeQrcodeProps(props);
   const content = resolveQrcodeContent(
@@ -2784,9 +2785,10 @@ function QrcodeEditor({
   const encoded = encodeQrcode(content, settings);
 
   const fit = encoded.render
-    ? qrcodePixelSize(encoded.render.moduleCount, settings.scale)
+    ? qrcodePixelSize(encoded.render.moduleCount, settings.scale, settings.quietZone)
     : null;
   const clipped = fit !== null && (fit > component.width || fit > component.height);
+  const boxLargerThanCode = fit !== null && (component.width > fit || component.height > fit);
 
   return (
     <div className="property-section">
@@ -2880,16 +2882,45 @@ function QrcodeEditor({
         </select>
       </div>
 
+      <div className="property-row">
+        <label>Quiet zone</label>
+        <ToggleSwitch
+          checked={settings.quietZone}
+          onChange={(checked) => onChange('quietZone', checked)}
+        />
+      </div>
+      {!settings.quietZone && (
+        <p className="shape-warning" role="status">
+          Scanners rely on clear space around a code. With the quiet zone off,
+          keep the area around this widget plain and light — on a dark or busy
+          background the code may stop scanning.
+        </p>
+      )}
+
       {encoded.error && (
         <p className="shape-warning" role="status">{encoded.error}</p>
       )}
       {encoded.render && (
         <p className={clipped ? 'shape-warning' : 'video-board-note'} role="status">
-          {`Version ${encoded.render.version}, ${encoded.render.moduleCount}×${encoded.render.moduleCount} modules — ${fit}×${fit} px with its quiet zone.`}
+          {`Version ${encoded.render.version}, ${encoded.render.moduleCount}×${encoded.render.moduleCount} modules — ${fit}×${fit} px${settings.quietZone ? ' with its quiet zone' : ''}.`}
           {clipped
             ? ` The widget is ${component.width}×${component.height}, so the code will be clipped: enlarge the widget or lower the scale.`
-            : ''}
+            : boxLargerThanCode
+              ? ` The widget is ${component.width}×${component.height}; the margin around the code is the widget's own background.`
+              : ''}
         </p>
+      )}
+      {fit !== null && (component.width !== fit || component.height !== fit) && !clipped && (
+        <div className="property-row">
+          <label />
+          <button
+            type="button"
+            className="qrcode-fit-button"
+            onClick={() => updateComponent(component.id, { width: fit, height: fit })}
+          >
+            Shrink the widget to the code — {fit} × {fit}
+          </button>
+        </div>
       )}
       <span className="property-hint">
         A string sent over communication replaces this content while the panel

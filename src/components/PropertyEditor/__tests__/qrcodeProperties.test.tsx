@@ -117,6 +117,33 @@ describe('qrcode properties', () => {
     expect(screen.getByText(/does not fit version 1 at level H/)).toBeTruthy();
   });
 
+  it('turns the quiet zone off, with a warning about clear space', () => {
+    fireEvent.click(screen.getByText('Quiet zone').closest('.property-row')!
+      .querySelector('.toggle-switch-wrapper')!);
+    expect(current().props.quietZone).toBe(false);
+
+    cleanup();
+    setUp(qr({ source: 'literal', literal: 'https://bitdove.net', quietZone: false }));
+    expect(screen.getByText(/keep the area around this widget plain/)).toBeTruthy();
+  });
+
+  it('shrinks the widget to the code in one click', () => {
+    cleanup();
+    // Version 2 at scale 2 with quiet zone: (25+8)*2 = 66 px, box is 200.
+    setUp(qr({ source: 'literal', literal: 'https://bitdove.net', version: 2, scale: 2 }));
+    const button = screen.getByRole('button', { name: /Shrink the widget to the code — 66 × 66/ });
+
+    fireEvent.click(button);
+    expect(current().width).toBe(66);
+    expect(current().height).toBe(66);
+  });
+
+  it('names the leftover margin for what it is: the widget’s own background', () => {
+    cleanup();
+    setUp(qr({ source: 'literal', literal: 'https://bitdove.net', version: 2, scale: 2 }));
+    expect(screen.getByText(/margin around the code is the widget's own background/)).toBeTruthy();
+  });
+
   it('points at the Communication section for run-time content', () => {
     expect(screen.getByText(/sent over communication replaces this content/)).toBeTruthy();
   });

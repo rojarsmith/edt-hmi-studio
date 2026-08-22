@@ -230,6 +230,7 @@ typedef struct {
     uint8_t max_version;
     uint8_t ecc;           /* qrcodegen_Ecc_* */
     uint8_t scale;         /* pixels per module */
+    bool quiet;            /* draw the standard's 4-module clear margin */
     uint32_t dark;         /* 0xRRGGBB */
     uint32_t light;
     char text[129];        /* the longest string a 64-register read carries */
@@ -264,7 +265,7 @@ static void ui_qrcode_apply(lv_obj_t *canvas, ui_qrcode_context_t *context)
     }
 
     qr_size = qrcodegen_getSize(ui_qrcode_modules);
-    px = (int32_t)(qr_size + 8) * context->scale;
+    px = (int32_t)(qr_size + (context->quiet ? 8 : 0)) * context->scale;
 
     previous = lv_canvas_get_draw_buf(canvas);
     draw_buf = lv_draw_buf_create((uint32_t)px, (uint32_t)px, LV_COLOR_FORMAT_I1, LV_STRIDE_AUTO);
@@ -286,6 +287,7 @@ static void ui_qrcode_apply(lv_obj_t *canvas, ui_qrcode_context_t *context)
     {
         uint8_t *pixels = draw_buf->data + 8;
         uint32_t stride = draw_buf->header.stride;
+        int margin = context->quiet ? 4 : 0;
         int module_y;
 
         for (module_y = 0; module_y < qr_size; module_y++) {
@@ -296,10 +298,10 @@ static void ui_qrcode_apply(lv_obj_t *canvas, ui_qrcode_context_t *context)
                     continue;
                 }
                 for (y0 = 0; y0 < context->scale; y0++) {
-                    int32_t y = ((int32_t)module_y + 4) * context->scale + y0;
+                    int32_t y = ((int32_t)module_y + margin) * context->scale + y0;
                     int x0;
                     for (x0 = 0; x0 < context->scale; x0++) {
-                        int32_t x = ((int32_t)module_x + 4) * context->scale + x0;
+                        int32_t x = ((int32_t)module_x + margin) * context->scale + x0;
                         pixels[(uint32_t)y * stride + ((uint32_t)x >> 3)] |=
                             (uint8_t)(0x80U >> ((uint32_t)x & 7U));
                     }
@@ -370,6 +372,7 @@ function qrcodeContextDeclaration(
     `    .max_version = ${maxVersion}U,`,
     `    .ecc = ${QRCODE_ECC_ENUM[settings.ecc] ?? 'qrcodegen_Ecc_MEDIUM'},`,
     `    .scale = ${settings.scale}U,`,
+    `    .quiet = ${settings.quietZone ? 'true' : 'false'},`,
     `    .dark = ${dark}U,`,
     `    .light = ${light}U,`,
     `    .text = "${escapeCString(content)}",`,

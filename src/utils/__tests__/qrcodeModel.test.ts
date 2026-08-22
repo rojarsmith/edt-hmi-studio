@@ -109,8 +109,14 @@ describe('encoding', () => {
     expect(encodeQrcode('こんにちは', normalizeQrcodeProps({ version: 1, ecc: 'M' })).render).toBeNull();
   });
 
-  it('counts the quiet zone into the pixel size', () => {
+  it('counts the quiet zone into the pixel size, and leaves it out when off', () => {
     // 25 modules + 4 each side, at 3 px per module.
     expect(qrcodePixelSize(25, 3)).toBe(99);
+    expect(qrcodePixelSize(25, 3, false)).toBe(75);
+  });
+
+  it('reads the quiet zone as on unless switched off', () => {
+    expect(normalizeQrcodeProps({}).quietZone).toBe(true);
+    expect(normalizeQrcodeProps({ quietZone: false }).quietZone).toBe(false);
   });
 });

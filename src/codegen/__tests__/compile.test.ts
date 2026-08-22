@@ -1181,6 +1181,16 @@ describe.skipIf(missing.length > 0)('Compile verification', { timeout: 300_000 }
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
 
+    it('compiles with the quiet zone off', { timeout: 30_000 }, () => {
+      const qr = createComponent('qrcode', {
+        name: 'tight_qr',
+        props: { source: 'literal', literal: 'https://bitdove.net', quietZone: false },
+      });
+      const screen = createScreen({ name: 'main', components: [qr] });
+      const result = compileGenerated(generateCode([screen], defaultOptions()));
+      expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
+    });
+
     it('compiles two QR codes beside other widgets, auto version', { timeout: 30_000 }, () => {
       const a = createComponent('qrcode', { name: 'qr_a', props: { source: 'literal', literal: 'A' } });
       const b = createComponent('qrcode', { name: 'qr_b', props: { source: 'literal', literal: 'B', ecc: 'L' } });
