@@ -1680,3 +1680,21 @@
   padding: 6px 8px;
   margin: 6px 0 0 0;
 }
+
+/* The Video widget's playlist: typed, one file per line. Monospace, because
+   a path is read character by character and a proportional face hides a
+   doubled slash. */
+.video-file-list {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.property-hint {
+  color: #6f7f99;
+  font-size: 11px;
+  line-height: 1.5;
+}

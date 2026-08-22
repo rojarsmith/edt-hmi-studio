@@ -25,18 +25,36 @@ nothing else:
 
 | Property | Default | What it does |
 | --- | --- | --- |
-| **File name on the SD card** | *(empty)* | The file to play, as it is named in the root of the card — `intro.avi`. |
+| **Source** | Files I name | A list of files typed one per line, or **Every .avi in a folder**, scanned off the card. |
+| **Files on the SD card** | *(empty)* | The playlist, in play order. Each entry is a file's name with its folder in front if it lives in one — `intro.avi`, `clips/morning.avi`. Either slash is accepted; a Windows user types what their screen shows. |
+| **Folder on the SD card** | *(empty — the top level)* | For a folder scan: every `.avi` in it plays, in name order. |
 | **Auto Play** | On | Start playing as soon as the screen carrying the widget is loaded. |
-| **Loop** | On | Start again from the first frame when the last one has been shown. |
+| **Loop** | On | After the last file, start the playlist again. With one file that is the film looping. |
+| **Random order** | Off | The next file is drawn at random — from a software random sequence seeded differently every run — and is **never the one that just played**. With Loop off, as many files play as the list holds, then it stops. |
+
+A playlist of one behaves exactly as the single file always did, and a project
+written before playlists carries its old `fileName` and plays it unchanged.
 
 There is no import step, no resource entry, and nothing added to the build. A
 two-hour film costs the firmware image exactly as much as a two-second one:
-nothing. Changing the video means swapping the card, not rebuilding.
+nothing. Changing the videos means changing files on the card, not rebuilding.
 
-The price is that the editor has never seen the file, and cannot check it. So it
-checks the three things that are wrong whatever is on the card — no name, a path
-where a name belongs, an extension that is not `.avi` — and leaves everything
-else to the panel, which is the only thing that can actually look.
+The price is that the editor has never seen the files, and cannot check them.
+So it checks the things that are wrong whatever is on the card — no files
+named, an entry whose extension is not `.avi`, the same file listed twice —
+and leaves everything else to the panel, which is the only thing that can
+actually look. A folder scan gets no checks at all: what the folder holds is
+the panel's to find out.
+
+### How the playlist advances
+
+One file plays start to finish; then the next is chosen. In order, top to
+bottom, unless Random order is on. A file that will not open — deleted from
+the card, wrong format — is **skipped, not fatal**: a playlist is a set of
+separate videos, and one bad member is passed over. Only when every file fails
+does the widget show why. A folder scan collects up to 64 files; the scan
+happens when the widget starts playing, so re-inserting a card with new files
+in the folder picks them up on the next visit to the screen.
 
 ## 2. Which boards can play one
 
@@ -84,8 +102,8 @@ ffmpeg -i source.mp4 -vf "scale=800:480,fps=24" -c:v mjpeg -q:v 3 -an intro.avi
 ```
 
 `-an` drops the audio — see [§7](#7-what-this-deliberately-does-not-do). Copy the
-result into the **root** of a FAT32 or exFAT card, and type its name into the
-widget.
+result anywhere on a FAT32 or exFAT card, and type its name — with the folder
+in front if it is in one — into the widget.
 
 ### The AVI the reader walks
 
@@ -338,8 +356,8 @@ is around 140 KB, so the ceiling is well past any sane quality setting — and a
 file that does exceed it says so rather than being decoded from a truncated
 buffer.
 
-**The file lives in the root of the card.** The name typed in the editor is a
-name, not a path. The property editor says so when it sees a separator.
+**No seeking within a file.** The playlist can move between files, but not to
+an arbitrary point inside one.
 
 ## 8. Where the code is
 

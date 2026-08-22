@@ -48,7 +48,8 @@ import {
   DEFAULT_START_ANGLE,
 } from '../../utils/circleGeometry';
 import ModbusBindingEditor from './ModbusBindingEditor';
-import { videoFileNameWarning } from './videoModel';
+import { videoPlaylistWarnings } from './videoModel';
+import { normalizeCardPath, normalizeVideoProps } from '../../utils/videoPlaylist';
 import {
   clampImageButtonStateIndex,
   createImageButtonState,
@@ -2726,13 +2727,20 @@ function renderComponentProps(
 
 // Image props editor with resource picker
 /**
- * Everything a Video widget is: a file name, and what to do with it.
+ * Everything a Video widget is: what it plays, and what to do with it.
  *
- * The file is not imported. It is typed, because it lives on the SD card the
- * panel reads at run time and the editor has no way to see the card — so this
- * field is a promise about what will be there, and the panel checks it. A name
- * that matches nothing on the card is drawn as "Video not found" on the panel
- * rather than failing the build, which is the only honest place to find out.
+ * Nothing is imported. The files are named, because they live on the SD card
+ * the panel reads at run time and the editor has no way to see the card — so
+ * these fields are a promise about what will be there, and the panel checks
+ * it. A name that matches nothing on the card is drawn as "Video not found" on
+ * the panel rather than failing the build, which is the only honest place to
+ * find out.
+ *
+ * The list is a textarea, one file per line, rather than a row-per-file
+ * editor: a playlist is typed from a folder listing, and a box that takes a
+ * paste of one is worth more than one with an add button. Lines are kept
+ * exactly as typed while the field has focus — normalising on every
+ * keystroke would fight the cursor — and committed when it is left.
  *
  * The board line at the foot is not decoration. Playing video needs a JPEG
  * codec and an SD interface, and a board without them has no slower path to
@@ -2756,41 +2764,117 @@ function VideoEditor({
   const boardName = SUPPORTED_BOARDS.find((board) => board.id === boardId)?.model ?? boardId;
   const video = getBoardVideo(boardId);
 
-  const fileName: string = typeof props.fileName === 'string' ? props.fileName : '';
-  const trimmed = fileName.trim();
-  const fileWarning = videoFileNameWarning(trimmed);
+  const playlist = normalizeVideoProps(props);
+  const warnings = videoPlaylistWarnings(playlist);
+
+  // The list as the user is typing it. Seeded from the stored files,
+  // re-seeded whenever the stored list changes while the field is not being
+  // typed in — a different widget selected, an undo — and committed on blur.
+  // Adjusted during render rather than in an effect, which is React's own
+  // pattern for state that follows a prop.
+  const storedText = playlist.files.join('\n');
+  const [draft, setDraft] = useState(storedText);
+  const [editing, setEditing] = useState(false);
+  const [seededFrom, setSeededFrom] = useState(storedText);
+  if (!editing && storedText !== seededFrom) {
+    setSeededFrom(storedText);
+    setDraft(storedText);
+  }
+
+  const commitFiles = (text: string) => {
+    const files = text
+      .split(/\r?\n/)
+      .map(normalizeCardPath)
+      .filter((line) => line !== '');
+    onChange('files', files);
+  };
 
   return (
     <div className="property-section">
       <div className="section-header">Video</div>
-      <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-        <label>File name on the SD card</label>
-        <input
-          type="text"
-          value={fileName}
-          placeholder="name.avi"
-          spellCheck={false}
-          aria-label="Video file name"
-          onChange={(e) => onChange('fileName', e.target.value)}
-        />
+      <div className="property-row">
+        <label>Source</label>
+        <select
+          value={playlist.source}
+          aria-label="Video source"
+          onChange={(e) => onChange('source', e.target.value)}
+        >
+          <option value="list">Files I name</option>
+          <option value="folder">Every .avi in a folder</option>
+        </select>
       </div>
-      {fileWarning && (
-        <p className="shape-warning" role="status">{fileWarning}</p>
+
+      {playlist.source === 'list' ? (
+        <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+          <label>Files on the SD card, one per line, in play order</label>
+          <textarea
+            className="video-file-list"
+            value={draft}
+            rows={Math.min(8, Math.max(3, draft.split('\n').length + 1))}
+            placeholder={'intro.avi\nclips/morning.avi'}
+            spellCheck={false}
+            aria-label="Video files"
+            onFocus={() => setEditing(true)}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={(e) => {
+              setEditing(false);
+              commitFiles(e.target.value);
+            }}
+          />
+          <span className="property-hint">
+            A folder in front of the name is fine — either slash. The list plays
+            top to bottom unless Random order is on.
+          </span>
+        </div>
+      ) : (
+        <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+          <label>Folder on the SD card</label>
+          <input
+            type="text"
+            value={typeof props.folder === 'string' ? props.folder : ''}
+            placeholder="(the card's top level)"
+            spellCheck={false}
+            aria-label="Video folder"
+            onChange={(e) => onChange('folder', e.target.value)}
+            onBlur={(e) => onChange('folder', normalizeCardPath(e.target.value))}
+          />
+          <span className="property-hint">
+            Every .avi file in the folder is played, in name order. Leave it
+            empty for the card's top level.
+          </span>
+        </div>
       )}
+      {warnings.map((warning) => (
+        <p key={warning} className="shape-warning" role="status">{warning}</p>
+      ))}
+
       <div className="property-row">
         <label>Auto Play</label>
         <ToggleSwitch
-          checked={props.autoPlay !== false}
+          checked={playlist.autoPlay}
           onChange={(checked) => onChange('autoPlay', checked)}
         />
       </div>
       <div className="property-row">
         <label>Loop</label>
         <ToggleSwitch
-          checked={props.loop !== false}
+          checked={playlist.loop}
           onChange={(checked) => onChange('loop', checked)}
         />
       </div>
+      <div className="property-row">
+        <label>Random order</label>
+        <ToggleSwitch
+          checked={playlist.shuffle}
+          onChange={(checked) => onChange('shuffle', checked)}
+        />
+      </div>
+      {playlist.shuffle && (
+        <span className="property-hint">
+          The next file is picked at random and is never the one that just
+          played.
+        </span>
+      )}
       <p className={video ? 'video-board-note' : 'shape-warning'}>
         {video
           ? `${boardName} plays ${video.format} from the SD card, decoded by the JPEG codec. A name that matches no file on the card is drawn as “Video not found”.`

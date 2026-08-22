@@ -587,15 +587,38 @@ export interface ImageButtonProps {
  */
 export interface VideoProps {
   /**
-   * The file to play, as it is named in the root of the SD card — for example
-   * `intro.avi`. Empty means the widget has not been pointed at anything yet,
-   * which the panel reports the same way it reports a missing file.
+   * Where the playlist comes from: `list` plays `files` in order, `folder`
+   * scans `folder` on the card for every .avi in it, in name order.
    */
-  fileName: string;
+  source: 'list' | 'folder';
+  /**
+   * The files to play, each as it is named on the SD card with any folder in
+   * front of it — `intro.avi`, `clips/morning.avi`. Either slash is accepted
+   * when typed and normalised to `/`. Empty means the widget has not been
+   * pointed at anything yet, which the panel reports the same way it reports
+   * a missing file.
+   */
+  files: string[];
+  /** The folder scanned when `source` is `folder`. Empty is the card's root. */
+  folder: string;
   /** Start playing as soon as the screen carrying this widget is loaded. */
   autoPlay: boolean;
-  /** Start again from the first frame when the last one has been shown. */
+  /**
+   * Start again when the end is reached — of the playlist, not of one file.
+   * With one file that is the same thing.
+   */
   loop: boolean;
+  /**
+   * Play the list in random order, never the same file twice running. Drawn
+   * from a software random sequence on the panel, so no two runs match.
+   */
+  shuffle: boolean;
+  /**
+   * @deprecated The one-file shape this widget was first written in. Read
+   * through normalizeVideoProps() in src/utils/videoPlaylist.ts, which turns
+   * it into a one-entry `files`.
+   */
+  fileName?: string;
 }
 
 /**

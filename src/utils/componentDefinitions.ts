@@ -659,11 +659,14 @@ export const componentDefinitions: ComponentDefinition[] = [
     defaultWidth: 400,
     defaultHeight: 240,
     defaultProps: {
-      // Named rather than imported: the file lives on the SD card and never
-      // enters the firmware image. See VideoProps.
-      fileName: '',
+      // Named rather than imported: the files live on the SD card and never
+      // enter the firmware image. See VideoProps.
+      source: 'list',
+      files: [],
+      folder: '',
       autoPlay: true,
       loop: true,
+      shuffle: false,
     },
     defaultStyles: {
       default: {

@@ -14,6 +14,7 @@ import React from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { getComponentDefinition } from '../../utils/componentDefinitions';
 import { VIDEO_RULES, videoWarnings, type ComponentNote } from './componentNotes';
+import { describeVideoPlaylist, normalizeVideoProps } from '../../utils/videoPlaylist';
 
 const NoteRow: React.FC<{ note: ComponentNote }> = ({ note }) => (
   <li className={`info-note ${note.kind}`}>
@@ -70,7 +71,8 @@ const InformationPane: React.FC = () => {
   }
 
   const warnings = videoWarnings(component, screen, { width: canvasWidth, height: canvasHeight });
-  const fileName = typeof component.props.fileName === 'string' ? component.props.fileName.trim() : '';
+  const playlist = normalizeVideoProps(component.props);
+  const fileName = describeVideoPlaylist(playlist);
 
   return (
     <div className="dock-pane info-pane">
@@ -80,6 +82,7 @@ const InformationPane: React.FC = () => {
           <span className="dock-pane-meta">
             {' '}· {component.width} × {component.height}
             {' '}· {fileName ? fileName : 'no file named'}
+            {playlist.shuffle && ' · random order'}
           </span>
         </span>
         <span className="dock-pane-toolbar-end">

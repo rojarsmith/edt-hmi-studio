@@ -10,34 +10,80 @@ function sourceFor(props: Record<string, unknown>, name = 'clip'): string {
 }
 
 describe('video code generation', () => {
-  it('names the file rather than linking it, and says what to do with it', () => {
-    const source = sourceFor({ fileName: 'intro.avi', autoPlay: true, loop: true });
-    expect(source).toContain('hmi_video_attach(ui_clip, "intro.avi", true, true);');
+  it('attaches the widget to its own playlist table', () => {
+    const source = sourceFor({ source: 'list', files: ['intro.avi'] });
+    expect(source).toContain('hmi_video_attach(ui_clip, &ui_clip_playlist);');
   });
 
-  it('carries auto play and loop through as they were switched off', () => {
-    const source = sourceFor({ fileName: 'intro.avi', autoPlay: false, loop: false });
-    expect(source).toContain('hmi_video_attach(ui_clip, "intro.avi", false, false);');
+  it('lists the files, with the count and the flags', () => {
+    const source = sourceFor({
+      source: 'list',
+      files: ['intro.avi', 'clips/next.avi'],
+      autoPlay: true, loop: true, shuffle: false,
+    });
+    expect(source).toContain('static const char *const ui_clip_files[] = {');
+    expect(source).toContain('"intro.avi",');
+    expect(source).toContain('"clips/next.avi",');
+    expect(source).toContain('.files = ui_clip_files,');
+    expect(source).toContain('.count = 2U,');
+    expect(source).toContain('.folder = NULL,');
+    expect(source).toContain('.auto_play = true,');
+    expect(source).toContain('.loop = true,');
+    expect(source).toContain('.shuffle = false,');
   });
 
-  it('defaults both to on when the props predate them', () => {
-    const source = sourceFor({ fileName: 'intro.avi' });
-    expect(source).toContain('hmi_video_attach(ui_clip, "intro.avi", true, true);');
+  it('carries the flags through as they were switched', () => {
+    const source = sourceFor({
+      source: 'list', files: ['intro.avi'],
+      autoPlay: false, loop: false, shuffle: true,
+    });
+    expect(source).toContain('.auto_play = false,');
+    expect(source).toContain('.loop = false,');
+    expect(source).toContain('.shuffle = true,');
+  });
+
+  it('emits a folder scan as a folder and no file array', () => {
+    const source = sourceFor({ source: 'folder', folder: 'clips' });
+    expect(source).toContain('.files = NULL,');
+    expect(source).toContain('.count = 0U,');
+    expect(source).toContain('.folder = "clips",');
+    expect(source).not.toContain('ui_clip_files[]');
+  });
+
+  it('scans the card root as an empty folder string', () => {
+    const source = sourceFor({ source: 'folder', folder: '' });
+    expect(source).toContain('.folder = "",');
+  });
+
+  it('reads a project written before playlists, one file becoming a one-entry list', () => {
+    const source = sourceFor({ fileName: 'legacy.avi' });
+    expect(source).toContain('"legacy.avi",');
+    expect(source).toContain('.count = 1U,');
+    // Migrated shape defaults both switches on.
+    expect(source).toContain('.auto_play = true,');
+    expect(source).toContain('.loop = true,');
+  });
+
+  it('normalises a typed path to forward slashes', () => {
+    const source = sourceFor({ source: 'list', files: [`clips${String.fromCharCode(92)}next.avi`] });
+    expect(source).toContain('"clips/next.avi",');
   });
 
   it('still attaches a widget pointed at nothing, so the panel reports it', () => {
-    const source = sourceFor({ fileName: '', autoPlay: true, loop: true });
-    expect(source).toContain('hmi_video_attach(ui_clip, "", true, true);');
+    const source = sourceFor({ source: 'list', files: [] });
+    expect(source).toContain('hmi_video_attach(ui_clip, &ui_clip_playlist);');
+    expect(source).toContain('.files = NULL,');
+    expect(source).toContain('.count = 0U,');
   });
 
   it('creates the widget as the black frame the picture is drawn into', () => {
-    const source = sourceFor({ fileName: 'intro.avi' });
+    const source = sourceFor({ source: 'list', files: ['intro.avi'] });
     expect(source).toContain('ui_clip = lv_obj_create(');
     expect(source).toContain('lv_obj_remove_flag(ui_clip, LV_OBJ_FLAG_SCROLLABLE);');
   });
 
   it('includes the runtime header only for a project that has a video', () => {
-    expect(sourceFor({ fileName: 'intro.avi' })).toContain('#include "hmi_video.h"');
+    expect(sourceFor({ source: 'list', files: ['intro.avi'] })).toContain('#include "hmi_video.h"');
 
     const withoutVideo = generateUiSource(
       [createScreen({ components: [createComponent('label', { name: 'title' })] })],
@@ -49,7 +95,7 @@ describe('video code generation', () => {
   it('finds a video nested inside a container', () => {
     const nested = createComponent('obj', {
       name: 'panel',
-      children: [createComponent('video', { name: 'clip', props: { fileName: 'a.avi' } })],
+      children: [createComponent('video', { name: 'clip', props: { source: 'list', files: ['a.avi'] } })],
     });
     const source = generateUiSource(
       [createScreen({ components: [nested] })],
@@ -59,7 +105,7 @@ describe('video code generation', () => {
   });
 
   it('escapes a file name that would otherwise break the string literal', () => {
-    const source = sourceFor({ fileName: 'say "hi".avi' });
-    expect(source).toContain('hmi_video_attach(ui_clip, "say \\"hi\\".avi", true, true);');
+    const source = sourceFor({ source: 'list', files: ['say "hi".avi'] });
+    expect(source).toContain('"say \\"hi\\".avi",');
   });
 });

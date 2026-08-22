@@ -12,6 +12,7 @@
 
 import type { LvglComponent, Screen } from '../../types';
 import { SUPPORTED_BOARDS } from '../../types/hmi';
+import { normalizeVideoProps, videoPlaylistIsEmpty } from '../../utils/videoPlaylist';
 
 /** One thing the pane says. `kind` decides how loudly. */
 export interface ComponentNote {
@@ -89,9 +90,15 @@ export const VIDEO_RULES: ComponentNote[] = [
   },
   {
     kind: 'rule',
-    title: 'The file lives in the top level of the SD card',
+    title: 'The files live on the SD card, not in the project',
     body:
-      'Copy the file straight onto the card — not inside a folder — and type its name here exactly as it appears there, ending in .avi. The file is not stored in the project: changing the video means changing the file on the card, with nothing to rebuild.',
+      'Copy the files onto the card and name them here exactly as they appear there, ending in .avi, with the folder in front if they are in one — clips/morning.avi. Changing a video means changing the file on the card, with nothing to rebuild.',
+  },
+  {
+    kind: 'rule',
+    title: 'Several files play as a list',
+    body:
+      'Name more than one file and they play one after another, top to bottom; or point the component at a folder and every .avi in it plays, in name order. Loop starts the list again after the last one. Random order picks the next file by chance and never repeats the one that just played.',
   },
   {
     kind: 'rule',
@@ -187,8 +194,7 @@ export function videoWarnings(
     });
   }
 
-  const fileName = typeof video.props.fileName === 'string' ? video.props.fileName.trim() : '';
-  if (fileName === '') {
+  if (videoPlaylistIsEmpty(normalizeVideoProps(video.props))) {
     notes.push({
       kind: 'warning',
       title: 'No file named yet',

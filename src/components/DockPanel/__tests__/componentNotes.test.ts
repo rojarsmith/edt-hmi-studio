@@ -29,7 +29,8 @@ describe('the rules a video lives by', () => {
   it('say the things the canvas cannot show, in the designer’s words', () => {
     const titles = VIDEO_RULES.map((rule) => rule.title);
     expect(titles).toContain('The video needs its space to itself');
-    expect(titles).toContain('The file lives in the top level of the SD card');
+    expect(titles).toContain('The files live on the SD card, not in the project');
+    expect(titles).toContain('Several files play as a list');
     expect(titles).toContain('The picture plays without sound');
   });
 

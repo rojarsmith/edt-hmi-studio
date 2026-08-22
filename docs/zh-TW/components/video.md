@@ -79,17 +79,25 @@ isContainer: false
 
 | 名稱 | 型別 | 預設值 | 說明 |
 |---|---|---|---|
-| `fileName` | `string` | `''` | 要播的檔案，就用它在 SD 卡**根目錄**裡的名字。是名字，不是路徑。 |
+| `source` | `'list' \| 'folder'` | `'list'` | 清單的來源：逐一指名的檔案，或資料夾裡的每一個 `.avi`。 |
+| `files` | `string[]` | `[]` | 播放清單，照播放順序。每一項前面可以帶資料夾——`clips/morning.avi`。輸入時正反斜線都收；存起來用 `/`。 |
+| `folder` | `string` | `''` | `source` 是 `'folder'` 時要掃描的資料夾。空白是卡片最上層。 |
 | `autoPlay` | `boolean` | `true` | 載入帶著這個元件的畫面時就開始播。 |
-| `loop` | `boolean` | `true` | 播完最後一格之後，從第一格再來一次。 |
+| `loop` | `boolean` | `true` | 播完最後一個檔案之後，整份清單從頭再來。 |
+| `shuffle` | `boolean` | `false` | 亂數順序——下一個絕不會是剛播完的那一個。 |
+| `fileName` | `string` | — | **已棄用。** 播放清單之前的單檔形狀；讀成只有一項的 `files`。 |
 
 ### props 型別
 
 ```typescript
 interface VideoProps {
-  fileName: string;
+  source: 'list' | 'folder';
+  files: string[];
+  folder: string;
   autoPlay: boolean;
   loop: boolean;
+  shuffle: boolean;
+  /** @deprecated */ fileName?: string;
 }
 ```
 

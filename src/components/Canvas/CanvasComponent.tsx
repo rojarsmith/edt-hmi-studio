@@ -10,6 +10,7 @@ import {
   normalizeImageButtonProps,
 } from '../PropertyEditor/imageButtonModel';
 import { resolveFallbackBackground } from './widgetBackground';
+import { describeVideoPlaylist, normalizeVideoProps } from '../../utils/videoPlaylist';
 import { partColor, partStyle } from '../../utils/widgetParts';
 import {
   DEFAULT_LINE_WIDTH,
@@ -986,15 +987,18 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
           </div>
         );
       
-      case 'video':
+      case 'video': {
+        const playlist = normalizeVideoProps(props);
         return (
           <CanvasVideoContent
-            fileName={props.fileName}
-            autoPlay={props.autoPlay !== false}
-            loop={props.loop !== false}
+            fileName={describeVideoPlaylist(playlist)}
+            autoPlay={playlist.autoPlay}
+            loop={playlist.loop}
+            shuffle={playlist.shuffle}
             textColor={defaultStyle.textColor || '#ffffff'}
           />
         );
+      }
 
       default:
         return <div>{type}</div>;
@@ -1112,11 +1116,13 @@ export const CanvasImageContent: React.FC<{
  * in the same words, at the moment it looks. See docs/video-playback.md.
  */
 export const CanvasVideoContent: React.FC<{
+  /** What plays, already summarised — a file, `a.avi +2`, or a folder. */
   fileName?: string;
   autoPlay?: boolean;
   loop?: boolean;
+  shuffle?: boolean;
   textColor?: string;
-}> = React.memo(({ fileName, autoPlay, loop, textColor }) => {
+}> = React.memo(({ fileName, autoPlay, loop, shuffle, textColor }) => {
   const named = typeof fileName === 'string' ? fileName.trim() : '';
 
   return (
@@ -1156,12 +1162,14 @@ export const CanvasVideoContent: React.FC<{
       >
         {named || 'No file named'}
       </span>
-      {named && (autoPlay || loop) && (
+      {named && (autoPlay || loop || shuffle) && (
         <span
           className="lvgl-video-badges"
           style={{ fontSize: '9px', letterSpacing: '0.04em', opacity: 0.6 }}
         >
-          {[autoPlay ? 'AUTO' : null, loop ? 'LOOP' : null].filter(Boolean).join(' · ')}
+          {[autoPlay ? 'AUTO' : null, loop ? 'LOOP' : null, shuffle ? 'RANDOM' : null]
+            .filter(Boolean)
+            .join(' · ')}
         </span>
       )}
     </div>

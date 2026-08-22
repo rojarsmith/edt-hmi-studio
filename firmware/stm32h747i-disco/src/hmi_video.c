@@ -44,6 +44,8 @@
 #include "hmi_jpeg.h"
 #include "hmi_sd.h"
 
+#include "ff.h"
+
 #include <string.h>
 
 /**
@@ -55,8 +57,17 @@
  */
 #define HMI_VIDEO_MAX_WIDGETS 4U
 
-/** The longest file name the widget will hold, including the terminator. */
-#define HMI_VIDEO_MAX_NAME 64U
+/**
+ * The most files a folder scan will collect, and the longest path each may be.
+ *
+ * A playlist bigger than this is not refused — the first this-many files, in
+ * name order, are what plays. 64 clips is well past what a panel loops through,
+ * and 96 characters holds a folder and a long file name with room to spare.
+ * The pool is one shared buffer: only one video plays at a time, so only one
+ * scan is ever live.
+ */
+#define HMI_VIDEO_MAX_LIST 64U
+#define HMI_VIDEO_PATH_MAX 96U
 
 /*
  * The largest picture this build decodes: the panel's own size. A frame bigger
@@ -132,9 +143,12 @@ typedef struct {
     /** The screen the frame was created on, whose unload hides the overlay. */
     lv_obj_t *screen;
 
-    char file_name[HMI_VIDEO_MAX_NAME];
+    /* What this widget plays. A file-scope const from generated code, so the
+       pointer is kept rather than the contents copied. */
+    const hmi_video_playlist_t *playlist;
     bool auto_play;
     bool loop;
+    bool shuffle;
 
     video_state_t state;
     /** Whether this widget is the one holding the open file and the buffers. */
@@ -158,6 +172,26 @@ static uint32_t widget_count;
 /** The one open file, and the one player it belongs to. */
 static hmi_avi_t session;
 static video_widget_t *session_owner;
+
+/*
+ * The playlist being played, resolved to a flat list of paths and a position
+ * in it. Shared, like the session it belongs to, because only one video plays
+ * at a time. For a named list the paths point into the widget's generated
+ * table; for a folder scan they point into scanned_paths below.
+ */
+typedef struct {
+    const char *const *entries; /* the paths, whichever store they live in */
+    uint16_t count;
+    uint16_t current;           /* index open now */
+    uint16_t played;            /* files shown this run, for shuffle without loop */
+    uint16_t last;              /* index shown before this one, so shuffle can avoid it */
+    uint32_t rng;               /* seeded per run, so no two runs pick alike */
+} playlist_cursor_t;
+
+static playlist_cursor_t cursor;
+static char scanned_paths[HMI_VIDEO_MAX_LIST][HMI_VIDEO_PATH_MAX];
+static const char *scanned_index[HMI_VIDEO_MAX_LIST];
+static uint16_t scanned_count;
 
 static lv_timer_t *video_timer;
 
@@ -298,6 +332,216 @@ static void retry_later(video_widget_t *widget, const char *text, const char *de
 }
 
 /* ------------------------------------------------------------------ */
+/*  The playlist                                                       */
+/* ------------------------------------------------------------------ */
+
+/** A small, self-contained PRNG, so shuffle does not perturb any other. */
+static uint32_t next_rand(void)
+{
+    uint32_t x = cursor.rng;
+
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    cursor.rng = (x != 0U) ? x : 0xA5A5A5A5U;
+    return cursor.rng;
+}
+
+static const char *entry_path(uint16_t index)
+{
+    return cursor.entries[index];
+}
+
+static bool has_avi_extension(const char *name)
+{
+    const size_t length = strlen(name);
+
+    if (length < 4U) {
+        return false;
+    }
+    return (name[length - 4U] == '.') &&
+           ((name[length - 3U] == 'a') || (name[length - 3U] == 'A')) &&
+           ((name[length - 2U] == 'v') || (name[length - 2U] == 'V')) &&
+           ((name[length - 1U] == 'i') || (name[length - 1U] == 'I'));
+}
+
+/**
+ * Read every .avi in a folder on the card into scanned_paths, in name order.
+ *
+ * Returns false only for a card that could not be read — a folder with no
+ * video in it is a valid, empty scan, which the caller turns into "Video not
+ * found". Sorted here because f_readdir hands entries back in the order the
+ * file system stored them, and a playlist a person can predict is one in name
+ * order.
+ */
+static bool scan_folder(const char *folder)
+{
+    DIR dir;
+    FILINFO info;
+    const char *path = (folder != NULL && folder[0] != 0) ? folder : "/";
+
+    scanned_count = 0U;
+
+    if (f_opendir(&dir, path) != FR_OK) {
+        return false;
+    }
+
+    while (scanned_count < HMI_VIDEO_MAX_LIST) {
+        if (f_readdir(&dir, &info) != FR_OK) {
+            (void)f_closedir(&dir);
+            return false;
+        }
+        if (info.fname[0] == 0) {
+            break; /* end of directory */
+        }
+        if ((info.fattrib & AM_DIR) != 0U) {
+            continue; /* folders are not files to play */
+        }
+        if (!has_avi_extension(info.fname)) {
+            continue;
+        }
+
+        /* Store the full path, so opening a scanned file is no different from
+           opening a named one. */
+        if (folder != NULL && folder[0] != 0) {
+            (void)lv_snprintf(
+                scanned_paths[scanned_count], HMI_VIDEO_PATH_MAX, "%s/%s", folder, info.fname);
+        } else {
+            (void)lv_strlcpy(scanned_paths[scanned_count], info.fname, HMI_VIDEO_PATH_MAX);
+        }
+        scanned_count++;
+    }
+    (void)f_closedir(&dir);
+
+    /* Insertion sort by path. A handful of entries, so the simplest thing that
+       is stable is the right one. */
+    for (uint16_t i = 1U; i < scanned_count; ++i) {
+        char key[HMI_VIDEO_PATH_MAX];
+        int16_t j = (int16_t)i - 1;
+
+        (void)lv_strlcpy(key, scanned_paths[i], HMI_VIDEO_PATH_MAX);
+        while ((j >= 0) && (strcmp(scanned_paths[j], key) > 0)) {
+            (void)lv_strlcpy(scanned_paths[j + 1], scanned_paths[j], HMI_VIDEO_PATH_MAX);
+            j--;
+        }
+        (void)lv_strlcpy(scanned_paths[j + 1], key, HMI_VIDEO_PATH_MAX);
+    }
+
+    for (uint16_t i = 0U; i < scanned_count; ++i) {
+        scanned_index[i] = scanned_paths[i];
+    }
+    return true;
+}
+
+typedef enum {
+    RESOLVE_OK = 0,
+    RESOLVE_EMPTY,   /* nothing to play — no files named, or none in the folder */
+    RESOLVE_CARD,    /* the folder could not be read */
+} resolve_result_t;
+
+/**
+ * Turn the widget's playlist into a flat list of paths and a starting index.
+ */
+static resolve_result_t resolve_playlist(video_widget_t *widget)
+{
+    const hmi_video_playlist_t *playlist = widget->playlist;
+
+    cursor.rng = DWT->CYCCNT | 1U; /* per run, so no two runs pick alike */
+    cursor.played = 0U;
+    cursor.last = 0xFFFFU;
+
+    if (playlist->folder != NULL) {
+        if (!scan_folder(playlist->folder)) {
+            return RESOLVE_CARD;
+        }
+        cursor.entries = scanned_index;
+        cursor.count = scanned_count;
+    } else {
+        cursor.entries = playlist->files;
+        cursor.count = playlist->count;
+    }
+
+    if (cursor.count == 0U) {
+        return RESOLVE_EMPTY;
+    }
+    cursor.current = widget->shuffle
+        ? (uint16_t)(next_rand() % cursor.count)
+        : 0U;
+    return RESOLVE_OK;
+}
+
+/** Point the frame timer at the open file's rate. */
+static void apply_frame_period(void)
+{
+    uint32_t period_ms = session.frame_period_us / 1000U;
+
+    if (video_timer != NULL) {
+        lv_timer_set_period(video_timer, (period_ms == 0U) ? 1U : period_ms);
+    }
+}
+
+/**
+ * Open the file at `cursor.current`, or the next readable one after it.
+ *
+ * A single bad file in a list is skipped, not fatal: a playlist is a set of
+ * separate videos, and one that will not open is one to pass over rather than
+ * a reason to blank the widget. Only when every file fails does the caller
+ * hear about it.
+ */
+static bool open_current_file(void)
+{
+    for (uint16_t tries = 0U; tries < cursor.count; ++tries) {
+        if (hmi_avi_open(&session, entry_path(cursor.current)) == HMI_AVI_OK) {
+            if ((session.width <= HMI_VIDEO_MAX_WIDTH) &&
+                (session.height <= HMI_VIDEO_MAX_HEIGHT)) {
+                apply_frame_period();
+                return true;
+            }
+            hmi_avi_close(&session);
+        }
+        /* Skip to the next file to look for a readable one. */
+        cursor.current = (uint16_t)((cursor.current + 1U) % cursor.count);
+    }
+    return false;
+}
+
+/**
+ * Move the cursor to the next file to play, or report that the playlist is
+ * done. Does not open anything.
+ */
+static bool next_file(video_widget_t *widget)
+{
+    /* Finite playback ends once as many files have been shown as the list
+       holds — one pass for a sequential list, that many picks for a shuffled
+       one. */
+    if (!widget->loop && (cursor.played >= cursor.count)) {
+        return false;
+    }
+
+    if (cursor.count <= 1U) {
+        /* One file: loop replays it, and !loop was caught above. */
+        cursor.played++;
+        return true;
+    }
+
+    if (widget->shuffle) {
+        /* A random index that is never the current one: pick in a range one
+           short, and step past current. Never repeats the file just played. */
+        uint16_t pick = (uint16_t)(next_rand() % (cursor.count - 1U));
+
+        if (pick >= cursor.current) {
+            pick++;
+        }
+        cursor.last = cursor.current;
+        cursor.current = pick;
+    } else {
+        cursor.current = (uint16_t)((cursor.current + 1U) % cursor.count);
+    }
+    cursor.played++;
+    return true;
+}
+
+/* ------------------------------------------------------------------ */
 /*  The session                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -325,12 +569,10 @@ static void close_session(void)
  */
 static bool open_session(video_widget_t *widget)
 {
-    hmi_avi_result_t opened;
-
     close_session();
 
-    if (widget->file_name[0] == 0) {
-        fail(widget, HMI_VIDEO_MSG_NOT_FOUND, "no file name set");
+    if (widget->playlist == NULL) {
+        fail(widget, HMI_VIDEO_MSG_NOT_FOUND, "no playlist set");
         return false;
     }
 
@@ -351,51 +593,33 @@ static bool open_session(video_widget_t *widget)
         return false;
     }
 
-    opened = hmi_avi_open(&session, widget->file_name);
-    switch (opened) {
-    case HMI_AVI_OK:
+    switch (resolve_playlist(widget)) {
+    case RESOLVE_OK:
         break;
-    case HMI_AVI_NO_FILE:
-        /* Retried, not final: the usual fix is to copy the file onto the card
-           and push it back in, and the detect pin will see that happen. */
-        retry_later(widget, HMI_VIDEO_MSG_NOT_FOUND, session.detail);
+    case RESOLVE_CARD:
+        retry_later(widget, HMI_VIDEO_MSG_CARD_UNREADABLE, hmi_sd_detail());
         return false;
-    case HMI_AVI_NOT_MJPEG:
-        fail(widget, HMI_VIDEO_MSG_FORMAT, session.detail);
-        return false;
-    case HMI_AVI_UNREADABLE:
+    case RESOLVE_EMPTY:
     default:
-        /* The card mounted a moment ago, so a file that will not parse is the
-           file's problem rather than the card's. */
+        /* Retried, not final: the usual fix is to copy files onto the card and
+           push it back in, and the detect pin will see that happen. */
+        retry_later(
+            widget, HMI_VIDEO_MSG_NOT_FOUND,
+            widget->playlist->folder != NULL ? "no .avi in the folder" : "no files listed");
+        return false;
+    }
+
+    if (!open_current_file()) {
+        /* Every file in the playlist failed to open or parse. */
         fail(widget, HMI_VIDEO_MSG_FORMAT, session.detail);
         return false;
     }
-
-    if ((session.width > HMI_VIDEO_MAX_WIDTH) ||
-        (session.height > HMI_VIDEO_MAX_HEIGHT)) {
-        char detail[48];
-
-        (void)lv_snprintf(
-            detail, sizeof(detail), "%lux%lu larger than %ux%u",
-            (unsigned long)session.width, (unsigned long)session.height,
-            (unsigned)HMI_VIDEO_MAX_WIDTH, (unsigned)HMI_VIDEO_MAX_HEIGHT);
-        hmi_avi_close(&session);
-        fail(widget, HMI_VIDEO_MSG_FORMAT, detail);
-        return false;
-    }
+    /* The first file is the first play; finite playback counts from here. */
+    cursor.played = 1U;
 
     session_owner = widget;
     widget->holds_session = true;
     widget->state = widget->auto_play ? VIDEO_PLAYING : VIDEO_PAUSED;
-
-    if (video_timer != NULL) {
-        uint32_t period_ms = session.frame_period_us / 1000U;
-
-        if (period_ms == 0U) {
-            period_ms = 1U;
-        }
-        lv_timer_set_period(video_timer, period_ms);
-    }
 
     /* Paused before the first frame has anything to show, so the widget stays
        on its black frame rather than on a stale picture from another file. */
@@ -431,19 +655,26 @@ static bool advance_frame(video_widget_t *widget)
         &compressed_bytes);
 
     if (read == HMI_AVI_END) {
-        if (!widget->loop) {
-            /* The last frame stays on screen. Stopping to black would look
-               like a failure, and the video did exactly what it was asked. */
+        /* This file is done. Move to the next in the playlist — a different
+           file, the same one again for a single-file loop, or nowhere when a
+           finite playlist has run out. */
+        if (!next_file(widget)) {
+            /* The last frame of the last file stays on screen. Stopping to
+               black would look like a failure, and the playlist did exactly
+               what it was asked. */
             widget->state = VIDEO_ENDED;
             return false;
         }
-        hmi_avi_rewind(&session);
+        hmi_avi_close(&session);
+        if (!open_current_file()) {
+            fail(widget, HMI_VIDEO_MSG_FORMAT, session.detail);
+            return false;
+        }
         read = hmi_avi_next_frame(
             &session, frame_compressed, sizeof(frame_compressed), &compressed,
             &compressed_bytes);
         if (read == HMI_AVI_END) {
-            /* A file whose movi list holds no video chunks at all. Looping it
-               would spin this timer forever finding nothing. */
+            /* A file whose movi list holds no video chunks at all. */
             fail(widget, HMI_VIDEO_MSG_FORMAT, "no video frames in file");
             return false;
         }
@@ -703,15 +934,11 @@ static void screen_unload_cb(lv_event_t *event)
     board_display_overlay_hide();
 }
 
-void hmi_video_attach(
-    lv_obj_t *frame,
-    const char *file_name,
-    bool auto_play,
-    bool loop)
+void hmi_video_attach(lv_obj_t *frame, const hmi_video_playlist_t *playlist)
 {
     video_widget_t *widget;
 
-    if (frame == NULL) {
+    if ((frame == NULL) || (playlist == NULL)) {
         return;
     }
 
@@ -735,13 +962,11 @@ void hmi_video_attach(
     memset(widget, 0, sizeof(*widget));
     widget->frame = frame;
     widget->screen = lv_obj_get_screen(frame);
-    widget->auto_play = auto_play;
-    widget->loop = loop;
+    widget->playlist = playlist;
+    widget->auto_play = playlist->auto_play;
+    widget->loop = playlist->loop;
+    widget->shuffle = playlist->shuffle;
     widget->state = VIDEO_IDLE;
-
-    if (file_name != NULL) {
-        (void)lv_strlcpy(widget->file_name, file_name, HMI_VIDEO_MAX_NAME);
-    }
 
     cycle_counter_start();
 
@@ -777,17 +1002,13 @@ void hmi_video_play(lv_obj_t *frame)
         return;
     }
     if (widget->state == VIDEO_ENDED) {
-        /* Playing something that has ended starts it again — the only reading
-           of "play" that does anything from here. */
-        if (widget->holds_session) {
-            hmi_avi_rewind(&session);
-        }
+        /* A playlist that ran out plays again from the top: drop the session
+           so the next tick opens it fresh. */
+        close_session();
     }
     widget->state = VIDEO_PLAYING;
-    if (widget->holds_session && (video_timer != NULL)) {
-        uint32_t period_ms = session.frame_period_us / 1000U;
-
-        lv_timer_set_period(video_timer, (period_ms == 0U) ? 1U : period_ms);
+    if (widget->holds_session) {
+        apply_frame_period();
     }
 }
 
@@ -807,11 +1028,10 @@ void hmi_video_stop(lv_obj_t *frame)
     if ((widget == NULL) || (widget->state == VIDEO_FAILED)) {
         return;
     }
-    if (widget->holds_session) {
-        hmi_avi_rewind(&session);
-    }
-    widget->state = VIDEO_PAUSED;
-    /* Back to the black frame: a stopped video showing its last frame would be
+    /* Drop the session so play starts the playlist from the top, and go back
+       to the black frame: a stopped video showing its last frame would be
        indistinguishable from a paused one. */
+    close_session();
+    widget->state = VIDEO_PAUSED;
     show_message(widget, HMI_VIDEO_MSG_BLANK, NULL);
 }

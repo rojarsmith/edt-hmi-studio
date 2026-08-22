@@ -5,6 +5,7 @@ import type {
 } from '../../types';
 import { isArcPart, partSelector, widgetParts } from '../../utils/widgetParts';
 import { screensHaveVideo } from '../../utils/videoWidgets';
+import { normalizeVideoProps } from '../../utils/videoPlaylist';
 import type { CodeGenOptions } from '../types';
 import type { ImageResource, FontResource } from '../../resources/types';
 import { collectUsedCustomFonts } from '../fontUsage';
@@ -202,6 +203,39 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
   }
   
   return `${func}(${parentVar})`;
+}
+
+/**
+ * What a video plays, as the constant table the runtime reads it from.
+ *
+ * A list is an array of C strings and a count; a folder scan is a folder and
+ * no array. Paths are already normalised to forward slashes by the time they
+ * get here — that is the form FatFs takes, and the editor accepted either
+ * slash so a Windows user could type what their own screen shows. An empty
+ * list is still emitted, with no files and no folder, so the panel is the
+ * thing that reports it.
+ */
+function videoPlaylistDeclaration(varName: string, component: LvglComponent): string {
+  const playlist = normalizeVideoProps(component.props);
+  const lines: string[] = [];
+  const scanning = playlist.source === 'folder';
+
+  if (!scanning && playlist.files.length > 0) {
+    lines.push(`static const char *const ${varName}_files[] = {`);
+    for (const file of playlist.files) {
+      lines.push(`    "${escapeCString(file)}",`);
+    }
+    lines.push('};');
+  }
+  lines.push(`static const hmi_video_playlist_t ${varName}_playlist = {`);
+  lines.push(`    .files = ${!scanning && playlist.files.length > 0 ? `${varName}_files` : 'NULL'},`);
+  lines.push(`    .count = ${scanning ? 0 : playlist.files.length}U,`);
+  lines.push(`    .folder = ${scanning ? `"${escapeCString(playlist.folder)}"` : 'NULL'},`);
+  lines.push(`    .auto_play = ${playlist.autoPlay ? 'true' : 'false'},`);
+  lines.push(`    .loop = ${playlist.loop ? 'true' : 'false'},`);
+  lines.push(`    .shuffle = ${playlist.shuffle ? 'true' : 'false'},`);
+  lines.push('};');
+  return lines.join('\n');
 }
 
 /**
@@ -1194,20 +1228,18 @@ function generatePropsCode(
       break;
       
     case 'video': {
-      // Nothing to scroll: the runtime's image fills the box exactly, and a
-      // stray drag on a touch panel must not slide the picture.
+      // Nothing to scroll: the runtime's picture fills the box exactly, and a
+      // stray drag on a touch panel must not slide it.
       const clearFlag = isV9 ? 'lv_obj_remove_flag' : 'lv_obj_clear_flag';
       lines.push(`${indent}${clearFlag}(${varName}, LV_OBJ_FLAG_SCROLLABLE);`);
-      // The file is named, never linked: it lives on the SD card, and the
-      // runtime is what looks for it. A name matching nothing on the card
-      // leaves the widget reading "Video not found" — the panel's report, made
-      // at the only moment anything can actually look.
-      const fileName = typeof props.fileName === 'string' ? props.fileName.trim() : '';
-      lines.push(
-        `${indent}hmi_video_attach(${varName}, "${escapeCString(fileName)}", ` +
-          `${props.autoPlay === false ? 'false' : 'true'}, ` +
-          `${props.loop === false ? 'false' : 'true'});`,
-      );
+      // The files are named, never linked: they live on the SD card, and the
+      // runtime is what looks for them. The playlist itself is a file-scope
+      // table beside the widget's variable — see videoPlaylistDeclaration —
+      // because the runtime keeps the pointer rather than copying. A name
+      // matching nothing on the card leaves the widget reading "Video not
+      // found": the panel's report, made at the only moment anything can
+      // actually look.
+      lines.push(`${indent}hmi_video_attach(${varName}, &${varName}_playlist);`);
       break;
     }
 
@@ -2977,6 +3009,10 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
       // so the array has to outlive the widget: file scope, beside it.
       if (comp.type === 'line' || comp.type === 'polygon') {
         lines.push(linePointsDeclaration(varName, comp, options));
+      }
+      // The same for a video's playlist: hmi_video_attach keeps the pointer.
+      if (comp.type === 'video') {
+        lines.push(videoPlaylistDeclaration(varName, comp));
       }
     }
     lines.push('');

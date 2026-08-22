@@ -249,7 +249,10 @@ describe('componentDefinitions', () => {
 
     it('starts a video pointed at nothing, playing and looping', () => {
       const video = componentDefinitions.find(def => def.type === 'video');
-      expect(video!.defaultProps).toEqual({ fileName: '', autoPlay: true, loop: true });
+      expect(video!.defaultProps).toEqual({
+        source: 'list', files: [], folder: '',
+        autoPlay: true, loop: true, shuffle: false,
+      });
       // Black, because that is what an empty frame is — see componentDefinitions.
       expect(video!.defaultStyles.default.bgColor).toBe('#000000');
       expect(video!.isContainer).toBe(false);

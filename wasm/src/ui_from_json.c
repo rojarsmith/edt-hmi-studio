@@ -463,15 +463,41 @@ static lv_obj_t *create_video(lv_obj_t *parent, const cJSON *comp) {
     lv_obj_remove_flag(frame, LV_OBJ_FLAG_SCROLLABLE);
 
     const cJSON *props = cJSON_GetObjectItemCaseSensitive(comp, "props");
-    const char *file = props ? cjson_get_string(props, "fileName") : NULL;
-    if (file && file[0] == 0) file = NULL;
+    /* A playlist now: the files array, or a folder to scan. Show what it plays,
+       the same one line the design canvas draws. Still not played here: a
+       browser tab has no card reader. */
+    const char *label = NULL;
+    char summary[96];
+    const cJSON *source = cJSON_GetObjectItemCaseSensitive(props, "source");
+    const cJSON *folder = cJSON_GetObjectItemCaseSensitive(props, "folder");
+    const cJSON *files = cJSON_GetObjectItemCaseSensitive(props, "files");
+    const char *legacy = props ? cjson_get_string(props, "fileName") : NULL;
+
+    if (source && cJSON_IsString(source) && strcmp(source->valuestring, "folder") == 0) {
+        const char *dir = (folder && cJSON_IsString(folder)) ? folder->valuestring : "";
+        snprintf(summary, sizeof(summary), "%s/ (every .avi)", dir);
+        label = summary;
+    } else if (files && cJSON_IsArray(files) && cJSON_GetArraySize(files) > 0) {
+        const cJSON *first = cJSON_GetArrayItem(files, 0);
+        int extra = cJSON_GetArraySize(files) - 1;
+        if (first && cJSON_IsString(first)) {
+            if (extra > 0) {
+                snprintf(summary, sizeof(summary), "%s +%d", first->valuestring, extra);
+            } else {
+                snprintf(summary, sizeof(summary), "%s", first->valuestring);
+            }
+            label = summary;
+        }
+    } else if (legacy && legacy[0] != 0) {
+        label = legacy;
+    }
 
     lv_obj_t *text = lv_label_create(frame);
     lv_label_set_long_mode(text, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_width(text, lv_pct(90));
     lv_obj_set_style_text_align(text, LV_TEXT_ALIGN_CENTER, 0);
-    if (file) {
-        lv_label_set_text_fmt(text, LV_SYMBOL_VIDEO " %s\nNot played in the Emulator", file);
+    if (label) {
+        lv_label_set_text_fmt(text, LV_SYMBOL_VIDEO " %s\nNot played in the Emulator", label);
     } else {
         lv_label_set_text(text, LV_SYMBOL_VIDEO " No file named");
     }

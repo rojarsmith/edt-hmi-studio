@@ -89,17 +89,25 @@ Nothing.
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `fileName` | `string` | `''` | The file to play, as it is named in the **root** of the SD card. A name, not a path. |
+| `source` | `'list' \| 'folder'` | `'list'` | Where the playlist comes from: files named one by one, or every `.avi` in a folder. |
+| `files` | `string[]` | `[]` | The playlist, in play order. Each entry may carry a folder in front — `clips/morning.avi`. Either slash is accepted when typed; stored with `/`. |
+| `folder` | `string` | `''` | The folder scanned when `source` is `'folder'`. Empty is the card's top level. |
 | `autoPlay` | `boolean` | `true` | Start playing as soon as the screen carrying the widget is loaded. |
-| `loop` | `boolean` | `true` | Start again from the first frame when the last one has been shown. |
+| `loop` | `boolean` | `true` | After the last file, start the playlist again. |
+| `shuffle` | `boolean` | `false` | Random order — the next file is never the one that just played. |
+| `fileName` | `string` | — | **Deprecated.** The one-file shape from before playlists; read as a one-entry `files`. |
 
 ### props type
 
 ```typescript
 interface VideoProps {
-  fileName: string;
+  source: 'list' | 'folder';
+  files: string[];
+  folder: string;
   autoPlay: boolean;
   loop: boolean;
+  shuffle: boolean;
+  /** @deprecated */ fileName?: string;
 }
 ```
 

@@ -1,5 +1,5 @@
-// A video's own section: the file it names on the SD card, what to do with it
-// when the screen loads, and what the chosen board will actually do with it.
+// A video's own section: the playlist it names on the SD card, what to do
+// with it when the screen loads, and what the chosen board will actually do.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, fireEvent, screen } from '@testing-library/react';
@@ -33,7 +33,12 @@ function onBoard(boardId: BoardId) {
   });
 }
 
-function setUp(props: Record<string, unknown> = { fileName: 'intro.avi', autoPlay: true, loop: true }) {
+const DEFAULT_PROPS = {
+  source: 'list', files: ['intro.avi'], folder: '',
+  autoPlay: true, loop: true, shuffle: false,
+};
+
+function setUp(props: Record<string, unknown> = DEFAULT_PROPS) {
   useEditorStore.setState({
     screens: [{
       id: 'screen-1', name: 'Screen 1', backgroundColor: '#fff',
@@ -50,46 +55,67 @@ function setUp(props: Record<string, unknown> = { fileName: 'intro.avi', autoPla
 }
 
 const current = () => useEditorStore.getState().screens[0].components[0];
+const BS = String.fromCharCode(92);
 
 describe('video properties', () => {
   beforeEach(() => {
     onBoard('stm32h747i-disco');
   });
 
-  it('shows the file name as a field to type into, not a resource to pick', () => {
+  it('shows the files as a list to type into, not resources to pick', () => {
     setUp();
 
-    const field = screen.getByLabelText('Video file name') as HTMLInputElement;
+    const field = screen.getByLabelText('Video files') as HTMLTextAreaElement;
     expect(field.value).toBe('intro.avi');
-    expect(field.placeholder).toBe('name.avi');
+    expect(field.placeholder).toContain('clips/morning.avi');
   });
 
-  it('keeps what was typed', () => {
+  it('commits the typed lines as files, normalising each path', () => {
     setUp();
 
-    fireEvent.change(screen.getByLabelText('Video file name'), {
-      target: { value: 'demo-loop.avi' },
+    const field = screen.getByLabelText('Video files');
+    fireEvent.change(field, {
+      target: { value: `intro.avi\nclips${BS}morning.avi\n\n` },
     });
+    fireEvent.blur(field);
 
-    expect(current().props.fileName).toBe('demo-loop.avi');
+    expect(current().props.files).toEqual(['intro.avi', 'clips/morning.avi']);
   });
 
-  it('says what to do about a name that is not one', () => {
-    setUp({ fileName: 'clips/intro.avi', autoPlay: true, loop: true });
+  it('switches to a folder scan and keeps the folder normalised', () => {
+    const first = setUp();
 
-    expect(screen.getByText(/rather than a path/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Video source'), {
+      target: { value: 'folder' },
+    });
+    expect(current().props.source).toBe('folder');
+    first.unmount();
+
+    setUp({ ...DEFAULT_PROPS, source: 'folder', folder: '' });
+    const folder = screen.getByLabelText('Video folder');
+    fireEvent.change(folder, { target: { value: `${BS}clips${BS}` } });
+    fireEvent.blur(folder);
+
+    expect(current().props.folder).toBe('clips');
   });
 
-  it('says which container is read when the extension is something else', () => {
-    setUp({ fileName: 'intro.mp4', autoPlay: true, loop: true });
+  it('says which container is read when an entry has the wrong extension', () => {
+    setUp({ ...DEFAULT_PROPS, files: ['intro.mp4'] });
 
     expect(screen.getByText(/Only an AVI container/)).toBeTruthy();
   });
 
-  it('asks for a name when the widget is pointed at nothing', () => {
-    setUp({ fileName: '', autoPlay: true, loop: true });
+  it('asks for a file when the list is empty', () => {
+    setUp({ ...DEFAULT_PROPS, files: [] });
 
     expect(screen.getByText(/No file named yet/)).toBeTruthy();
+  });
+
+  it('accepts a path in front of a name without complaint', () => {
+    setUp({ ...DEFAULT_PROPS, files: ['clips/intro.avi'] });
+
+    expect(screen.queryByText(/Only an AVI container/)).toBeNull();
+    expect(screen.queryByText(/No file named yet/)).toBeNull();
   });
 
   it('names the board and what it will do with the file', () => {
@@ -124,13 +150,27 @@ describe('video properties', () => {
     expect(current().props.loop).toBe(false);
   });
 
-  it('treats props written before these existed as both switched on', () => {
-    setUp({ fileName: 'intro.avi' });
+  it('switches random order on, and explains it', () => {
+    const first = setUp();
 
-    // Turning one off has to be a change, which it only is if it read as on.
+    fireEvent.click(screen.getByText('Random order').closest('.property-row')!
+      .querySelector('.toggle-switch-wrapper')!);
+    expect(current().props.shuffle).toBe(true);
+    first.unmount();
+
+    setUp({ ...DEFAULT_PROPS, shuffle: true });
+    expect(screen.getByText(/never the one that just/)).toBeTruthy();
+  });
+
+  it('reads a project written before playlists as its one file', () => {
+    setUp({ fileName: 'legacy.avi' });
+
+    const field = screen.getByLabelText('Video files') as HTMLTextAreaElement;
+    expect(field.value).toBe('legacy.avi');
+
+    // Turning a switch off has to be a change, which it only is if it read as on.
     fireEvent.click(screen.getByText('Loop').closest('.property-row')!
       .querySelector('.toggle-switch-wrapper')!);
-
     expect(current().props.loop).toBe(false);
   });
 });

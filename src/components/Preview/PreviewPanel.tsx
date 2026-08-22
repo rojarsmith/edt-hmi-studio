@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { describeVideoPlaylist, normalizeVideoProps } from '../../utils/videoPlaylist';
 import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
 import type {
@@ -869,15 +870,18 @@ const PreviewPanel: React.FC = () => {
           });
           break;
 
-        case 'video':
+        case 'video': {
+          const playlist = normalizeVideoProps(comp.props);
           drawVideo(ctx, x, y, w, h, {
-            fileName: comp.props.fileName,
-            autoPlay: comp.props.autoPlay !== false,
-            loop: comp.props.loop !== false,
+            fileName: describeVideoPlaylist(playlist),
+            autoPlay: playlist.autoPlay,
+            loop: playlist.loop,
+            shuffle: playlist.shuffle,
             bgColor: bgColorStyle,
             textColor,
           });
           break;
+        }
 
         case 'spinner':
           drawSpinner(ctx, x, y, w, h, {
@@ -2076,7 +2080,7 @@ function drawWindow(
 function drawVideo(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  opts: { fileName?: string; autoPlay: boolean; loop: boolean; bgColor: string; textColor: string }
+  opts: { fileName?: string; autoPlay: boolean; loop: boolean; shuffle?: boolean; bgColor: string; textColor: string }
 ) {
   const named = typeof opts.fileName === 'string' ? opts.fileName.trim() : '';
 
@@ -2107,7 +2111,8 @@ function drawVideo(
   ctx.globalAlpha = named ? 0.9 : 0.6;
   ctx.font = '11px monospace';
   ctx.fillText(named || 'No file named', centreX, centreY + size + 8, Math.max(0, w - 12));
-  const badges = [opts.autoPlay ? 'AUTO' : null, opts.loop ? 'LOOP' : null].filter(Boolean);
+  const badges = [opts.autoPlay ? 'AUTO' : null, opts.loop ? 'LOOP' : null, opts.shuffle ? 'RANDOM' : null]
+    .filter(Boolean);
   if (named && badges.length > 0) {
     ctx.globalAlpha = 0.6;
     ctx.font = '9px sans-serif';

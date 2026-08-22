@@ -35,7 +35,7 @@ function widget(
 }
 
 const video = widget('video', 'Video_1', { x: 0, y: 0, width: 800, height: 480 }, {
-  props: { fileName: 'city.avi', autoPlay: true, loop: true },
+  props: { source: 'list', files: ['city.avi'], autoPlay: true, loop: true, shuffle: false },
 });
 const button = widget('btn', 'Button_2', { x: 300, y: 400, width: 100, height: 40 });
 const beside = widget('btn', 'Button_3', { x: 820, y: 400, width: 100, height: 40 });
@@ -82,7 +82,7 @@ describe('InformationPane', () => {
     // The toolbar line; a rule's body mentions the same size, so scope it.
     expect(screen.getByText(/city\.avi/)).toHaveTextContent('800 × 480');
     expect(screen.getByText('The video needs its space to itself')).toBeInTheDocument();
-    expect(screen.getByText('The file lives in the top level of the SD card')).toBeInTheDocument();
+    expect(screen.getByText('The files live on the SD card, not in the project')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Ready to play');
   });
 
