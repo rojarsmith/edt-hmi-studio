@@ -307,7 +307,11 @@ are the same either way, and the audio stream is only making it bigger.
 **Nothing can be drawn over a playing video.** The picture is on the display
 controller's second layer, which the LTDC composites *above* everything LVGL
 draws. A label placed over the widget in the editor will be under the video on
-the panel. That is the price of not copying the frame, and it is the right
+the panel. Beside the widget, everything is LVGL's as usual: the layer blends
+with per-pixel alpha, and its default colour — what the LTDC paints outside the
+window, and everywhere when the layer is disabled — is transparent. With
+constant-alpha blending it would not be, and the first build painted opaque
+black over every part of the UI the window did not cover. That is the price of not copying the frame, and it is the right
 price: the alternative costs most of the frame period. A caption goes beside
 the video, not on it.
 

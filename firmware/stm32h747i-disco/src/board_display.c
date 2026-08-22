@@ -219,11 +219,20 @@ bool board_display_overlay_show(const board_overlay_t *overlay)
     cfg.PixelFormat = LTDC_PIXEL_FORMAT_RGB565;
     cfg.Alpha = 255U;
     cfg.Alpha0 = 0U;
-    /* Constant alpha only. RGB565 carries no alpha of its own, and the
-       per-pixel factors layer 0 uses would read the missing byte as whatever
-       the controller substitutes. Opaque over its window, invisible outside. */
-    cfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_CA;
-    cfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_CA;
+    /*
+     * Per-pixel alpha times constant alpha — the same factors layer 0 uses,
+     * and here the choice is not a preference. The LTDC paints a layer's
+     * *default colour* everywhere outside its window and everywhere when the
+     * layer is disabled, and that colour carries its own alpha (Alpha0, zero
+     * above). Only the PAxCA factors consult it: with constant-alpha-only
+     * blending the default colour was composed at alpha 255, and the overlay
+     * painted opaque black over every part of the UI its window did not
+     * cover — and over the whole of the next screen once it was "hidden".
+     * RGB565 has no alpha byte; the controller substitutes 0xFF for it, so
+     * inside the window the picture is opaque all the same.
+     */
+    cfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_PAxCA;
+    cfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_PAxCA;
     cfg.FBStartAdress = (uint32_t)(uintptr_t)origin;
     cfg.ImageWidth = overlay->width;
     cfg.ImageHeight = (uint32_t)(y2 - y1 + 1);
@@ -260,7 +269,13 @@ void board_display_overlay_hide(void)
         return;
     }
     overlay_visible = false;
+    /* Disabled, and at constant alpha zero as well: a disabled layer still
+       composes its default colour, and zero here is what makes that colour
+       contribute nothing whichever blending factors are in force. The next
+       show reconfigures the layer in full, so the alpha comes back with it. */
     __HAL_LTDC_LAYER_DISABLE(&hlcd_ltdc, HMI_OVERLAY_LAYER);
+    (void)HAL_LTDC_SetAlpha_NoReload(&hlcd_ltdc, 0U, HMI_OVERLAY_LAYER);
+    overlay_cfg_valid = false;
     (void)BSP_LCD_Reload(HMI_LCD_INSTANCE, BSP_LCD_RELOAD_VERTICAL_BLANKING);
 }
 
