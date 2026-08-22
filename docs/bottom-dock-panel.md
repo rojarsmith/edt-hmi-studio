@@ -301,10 +301,14 @@ moment they reach for the widget.
 because both are about the project as a whole rather than one operation's
 transcript. Available on every tab, like Work.
 
-**It comes forward on its own.** Selecting a video brings Information to the
-front and expands the dock if it was collapsed. Only on a *new* selection: a
-designer who switches to Work while the same video stays selected has made a
-choice, and the pane must not undo it. Selecting anything else leaves the dock
+**It comes forward on its own — but never opens the drawer.** Selecting a
+video makes Information the front tab of the strip, so it is the pane waiting
+when the dock is next opened; a collapsed dock stays collapsed. Selecting a
+widget is the commonest thing a designer does, and a drawer that opened on every
+click would be taking the canvas away from them for a note they can read
+whenever they choose to look down. Only on a *new* selection: a designer who
+switches to Work while the same video stays selected has made a choice, and
+the pane must not undo it. Selecting anything else leaves the dock
 where it was — for every other widget the pane reads *nothing to add*, and a
 pane that says nothing has no business jumping forward.
 

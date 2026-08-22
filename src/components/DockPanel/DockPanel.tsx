@@ -57,14 +57,19 @@ const DockPanel: React.FC<DockPanelProps> = ({ showBuildOutput = false }) => {
   const height = useDockStore((state) => state.height);
   const toggleExpanded = useDockStore((state) => state.toggleExpanded);
   const setActivePane = useDockStore((state) => state.setActivePane);
-  const showPane = useDockStore((state) => state.showPane);
   const setHeight = useDockStore((state) => state.setHeight);
 
-  // Selecting a video brings Information to the front. A video's rules are the
-  // one kind of thing the canvas cannot show — what it hides, where its file
-  // lives — so they appear the moment the designer reaches for one, and not
-  // again until a different video is picked: switching to another pane while
-  // the same video stays selected is a choice this must not undo.
+  // Selecting a video brings Information to the front of the strip. A video's
+  // rules are the one kind of thing the canvas cannot show — what it hides,
+  // where its file lives — so they are the pane waiting when the dock is next
+  // opened, and not again until a different video is picked: switching to
+  // another pane while the same video stays selected is a choice this must
+  // not undo.
+  //
+  // The front of the strip only. A collapsed dock stays collapsed: selecting a
+  // widget is the commonest thing a designer does, and a drawer that opened
+  // on every click would be taking the canvas away from them for a note they
+  // can read whenever they choose to look down.
   const selectedId = useEditorStore((state) => state.selection.selectedIds[0] ?? null);
   const selectedType = useEditorStore((state) =>
     state.selection.selectedIds[0]
@@ -73,9 +78,9 @@ const DockPanel: React.FC<DockPanelProps> = ({ showBuildOutput = false }) => {
   );
   useEffect(() => {
     if (selectedId && selectedType === 'video') {
-      showPane('info');
+      setActivePane('info');
     }
-  }, [selectedId, selectedType, showPane]);
+  }, [selectedId, selectedType, setActivePane]);
   // Anything unfinished, not just a firmware operation: the lamp answers "is
   // something still going?", and an Emulator build left the answer wrong until
   // it became a Work item. Two primitive selectors rather than a filtered

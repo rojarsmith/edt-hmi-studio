@@ -145,14 +145,16 @@ describe('the dock and a video', () => {
     expect(useDockStore.getState().activePane).toBe('work');
   });
 
-  it('expands a collapsed dock to show the rules', () => {
+  it('leaves a collapsed dock collapsed, with Information waiting behind the strip', () => {
+    // Selecting a widget is the commonest thing a designer does; a drawer that
+    // opened on every click would be taking the canvas away for a note.
     useDockStore.setState({ expanded: false });
     setUp([video], []);
     render(<DockPanel />);
 
     setUp([video], ['Video_1']);
 
-    expect(useDockStore.getState().expanded).toBe(true);
+    expect(useDockStore.getState().expanded).toBe(false);
     expect(useDockStore.getState().activePane).toBe('info');
   });
 });
