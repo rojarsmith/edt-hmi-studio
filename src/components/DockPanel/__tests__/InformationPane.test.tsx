@@ -86,12 +86,12 @@ describe('InformationPane', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Ready to play');
   });
 
-  it('names the button that overlaps the video and counts it as a thing to fix', () => {
+  it('names the button that overlaps the video and counts it as a reminder', () => {
     setUp([video, button], ['Video_1']);
     render(<InformationPane />);
 
     expect(screen.getByText('Button_2 overlaps this video')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('1 thing to fix');
+    expect(screen.getByRole('status')).toHaveTextContent('1 reminder');
   });
 
   it('is satisfied by a button beside the video', () => {

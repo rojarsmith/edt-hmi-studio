@@ -83,10 +83,13 @@ const InformationPane: React.FC = () => {
           </span>
         </span>
         <span className="dock-pane-toolbar-end">
+          {/* Reminders, not faults: nothing here stops a build or a flash.
+              The panel will play whatever it is given, and these are the
+              things it is worth knowing about before it does. */}
           <span className={`info-verdict ${warnings.length === 0 ? 'ok' : 'attention'}`} role="status">
             {warnings.length === 0
               ? 'Ready to play'
-              : `${warnings.length} thing${warnings.length === 1 ? '' : 's'} to fix`}
+              : `${warnings.length} reminder${warnings.length === 1 ? '' : 's'}`}
           </span>
         </span>
       </div>

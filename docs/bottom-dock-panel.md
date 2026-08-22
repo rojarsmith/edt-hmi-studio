@@ -317,8 +317,9 @@ every time. *Warnings* are derived from the screen: `Button_2 overlaps this
 video`, `The video runs off the screen`, `No file named yet`. The overlap check
 flattens the screen's tree into absolute boxes and intersects them, skipping
 the video's own ancestors (a container the video sits in is not "over" it) and
-hidden components. A verdict in the toolbar — *Ready to play* or *2 things to
-fix* — is the one-glance answer.
+hidden components. A verdict in the toolbar — *Ready to play* or *2 reminders* — is the
+one-glance answer. Reminders, not faults: nothing here stops a build, and the
+word has to say so.
 
 **In the designer's words, and only those.** Nothing in the pane names LVGL, a
 layer, a codec or a buffer; a test asserts it. The display controller's second
