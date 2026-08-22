@@ -83,6 +83,19 @@
  */
 #define HMI_VIDEO_IDLE_PERIOD_MS 200U
 
+/**
+ * How long a widget waits before trying the card again after a card-class
+ * failure — no card, a card that would not mount, a read that failed.
+ *
+ * These are the failures that fix themselves: a card pushed in, a card that
+ * answers on the second attempt, a CRC error on one read. Retrying them is
+ * what makes "push the card in and it starts" true, and what keeps one bad
+ * read from ending playback for good. A file-class failure — no such file, a
+ * codec that is not Motion JPEG — is not retried, because nothing on the panel
+ * is going to change it; leaving the screen and coming back does.
+ */
+#define HMI_VIDEO_RETRY_PERIOD_MS 1000U
+
 /** What the panel says, in the panel's words. */
 #define HMI_VIDEO_MSG_NOT_FOUND "Video not found"
 #define HMI_VIDEO_MSG_NO_CARD "No SD card"
@@ -91,6 +104,9 @@
 #define HMI_VIDEO_MSG_BUSY "Another video is playing"
 /* Nothing at all: the black frame with no words on it. */
 #define HMI_VIDEO_MSG_BLANK ""
+
+/** The message plus its detail line, as drawn. */
+#define HMI_VIDEO_TEXT_MAX 112U
 
 typedef enum {
     /** Registered, never opened. The state every widget starts in. */
@@ -118,14 +134,16 @@ typedef struct {
     /** Whether this widget is the one holding the open file and the buffers. */
     bool holds_session;
     /**
-     * The message currently on the label, as the literal it was set from.
-     *
-     * Compared by pointer, which works because every message here is one of
-     * the string literals above. Without it the timer would re-set the same
-     * text on every tick, and lv_label_set_text reallocates and invalidates
+     * What the label currently says, so the timer does not re-set the same
+     * text on every tick — lv_label_set_text reallocates and invalidates
      * whether or not the words changed.
      */
-    const char *shown;
+    char shown[HMI_VIDEO_TEXT_MAX];
+    /**
+     * When a card-class failure may be tried again, as an lv_tick_get value.
+     * Zero when nothing is waiting. See HMI_VIDEO_RETRY_PERIOD_MS.
+     */
+    uint32_t retry_at;
 } video_widget_t;
 
 static video_widget_t widgets[HMI_VIDEO_MAX_WIDGETS];
@@ -153,15 +171,32 @@ static void video_timer_cb(lv_timer_t *timer);
 /*  What the widget shows                                              */
 /* ------------------------------------------------------------------ */
 
-static void show_message(video_widget_t *widget, const char *text)
+/**
+ * Put a message on the widget, with the reason under it when there is one.
+ *
+ * The headline is for the person in front of the panel: *Video not found*,
+ * *No SD card*. The detail line is for whoever has to fix it, and says which
+ * step failed and what it reported — "mount failed (FR 13)", "decode: HAL 3
+ * err 0x4". Without it the headline is all there is, and "SD card unreadable"
+ * on its own cannot be acted on by anyone.
+ */
+static void show_message(video_widget_t *widget, const char *text, const char *detail)
 {
-    if (widget->shown == text) {
+    char combined[HMI_VIDEO_TEXT_MAX];
+
+    if ((detail != NULL) && (detail[0] != 0) && (text[0] != 0)) {
+        (void)lv_snprintf(combined, sizeof(combined), "%s\n%s", text, detail);
+    } else {
+        (void)lv_snprintf(combined, sizeof(combined), "%s", text);
+    }
+
+    if (strcmp(widget->shown, combined) == 0) {
         return;
     }
-    widget->shown = text;
+    (void)lv_strlcpy(widget->shown, combined, sizeof(widget->shown));
 
     if (widget->message != NULL) {
-        lv_label_set_text(widget->message, text);
+        lv_label_set_text(widget->message, combined);
         lv_obj_remove_flag(widget->message, LV_OBJ_FLAG_HIDDEN);
     }
     if (widget->picture != NULL) {
@@ -171,7 +206,7 @@ static void show_message(video_widget_t *widget, const char *text)
 
 static void show_picture(video_widget_t *widget)
 {
-    widget->shown = NULL;
+    widget->shown[0] = 0;
     if (widget->message != NULL) {
         lv_obj_add_flag(widget->message, LV_OBJ_FLAG_HIDDEN);
     }
@@ -180,10 +215,23 @@ static void show_picture(video_widget_t *widget)
     }
 }
 
-static void fail(video_widget_t *widget, const char *text)
+/** A failure nothing on the panel will change. Stays until the screen is left. */
+static void fail(video_widget_t *widget, const char *text, const char *detail)
 {
     widget->state = VIDEO_FAILED;
-    show_message(widget, text);
+    widget->retry_at = 0U;
+    show_message(widget, text, detail);
+}
+
+/** A failure that may clear itself. Shown now, tried again in a second. */
+static void retry_later(video_widget_t *widget, const char *text, const char *detail)
+{
+    widget->state = VIDEO_IDLE;
+    widget->retry_at = lv_tick_get() + HMI_VIDEO_RETRY_PERIOD_MS;
+    if (widget->retry_at == 0U) {
+        widget->retry_at = 1U;
+    }
+    show_message(widget, text, detail);
 }
 
 /* ------------------------------------------------------------------ */
@@ -218,16 +266,16 @@ static bool open_session(video_widget_t *widget)
     close_session();
 
     if (widget->file_name[0] == 0) {
-        fail(widget, HMI_VIDEO_MSG_NOT_FOUND);
+        fail(widget, HMI_VIDEO_MSG_NOT_FOUND, "no file name set");
         return false;
     }
 
     switch (hmi_sd_mount()) {
     case HMI_SD_NO_CARD:
-        fail(widget, HMI_VIDEO_MSG_NO_CARD);
+        retry_later(widget, HMI_VIDEO_MSG_NO_CARD, NULL);
         return false;
     case HMI_SD_UNREADABLE:
-        fail(widget, HMI_VIDEO_MSG_CARD_UNREADABLE);
+        retry_later(widget, HMI_VIDEO_MSG_CARD_UNREADABLE, hmi_sd_detail());
         return false;
     case HMI_SD_READY:
     default:
@@ -235,7 +283,7 @@ static bool open_session(video_widget_t *widget)
     }
 
     if (!hmi_jpeg_init()) {
-        fail(widget, HMI_VIDEO_MSG_FORMAT);
+        fail(widget, HMI_VIDEO_MSG_FORMAT, hmi_jpeg_detail());
         return false;
     }
 
@@ -244,23 +292,31 @@ static bool open_session(video_widget_t *widget)
     case HMI_AVI_OK:
         break;
     case HMI_AVI_NO_FILE:
-        fail(widget, HMI_VIDEO_MSG_NOT_FOUND);
+        /* Retried, not final: the usual fix is to copy the file onto the card
+           and push it back in, and the detect pin will see that happen. */
+        retry_later(widget, HMI_VIDEO_MSG_NOT_FOUND, session.detail);
         return false;
     case HMI_AVI_NOT_MJPEG:
-        fail(widget, HMI_VIDEO_MSG_FORMAT);
+        fail(widget, HMI_VIDEO_MSG_FORMAT, session.detail);
         return false;
     case HMI_AVI_UNREADABLE:
     default:
         /* The card mounted a moment ago, so a file that will not parse is the
            file's problem rather than the card's. */
-        fail(widget, HMI_VIDEO_MSG_FORMAT);
+        fail(widget, HMI_VIDEO_MSG_FORMAT, session.detail);
         return false;
     }
 
     if ((session.width > HMI_VIDEO_MAX_WIDTH) ||
         (session.height > HMI_VIDEO_MAX_HEIGHT)) {
+        char detail[48];
+
+        (void)lv_snprintf(
+            detail, sizeof(detail), "%lux%lu larger than %ux%u",
+            (unsigned long)session.width, (unsigned long)session.height,
+            (unsigned)HMI_VIDEO_MAX_WIDTH, (unsigned)HMI_VIDEO_MAX_HEIGHT);
         hmi_avi_close(&session);
-        fail(widget, HMI_VIDEO_MSG_FORMAT);
+        fail(widget, HMI_VIDEO_MSG_FORMAT, detail);
         return false;
     }
 
@@ -280,7 +336,7 @@ static bool open_session(video_widget_t *widget)
     /* Paused before the first frame has anything to show, so the widget stays
        on its black frame rather than on a stale picture from another file. */
     if (widget->state == VIDEO_PAUSED) {
-        show_message(widget, HMI_VIDEO_MSG_BLANK);
+        show_message(widget, HMI_VIDEO_MSG_BLANK, NULL);
     }
     return true;
 }
@@ -316,22 +372,42 @@ static bool advance_frame(video_widget_t *widget)
         if (read == HMI_AVI_END) {
             /* A file whose movi list holds no video chunks at all. Looping it
                would spin this timer forever finding nothing. */
-            fail(widget, HMI_VIDEO_MSG_FORMAT);
+            fail(widget, HMI_VIDEO_MSG_FORMAT, "no video frames in file");
             return false;
         }
     }
 
     if (read == HMI_AVI_FRAME_TOO_LARGE) {
-        fail(widget, HMI_VIDEO_MSG_FORMAT);
+        fail(widget, HMI_VIDEO_MSG_FORMAT, session.detail);
         return false;
     }
     if (read != HMI_AVI_OK) {
-        /* The card stopped answering mid-file. Dropping the mount means the
-           next attempt starts from the card again rather than from a volume
-           that is no longer there. */
+        /* The card stopped answering mid-file — or one read failed its CRC.
+           Dropping the mount means the next attempt starts from the card
+           again rather than from a volume that is no longer there, and
+           retrying is what turns one bad read into a skipped frame rather
+           than the end of the film. */
+        char detail[48];
+
+        (void)lv_strlcpy(
+            detail,
+            (hmi_sd_detail()[0] != 0) ? hmi_sd_detail() : session.detail,
+            sizeof(detail));
+        close_session();
         hmi_sd_unmount();
-        fail(widget, HMI_VIDEO_MSG_CARD_UNREADABLE);
+        retry_later(widget, HMI_VIDEO_MSG_CARD_UNREADABLE, detail);
         return false;
+    }
+
+    /* The HAL hands the codec whole words and drops the last one to three
+       bytes of an odd-length frame — which is where the EOI marker lives.
+       Padding with zeros past the end is harmless to the decoder and keeps
+       the marker in. The buffer has room: the reader refuses any frame that
+       would not leave it. */
+    while (((compressed_bytes & 3U) != 0U) &&
+           (compressed_bytes < sizeof(frame_compressed))) {
+        frame_compressed[compressed_bytes] = 0U;
+        compressed_bytes++;
     }
 
     decoded = hmi_jpeg_decode_to_argb(
@@ -350,7 +426,7 @@ static bool advance_frame(video_widget_t *widget)
         &decoded_height);
 
     if (decoded != HMI_JPEG_OK) {
-        fail(widget, HMI_VIDEO_MSG_FORMAT);
+        fail(widget, HMI_VIDEO_MSG_FORMAT, hmi_jpeg_detail());
         return false;
     }
 
@@ -396,7 +472,8 @@ static void release_offscreen_widgets(const lv_obj_t *screen)
             close_session();
         }
         widget->state = VIDEO_IDLE;
-        widget->shown = NULL;
+        widget->retry_at = 0U;
+        widget->shown[0] = 0;
     }
 }
 
@@ -466,7 +543,7 @@ static void video_timer_cb(lv_timer_t *timer)
                 close_session();
             }
             other->state = VIDEO_IDLE;
-            show_message(other, HMI_VIDEO_MSG_BUSY);
+            show_message(other, HMI_VIDEO_MSG_BUSY, NULL);
         }
     }
 
@@ -476,6 +553,15 @@ static void video_timer_cb(lv_timer_t *timer)
            when the screen has been left and come back to. */
         idle_tick();
         return;
+    }
+
+    if ((widget->retry_at != 0U) && !widget->holds_session) {
+        /* A card-class failure, waiting its second out. */
+        if ((int32_t)(lv_tick_get() - widget->retry_at) < 0) {
+            idle_tick();
+            return;
+        }
+        widget->retry_at = 0U;
     }
 
     if (!widget->holds_session && !open_session(widget)) {
@@ -527,6 +613,7 @@ static void frame_deleted_cb(lv_event_t *event)
     widget->picture = NULL;
     widget->message = NULL;
     widget->state = VIDEO_IDLE;
+    widget->retry_at = 0U;
 }
 
 void hmi_video_attach(
@@ -583,7 +670,9 @@ void hmi_video_attach(
        calls Text Color — so the message is styled with the widget rather than
        hard-coded here. */
     widget->message = lv_label_create(frame);
-    lv_label_set_long_mode(widget->message, LV_LABEL_LONG_MODE_DOTS);
+    /* Wrapped, not dotted: the detail line under a message is the part that
+       says what to fix, and it must not be the part that gets cut off. */
+    lv_label_set_long_mode(widget->message, LV_LABEL_LONG_MODE_WRAP);
     lv_obj_set_width(widget->message, lv_pct(90));
     lv_obj_set_style_text_align(widget->message, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(widget->message, "");
@@ -641,5 +730,5 @@ void hmi_video_stop(lv_obj_t *frame)
     widget->state = VIDEO_PAUSED;
     /* Back to the black frame: a stopped video showing its last frame would be
        indistinguishable from a paused one. */
-    show_message(widget, HMI_VIDEO_MSG_BLANK);
+    show_message(widget, HMI_VIDEO_MSG_BLANK, NULL);
 }

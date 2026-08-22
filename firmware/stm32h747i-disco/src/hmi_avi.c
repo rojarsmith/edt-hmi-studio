@@ -18,6 +18,7 @@
 
 #include "hmi_avi.h"
 
+#include <stdio.h>
 #include <string.h>
 
 /** 'RIFF', 'LIST', 'avih' and friends, as the little-endian words they are. */
@@ -52,19 +53,46 @@ static uint32_t read_u32(const uint8_t *bytes)
            ((uint32_t)bytes[3] << 24);
 }
 
+/** The last FatFs result that was not FR_OK, so a failure can be named. */
+static FRESULT last_result;
+
 static bool read_exact(FIL *file, void *destination, uint32_t bytes)
 {
     UINT read = 0U;
+    const FRESULT result = f_read(file, destination, bytes, &read);
 
-    if (f_read(file, destination, bytes, &read) != FR_OK) {
+    if (result != FR_OK) {
+        last_result = result;
         return false;
     }
-    return read == bytes;
+    if (read != bytes) {
+        /* Past the end of the file: FatFs reports that as a short read rather
+           than as an error, so it needs a code of its own here. */
+        last_result = FR_INVALID_OBJECT;
+        return false;
+    }
+    return true;
 }
 
 static bool seek_to(FIL *file, FSIZE_t offset)
 {
-    return f_lseek(file, offset) == FR_OK;
+    const FRESULT result = f_lseek(file, offset);
+
+    if (result != FR_OK) {
+        last_result = result;
+        return false;
+    }
+    return true;
+}
+
+static void set_detail(hmi_avi_t *avi, const char *what)
+{
+    (void)snprintf(avi->detail, sizeof(avi->detail), "%s", what);
+}
+
+static void set_detail_fr(hmi_avi_t *avi, const char *what)
+{
+    (void)snprintf(avi->detail, sizeof(avi->detail), "%s (FR %d)", what, (int)last_result);
 }
 
 /**
@@ -146,6 +174,7 @@ static hmi_avi_result_t parse_header_list(
 
         if (!seek_to(&avi->file, at) ||
             !read_exact(&avi->file, header, CHUNK_HEADER_BYTES)) {
+            set_detail_fr(avi, "header read");
             return HMI_AVI_UNREADABLE;
         }
         id = read_u32(&header[0]);
@@ -157,6 +186,7 @@ static hmi_avi_result_t parse_header_list(
 
             if ((size < AVI_HEADER_MIN_BYTES) ||
                 !read_exact(&avi->file, main_header, AVI_HEADER_MIN_BYTES)) {
+                set_detail(avi, "avih chunk short");
                 return HMI_AVI_UNREADABLE;
             }
             avi->frame_period_us = read_u32(&main_header[0]);
@@ -168,6 +198,7 @@ static hmi_avi_result_t parse_header_list(
             uint8_t list_type[4];
 
             if (!read_exact(&avi->file, list_type, sizeof(list_type))) {
+                set_detail_fr(avi, "hdrl list read");
                 return HMI_AVI_UNREADABLE;
             }
             if (read_u32(list_type) == FCC_STRL) {
@@ -178,6 +209,7 @@ static hmi_avi_result_t parse_header_list(
 
                 /* The first chunk of a strl is always its strh. */
                 if (!read_exact(&avi->file, inner, CHUNK_HEADER_BYTES)) {
+                    set_detail_fr(avi, "strh read");
                     return HMI_AVI_UNREADABLE;
                 }
                 inner_id = read_u32(&inner[0]);
@@ -191,6 +223,11 @@ static hmi_avi_result_t parse_header_list(
 
                     if ((type == FCC_VIDS) && !have_video) {
                         if (!is_motion_jpeg(handler)) {
+                            (void)snprintf(
+                                avi->detail, sizeof(avi->detail),
+                                "codec %c%c%c%c is not MJPEG",
+                                (int)(handler & 0xFFU), (int)((handler >> 8) & 0xFFU),
+                                (int)((handler >> 16) & 0xFFU), (int)((handler >> 24) & 0xFFU));
                             return HMI_AVI_NOT_MJPEG;
                         }
                         avi->video_stream = stream_index;
@@ -206,10 +243,16 @@ static hmi_avi_result_t parse_header_list(
         at = body + size + (size & 1U);
     }
 
-    if (!have_main || !have_video) {
+    if (!have_main) {
+        set_detail(avi, "no avih in hdrl");
+        return HMI_AVI_UNREADABLE;
+    }
+    if (!have_video) {
+        set_detail(avi, "no video stream");
         return HMI_AVI_UNREADABLE;
     }
     if ((avi->width == 0U) || (avi->height == 0U)) {
+        set_detail(avi, "zero-sized picture");
         return HMI_AVI_UNREADABLE;
     }
     if ((avi->frame_period_us < AVI_MIN_FRAME_PERIOD_US) ||
@@ -236,6 +279,7 @@ hmi_avi_result_t hmi_avi_open(hmi_avi_t *avi, const char *file_name)
     }
 
     memset(avi, 0, sizeof(*avi));
+    last_result = FR_OK;
 
     opened = f_open(&avi->file, file_name, FA_READ);
     if (opened != FR_OK) {
@@ -243,15 +287,20 @@ hmi_avi_result_t hmi_avi_open(hmi_avi_t *avi, const char *file_name)
            that stopped answering mid-open, a volume that lost its mount — is a
            card problem, and saying "video not found" for it would send the user
            looking for a file that is sitting right there. */
+        (void)snprintf(avi->detail, sizeof(avi->detail), "open failed (FR %d)", (int)opened);
         return ((opened == FR_NO_FILE) || (opened == FR_NO_PATH))
             ? HMI_AVI_NO_FILE
             : HMI_AVI_UNREADABLE;
     }
     avi->open = true;
 
-    if (!read_exact(&avi->file, riff, sizeof(riff)) ||
-        (read_u32(&riff[0]) != FCC_RIFF) ||
-        (read_u32(&riff[8]) != FCC_AVI)) {
+    if (!read_exact(&avi->file, riff, sizeof(riff))) {
+        set_detail_fr(avi, "RIFF read");
+        hmi_avi_close(avi);
+        return HMI_AVI_UNREADABLE;
+    }
+    if ((read_u32(&riff[0]) != FCC_RIFF) || (read_u32(&riff[8]) != FCC_AVI)) {
+        set_detail(avi, "not a RIFF/AVI file");
         hmi_avi_close(avi);
         return HMI_AVI_UNREADABLE;
     }
@@ -267,6 +316,7 @@ hmi_avi_result_t hmi_avi_open(hmi_avi_t *avi, const char *file_name)
 
         if (!seek_to(&avi->file, at) ||
             !read_exact(&avi->file, header, CHUNK_HEADER_BYTES)) {
+            set_detail_fr(avi, "chunk read");
             hmi_avi_close(avi);
             return HMI_AVI_UNREADABLE;
         }
@@ -282,10 +332,12 @@ hmi_avi_result_t hmi_avi_open(hmi_avi_t *avi, const char *file_name)
                size below that is a corrupt header, and the subtraction below
                would wrap into a length of four billion. */
             if (size < 4U) {
+                set_detail(avi, "LIST chunk too short");
                 hmi_avi_close(avi);
                 return HMI_AVI_UNREADABLE;
             }
             if (!read_exact(&avi->file, list_type, sizeof(list_type))) {
+                set_detail_fr(avi, "LIST read");
                 hmi_avi_close(avi);
                 return HMI_AVI_UNREADABLE;
             }
@@ -315,12 +367,19 @@ hmi_avi_result_t hmi_avi_open(hmi_avi_t *avi, const char *file_name)
         at = body + size + (size & 1U);
     }
 
-    if ((header_result != HMI_AVI_OK) || !have_movi) {
+    if (header_result != HMI_AVI_OK) {
+        set_detail(avi, "no hdrl list");
+        hmi_avi_close(avi);
+        return HMI_AVI_UNREADABLE;
+    }
+    if (!have_movi) {
+        set_detail(avi, "no movi list");
         hmi_avi_close(avi);
         return HMI_AVI_UNREADABLE;
     }
 
     avi->next_chunk = avi->movi_start;
+    avi->detail[0] = 0;
     return HMI_AVI_OK;
 }
 
@@ -344,6 +403,7 @@ hmi_avi_result_t hmi_avi_next_frame(
 
         if (!seek_to(&avi->file, avi->next_chunk) ||
             !read_exact(&avi->file, header, CHUNK_HEADER_BYTES)) {
+            set_detail_fr(avi, "frame header read");
             return HMI_AVI_UNREADABLE;
         }
         id = read_u32(&header[0]);
@@ -371,13 +431,18 @@ hmi_avi_result_t hmi_avi_next_frame(
             continue;
         }
         if (size > capacity) {
+            (void)snprintf(
+                avi->detail, sizeof(avi->detail), "frame %lu bytes > buffer",
+                (unsigned long)size);
             return HMI_AVI_FRAME_TOO_LARGE;
         }
         if (!read_exact(&avi->file, buffer, size)) {
+            set_detail_fr(avi, "frame read");
             return HMI_AVI_UNREADABLE;
         }
 
         *length = size;
+        avi->detail[0] = 0;
         return HMI_AVI_OK;
     }
 

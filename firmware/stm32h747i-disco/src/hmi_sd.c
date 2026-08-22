@@ -25,6 +25,7 @@
 #include "stm32h7xx_hal.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #define HMI_SD_INSTANCE 0U
@@ -37,6 +38,41 @@
 static bool sd_initialised;
 static FATFS sd_filesystem;
 static bool sd_mounted;
+
+/** See hmi_sd_detail. Kept short: it is drawn on the widget. */
+static char sd_detail[48];
+
+const char *hmi_sd_detail(void)
+{
+    return sd_detail;
+}
+
+/**
+ * Bring the card up, at a bus speed this board can be trusted at.
+ *
+ * BSP_SD_Init ends by switching the card to High Speed — 50 MHz on the
+ * SDMMC_CK — and ignores whether that worked. On this Discovery, with the
+ * socket on the far side of the board from the MCU, 50 MHz is where reads
+ * start failing their CRC now and then, which is exactly the "worked the
+ * second time" failure a video shows. Default speed is 25 MHz, 12.5 MB/s on
+ * a 4-bit bus, and the video needs 3.5 MB/s. Nothing is lost by being slow.
+ */
+static bool card_init(void)
+{
+    const int32_t status = BSP_SD_Init(HMI_SD_INSTANCE);
+
+    if (status != BSP_ERROR_NONE) {
+        (void)snprintf(sd_detail, sizeof(sd_detail), "SD init failed (%ld)", (long)status);
+        return false;
+    }
+    if (HAL_SD_ConfigSpeedBusOperation(
+            &hsd_sdmmc[HMI_SD_INSTANCE], SDMMC_SPEED_MODE_DEFAULT) != HAL_OK) {
+        /* Not fatal: the card stays at whatever speed it agreed to, and the
+           reads below will say so if that turns out to be too fast. */
+        (void)snprintf(sd_detail, sizeof(sd_detail), "default speed refused");
+    }
+    return true;
+}
 
 bool hmi_sd_present(void)
 {
@@ -77,7 +113,7 @@ hmi_sd_state_t hmi_sd_mount(void)
     }
 
     if (!sd_initialised) {
-        if (BSP_SD_Init(HMI_SD_INSTANCE) != BSP_ERROR_NONE) {
+        if (!card_init()) {
             /* Init fails for an empty slot too, so ask the detect pin which
                of the two it was before naming it. */
             return hmi_sd_present() ? HMI_SD_UNREADABLE : HMI_SD_NO_CARD;
@@ -92,9 +128,15 @@ hmi_sd_state_t hmi_sd_mount(void)
     /* Mount now (opt = 1) rather than on first access, so a card with no file
        system is reported here instead of surfacing as a failed f_open, which
        would read as "the video is missing". */
-    if (f_mount(&sd_filesystem, "", 1U) != FR_OK) {
-        return HMI_SD_UNREADABLE;
+    {
+        const FRESULT mounted = f_mount(&sd_filesystem, "", 1U);
+
+        if (mounted != FR_OK) {
+            (void)snprintf(sd_detail, sizeof(sd_detail), "mount failed (FR %d)", (int)mounted);
+            return HMI_SD_UNREADABLE;
+        }
     }
+    sd_detail[0] = 0;
 
     sd_mounted = true;
     return HMI_SD_READY;
@@ -124,7 +166,7 @@ DSTATUS disk_initialize(BYTE pdrv)
         return STA_NOINIT | STA_NODISK;
     }
     if (!sd_initialised) {
-        if (BSP_SD_Init(HMI_SD_INSTANCE) != BSP_ERROR_NONE) {
+        if (!card_init()) {
             return STA_NOINIT;
         }
         sd_initialised = true;
@@ -166,22 +208,32 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
        assume alignment, so an odd address is bounced one sector at a time
        rather than trusted. */
     if ((((uintptr_t)buff) & 3U) == 0U) {
-        if (BSP_SD_ReadBlocks(
-                HMI_SD_INSTANCE,
-                (uint32_t *)(void *)buff,
-                (uint32_t)sector,
-                count) != BSP_ERROR_NONE) {
+        const int32_t read = BSP_SD_ReadBlocks(
+            HMI_SD_INSTANCE,
+            (uint32_t *)(void *)buff,
+            (uint32_t)sector,
+            count);
+
+        if (read != BSP_ERROR_NONE) {
+            (void)snprintf(
+                sd_detail, sizeof(sd_detail), "read failed (%ld) at %lu x%u",
+                (long)read, (unsigned long)sector, (unsigned)count);
             return RES_ERROR;
         }
     } else {
         static uint32_t bounce[FF_MAX_SS / sizeof(uint32_t)];
 
         for (UINT block = 0U; block < count; ++block) {
-            if (BSP_SD_ReadBlocks(
-                    HMI_SD_INSTANCE,
-                    bounce,
-                    (uint32_t)sector + block,
-                    1U) != BSP_ERROR_NONE) {
+            const int32_t read = BSP_SD_ReadBlocks(
+                HMI_SD_INSTANCE,
+                bounce,
+                (uint32_t)sector + block,
+                1U);
+
+            if (read != BSP_ERROR_NONE) {
+                (void)snprintf(
+                    sd_detail, sizeof(sd_detail), "read failed (%ld) at %lu",
+                    (long)read, (unsigned long)(sector + block));
                 return RES_ERROR;
             }
             if (!wait_for_card_ready(HMI_SD_TRANSFER_TIMEOUT_MS)) {

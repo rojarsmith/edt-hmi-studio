@@ -32,6 +32,7 @@
 
 #include "stm32h7xx_hal.h"
 
+#include <stdio.h>
 
 /**
  * How long the codec gets for one frame before it is called failed.
@@ -47,6 +48,24 @@
 static JPEG_HandleTypeDef hmi_jpeg;
 static DMA2D_HandleTypeDef hmi_jpeg_dma2d;
 static bool jpeg_ready;
+
+/** See hmi_jpeg_detail. */
+static char jpeg_detail[48];
+
+const char *hmi_jpeg_detail(void)
+{
+    return jpeg_detail;
+}
+
+static const char *sampling_name(uint32_t subsampling)
+{
+    switch (subsampling) {
+    case JPEG_444_SUBSAMPLING: return "4:4:4";
+    case JPEG_422_SUBSAMPLING: return "4:2:2";
+    case JPEG_420_SUBSAMPLING: return "4:2:0";
+    default: return "4:?:?";
+    }
+}
 
 /*
  * Where the codec is writing, tracked across the HAL's data-ready callbacks.
@@ -136,6 +155,9 @@ bool hmi_jpeg_init(void)
 
     hmi_jpeg.Instance = JPEG;
     if (HAL_JPEG_Init(&hmi_jpeg) != HAL_OK) {
+        (void)snprintf(
+            jpeg_detail, sizeof(jpeg_detail), "JPEG init failed (err 0x%lx)",
+            (unsigned long)hmi_jpeg.ErrorCode);
         return false;
     }
 
@@ -209,6 +231,7 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
 
     if (!jpeg_ready || (jpeg == NULL) || (blocks == NULL) || (argb == NULL) ||
         (width == NULL) || (height == NULL) || (jpeg_bytes < 4U)) {
+        (void)snprintf(jpeg_detail, sizeof(jpeg_detail), "decode: bad arguments");
         return HMI_JPEG_DECODE_FAILED;
     }
 
@@ -221,17 +244,30 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
 
     /* Cast away const: the HAL takes a non-const input pointer and only ever
        reads through it. */
-    if (HAL_JPEG_Decode(
+    {
+        const HAL_StatusTypeDef decoded = HAL_JPEG_Decode(
             &hmi_jpeg,
             (uint8_t *)(uintptr_t)jpeg,
             jpeg_bytes,
             blocks,
             blocks_capacity,
-            HMI_JPEG_TIMEOUT_MS) != HAL_OK) {
-        return HMI_JPEG_DECODE_FAILED;
+            HMI_JPEG_TIMEOUT_MS);
+
+        if (decoded != HAL_OK) {
+            /* HAL 3 is a timeout: the codec never reached end-of-conversion,
+               which is what a truncated or non-baseline frame looks like. The
+               error code names the rest — 0x2 is a bad Huffman table, 0x4 a
+               timeout, 0x80 a DMA fault. */
+            (void)snprintf(
+                jpeg_detail, sizeof(jpeg_detail), "decode: HAL %d err 0x%lx out %lu",
+                (int)decoded, (unsigned long)hmi_jpeg.ErrorCode,
+                (unsigned long)jpeg_output_used);
+            return HMI_JPEG_DECODE_FAILED;
+        }
     }
 
     if (HAL_JPEG_GetInfo(&hmi_jpeg, &info) != HAL_OK) {
+        (void)snprintf(jpeg_detail, sizeof(jpeg_detail), "decode: no header info");
         return HMI_JPEG_DECODE_FAILED;
     }
 
@@ -242,13 +278,24 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
         !sampling_geometry(
             info.ChromaSubsampling, &mcu_width, &mcu_height, &css,
             &bytes_per_pixel)) {
+        (void)snprintf(
+            jpeg_detail, sizeof(jpeg_detail), "colour space %lu %s not YCbCr",
+            (unsigned long)info.ColorSpace, sampling_name(info.ChromaSubsampling));
         return HMI_JPEG_UNSUPPORTED;
     }
     if (((info.ImageWidth % mcu_width) != 0U) ||
         ((info.ImageHeight % mcu_height) != 0U)) {
+        (void)snprintf(
+            jpeg_detail, sizeof(jpeg_detail), "%s %lux%lu not block-aligned",
+            sampling_name(info.ChromaSubsampling),
+            (unsigned long)info.ImageWidth, (unsigned long)info.ImageHeight);
         return HMI_JPEG_UNSUPPORTED;
     }
     if ((info.ImageWidth > max_width) || (info.ImageHeight > max_height)) {
+        (void)snprintf(
+            jpeg_detail, sizeof(jpeg_detail), "%lux%lu larger than %lux%lu",
+            (unsigned long)info.ImageWidth, (unsigned long)info.ImageHeight,
+            (unsigned long)max_width, (unsigned long)max_height);
         return HMI_JPEG_TOO_LARGE;
     }
     /* A stride of zero means "pack the rows", which is what a caller wants
@@ -258,11 +305,15 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
     if (stride_px == 0U) {
         stride_px = info.ImageWidth;
     } else if (info.ImageWidth > stride_px) {
+        (void)snprintf(jpeg_detail, sizeof(jpeg_detail), "wider than the stride");
         return HMI_JPEG_TOO_LARGE;
     }
 
     needed = info.ImageWidth * info.ImageHeight * bytes_per_pixel;
     if ((needed > blocks_capacity) || (jpeg_output_used == 0U)) {
+        (void)snprintf(
+            jpeg_detail, sizeof(jpeg_detail), "codec wrote %lu of %lu bytes",
+            (unsigned long)jpeg_output_used, (unsigned long)needed);
         return HMI_JPEG_TOO_LARGE;
     }
 
@@ -288,9 +339,11 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
     hmi_jpeg_dma2d.LayerCfg[1].AlphaInverted = DMA2D_REGULAR_ALPHA;
 
     if (HAL_DMA2D_Init(&hmi_jpeg_dma2d) != HAL_OK) {
+        (void)snprintf(jpeg_detail, sizeof(jpeg_detail), "DMA2D init failed");
         return HMI_JPEG_DECODE_FAILED;
     }
     if (HAL_DMA2D_ConfigLayer(&hmi_jpeg_dma2d, 1U) != HAL_OK) {
+        (void)snprintf(jpeg_detail, sizeof(jpeg_detail), "DMA2D layer failed");
         return HMI_JPEG_DECODE_FAILED;
     }
     if (HAL_DMA2D_Start(
@@ -299,15 +352,20 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
             (uint32_t)(uintptr_t)argb,
             info.ImageWidth,
             info.ImageHeight) != HAL_OK) {
+        (void)snprintf(jpeg_detail, sizeof(jpeg_detail), "DMA2D start failed");
         return HMI_JPEG_DECODE_FAILED;
     }
     if (HAL_DMA2D_PollForTransfer(&hmi_jpeg_dma2d, HMI_DMA2D_TIMEOUT_MS) !=
         HAL_OK) {
+        (void)snprintf(
+            jpeg_detail, sizeof(jpeg_detail), "DMA2D err 0x%lx",
+            (unsigned long)hmi_jpeg_dma2d.ErrorCode);
         return HMI_JPEG_DECODE_FAILED;
     }
 
     /* DMA2D wrote SDRAM behind the cache; LVGL reads those pixels through it. */
     invalidate_dcache_range(argb, stride_px * info.ImageHeight * 4U);
 
+    jpeg_detail[0] = 0;
     return HMI_JPEG_OK;
 }

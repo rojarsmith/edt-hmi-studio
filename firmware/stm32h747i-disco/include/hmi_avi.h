@@ -61,6 +61,13 @@ typedef struct {
     uint32_t frame_count;
     /** Which stream number carries the video, as `NNdc` names it. */
     uint8_t video_stream;
+
+    /**
+     * One short line saying why the last call failed — "open failed (FR 4)",
+     * "codec H264 is not MJPEG", "frame 612403 bytes > buffer". Drawn on the
+     * widget under the message. Empty after a call that succeeded.
+     */
+    char detail[48];
 } hmi_avi_t;
 
 /**

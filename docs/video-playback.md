@@ -214,9 +214,38 @@ card is not in the slot" are the same failure; to the person holding the card
 they are completely different, and telling someone their video is missing when
 they simply forgot to push the card in sends them looking in the wrong place.
 
-A widget that fails says its piece once and stops — retrying every frame period
-would hammer a card that is not there. Leaving the screen and coming back
-retries.
+### The line under the message
+
+Every message carries a second line saying **which step failed and what it
+reported** — `mount failed (FR 13)`, `read failed (-4) at 8192 x64`,
+`codec H264 is not MJPEG`, `decode: HAL 3 err 0x4 out 0`, `4:2:2 612x400 not
+block-aligned`. The headline is for the person in front of the panel; the
+detail is for whoever has to fix it. *SD card unreadable* on its own cannot be
+acted on by anyone, and a panel that says only that is a panel that has to be
+put under a debugger to be understood.
+
+The codes are the underlying layer's own: `FR n` is a FatFs `FRESULT`, a bare
+negative number is a BSP error, `HAL n err 0x…` is the HAL status and the JPEG
+handle's `ErrorCode`.
+
+### What is retried, and what is not
+
+Failures split by whether anything on the panel could change them:
+
+| Class | Messages | What happens |
+| --- | --- | --- |
+| **Card** | *No SD card*, *SD card unreadable*, *Video not found* | Shown now, **tried again every second**. A card pushed in starts playing; a file copied onto the card and reinserted is found; one read that fails its CRC costs a frame, not the film. |
+| **File** | *Video format not supported* | Shown and left. Nothing on the panel will turn an H.264 file into Motion JPEG. Leaving the screen and coming back tries again. |
+
+### The SD bus runs at default speed
+
+The BSP ends card initialisation by switching to High Speed — 50 MHz on
+`SDMMC_CK` — and does not check whether that worked. On this Discovery the
+socket is on the far side of the board from the MCU, and 50 MHz is where reads
+start failing their CRC now and then, which shows as a video that worked the
+second time. The runtime drops the bus back to **default speed, 25 MHz**:
+12.5 MB/s on four data lines against the 3.5 MB/s the video needs. Nothing is
+lost by being slow here.
 
 ### In the editor, and in the Preview
 

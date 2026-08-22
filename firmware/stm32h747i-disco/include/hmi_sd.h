@@ -38,6 +38,14 @@ void hmi_sd_unmount(void);
 /** Whether a card is physically in the slot, straight from the detect pin. */
 bool hmi_sd_present(void);
 
+/**
+ * One short line saying why the last hmi_sd_mount did not return READY, or
+ * what the last failed read reported — "SD init failed (-4)", "mount failed
+ * (FR 13)". Shown on the panel under the message, because "SD card
+ * unreadable" on its own tells nobody what to change.
+ */
+const char *hmi_sd_detail(void);
+
 #ifdef __cplusplus
 }
 #endif

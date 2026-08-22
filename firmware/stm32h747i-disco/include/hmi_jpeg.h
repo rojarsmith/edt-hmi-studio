@@ -27,6 +27,13 @@ typedef enum {
 bool hmi_jpeg_init(void);
 
 /**
+ * One short line saying why the last call failed — "decode: HAL 3 err 0x4",
+ * "4:2:2 612x400 not block-aligned", "DMA2D timeout". Drawn on the widget
+ * under the message. Empty after a call that succeeded.
+ */
+const char *hmi_jpeg_detail(void);
+
+/**
  * Decode one JPEG frame into ARGB8888, in hardware from end to end.
  *
  * `blocks` is scratch: the codec's own output, YCbCr in MCU-block order, which
