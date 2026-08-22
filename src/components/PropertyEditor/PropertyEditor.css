@@ -1720,3 +1720,41 @@
 .qrcode-fit-button:hover {
   background: #e8edf3;
 }
+
+/* The planning arithmetic for a string that is not the content: counts, the
+   version each level would need, pixels, registers, and what to change. */
+.qrcode-plan {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #4a5568;
+  background: #f4f6f8;
+  border: 1px solid #dfe3e8;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 6px 0 0 0;
+}
+.qrcode-plan p {
+  margin: 0 0 4px 0;
+}
+.qrcode-plan p:last-child {
+  margin-bottom: 0;
+}
+.qrcode-plan-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2px 0 6px 0;
+}
+.qrcode-plan-table th,
+.qrcode-plan-table td {
+  text-align: left;
+  padding: 2px 6px;
+  border-bottom: 1px solid #e3e8ee;
+}
+.qrcode-plan-table th {
+  font-weight: 600;
+  color: #2b3a4e;
+}
+.qrcode-plan-table tr.current td {
+  font-weight: 600;
+  color: #1f6feb;
+}

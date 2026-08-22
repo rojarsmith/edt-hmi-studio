@@ -643,6 +643,13 @@ export interface QrcodeProps {
   scale: number;
   /** Error correction level, as the QR standard names them. */
   ecc: 'L' | 'M' | 'Q' | 'H';
+  /** The standard's 4-module clear margin; on unless switched off. */
+  quietZone?: boolean;
+  /**
+   * A string to plan the widget around — never encoded, never generated.
+   * Feeds the property editor's arithmetic only; saved with the project.
+   */
+  sampleText?: string;
 }
 
 /**

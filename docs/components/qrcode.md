@@ -64,6 +64,8 @@ picture computed from its content.
 | `version` | `number` | `0` | 0 = the smallest version the content fits; 1–40 pins it. |
 | `scale` | `number` | `2` | Pixels per module, 1–8. |
 | `ecc` | `'L' \| 'M' \| 'Q' \| 'H'` | `'M'` | Error correction level. |
+| `quietZone` | `boolean` | `true` | The standard's 4-module clear margin, drawn in the light colour. |
+| `sampleText` | `string` | `''` | A string to plan the widget around. Never encoded, never generated — see *Planning for a string*. |
 
 ### About the properties
 
@@ -108,6 +110,36 @@ To remove even that, switch **Quiet zone** off — the right move only when the
 widget already sits on a plain, light background that provides the clearance
 instead; on a dark or busy background the code may stop scanning, and the
 editor says so when the switch goes off.
+
+### Planning for a string
+
+A code fed over communication has a problem at design time: the widget has
+no content, so nothing tells the designer which version the longest work
+order URL will need, whether it fits the box at this scale, or how many
+registers the binding must read. **Plan for a string** is a field for
+exactly that — type the longest string the server will ever send (Unicode
+welcome: it is counted in UTF-8 bytes, the way the code and the registers
+count it), and the editor answers:
+
+- **characters and bytes**, separately, with a note when they differ — a
+  kanji costs three bytes where a letter costs one;
+- **the smallest version at the widget's level**, its module count, and the
+  pixel square at the widget's scale and quiet-zone setting;
+- **the smallest version at every level**, L through H, so the cost of more
+  error correction is a glance rather than four experiments;
+- **the registers** a string binding needs (two bytes each);
+- and, only when something is wrong, **what to change, with the number**:
+  *"Version is pinned to 2, which cannot hold this: set it to 3 or higher, or
+  to Auto"*; *"lower the scale to 3, or enlarge the widget to 259×259"*;
+  *"the binding's Length is 8 registers (16 bytes); this string needs 16"*;
+  *"longer than communication can carry: 140 bytes, and a string binding
+  reads at most 128"*.
+
+The field is **planning only**. It is never encoded — the canvas stays blank
+while you type into it — and it never reaches the generated code or the
+Simulator; a test holds each of those doors shut. It *is* saved with the
+project, as the widget's `sampleText` prop, so the next person to open the
+design sees what the code was sized for.
 
 ## 6. Communication
 

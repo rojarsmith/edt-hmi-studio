@@ -71,6 +71,15 @@ export interface QrcodeSettings {
    * plain, light background that provides the clearance instead.
    */
   quietZone: boolean;
+  /**
+   * A string the designer wants the widget sized for — the longest work-order
+   * URL the server will ever send, say. Never encoded, never generated: it
+   * feeds the property editor's planning arithmetic (which version it needs
+   * at each level, how many pixels, how many registers) and nothing else.
+   * Saved with the project so the next person sees what the code was planned
+   * around.
+   */
+  sampleText: string;
 }
 
 /**
@@ -97,6 +106,7 @@ export function normalizeQrcodeProps(props: Record<string, any> | undefined): Qr
     scale: clampInt(p.scale, QRCODE_SCALE_MIN, QRCODE_SCALE_MAX, 2),
     ecc: p.ecc === 'L' || p.ecc === 'Q' || p.ecc === 'H' ? p.ecc : 'M',
     quietZone: p.quietZone !== false,
+    sampleText: typeof p.sampleText === 'string' ? p.sampleText : '',
   };
 }
 
@@ -195,4 +205,128 @@ export function qrcodePixelSize(
   quietZone: boolean = true,
 ): number {
   return (moduleCount + (quietZone ? 8 : 0)) * scale;
+}
+
+/** The most a string binding can carry: 64 registers, two bytes each. */
+export const QRCODE_COMM_BYTES_MAX = 128;
+
+/** The smallest version `text` fits at `ecc`, or null past version 40. */
+export function qrcodeMinVersion(text: string, ecc: QrcodeEcc): number | null {
+  try {
+    const qr = qrcode(0, ecc);
+    qr.addData(text);
+    qr.make();
+    return (qr.getModuleCount() - 17) / 4;
+  } catch {
+    return null;
+  }
+}
+
+export interface QrcodePlan {
+  /** Code points — what a person would count. */
+  characters: number;
+  /** UTF-8 bytes — what the code and the registers count. */
+  bytes: number;
+  /** Any character wider than one byte: the two counts differ, and that is worth saying. */
+  multibyte: boolean;
+  /** The smallest version per level; null when even version 40 is too small. */
+  minVersionByLevel: Record<QrcodeEcc, number | null>;
+  /** At the widget's own level. */
+  minVersion: number | null;
+  moduleCount: number | null;
+  /** At the widget's scale, with its quiet zone setting. */
+  pixelSize: number | null;
+  /** The largest scale at which the code fits the widget box; 0 when none does. */
+  scaleThatFits: number;
+  /** Registers a string binding needs to carry every byte. */
+  registers: number;
+  /**
+   * What the designer should do about it, in order of how much it matters.
+   * Each one names the setting and the number, so it can be acted on without
+   * working anything out.
+   */
+  advice: string[];
+}
+
+/**
+ * Size the widget for a string that is not its content.
+ *
+ * The planning arithmetic the property editor does for the real content,
+ * done for a string the designer is planning around instead — typically the
+ * longest thing communication will ever send, which the widget has no other
+ * way of knowing at design time. Unicode is counted the way the code counts
+ * it: in UTF-8 bytes, where a kanji is three and a letter is one.
+ */
+export function planQrcode(
+  text: string,
+  settings: QrcodeSettings,
+  box: { width: number; height: number },
+  binding: { stringRegisters: number } | null,
+): QrcodePlan | null {
+  if (text === '') return null;
+
+  const characters = Array.from(text).length;
+  const bytes = new TextEncoder().encode(text).length;
+  const levels: QrcodeEcc[] = ['L', 'M', 'Q', 'H'];
+  const minVersionByLevel = Object.fromEntries(
+    levels.map((level) => [level, qrcodeMinVersion(text, level)]),
+  ) as Record<QrcodeEcc, number | null>;
+  const minVersion = minVersionByLevel[settings.ecc];
+  const moduleCount = minVersion === null ? null : 17 + 4 * minVersion;
+  const pixelSize = moduleCount === null
+    ? null
+    : qrcodePixelSize(moduleCount, settings.scale, settings.quietZone);
+  const side = Math.min(box.width, box.height);
+  const modulesWithMargin = moduleCount === null ? 0 : moduleCount + (settings.quietZone ? 8 : 0);
+  const scaleThatFits = moduleCount === null
+    ? 0
+    : Math.min(QRCODE_SCALE_MAX, Math.floor(side / modulesWithMargin));
+  const registers = Math.ceil(bytes / 2);
+
+  const advice: string[] = [];
+  if (minVersion === null) {
+    advice.push(
+      `Too long for a QR code at level ${settings.ecc}: ${bytes} bytes, and version 40 holds at most `
+      + `${{ L: 2953, M: 2331, Q: 1663, H: 1273 }[settings.ecc]}. Shorten the string or lower the correction level.`,
+    );
+  } else {
+    if (settings.version !== QRCODE_VERSION_AUTO && settings.version < minVersion) {
+      advice.push(
+        `Version is pinned to ${settings.version}, which cannot hold this: set it to ${minVersion} or higher, or to Auto.`,
+      );
+    }
+    if (pixelSize !== null && pixelSize > side) {
+      advice.push(
+        scaleThatFits >= QRCODE_SCALE_MIN
+          ? `At scale ${settings.scale} the code is ${pixelSize}×${pixelSize} px and the widget is ${box.width}×${box.height}: `
+            + `lower the scale to ${scaleThatFits}, or enlarge the widget to ${pixelSize}×${pixelSize}.`
+          : `Even at scale 1 the code is ${modulesWithMargin}×${modulesWithMargin} px and the widget is ${box.width}×${box.height}: `
+            + `enlarge the widget to at least ${modulesWithMargin}×${modulesWithMargin}.`,
+      );
+    }
+  }
+  if (bytes > QRCODE_COMM_BYTES_MAX) {
+    advice.push(
+      `Longer than communication can carry: ${bytes} bytes, and a string binding reads at most `
+      + `${QRCODE_COMM_BYTES_MAX} (64 registers). Only the first ${QRCODE_COMM_BYTES_MAX} bytes would arrive.`,
+    );
+  } else if (binding && binding.stringRegisters < registers) {
+    advice.push(
+      `The binding's Length is ${binding.stringRegisters} registers (${2 * binding.stringRegisters} bytes); `
+      + `this string needs ${registers}. Raise Length to ${registers} or the string will be cut.`,
+    );
+  }
+
+  return {
+    characters,
+    bytes,
+    multibyte: bytes !== characters,
+    minVersionByLevel,
+    minVersion,
+    moduleCount,
+    pixelSize,
+    scaleThatFits,
+    registers,
+    advice,
+  };
 }

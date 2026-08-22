@@ -148,3 +148,67 @@ describe('qrcode properties', () => {
     expect(screen.getByText(/sent over communication replaces this content/)).toBeTruthy();
   });
 });
+
+describe('planning a QR code around a string that is not its content', () => {
+  beforeEach(() => {
+    cleanup();
+    setUp(qr({ source: 'literal', literal: '', version: 0, scale: 2, ecc: 'M' }));
+  });
+
+  it('keeps the planning string on the widget, so the project remembers it', () => {
+    fireEvent.change(screen.getByLabelText('QR planning string'), {
+      target: { value: 'https://bitdove.net/order/12345' },
+    });
+    expect(current().props.sampleText).toBe('https://bitdove.net/order/12345');
+    // And the content itself is untouched: this is a plan, not the code.
+    expect(current().props.literal).toBe('');
+  });
+
+  it('does the arithmetic for it, in UTF-8 bytes', () => {
+    fireEvent.change(screen.getByLabelText('QR planning string'), {
+      target: { value: 'https://例え.jp/こんにちは' },
+    });
+    const result = screen.getByLabelText('QR planning result');
+    expect(result.textContent).toMatch(/19 characters, 33 bytes of UTF-8/);
+    expect(result.textContent).toMatch(/At level M it needs version \d+/);
+    expect(result.textContent).toMatch(/Over communication: 17 registers/);
+  });
+
+  it('shows the version every level would need, the current one marked', () => {
+    fireEvent.change(screen.getByLabelText('QR planning string'), {
+      target: { value: 'https://bitdove.net' },
+    });
+    const rows = screen.getByLabelText('QR planning result').querySelectorAll('tbody tr');
+    expect(rows.length).toBe(4);
+    expect(rows[1].className).toBe('current');
+    expect(rows[3].textContent).toMatch(/H.*3 · 29×29/);
+  });
+
+  it('says what to change when the pinned version or the box is too small', () => {
+    cleanup();
+    setUp(qr(
+      { source: 'literal', literal: '', version: 1, scale: 8, ecc: 'M', sampleText: 'https://bitdove.net/order/12345' },
+      { width: 100, height: 100 },
+    ));
+    const result = screen.getByLabelText('QR planning result');
+    expect(result.textContent).toMatch(/Version is pinned to 1/);
+    expect(result.textContent).toMatch(/lower the scale to \d+, or enlarge the widget/);
+  });
+
+  it('checks the string against the binding’s Length', () => {
+    cleanup();
+    const component = qr({ source: 'literal', literal: '', sampleText: 'https://bitdove.net/order/12345' });
+    component.modbusBinding = {
+      enabled: true, area: 'holding-register', address: 100, dataType: 'string',
+      access: 'read', property: 'text', scale: 1, pollIntervalMs: 500,
+      writeBehavior: 'widget-value', writeValue: 0, stringRegisters: 8,
+    };
+    setUp(component);
+    expect(screen.getByLabelText('QR planning result').textContent)
+      .toMatch(/Length is 8 registers \(16 bytes\); this string needs 16/);
+  });
+
+  it('says it is planning only', () => {
+    expect(screen.getByText(/never encoded, never built into the firmware/)).toBeTruthy();
+  });
+});

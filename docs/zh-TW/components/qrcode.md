@@ -58,6 +58,8 @@ Basic 那個顯示專案匯入圖片的 Image。QR 碼是一張由內容計算�
 | `version` | `number` | `0` | 0 = 裝得下的最小版本；1–40 釘死版本。 |
 | `scale` | `number` | `2` | 每模組像素數，1–8。 |
 | `ecc` | `'L' \| 'M' \| 'Q' \| 'H'` | `'M'` | 錯誤更正等級。 |
+| `quietZone` | `boolean` | `true` | 標準規定的 4 模組淨空，以淺色繪製。 |
+| `sampleText` | `string` | `''` | 用來規劃元件尺寸的字串。絕不編碼、絕不產生程式碼——見「用一個字串來規劃」。 |
 
 ### 關於這些屬性
 
@@ -90,6 +92,30 @@ Basic 那個顯示專案匯入圖片的 Image。QR 碼是一張由內容計算�
 只剩安靜區。連安靜區都不要的話，把 **Quiet zone** 關掉——但只有在元件本來就放在
 素色、淺色背景上（由背景提供淨空）時才是對的做法；放在深色或花的背景上，碼可能就
 掃不到了，開關關掉時編輯器會這樣提醒。
+
+### 用一個字串來規劃
+
+由通訊餵內容的碼在設計期有個難題：元件沒有內容，所以沒有東西告訴設計者最長的工單
+網址需要哪個版本、在這個 scale 下裝不裝得進框、綁定要讀幾個 register。**Plan for a
+string** 就是為此而設的欄位——打進伺服器將來會送的最長字串（Unicode 歡迎：以 UTF-8
+位元組計算，和碼與 register 的算法一致），編輯器就回答：
+
+- **字元數與位元組數**，分開算，兩者不同時會提醒——一個漢字佔三個位元組、一個字母
+  佔一個；
+- **在元件目前等級下的最小版本**、模組數，以及在元件的 scale 與安靜區設定下的像素
+  邊長；
+- **四個等級各自的最小版本**，L 到 H，多一級錯誤更正要付多少代價一眼就看到，不用
+  試四次；
+- 字串綁定需要的 **register 數**（每個兩個位元組）；
+- 以及，只在有問題時，**該改什麼、改成多少**：「Version is pinned to 2, which
+  cannot hold this: set it to 3 or higher, or to Auto」、「lower the scale to 3, or
+  enlarge the widget to 259×259」、「the binding's Length is 8 registers (16 bytes);
+  this string needs 16」、「longer than communication can carry: 140 bytes, and a
+  string binding reads at most 128」。
+
+這個欄位**只用於規劃**。它絕不會被編碼——打字時畫布保持空白——也絕不會進到產生的
+程式碼或 Simulator，各有一個測試把門守住。但它**會**隨專案儲存，放在元件的
+`sampleText` 屬性裡，下一個打開設計的人就看得到這個碼是按什麼尺寸規劃的。
 
 ## 6. 通訊
 

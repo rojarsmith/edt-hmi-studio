@@ -58,6 +58,7 @@ import {
   QRCODE_SCALE_MAX,
   encodeQrcode,
   normalizeQrcodeProps,
+  planQrcode,
   qrcodePixelSize,
   resolveQrcodeContent,
 } from '../../utils/qrcodeModel';
@@ -2790,6 +2791,20 @@ function QrcodeEditor({
   const clipped = fit !== null && (fit > component.width || fit > component.height);
   const boxLargerThanCode = fit !== null && (component.width > fit || component.height > fit);
 
+  // The planning string is sized against the widget's own settings and box,
+  // and against its string binding when it has one — so the advice names the
+  // Length field's actual value rather than a default.
+  const stringBinding = component.modbusBinding?.enabled
+    && component.modbusBinding.dataType === 'string'
+    ? { stringRegisters: component.modbusBinding.stringRegisters ?? 16 }
+    : null;
+  const plan = planQrcode(
+    settings.sampleText,
+    settings,
+    { width: component.width, height: component.height },
+    stringBinding,
+  );
+
   return (
     <div className="property-section">
       <div className="section-header">QR Code</div>
@@ -2933,6 +2948,58 @@ function QrcodeEditor({
         A string sent over communication replaces this content while the panel
         runs — bind one in the Communication section below.
       </span>
+
+      <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+        <label>Plan for a string</label>
+        <textarea
+          value={settings.sampleText}
+          rows={2}
+          placeholder="The longest string communication will ever send"
+          spellCheck={false}
+          aria-label="QR planning string"
+          style={{ width: '100%', resize: 'vertical' }}
+          onChange={(e) => onChange('sampleText', e.target.value)}
+        />
+      </div>
+      <span className="property-hint">
+        Planning only — never encoded, never built into the firmware. Saved with
+        the project, so the next person sees what this code was sized for.
+      </span>
+      {plan && (
+        <div className="qrcode-plan" role="status" aria-label="QR planning result">
+          <p>
+            {`${plan.characters} character${plan.characters === 1 ? '' : 's'}, ${plan.bytes} byte${plan.bytes === 1 ? '' : 's'} of UTF-8`}
+            {plan.multibyte ? ' — some characters cost more than one byte, and bytes are what the code counts.' : '.'}
+          </p>
+          {plan.minVersion !== null && plan.moduleCount !== null && (
+            <p>
+              {`At level ${settings.ecc} it needs version ${plan.minVersion} (${plan.moduleCount}×${plan.moduleCount} modules) — ${plan.pixelSize}×${plan.pixelSize} px at scale ${settings.scale}${settings.quietZone ? ' with the quiet zone' : ''}.`}
+            </p>
+          )}
+          <table className="qrcode-plan-table">
+            <thead>
+              <tr><th>Level</th><th>Smallest version</th></tr>
+            </thead>
+            <tbody>
+              {QRCODE_ECC_LEVELS.map((level) => {
+                const version = plan.minVersionByLevel[level.value];
+                return (
+                  <tr key={level.value} className={level.value === settings.ecc ? 'current' : undefined}>
+                    <td>{level.value}</td>
+                    <td>{version === null ? 'does not fit' : `${version} · ${17 + 4 * version}×${17 + 4 * version}`}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p>
+            {`Over communication: ${plan.registers} register${plan.registers === 1 ? '' : 's'} (two bytes each).`}
+          </p>
+          {plan.advice.map((line) => (
+            <p key={line} className="shape-warning">{line}</p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -663,8 +663,10 @@ export const componentDefinitions: ComponentDefinition[] = [
     defaultWidth: 120,
     defaultHeight: 120,
     defaultProps: {
-      // A literal by default, so the widget shows something scannable the
-      // moment it lands; binding a Texts resource is one dropdown away.
+      // A literal by default, and an empty one: the widget lands blank and
+      // stays blank until it is given content — or until communication sends
+      // some, which is the state a server-fed code should start in. Binding
+      // a Texts resource is one dropdown away.
       source: 'literal',
       literal: '',
       textId: '',
@@ -673,6 +675,8 @@ export const componentDefinitions: ComponentDefinition[] = [
       version: 0,
       scale: 2,
       ecc: 'M',
+      // Planning only: a string the widget is sized for, never encoded.
+      sampleText: '',
     },
     defaultStyles: {
       default: {

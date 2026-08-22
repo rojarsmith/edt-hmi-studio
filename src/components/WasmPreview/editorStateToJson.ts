@@ -146,8 +146,11 @@ export function editorStateToJson(
   for (const component of components) {
     if (component.type === 'qrcode') {
       const settings = normalizeQrcodeProps(component.props);
+      // The planning string is the editor's alone: not content, not a prop
+      // the Simulator has any use for.
+      const { sampleText: _planningOnly, ...props } = component.props;
       component.props = {
-        ...component.props,
+        ...props,
         content: resolveQrcodeContent(settings, texts, languageCodes),
         version: settings.version,
         scale: settings.scale,

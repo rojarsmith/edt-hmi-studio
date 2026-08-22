@@ -37,6 +37,12 @@ describe('qrcode code generation', () => {
     expect(source).toContain('lv_image_set_src(canvas, NULL);');
   });
 
+  it('leaves the planning string out of the firmware entirely', () => {
+    const source = sourceFor({ source: 'literal', literal: 'A', sampleText: 'https://planning.only/never-generated' });
+    expect(source).toContain('.text = "A",');
+    expect(source).not.toContain('planning.only');
+  });
+
   it('pins version, ecc and scale as configured', () => {
     const source = sourceFor({ source: 'literal', literal: 'x', version: 7, scale: 4, ecc: 'H' });
     expect(source).toContain('.min_version = 7U,');
