@@ -44,7 +44,7 @@ else to the panel, which is the only thing that can actually look.
 | --- | --- | --- |
 | **STM32H747I-DISCO** | ✅ | JPEG codec peripheral, and a 4-bit microSD socket on SDMMC1. |
 | STM32F746G-DISCO | ❌ | No JPEG codec. The peripheral arrived with the F76x/F77x parts. |
-| EDT EVK043027B | ❌ | The STM32U599 has no JPEG codec, and the kit brings out no SD socket. |
+| EDT EVK043027B | ❌ | The STM32U599 has no JPEG codec, and the board has no external RAM for the frame buffers. |
 
 This is not a driver that has not been written yet. Decoding twenty-four
 800×480 JPEGs a second is not something a Cortex-M7 does in software *while also
@@ -62,6 +62,10 @@ compiler, rather than as a message about a missing header file.
 [`src/types/hmi.ts`](../src/types/hmi.ts). Adding a fourth board that can play
 video means filling that field in and giving the board a runtime; nothing else
 in the editor has to change.
+
+[§10](#10-how-hard-the-hardware-dependency-is) takes the dependency apart layer
+by layer, says which parts of this travel to another board and which do not, and
+spells out what it means for the EVK043027B.
 
 ## 3. The format, and the file
 
@@ -286,3 +290,99 @@ this firmware does can alter a card.
 See [docs/components/video.md](./components/video.md) for the widget's own
 reference page: properties, styles, events, the rendering layers and the LVGL
 API mapping.
+
+## 10. How hard the hardware dependency is
+
+Video is the only widget in the editor whose feasibility is a property of the
+chip. Every other widget is LVGL drawing in software; moving it to a new board
+means writing a display driver. Video is not like that, and it is worth being
+precise about *which* parts of it are not.
+
+### 10.1 The four layers
+
+| Layer | Depends on | How hard |
+| --- | --- | --- |
+| **Decoding** | The JPEG codec peripheral | **Absolute.** No codec, no video — see [§10.2](#102-why-there-is-no-software-fallback). |
+| **Colour conversion** | DMA2D's YCbCr input mode | Absolute in principle, but every STM32 that has the codec also has this. |
+| **Reading the file** | SDMMC and a microSD socket | Soft. USB mass storage or a QSPI NOR would do; only [`hmi_sd.c`](../firmware/stm32h747i-disco/src/hmi_sd.c) changes. |
+| **Memory** | 3.1 MB for the three buffers in [§4](#the-buffers) | Firm. Needs external RAM; no STM32's internal SRAM holds this beside two frame buffers and an LVGL heap. |
+
+Which parts have the codec is a fact of the silicon, read from each part's
+device header (`JPEG_BASE` is either defined or it is not):
+
+| Part | `JPEG_BASE` | External RAM on the board | Verdict |
+| --- | --- | --- | --- |
+| STM32H747XI (H747I-DISCO) | defined | 32 MB SDRAM | ✅ Plays |
+| STM32F746NG (F746G-DISCO) | absent — arrived with the F76x/F77x | 8 MB SDRAM | ❌ No codec |
+| STM32U599NJ (EVK043027B) | absent — only a DCMI capture-mode bit of the same name | none; 2496 KB internal SRAM | ❌ No codec, and nowhere to put the buffers |
+
+The U599 does carry SDMMC1 and SDMMC2 and DMA2D. Neither helps: the layer it
+is missing is the one with no substitute.
+
+### 10.2 Why there is no software fallback
+
+The obvious question is whether a board without the codec could decode in
+software, slower. It could, and the result would not be a video.
+
+A 800×480 baseline JPEG through libjpeg-turbo or TJpgDec on a Cortex-M7 at
+400 MHz takes in the region of 150–300 ms — **3 to 6 frames a second**, against
+the 24 this format is encoded at. And for every one of those milliseconds the
+CPU is the decoder: LVGL does not draw, touch is not read, Modbus does not
+poll. A slideshow that freezes the panel between slides is not a slower
+version of the feature; it is a different and worse feature wearing its name.
+
+Dropping the resolution changes the arithmetic but not the conclusion.
+320×240 at 10 fps is reachable in software on the F746, and the panel would
+still stall for most of every frame period. That is a decision for a product
+that wants it, with its own widget and its own honest name — not a fallback to
+slip under this one.
+
+So the runtime has no software path, on purpose. A board that lacks the codec
+says *cannot be built* rather than building something that looks like it works
+in the editor and stutters on the bench.
+
+### 10.3 What travels, and what does not
+
+Most of the implementation is portable. Only one file is welded to the part.
+
+| Piece | Portable? | Notes |
+| --- | --- | --- |
+| Editor: category, widget, property editor, canvas, Prototype, Emulator, code generation | **Yes, entirely.** | Knows nothing about the board beyond `BoardDefinition.video`. |
+| The build gate (Deploy tab, Video section) | **Yes.** | Reads the same field. A new board is one entry in [`src/types/hmi.ts`](../src/types/hmi.ts). |
+| [`hmi_avi.c`](../firmware/stm32h747i-disco/src/hmi_avi.c) — AVI demuxer | **Yes.** | Plain C over FatFs. No peripheral in it. |
+| [`hmi_sd.c`](../firmware/stm32h747i-disco/src/hmi_sd.c), [`ffconf.h`](../firmware/stm32h747i-disco/include/ffconf.h) | Mostly. | The `disk_*` functions call the board's BSP; a different storage device means rewriting those five functions and nothing above them. |
+| [`hmi_video.c`](../firmware/stm32h747i-disco/src/hmi_video.c) — the widget runtime | Mostly. | Pure LVGL except for the `.sdram` section attribute on its three buffers, which a board with different memory would place differently. |
+| [`hmi_jpeg.c`](../firmware/stm32h747i-disco/src/hmi_jpeg.c) — JPEG codec + DMA2D | **No.** | This is the file that is the hardware. Moving to an F769 or an H7B3 means re-checking its clock enable, its MCU-block geometry and its cache maintenance — a day's work on a part that has the codec, and not possible on one that does not. |
+
+Adding a board that *has* the codec — an F769I-DISCO, an H7B3I-DK, an
+H750-based custom board — is therefore: one `video` entry in the board
+definition, a copy of the four `hmi_*` runtime files with `hmi_jpeg.c` and
+`hmi_sd.c` re-pointed at that board's BSP, FatFs pinned in its
+`bootstrap-deps.ps1`, and the HAL JPEG/SD sources in its `CMakeLists.txt`.
+
+### 10.4 What it means for the EVK043027B
+
+This is the part worth stating plainly. The EVK043027B is EDT's own evaluation
+kit, and **this widget will never run on it**: the STM32U599 has no JPEG codec
+and the board has no external RAM, and neither is something a driver can
+supply. A project that places a Video widget cannot be built for it, and the
+Deploy tab says so.
+
+If the product line expects video on a U599 panel, the choices are these, and
+they are product decisions rather than engineering ones:
+
+1. **Treat video as a feature of the H7-class boards.** This is what the
+   editor does today. The widget is there for every board to design with; it
+   builds for the ones that can play it.
+2. **A separate, smaller widget with an honest name** — a software-decoded
+   *Slideshow* or *Animated Image* at 320×240 and a handful of frames a
+   second, stalling the UI while it decodes. Possible on the U599; not this
+   widget, and not to be sold as video.
+3. **Next hardware revision on a part with the codec** — an STM32H7 (H743,
+   H750, H7A3/H7B3) or an F76x/F77x — with external SDRAM or the H7B3's
+   1.4 MB of internal SRAM to hold the buffers.
+
+Nothing in the editor or the firmware needs to change for any of the three:
+the gate already says *cannot be built* in the right place, and a board that
+gains the codec is one entry away.
+

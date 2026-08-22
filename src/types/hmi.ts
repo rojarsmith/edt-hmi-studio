@@ -265,7 +265,7 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     protocols: ['modbus-rtu'],
     // No JPEG codec. The peripheral arrived with the STM32F76x/F77x parts;
     // the F746NG here does not carry one, and the board's microSD socket has
-    // nothing to feed. See docs/video-playback.md §2.
+    // nothing to feed. See docs/video-playback.md §10.
     video: null,
     lvgl: {
       fontLarge: true,
@@ -377,8 +377,10 @@ export const SUPPORTED_BOARDS: readonly BoardDefinition[] = [
     // still cannot be built — the Protocol tab says so rather than letting the
     // build fail later.
     protocols: ['modbus-rtu', 'can-bus'],
-    // The STM32U599 has no JPEG codec, and the kit brings no SD socket out.
-    // See docs/video-playback.md §2.
+    // The STM32U599 has no JPEG codec: stm32u599xx.h defines no JPEG_BASE,
+    // only a DCMI capture mode bit of the same name. It does have SDMMC, but
+    // that is moot — and it has no external RAM for the 3 MB of frame buffers
+    // either. See docs/video-playback.md §10.
     video: null,
     lvgl: {
       fontLarge: true,
