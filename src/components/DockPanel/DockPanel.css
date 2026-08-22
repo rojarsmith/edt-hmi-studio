@@ -422,3 +422,107 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Information pane
+   ----------------
+   Sentences, not a log: the rules a component lives by, and what this one
+   breaks. Plain text at reading size, because it is read rather than scanned. */
+
+.info-pane .info-subject {
+  color: #d7e2f2;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.info-verdict {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.info-verdict.ok {
+  color: #3fb27f;
+  background: rgba(63, 178, 127, 0.14);
+}
+.info-verdict.attention {
+  color: #f0b35a;
+  background: rgba(240, 179, 90, 0.14);
+}
+
+.info-empty {
+  margin: 0;
+  padding: 18px 14px;
+  color: #6f7f99;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.info-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 14px 14px;
+}
+
+.info-section + .info-section {
+  margin-top: 14px;
+}
+
+.info-section h3 {
+  margin: 0 0 6px;
+  color: #8fa0bb;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.info-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.info-note {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1b2538;
+  color: #d7e2f2;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.info-note:last-child {
+  border-bottom: none;
+}
+
+.info-note-glyph {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8fa0bb;
+  background: #1b2538;
+}
+.info-note.warning .info-note-glyph {
+  color: #1a1300;
+  background: #f0b35a;
+}
+
+.info-note-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.info-note-title {
+  font-weight: 600;
+}
+
+.info-note-body {
+  color: #a9b7cc;
+}

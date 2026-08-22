@@ -281,3 +281,49 @@ a compiler transcript into words it does not have.
 **Still not done.** Arrow-key navigation of the tab strip and a keyboard
 alternative to the drag grip. Four panes make that more pressing than three
 did, not less.
+
+## 12. The fifth pane: Information
+
+The first pane that is not a log. **Information** says what the selected
+component needs from the panel — the rules a designer has to know and cannot
+read off the canvas — and what this particular one breaks.
+
+**Where it came from.** The Video widget. A video on the panel hides whatever
+overlaps it, is shown at its recorded size rather than the widget's, and plays
+a file that lives on a card the editor has never seen. None of that is visible
+on the canvas, where a video is a black box with a file name on it. The first
+project with a video put a button on top of it and the panel showed the video
+and no button, and the designer had no way to know that was the rule rather
+than a fault. The rule has to be said where the designer is looking, at the
+moment they reach for the widget.
+
+**Where it sits.** Between **Work** and **Build Firmware** — beside Work
+because both are about the project as a whole rather than one operation's
+transcript. Available on every tab, like Work.
+
+**It comes forward on its own.** Selecting a video brings Information to the
+front and expands the dock if it was collapsed. Only on a *new* selection: a
+designer who switches to Work while the same video stays selected has made a
+choice, and the pane must not undo it. Selecting anything else leaves the dock
+where it was — for every other widget the pane reads *nothing to add*, and a
+pane that says nothing has no business jumping forward.
+
+**Two kinds of line.** *Rules* are fixed — the eight a video lives by, the same
+every time. *Warnings* are derived from the screen: `Button_2 overlaps this
+video`, `The video runs off the screen`, `No file named yet`. The overlap check
+flattens the screen's tree into absolute boxes and intersects them, skipping
+the video's own ancestors (a container the video sits in is not "over" it) and
+hidden components. A verdict in the toolbar — *Ready to play* or *2 things to
+fix* — is the one-glance answer.
+
+**In the designer's words, and only those.** Nothing in the pane names LVGL, a
+layer, a codec or a buffer; a test asserts it. The display controller's second
+layer is the reason the rule exists, and the rule — *the video needs its space
+to itself* — is what the designer has to act on. See
+[video-playback.md](./video-playback.md) for the reasons, and
+[`componentNotes.ts`](../src/components/DockPanel/componentNotes.ts) for the
+words.
+
+**What to add next.** Any widget whose behaviour on the panel cannot be read
+off the canvas belongs here: `componentNotes.ts` is the one place to put its
+rules and checks, and the pane picks them up by type.

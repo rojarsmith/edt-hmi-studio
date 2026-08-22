@@ -35,11 +35,11 @@ beforeEach(() => {
 });
 
 describe('DockPanel', () => {
-  it('offers all three panes, with Work first', () => {
+  it('offers all four panes, with Work first', () => {
     render(<DockPanel />);
 
     const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
-    expect(tabs).toEqual(['Work', 'Build Firmware', 'Flash & Reset']);
+    expect(tabs).toEqual(['Work', 'Information', 'Build Firmware', 'Flash & Reset']);
   });
 
   it('is available whatever the workspace is showing', () => {
@@ -57,7 +57,7 @@ describe('DockPanel', () => {
     const { container } = render(<DockPanel />);
 
     expect(container.querySelector('.dock-panel')).toHaveClass('collapsed');
-    expect(screen.getAllByRole('tab')).toHaveLength(3);
+    expect(screen.getAllByRole('tab')).toHaveLength(4);
     expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
   });
 

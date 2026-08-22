@@ -5,8 +5,9 @@
 // height and which pane is in front belong to dockStore.
 // See docs/bottom-dock-panel.md.
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import PanelChevron from '../LogicEditor/PanelChevron';
+import { useEditorStore } from '../../store/editorStore';
 import { useWorkStore } from '../../store/workStore';
 import {
   useDockStore,
@@ -16,6 +17,7 @@ import {
 } from '../../store/dockStore';
 import DeployLogPane from './DeployLogPane';
 import EmulatorOutputPane from './EmulatorOutputPane';
+import InformationPane from './InformationPane';
 import WorkPane from './WorkPane';
 import './DockPanel.css';
 
@@ -23,6 +25,9 @@ const PANES: { id: DockPaneId; label: string }[] = [
   // Work first: it is the one pane that says something about every operation,
   // and the two log panes are candidates for factory mode later.
   { id: 'work', label: 'Work' },
+  // What the selected component needs from the panel. Next to Work because
+  // both are about the project as a whole rather than one operation's log.
+  { id: 'info', label: 'Information' },
   // Between Work and the firmware log, which is where it belongs in the
   // ladder: the Emulator compiles before Deploy does.
   { id: 'output', label: 'Build Output' },
@@ -52,7 +57,25 @@ const DockPanel: React.FC<DockPanelProps> = ({ showBuildOutput = false }) => {
   const height = useDockStore((state) => state.height);
   const toggleExpanded = useDockStore((state) => state.toggleExpanded);
   const setActivePane = useDockStore((state) => state.setActivePane);
+  const showPane = useDockStore((state) => state.showPane);
   const setHeight = useDockStore((state) => state.setHeight);
+
+  // Selecting a video brings Information to the front. A video's rules are the
+  // one kind of thing the canvas cannot show — what it hides, where its file
+  // lives — so they appear the moment the designer reaches for one, and not
+  // again until a different video is picked: switching to another pane while
+  // the same video stays selected is a choice this must not undo.
+  const selectedId = useEditorStore((state) => state.selection.selectedIds[0] ?? null);
+  const selectedType = useEditorStore((state) =>
+    state.selection.selectedIds[0]
+      ? state.getComponentById(state.selection.selectedIds[0])?.type ?? null
+      : null,
+  );
+  useEffect(() => {
+    if (selectedId && selectedType === 'video') {
+      showPane('info');
+    }
+  }, [selectedId, selectedType, showPane]);
   // Anything unfinished, not just a firmware operation: the lamp answers "is
   // something still going?", and an Emulator build left the answer wrong until
   // it became a Work item. Two primitive selectors rather than a filtered
@@ -170,9 +193,11 @@ const DockPanel: React.FC<DockPanelProps> = ({ showBuildOutput = false }) => {
         <div className="dock-body" role="tabpanel">
           {visiblePane === 'work'
             ? <WorkPane />
-            : visiblePane === 'output'
-              ? <EmulatorOutputPane />
-              : <DeployLogPane pane={visiblePane} />}
+            : visiblePane === 'info'
+              ? <InformationPane />
+              : visiblePane === 'output'
+                ? <EmulatorOutputPane />
+                : <DeployLogPane pane={visiblePane} />}
         </div>
       )}
     </div>

@@ -10,8 +10,10 @@ import { create } from 'zustand';
 /**
  * 'output' is the Emulator's build log and is offered only on the Preview tab;
  * the rest are available everywhere. DockPanel decides which are on show.
+ * 'info' is what the selected component needs from the panel — see
+ * DockPanel/InformationPane.tsx.
  */
-export type DockPaneId = 'work' | 'output' | 'build' | 'flash';
+export type DockPaneId = 'work' | 'info' | 'output' | 'build' | 'flash';
 
 const HEIGHT_KEY = 'dockPanelHeight';
 export const DOCK_MIN_HEIGHT = 120;
