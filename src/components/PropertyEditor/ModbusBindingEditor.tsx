@@ -334,8 +334,9 @@ const ModbusBindingEditor: React.FC<ModbusBindingEditorProps> = ({
                 })}
               />
               <span className="property-hint">
-                {2 * (value.stringRegisters ?? 16)} characters — two per
-                register, high byte first, ended by a zero.
+                {2 * (value.stringRegisters ?? 16)} bytes of UTF-8 — two per
+                register, high byte first, ended by a zero. A kanji is three
+                bytes; plain letters are one each.
               </span>
             </div>
           )}

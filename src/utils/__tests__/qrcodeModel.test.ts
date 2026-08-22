@@ -93,6 +93,22 @@ describe('encoding', () => {
     expect(error).toMatch(/Nothing to encode/);
   });
 
+  it('encodes Unicode as UTF-8 bytes, the way every phone scanner reads it', () => {
+    // こんにちは is 15 UTF-8 bytes: too long for version 1 at M (14 bytes),
+    // so a correct encoder needs version 2. The library's default byte
+    // encoder truncated each character to its low byte — 5 bytes, version 1,
+    // and a code that scanned as noise. This is the test that keeps it out.
+    const { render } = encodeQrcode('こんにちは', normalizeQrcodeProps({ version: 0, ecc: 'M' }));
+    expect(render).not.toBeNull();
+    expect(render!.version).toBe(2);
+  });
+
+  it('fits Japanese into a pinned version by its UTF-8 byte count', () => {
+    // 15 bytes fit version 2 at M (28 bytes) and do not fit version 1 at M.
+    expect(encodeQrcode('こんにちは', normalizeQrcodeProps({ version: 2, ecc: 'M' })).render).not.toBeNull();
+    expect(encodeQrcode('こんにちは', normalizeQrcodeProps({ version: 1, ecc: 'M' })).render).toBeNull();
+  });
+
   it('counts the quiet zone into the pixel size', () => {
     // 25 modules + 4 each side, at 3 px per module.
     expect(qrcodePixelSize(25, 3)).toBe(99);

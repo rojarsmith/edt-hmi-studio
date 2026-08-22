@@ -180,19 +180,24 @@ static void completed_read_text(
     for (uint16_t index = 0U; index < quantity; ++index) {
         const uint16_t word =
             modbus_rtu_async_get_register(&g_modbus_client, index);
-        const char bytes[2] = {
-            (char)((word >> 8U) & 0xFFU),
-            (char)(word & 0xFFU),
+        const uint8_t bytes[2] = {
+            (uint8_t)((word >> 8U) & 0xFFU),
+            (uint8_t)(word & 0xFFU),
         };
 
         for (size_t half = 0U; half < 2U; ++half) {
-            const char c = bytes[half];
+            const uint8_t c = bytes[half];
 
-            if ((c == 0) || (c < 0x20) || (used + 1U >= capacity)) {
+            /* Unsigned on purpose, not plain char: UTF-8 continuation bytes
+               all sit above 0x7F, and on a platform where char is signed a
+               plain comparison would read every one of them as a control
+               character and cut a Japanese string off at its first kanji.
+               Only real control bytes (below space) end the string early. */
+            if ((c == 0U) || (c < 0x20U) || (used + 1U >= capacity)) {
                 out[used] = 0;
                 return;
             }
-            out[used] = c;
+            out[used] = (char)c;
             used++;
         }
     }

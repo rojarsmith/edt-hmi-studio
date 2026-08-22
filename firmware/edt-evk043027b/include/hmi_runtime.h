@@ -33,11 +33,13 @@ typedef enum {
     HMI_DATA_INT32,
     HMI_DATA_FLOAT32,
     /**
-     * ASCII text carried in consecutive holding or input registers, two
-     * characters per register, high byte first, ended by a NUL or by the
-     * end of the block. `string_registers` on the descriptor says how many
-     * registers the block spans. Read-only: nothing in the runtime writes
-     * text back to the server.
+     * UTF-8 text carried in consecutive holding or input registers, two
+     * bytes per register, high byte first, ended by a NUL or by the end of
+     * the block. Bytes, not characters: a kanji is three of them and may
+     * straddle a register boundary, which is fine — the decoder reassembles
+     * the byte stream and only a real control byte ends it early.
+     * `string_registers` on the descriptor says how many registers the block
+     * spans. Read-only: nothing in the runtime writes text back.
      */
     HMI_DATA_STRING,
 } hmi_data_type_t;

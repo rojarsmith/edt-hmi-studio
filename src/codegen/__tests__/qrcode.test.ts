@@ -53,6 +53,14 @@ describe('qrcode code generation', () => {
     expect(source).toContain('.text = "https://bitdove.net",');
   });
 
+  it('carries Unicode content through as UTF-8 in the generated string', () => {
+    // The generated .c is written as UTF-8 and compilers read string
+    // literals as the bytes they are, so the firmware's encoder receives
+    // exactly the bytes the canvas encoded.
+    const source = sourceFor({ source: 'literal', literal: 'https://例え.jp/こんにちは' });
+    expect(source).toContain('.text = "https://例え.jp/こんにちは",');
+  });
+
   it('carries the widget colours as dark and light', () => {
     const qr = createComponent('qrcode', {
       name: 'qr1',

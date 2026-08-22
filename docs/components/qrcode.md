@@ -67,6 +67,12 @@ picture computed from its content.
 
 ### About the properties
 
+- **Unicode is encoded as UTF-8**, in byte mode — the convention every phone
+  scanner decodes. Japanese, Chinese, or any other script works in the
+  literal, in a text resource, and over communication alike; capacity is
+  counted in UTF-8 bytes, so a kanji costs three where a letter costs one,
+  and the version arithmetic in the editor counts the same bytes the panel
+  encodes.
 - **A text resource is read in English**, whatever the panel's language: a QR
   code is scanned by a phone, not read by the operator, and the address behind
   it does not translate. Resolution falls back the way every text reader does
@@ -82,9 +88,10 @@ picture computed from its content.
 ## 6. Communication
 
 Bind the widget in its Communication section: a **string** read from
-consecutive holding or input registers — two ASCII characters per register,
+consecutive holding or input registers — two UTF-8 **bytes** per register,
 high byte first, ended by a zero — with a configurable length of 1–64
-registers (2–128 characters). Read-only: nothing on the panel edits a QR code.
+registers (2–128 bytes; a kanji is three of them and may straddle a register
+boundary, which is fine). Read-only: nothing on the panel edits a QR code.
 
 The panel polls the block and re-encodes **only when the string actually
 changes** — polls repeat, pictures should not. An empty read leaves the

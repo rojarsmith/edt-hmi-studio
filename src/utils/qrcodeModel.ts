@@ -18,6 +18,22 @@ import type { TextResource } from '../types';
 import { resolveText } from '../codegen/textResources';
 import qrcode from 'qrcode-generator';
 
+/*
+ * Encode text as UTF-8 bytes, not the library's default.
+ *
+ * The default byte encoder truncates every character to its low byte, which
+ * turns 日本語 into three bytes of noise — the code still draws, scans, and
+ * hands the phone garbage. UTF-8 in byte mode is what every phone scanner
+ * decodes, and it is exactly what the firmware's encoder receives: the
+ * generated C string literal carries the same UTF-8 bytes. One encoder rule
+ * on both sides is what makes the canvas honest.
+ *
+ * Our own TextEncoder rather than the library's optional UTF-8 table: the
+ * library ships several builds, not all of which carry the table, and which
+ * one a bundler picks is not this module's to control.
+ */
+qrcode.stringToBytes = (text: string) => Array.from(new TextEncoder().encode(text));
+
 export type QrcodeSource = 'text' | 'literal';
 
 /** The four levels the QR standard defines, lowest to highest redundancy. */
