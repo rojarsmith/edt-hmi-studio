@@ -10,7 +10,19 @@ param(
     [switch]$TraceFrames,
     [switch]$RawTrace,
     [ValidateRange(3, 64)]
-    [int]$DashboardRows = 12
+    [int]$DashboardRows = 12,
+
+    # A UTF-8 string served from consecutive holding registers, two bytes per
+    # register, high byte first, NUL-ended -- the block a QrCode widget's
+    # string binding reads. -StringText seeds it; -StringFile watches a text
+    # file and repacks the block whenever the file changes, so editing and
+    # saving the file changes the code on the panel within one poll.
+    [ValidateRange(0, 960)]
+    [int]$StringAddress = 100,
+    [ValidateRange(1, 64)]
+    [int]$StringRegisters = 24,
+    [string]$StringText = "",
+    [string]$StringFile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -295,6 +307,50 @@ $holdingRegisters[1] = 25
 $inputRegisters[0] = 456
 $discreteInputs[0] = $true
 
+function Set-StringRegisters {
+    param([string]$Text)
+
+    # UTF-8 bytes, two per register, high byte first, the rest zeroed. The
+    # panel stops at the first NUL, so a shorter string cleanly replaces a
+    # longer one. Bytes past the block are dropped -- the binding's length is
+    # the contract.
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+    $capacity = 2 * $StringRegisters
+    if ($bytes.Length -gt $capacity) {
+        $bytes = $bytes[0..($capacity - 1)]
+        Write-Host ("String truncated to {0} bytes to fit {1} registers." -f $capacity, $StringRegisters) -ForegroundColor Yellow
+    }
+    for ($index = 0; $index -lt $StringRegisters; $index++) {
+        $high = if ((2 * $index) -lt $bytes.Length) { [int]$bytes[2 * $index] } else { 0 }
+        $low = if ((2 * $index + 1) -lt $bytes.Length) { [int]$bytes[2 * $index + 1] } else { 0 }
+        $holdingRegisters[$StringAddress + $index] = [uint16](($high -shl 8) -bor $low)
+    }
+    if ($script:dashboardState) {
+        $script:dashboardState.LastOperation =
+            "String block @{0}: {1} byte(s)" -f $StringAddress, $bytes.Length
+    }
+}
+
+$script:stringFileStamp = [datetime]::MinValue
+function Update-StringFromFile {
+    # Repack when the watched file's timestamp moves. Reading the whole file
+    # is fine: it holds one line a person just typed.
+    if ([string]::IsNullOrEmpty($StringFile)) { return }
+    if (-not (Test-Path -LiteralPath $StringFile -PathType Leaf)) { return }
+    $stamp = (Get-Item -LiteralPath $StringFile).LastWriteTimeUtc
+    if ($stamp -le $script:stringFileStamp) { return }
+    $script:stringFileStamp = $stamp
+    $text = (Get-Content -LiteralPath $StringFile -Raw -Encoding UTF8)
+    if ($null -eq $text) { $text = "" }
+    Set-StringRegisters -Text $text.Trim()
+    Write-Host ('String updated from {0}: <{1}>' -f $StringFile, $text.Trim()) -ForegroundColor Cyan
+}
+
+if ($StringText -ne "") {
+    Set-StringRegisters -Text $StringText
+}
+Update-StringFromFile
+
 $serial = [System.IO.Ports.SerialPort]::new(
     $Port,
     $BaudRate,
@@ -355,12 +411,19 @@ try {
     }
 
     $receive = [System.Collections.Generic.List[byte]]::new()
+    $script:stringPollCountdown = 0
     while ($true) {
         while ($serial.BytesToRead -gt 0) {
             $receive.Add([byte]$serial.ReadByte())
         }
 
         if ($receive.Count -lt 8) {
+            # Idle: a cheap moment to notice the watched string file changing.
+            $script:stringPollCountdown--
+            if ($script:stringPollCountdown -le 0) {
+                $script:stringPollCountdown = 100  # ~200 ms at the 2 ms sleep
+                Update-StringFromFile
+            }
             Start-Sleep -Milliseconds 2
             continue
         }
