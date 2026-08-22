@@ -11,8 +11,20 @@
 extern "C" {
 #endif
 
-#define MODBUS_RTU_ASYNC_MAX_BITS      32U
-#define MODBUS_RTU_ASYNC_MAX_REGISTERS 2U
+#define MODBUS_RTU_ASYNC_MAX_BITS            32U
+
+/*
+ * Registers one read may carry. 64 is 128 bytes of UTF-8 -- the widest span
+ * a QrCode's string binding asks for -- and well inside the protocol's 125.
+ * Writes stay at two: the widest value any widget writes is a 32-bit number,
+ * so the request buffer need not grow with the response buffer.
+ */
+#define MODBUS_RTU_ASYNC_MAX_REGISTERS       64U
+#define MODBUS_RTU_ASYNC_MAX_WRITE_REGISTERS 2U
+
+/* Unit, function, byte count, the registers, CRC. */
+#define MODBUS_RTU_ASYNC_RX_FRAME_SIZE \
+    (5U + (2U * MODBUS_RTU_ASYNC_MAX_REGISTERS))
 
 typedef enum {
     MODBUS_RTU_ASYNC_IDLE = 0,
@@ -48,9 +60,11 @@ typedef struct {
     uint8_t expected_byte_count;
     uint8_t tx_frame[13];
     uint16_t tx_length;
-    uint8_t rx_frame[16];
+    uint8_t rx_frame[MODBUS_RTU_ASYNC_RX_FRAME_SIZE];
     volatile uint16_t rx_length;
     volatile uint16_t expected_rx_length;
+    /* Wire time of the longest response this request can draw. */
+    uint32_t rx_budget_ms;
     uint8_t rx_byte;
     volatile modbus_client_result_t completed_result;
     uint16_t registers[MODBUS_RTU_ASYNC_MAX_REGISTERS];

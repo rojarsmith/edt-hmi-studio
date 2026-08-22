@@ -25,8 +25,9 @@ static uint32_t interframe_delay_ms(
     return (38500U + baud_rate - 1U) / baud_rate;
 }
 
-static uint32_t transmit_budget_ms(
-    const modbus_rtu_async_client_t *client)
+static uint32_t frame_budget_ms(
+    const modbus_rtu_async_client_t *client,
+    uint16_t frame_length)
 {
     const uint32_t baud_rate = client->uart->Init.BaudRate;
     uint32_t duration_ms;
@@ -37,9 +38,15 @@ static uint32_t transmit_budget_ms(
 
     /* Twelve bits covers start/data/parity/two-stop-bit configurations. */
     duration_ms =
-        ((uint32_t)client->tx_length * 12000U + baud_rate - 1U) /
+        ((uint32_t)frame_length * 12000U + baud_rate - 1U) /
         baud_rate;
     return duration_ms + 2U;
+}
+
+static uint32_t transmit_budget_ms(
+    const modbus_rtu_async_client_t *client)
+{
+    return frame_budget_ms(client, client->tx_length);
 }
 
 static void append_crc(uint8_t *frame, uint16_t payload_length)
@@ -97,6 +104,16 @@ static bool queue_request(
     client->expected_byte_count = expected_byte_count;
     client->rx_length = 0U;
     client->expected_rx_length = 0U;
+    /*
+     * The reply's own wire time. The response timeout counts from the end of
+     * our request, and a full 64-register reply at 9600 baud takes longer
+     * than half the default timeout just to arrive.
+     */
+    client->rx_budget_ms = frame_budget_ms(
+        client,
+        (operation == MODBUS_RTU_ASYNC_WRITE)
+            ? 8U
+            : (uint16_t)(5U + expected_byte_count));
     client->completed_result = MODBUS_CLIENT_BUSY;
     client->last_exception = 0U;
 
@@ -403,7 +420,7 @@ bool modbus_rtu_async_start_write_registers(
         (client->phase != MODBUS_RTU_ASYNC_IDLE) ||
         (registers == NULL) ||
         (quantity == 0U) ||
-        (quantity > MODBUS_RTU_ASYNC_MAX_REGISTERS)) {
+        (quantity > MODBUS_RTU_ASYNC_MAX_WRITE_REGISTERS)) {
         return false;
     }
 
@@ -462,7 +479,8 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *uart)
 
     client->rx_length = 0U;
     client->expected_rx_length = 0U;
-    client->deadline_ms = HAL_GetTick() + client->timeout_ms;
+    client->deadline_ms =
+        HAL_GetTick() + client->timeout_ms + client->rx_budget_ms;
     client->phase = MODBUS_RTU_ASYNC_RECEIVING;
     (void)arm_next_rx_byte(client);
 }
