@@ -246,6 +246,12 @@ export interface QrcodePlan {
    * working anything out.
    */
   advice: string[];
+  /**
+   * Not a problem, a choice: with the version on Auto the code grows and
+   * shrinks with every string, and so does the white around it. Pinning the
+   * version this string needs gives every shorter string the same footprint.
+   */
+  footprintTip: string | null;
 }
 
 /**
@@ -317,6 +323,11 @@ export function planQrcode(
     );
   }
 
+  const footprintTip = (settings.version === QRCODE_VERSION_AUTO && minVersion !== null && moduleCount !== null)
+    ? `On Auto the code is resized for every string, and the white around it changes with it. `
+      + `Pin the version to ${minVersion} and every string up to this one draws at the same ${moduleCount}×${moduleCount} modules.`
+    : null;
+
   return {
     characters,
     bytes,
@@ -328,5 +339,6 @@ export function planQrcode(
     scaleThatFits,
     registers,
     advice,
+    footprintTip,
   };
 }

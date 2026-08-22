@@ -2785,9 +2785,16 @@ function QrcodeEditor({
   );
   const encoded = encodeQrcode(content, settings);
 
+  // A pinned version has a size before it has content: every string up to
+  // its capacity draws at the same modules. So a blank, communication-fed
+  // widget with a pinned version still gets the arithmetic and the Shrink
+  // button — that is exactly the widget whose footprint someone is fixing.
+  const pinnedModules = settings.version === QRCODE_VERSION_AUTO ? null : 17 + 4 * settings.version;
   const fit = encoded.render
     ? qrcodePixelSize(encoded.render.moduleCount, settings.scale, settings.quietZone)
-    : null;
+    : encoded.empty && pinnedModules !== null
+      ? qrcodePixelSize(pinnedModules, settings.scale, settings.quietZone)
+      : null;
   const clipped = fit !== null && (fit > component.width || fit > component.height);
   const boxLargerThanCode = fit !== null && (component.width > fit || component.height > fit);
 
@@ -2919,6 +2926,14 @@ function QrcodeEditor({
           over communication.
         </p>
       )}
+      {encoded.empty && pinnedModules !== null && fit !== null && (
+        <p className={clipped ? 'shape-warning' : 'video-board-note'} role="status">
+          {`Version ${settings.version} pinned: ${pinnedModules}×${pinnedModules} modules — ${fit}×${fit} px${settings.quietZone ? ' with its quiet zone' : ''}, for every string that fits it.`}
+          {clipped
+            ? ` The widget is ${component.width}×${component.height}, so the code will be clipped: enlarge the widget or lower the scale.`
+            : ''}
+        </p>
+      )}
       {encoded.error && (
         <p className="shape-warning" role="status">{encoded.error}</p>
       )}
@@ -2998,6 +3013,7 @@ function QrcodeEditor({
           {plan.advice.map((line) => (
             <p key={line} className="shape-warning">{line}</p>
           ))}
+          {plan.footprintTip && <p>{plan.footprintTip}</p>}
         </div>
       )}
     </div>

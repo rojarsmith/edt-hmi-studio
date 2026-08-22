@@ -212,3 +212,28 @@ describe('planning a QR code around a string that is not its content', () => {
     expect(screen.getByText(/never encoded, never built into the firmware/)).toBeTruthy();
   });
 });
+
+describe('a blank widget with a pinned version', () => {
+  it('has a size, and the Shrink button, before it has content', () => {
+    cleanup();
+    setUp(qr({ source: 'literal', literal: '', version: 3, scale: 2, ecc: 'M' }));
+    // 29 modules + 8 quiet, at 2 px.
+    expect(screen.getByText(/Version 3 pinned: 29×29 modules — 74×74 px with its quiet zone/)).toBeTruthy();
+    fireEvent.click(screen.getByText(/Shrink the widget to the code — 74 × 74/));
+    expect(current().width).toBe(74);
+    expect(current().height).toBe(74);
+  });
+
+  it('says when the pinned size outgrows the box', () => {
+    cleanup();
+    setUp(qr({ source: 'literal', literal: '', version: 10, scale: 4 }, { width: 100, height: 100 }));
+    expect(screen.getByText(/Version 10 pinned: 57×57 modules — 260×260 px.*will be clipped/)).toBeTruthy();
+  });
+
+  it('offers no size on Auto, since there is nothing to size yet', () => {
+    cleanup();
+    setUp(qr({ source: 'literal', literal: '', version: 0 }));
+    expect(screen.queryByText(/pinned:/)).toBeNull();
+    expect(screen.queryByText(/Shrink the widget/)).toBeNull();
+  });
+});

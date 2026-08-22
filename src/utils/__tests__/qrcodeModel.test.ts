@@ -210,3 +210,15 @@ describe('planning the widget around a string that is not its content', () => {
     expect(plan.advice[0]).toMatch(/Too long for a QR code at level L: 3000 bytes/);
   });
 });
+
+describe('keeping the footprint fixed', () => {
+  it('tells an Auto-version widget which version to pin', () => {
+    const plan = planQrcode('https://bitdove.net', normalizeQrcodeProps({}), { width: 120, height: 120 }, null)!;
+    expect(plan.footprintTip).toMatch(/Pin the version to 2 and every string up to this one draws at the same 25×25 modules/);
+  });
+
+  it('has nothing to add once the version is pinned', () => {
+    const plan = planQrcode('https://bitdove.net', normalizeQrcodeProps({ version: 3 }), { width: 120, height: 120 }, null)!;
+    expect(plan.footprintTip).toBeNull();
+  });
+});
