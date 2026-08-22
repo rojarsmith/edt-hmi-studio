@@ -127,13 +127,28 @@ SD card ──f_read──► compressed frame ──JPEG codec──► YCbCr, 
                                                           DMA2D
                                                             │
                                                             ▼
-                                       ARGB8888, raster order ──► lv_image
+                                RGB565, raster order ──► LTDC layer 1 ──► panel
+                                                                 ▲
+                                          LVGL's screen ──► LTDC layer 0
 ```
 
 The JPEG codec and DMA2D were designed as a pair on this part: DMA2D's YCbCr
 input mode reads exactly the MCU-block layout the codec emits, converts it, and
-writes raster ARGB8888. Nothing here is a software decode with hardware
+writes raster RGB565. Nothing here is a software decode with hardware
 assistance — it is a hardware decode.
+
+**And the frame never passes through LVGL.** The display controller has two
+hardware layers; LVGL draws on the first, and the decoded frame is handed to
+the second, which the LTDC composites over the UI on its way to the panel.
+Before this, the frame went to LVGL as an image: the CPU blitted 1.5 MB into
+the frame buffer and then copied it again to keep the second buffer in step —
+three megabytes of SDRAM traffic per frame, which was most of the frame period
+on its own. Now nothing copies the frame at all. The price is in
+[§7](#7-what-this-deliberately-does-not-do): the layer is always on top.
+
+Two picture buffers alternate, so DMA2D writes the frame the panel is *not*
+scanning; the swap is staged and lands at vertical blanking, the same way
+LVGL's own frames do.
 
 Both stages are **polled**, and the whole thing runs inside one `lv_timer`
 callback. The caller has to wait for the frame before it can show it, so an
@@ -145,12 +160,29 @@ At 24 fps a frame period is 41.7 ms. A 800×480 frame costs a few milliseconds o
 codec time and roughly 140 KB of card reads at the ~27 Mbit/s this is built for.
 The main loop keeps running Modbus and touch between frames.
 
-The one thing that can spend that budget badly is **scaling**. The picture is
-drawn with `LV_IMAGE_ALIGN_CONTAIN`, so it keeps its aspect ratio inside
-whatever box the widget was given — and when the widget is exactly the video's
-own resolution, LVGL blits the frame with no scaling at all. **Size the Video
-widget to the video.** At any other size every frame is resized in software, on
-the CPU, at frame rate.
+The largest single cost is now the **card read**, and it is sensitive to how
+the read is made. A frame starts wherever the muxer left it — any byte of any
+sector — and a read that starts there makes FatFs copy the first partial sector
+through its own buffer and hand the card a destination that is no longer
+word-aligned, which the SD layer can only serve one sector per command. In
+`city.avi`, 634 of 1347 frames land that way; each cost ~280 card commands
+instead of ~5, and the video crawled. The reader now backs up to the sector
+boundary before the frame and reads from there into a word-aligned buffer, so
+every sector goes straight from the card into place. The bus also starts at
+50 MHz High Speed and drops to 25 MHz the first time a read fails, for good —
+see [§6](#the-sd-bus-starts-fast-and-slows-down-once).
+
+The picture is not scaled — the LTDC cannot — so it is shown at its own size,
+centred in the widget and clipped to it. **Size the Video widget to the
+video.** A widget larger than the picture shows black around it; a smaller one
+shows the middle.
+
+### Measuring it
+
+There is no console on this firmware. `hmi_video_stats` is a global the
+debugger can read — pause and `p hmi_video_stats` — with the last frame's read,
+decode and show times in microseconds, the worst frame so far, and the frame
+count. Anything over the period (41 667 µs at 24 fps) is a dropped frame.
 
 ### The buffers
 
@@ -158,11 +190,14 @@ the CPU, at frame rate.
 | --- | --- | --- | --- |
 | Compressed frame | 512 KB | `f_read` | JPEG codec |
 | YCbCr MCU blocks | 1152 KB | JPEG codec | DMA2D |
-| ARGB8888 picture | 1500 KB | DMA2D | LVGL |
+| RGB565 picture × 2 | 2 × 768 KB | DMA2D | LTDC |
 
-All three live in the board's external SDRAM, in the `.sdram` section, above
+All of them live in the board's external SDRAM, in the `.sdram` section, above
 LVGL's own 4 MB heap. They are **shared, not per-widget**, because only one
-video can decode at a time ([§5](#5-one-player-at-a-time)).
+video can decode at a time ([§5](#5-one-player-at-a-time)). RGB565 rather than
+the ARGB8888 the rest of the display runs: the LTDC scans this buffer sixty
+times a second on the same SDRAM bus LVGL's frame buffer is scanned from, and
+half the bytes is half that bandwidth.
 
 A project with no Video widget pays none of it. `--gc-sections` drops the
 runtime and its buffers entirely when nothing calls `hmi_video_attach`; measured
@@ -170,10 +205,11 @@ on this board, a screen with a video costs **+20 KB of Flash and 3.1 MB of
 SDRAM** against the same screen without one, and a project that has no video is
 byte-for-byte what it was before this existed.
 
-D-Cache is maintained around each hand-off: the codec's output is cleaned before
-DMA2D reads it, and the converted frame is invalidated before LVGL does. Cards
-are read by polling rather than DMA, which sidesteps the same problem on that
-side at the cost of CPU time the runtime is spending waiting anyway.
+D-Cache is maintained at the one hand-off that needs it: the codec's output is
+written by the CPU and cleaned before DMA2D reads it. The converted frame needs
+nothing — DMA2D writes it and the LTDC reads it, and the CPU never touches it.
+Cards are read by polling rather than DMA, which sidesteps the same problem on
+that side at the cost of CPU time the runtime is spending waiting anyway.
 
 ## 5. One player at a time
 
@@ -182,15 +218,15 @@ Video widget on the loaded screen** and leaves any other showing *Another video
 is playing*. One video per screen is the shape a project actually takes;
 registering several across several screens is ordinary and works.
 
-The widget the project styles is the black frame. The runtime puts two children
-inside it:
+The widget the project styles is the black frame. The runtime puts one child
+inside it — an **`lv_label`**, centred, which carries whatever the panel has to
+say — and shows the picture itself on the overlay layer, positioned over the
+frame's box. The label inherits the frame's text colour, so the message is
+styled by the widget's own **Text Color** row rather than hard-coded.
 
-- an **`lv_image`**, which the decoded frame is set on, hidden until the first
-  frame lands;
-- an **`lv_label`**, centred, which carries whatever the panel has to say.
-
-The label inherits the frame's text colour, so the message is styled by the
-widget's own **Text Color** row rather than hard-coded.
+Leaving the screen takes the overlay down at once, from the screen's own
+unload event, rather than at the next timer tick: a layer that sits above
+LVGL would otherwise be painted over the top of the screen that replaced it.
 
 **Nothing is opened at `ui_init`.** `hmi_video_attach` records the name and
 returns; the card is first touched when the widget is actually on the active
@@ -237,15 +273,16 @@ Failures split by whether anything on the panel could change them:
 | **Card** | *No SD card*, *SD card unreadable*, *Video not found* | Shown now, **tried again every second**. A card pushed in starts playing; a file copied onto the card and reinserted is found; one read that fails its CRC costs a frame, not the film. |
 | **File** | *Video format not supported* | Shown and left. Nothing on the panel will turn an H.264 file into Motion JPEG. Leaving the screen and coming back tries again. |
 
-### The SD bus runs at default speed
+### The SD bus starts fast and slows down once
 
 The BSP ends card initialisation by switching to High Speed — 50 MHz on
 `SDMMC_CK` — and does not check whether that worked. On this Discovery the
-socket is on the far side of the board from the MCU, and 50 MHz is where reads
-start failing their CRC now and then, which shows as a video that worked the
-second time. The runtime drops the bus back to **default speed, 25 MHz**:
-12.5 MB/s on four data lines against the 3.5 MB/s the video needs. Nothing is
-lost by being slow here.
+socket is on the far side of the board from the MCU, and 50 MHz is where some
+cards' reads start failing their CRC now and then. It is also twice the
+throughput, and a frame's worth of reads is the largest single cost in showing
+one. So the bus **starts at 50 MHz and drops to 25 MHz the first time a read
+fails**, for good: a card that failed once there will do it again, and one
+frame lost to finding that out is cheaper than one lost every few seconds.
 
 ### In the editor, and in the Preview
 
@@ -266,6 +303,17 @@ brought up on SAI, and a buffer discipline that keeps sound in step with a video
 clock — a second project's worth of work, and one nothing in the widget's
 configuration currently asks for. Use `-an` when producing the file; the frames
 are the same either way, and the audio stream is only making it bigger.
+
+**Nothing can be drawn over a playing video.** The picture is on the display
+controller's second layer, which the LTDC composites *above* everything LVGL
+draws. A label placed over the widget in the editor will be under the video on
+the panel. That is the price of not copying the frame, and it is the right
+price: the alternative costs most of the frame period. A caption goes beside
+the video, not on it.
+
+**The picture is not scaled.** The LTDC cannot, so a 800×480 video in a
+400×240 widget shows its middle 400×240. Size the widget to the video, or
+encode the video at the widget's size.
 
 **No seeking, and no transport controls.** The widget has Auto Play and Loop.
 `hmi_video_play`, `hmi_video_pause` and `hmi_video_stop` exist in the runtime for

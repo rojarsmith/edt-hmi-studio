@@ -81,6 +81,20 @@ hmi_avi_result_t hmi_avi_open(hmi_avi_t *avi, const char *file_name);
 /**
  * Read the next video frame into `buffer`.
  *
+ * The frame lands somewhere inside the buffer, not at its start: `*frame`
+ * says where and `*length` how long. That is the cost of reading it fast. A
+ * frame begins wherever the muxer left it — any byte of any sector — and a
+ * read that starts there makes FatFs copy the first partial sector through
+ * its own buffer and hand the card a destination that is no longer word
+ * aligned, which the SD layer can only serve one sector per command. Reading
+ * from the sector boundary just before the frame into a word-aligned buffer
+ * lets every sector go straight from the card into place, at the price of
+ * up to 511 bytes of the previous chunk in front of it. Measured on this
+ * card, that is the difference between ~100 ms and ~10 ms a frame.
+ *
+ * The bytes after the frame, up to the next word boundary, are zeroed, so a
+ * decoder that takes whole words sees the frame's end marker intact.
+ *
  * Audio and any other stream in the file is skipped over, not decoded — see
  * docs/video-playback.md §7. Returns HMI_AVI_END once the `movi` list is
  * exhausted, leaving the reader where it is; call hmi_avi_rewind to loop.
@@ -89,6 +103,7 @@ hmi_avi_result_t hmi_avi_next_frame(
     hmi_avi_t *avi,
     uint8_t *buffer,
     uint32_t capacity,
+    const uint8_t **frame,
     uint32_t *length);
 
 /** Put the reader back at the first frame. */

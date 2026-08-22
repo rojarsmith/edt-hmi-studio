@@ -47,16 +47,23 @@ const char *hmi_sd_detail(void)
     return sd_detail;
 }
 
+static bool wait_for_card_ready(uint32_t timeout_ms);
+
 /**
- * Bring the card up, at a bus speed this board can be trusted at.
+ * Whether the bus has been dropped from High Speed to Default Speed.
  *
  * BSP_SD_Init ends by switching the card to High Speed — 50 MHz on the
  * SDMMC_CK — and ignores whether that worked. On this Discovery, with the
- * socket on the far side of the board from the MCU, 50 MHz is where reads
- * start failing their CRC now and then, which is exactly the "worked the
- * second time" failure a video shows. Default speed is 25 MHz, 12.5 MB/s on
- * a 4-bit bus, and the video needs 3.5 MB/s. Nothing is lost by being slow.
+ * socket on the far side of the board from the MCU, 50 MHz is where some
+ * cards' reads start failing their CRC now and then. 50 MHz is also twice
+ * the throughput, and a frame's worth of reads is the largest single cost
+ * in showing one. So the bus starts fast and drops to 25 MHz the first time
+ * a read fails, for good: a card that has failed once at 50 MHz will do it
+ * again, and a frame lost to finding that out is cheaper than a frame lost
+ * every few seconds.
  */
+static bool sd_slowed;
+
 static bool card_init(void)
 {
     const int32_t status = BSP_SD_Init(HMI_SD_INSTANCE);
@@ -65,13 +72,38 @@ static bool card_init(void)
         (void)snprintf(sd_detail, sizeof(sd_detail), "SD init failed (%ld)", (long)status);
         return false;
     }
-    if (HAL_SD_ConfigSpeedBusOperation(
-            &hsd_sdmmc[HMI_SD_INSTANCE], SDMMC_SPEED_MODE_DEFAULT) != HAL_OK) {
-        /* Not fatal: the card stays at whatever speed it agreed to, and the
-           reads below will say so if that turns out to be too fast. */
-        (void)snprintf(sd_detail, sizeof(sd_detail), "default speed refused");
-    }
+    sd_slowed = false;
     return true;
+}
+
+/** After a failed read: halve the clock, once. Returns whether it did. */
+static bool slow_down(void)
+{
+    if (sd_slowed) {
+        return false;
+    }
+    sd_slowed = true;
+    if (!wait_for_card_ready(HMI_SD_TRANSFER_TIMEOUT_MS)) {
+        return false;
+    }
+    return HAL_SD_ConfigSpeedBusOperation(
+        &hsd_sdmmc[HMI_SD_INSTANCE], SDMMC_SPEED_MODE_DEFAULT) == HAL_OK;
+}
+
+/**
+ * One multi-block read, retried once at the lower bus speed if it fails.
+ *
+ * The retry is here rather than in the caller because this is the only place
+ * that knows the failure was a read and not a missing card.
+ */
+static int32_t read_blocks(uint32_t *destination, uint32_t sector, uint32_t count)
+{
+    int32_t status = BSP_SD_ReadBlocks(HMI_SD_INSTANCE, destination, sector, count);
+
+    if ((status != BSP_ERROR_NONE) && slow_down()) {
+        status = BSP_SD_ReadBlocks(HMI_SD_INSTANCE, destination, sector, count);
+    }
+    return status;
 }
 
 bool hmi_sd_present(void)
@@ -205,14 +237,15 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
     /* BSP_SD_ReadBlocks takes a uint32_t*, and FatFs hands out a BYTE* that is
        word-aligned for its own buffers but need not be for a caller's. The
        polled HAL path copies through the SDMMC FIFO a word at a time and does
-       assume alignment, so an odd address is bounced one sector at a time
-       rather than trusted. */
+       assume alignment, so an odd address is bounced rather than trusted.
+       Bounced in runs, not sectors: every command costs the card a few
+       hundred microseconds before the first byte moves, so sixteen sectors
+       a command is the difference between a slow read and a stalled one.
+       The video reader aligns its own reads and never comes this way; this
+       is for FatFs's own structures and for anyone else. */
     if ((((uintptr_t)buff) & 3U) == 0U) {
-        const int32_t read = BSP_SD_ReadBlocks(
-            HMI_SD_INSTANCE,
-            (uint32_t *)(void *)buff,
-            (uint32_t)sector,
-            count);
+        const int32_t read = read_blocks(
+            (uint32_t *)(void *)buff, (uint32_t)sector, count);
 
         if (read != BSP_ERROR_NONE) {
             (void)snprintf(
@@ -221,25 +254,25 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
             return RES_ERROR;
         }
     } else {
-        static uint32_t bounce[FF_MAX_SS / sizeof(uint32_t)];
+#define BOUNCE_SECTORS 16U
+        static uint32_t bounce[(BOUNCE_SECTORS * FF_MAX_SS) / sizeof(uint32_t)];
+        UINT done = 0U;
 
-        for (UINT block = 0U; block < count; ++block) {
-            const int32_t read = BSP_SD_ReadBlocks(
-                HMI_SD_INSTANCE,
-                bounce,
-                (uint32_t)sector + block,
-                1U);
+        while (done < count) {
+            const UINT run = ((count - done) < BOUNCE_SECTORS) ? (count - done) : BOUNCE_SECTORS;
+            const int32_t read = read_blocks(bounce, (uint32_t)sector + done, run);
 
             if (read != BSP_ERROR_NONE) {
                 (void)snprintf(
-                    sd_detail, sizeof(sd_detail), "read failed (%ld) at %lu",
-                    (long)read, (unsigned long)(sector + block));
+                    sd_detail, sizeof(sd_detail), "read failed (%ld) at %lu x%u",
+                    (long)read, (unsigned long)(sector + done), (unsigned)run);
                 return RES_ERROR;
             }
             if (!wait_for_card_ready(HMI_SD_TRANSFER_TIMEOUT_MS)) {
                 return RES_NOTRDY;
             }
-            memcpy(&buff[block * FF_MAX_SS], bounce, FF_MAX_SS);
+            memcpy(&buff[done * FF_MAX_SS], bounce, run * FF_MAX_SS);
+            done += run;
         }
         return RES_OK;
     }

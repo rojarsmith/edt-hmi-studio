@@ -25,18 +25,24 @@
  * carries on. That costs a few milliseconds against a 41 ms frame period at
  * 24 fps — see docs/video-playback.md §4 — and buys a module with no
  * concurrency in it at all.
+ *
+ * Shown on the display controller's second layer, not drawn by LVGL. A frame
+ * handed to LVGL as an image is blitted into its frame buffer by the CPU and
+ * then copied again to keep the second buffer in step — three megabytes of
+ * SDRAM traffic a frame, which is most of the frame period on its own. The
+ * LTDC composites its second layer over the first in hardware, so the frame
+ * DMA2D wrote is the frame the panel scans, and nothing copies it. The cost
+ * is that the layer is always on top: nothing LVGL draws can appear over a
+ * playing video. See board_display.h.
  */
 
 #include "hmi_video.h"
 
+#include "board_display.h"
 #include "hmi_avi.h"
+#include "stm32h7xx_hal.h"
 #include "hmi_jpeg.h"
 #include "hmi_sd.h"
-
-/* lvgl.h does not pull the image cache in, and dropping the cached decode of
-   the frame descriptor is the only way to tell LVGL that the pixels behind an
-   unchanged pointer are different ones. */
-#include "misc/cache/instance/lv_image_cache.h"
 
 #include <string.h>
 
@@ -121,10 +127,10 @@ typedef enum {
 
 typedef struct {
     lv_obj_t *frame;
-    /** Fills with the decoded picture. Hidden until the first frame lands. */
-    lv_obj_t *picture;
     /** Carries the message. Hidden while a picture is showing. */
     lv_obj_t *message;
+    /** The screen the frame was created on, whose unload hides the overlay. */
+    lv_obj_t *screen;
 
     char file_name[HMI_VIDEO_MAX_NAME];
     bool auto_play;
@@ -155,15 +161,56 @@ static video_widget_t *session_owner;
 
 static lv_timer_t *video_timer;
 
-/** The image descriptor LVGL draws from, pointed at the decoded frame. */
-static lv_image_dsc_t frame_descriptor;
-
-/* The three big buffers, all in external SDRAM. Shared rather than per-widget,
-   because only one widget can be decoding at a time — see the file comment. */
-static HMI_VIDEO_SDRAM uint32_t frame_pixels[HMI_VIDEO_MAX_WIDTH * HMI_VIDEO_MAX_HEIGHT];
+/*
+ * The big buffers, all in external SDRAM. Shared rather than per-widget,
+ * because only one widget can be decoding at a time — see the file comment.
+ *
+ * Two picture buffers, because the LTDC is scanning one of them while DMA2D
+ * writes the next. Decoding into the one on screen would tear: the top of the
+ * panel would show the new frame and the bottom the old, on every frame. The
+ * swap is staged and lands at vertical blanking.
+ */
+static HMI_VIDEO_SDRAM uint16_t frame_pixels[2][HMI_VIDEO_MAX_WIDTH * HMI_VIDEO_MAX_HEIGHT];
+static uint32_t frame_back;
 /* Three bytes a pixel: the worst case is 4:4:4, where nothing is subsampled. */
 static HMI_VIDEO_SDRAM uint8_t frame_blocks[HMI_VIDEO_MAX_WIDTH * HMI_VIDEO_MAX_HEIGHT * 3U];
 static HMI_VIDEO_SDRAM uint8_t frame_compressed[HMI_VIDEO_MAX_FRAME_BYTES];
+
+/**
+ * What the last frames cost, for reading off the running board.
+ *
+ * There is no console on this firmware, so this is how the question "where
+ * does the time go" gets answered: pause the debugger and print it —
+ *
+ *   p hmi_video_stats
+ *
+ * Microseconds, from the Cortex-M7 cycle counter. `frame_us` is the whole
+ * timer callback for the last frame; the three stages inside it should add
+ * up to most of it. Anything over the period (41 667 us at 24 fps) is a
+ * dropped frame. `frames` counts shown frames since the widget started.
+ */
+typedef struct {
+    uint32_t frames;
+    uint32_t read_us;
+    uint32_t decode_us;
+    uint32_t show_us;
+    uint32_t frame_us;
+    uint32_t worst_frame_us;
+    uint32_t compressed_bytes;
+} hmi_video_stats_t;
+
+hmi_video_stats_t hmi_video_stats;
+
+static void cycle_counter_start(void)
+{
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+static uint32_t cycles_to_us(uint32_t cycles)
+{
+    return cycles / (SystemCoreClock / 1000000U);
+}
 
 static void video_timer_cb(lv_timer_t *timer);
 
@@ -199,20 +246,36 @@ static void show_message(video_widget_t *widget, const char *text, const char *d
         lv_label_set_text(widget->message, combined);
         lv_obj_remove_flag(widget->message, LV_OBJ_FLAG_HIDDEN);
     }
-    if (widget->picture != NULL) {
-        lv_obj_add_flag(widget->picture, LV_OBJ_FLAG_HIDDEN);
-    }
+    /* The overlay sits above everything LVGL draws, the message included. */
+    board_display_overlay_hide();
 }
 
-static void show_picture(video_widget_t *widget)
+/**
+ * Put the decoded frame on screen: centred in the widget's box, at its own
+ * size, clipped to the box. Not scaled — the LTDC cannot, and a widget sized
+ * to the video is the design to aim for anyway.
+ */
+static bool show_picture(video_widget_t *widget, const uint16_t *pixels, uint32_t w, uint32_t h)
 {
+    lv_area_t box;
+    board_overlay_t overlay;
+
     widget->shown[0] = 0;
     if (widget->message != NULL) {
         lv_obj_add_flag(widget->message, LV_OBJ_FLAG_HIDDEN);
     }
-    if (widget->picture != NULL) {
-        lv_obj_remove_flag(widget->picture, LV_OBJ_FLAG_HIDDEN);
-    }
+
+    lv_obj_get_coords(widget->frame, &box);
+    overlay.pixels = pixels;
+    overlay.width = w;
+    overlay.height = h;
+    overlay.x = box.x1 + ((lv_area_get_width(&box) - (int32_t)w) / 2);
+    overlay.y = box.y1 + ((lv_area_get_height(&box) - (int32_t)h) / 2);
+    overlay.clip_x1 = box.x1;
+    overlay.clip_y1 = box.y1;
+    overlay.clip_x2 = box.x2;
+    overlay.clip_y2 = box.y2;
+    return board_display_overlay_show(&overlay);
 }
 
 /** A failure nothing on the panel will change. Stays until the screen is left. */
@@ -240,6 +303,7 @@ static void retry_later(video_widget_t *widget, const char *text, const char *de
 
 static void close_session(void)
 {
+    board_display_overlay_hide();
     if (session_owner != NULL) {
         hmi_avi_close(&session);
         if (session_owner->state == VIDEO_PLAYING) {
@@ -349,14 +413,22 @@ static bool open_session(video_widget_t *widget)
  */
 static bool advance_frame(video_widget_t *widget)
 {
+    const uint8_t *compressed = NULL;
     uint32_t compressed_bytes = 0U;
     uint32_t decoded_width = 0U;
     uint32_t decoded_height = 0U;
     hmi_avi_result_t read;
     hmi_jpeg_result_t decoded;
+    uint16_t *pixels;
+    uint32_t t0;
+    uint32_t t1;
+    uint32_t t2;
+    uint32_t t3;
 
+    t0 = DWT->CYCCNT;
     read = hmi_avi_next_frame(
-        &session, frame_compressed, sizeof(frame_compressed), &compressed_bytes);
+        &session, frame_compressed, sizeof(frame_compressed), &compressed,
+        &compressed_bytes);
 
     if (read == HMI_AVI_END) {
         if (!widget->loop) {
@@ -367,7 +439,7 @@ static bool advance_frame(video_widget_t *widget)
         }
         hmi_avi_rewind(&session);
         read = hmi_avi_next_frame(
-            &session, frame_compressed, sizeof(frame_compressed),
+            &session, frame_compressed, sizeof(frame_compressed), &compressed,
             &compressed_bytes);
         if (read == HMI_AVI_END) {
             /* A file whose movi list holds no video chunks at all. Looping it
@@ -399,26 +471,21 @@ static bool advance_frame(video_widget_t *widget)
         return false;
     }
 
-    /* The HAL hands the codec whole words and drops the last one to three
-       bytes of an odd-length frame — which is where the EOI marker lives.
-       Padding with zeros past the end is harmless to the decoder and keeps
-       the marker in. The buffer has room: the reader refuses any frame that
-       would not leave it. */
-    while (((compressed_bytes & 3U) != 0U) &&
-           (compressed_bytes < sizeof(frame_compressed))) {
-        frame_compressed[compressed_bytes] = 0U;
-        compressed_bytes++;
-    }
+    t1 = DWT->CYCCNT;
 
-    decoded = hmi_jpeg_decode_to_argb(
-        frame_compressed,
-        compressed_bytes,
+    /* Into the buffer the panel is not scanning. The reader has already
+       padded the frame to a word boundary, so the HAL's whole-word input
+       drops nothing that matters. */
+    pixels = frame_pixels[frame_back];
+    decoded = hmi_jpeg_decode_to_rgb565(
+        compressed,
+        (compressed_bytes + 3U) & ~3U,
         frame_blocks,
         sizeof(frame_blocks),
-        frame_pixels,
-        /* Packed at the frame's own width, so the descriptor's stride below
-           cannot disagree with what DMA2D actually wrote — the AVI header's
-           idea of the size and the JPEG's need not match. */
+        pixels,
+        /* Packed at the frame's own width, so the overlay's pitch cannot
+           disagree with what DMA2D actually wrote — the AVI header's idea of
+           the size and the JPEG's need not match. */
         0U,
         HMI_VIDEO_MAX_WIDTH,
         HMI_VIDEO_MAX_HEIGHT,
@@ -429,22 +496,24 @@ static bool advance_frame(video_widget_t *widget)
         fail(widget, HMI_VIDEO_MSG_FORMAT, hmi_jpeg_detail());
         return false;
     }
+    t2 = DWT->CYCCNT;
 
-    frame_descriptor.header.magic = LV_IMAGE_HEADER_MAGIC;
-    frame_descriptor.header.cf = LV_COLOR_FORMAT_ARGB8888;
-    frame_descriptor.header.flags = 0U;
-    frame_descriptor.header.w = (uint16_t)decoded_width;
-    frame_descriptor.header.h = (uint16_t)decoded_height;
-    frame_descriptor.header.stride = (uint16_t)(decoded_width * 4U);
-    frame_descriptor.data = (const uint8_t *)frame_pixels;
-    frame_descriptor.data_size = decoded_width * decoded_height * 4U;
+    if (!show_picture(widget, pixels, decoded_width, decoded_height)) {
+        fail(widget, HMI_VIDEO_MSG_FORMAT, "overlay refused the frame");
+        return false;
+    }
+    frame_back ^= 1U;
+    t3 = DWT->CYCCNT;
 
-    /* The pixels behind the descriptor changed while the descriptor did not,
-       so LVGL has to be told to forget what it decoded from it last time. */
-    lv_image_cache_drop(&frame_descriptor);
-    lv_image_set_src(widget->picture, &frame_descriptor);
-    show_picture(widget);
-    lv_obj_invalidate(widget->picture);
+    hmi_video_stats.frames++;
+    hmi_video_stats.compressed_bytes = compressed_bytes;
+    hmi_video_stats.read_us = cycles_to_us(t1 - t0);
+    hmi_video_stats.decode_us = cycles_to_us(t2 - t1);
+    hmi_video_stats.show_us = cycles_to_us(t3 - t2);
+    hmi_video_stats.frame_us = cycles_to_us(t3 - t0);
+    if (hmi_video_stats.frame_us > hmi_video_stats.worst_frame_us) {
+        hmi_video_stats.worst_frame_us = hmi_video_stats.frame_us;
+    }
     return true;
 }
 
@@ -610,10 +679,28 @@ static void frame_deleted_cb(lv_event_t *event)
         close_session();
     }
     widget->frame = NULL;
-    widget->picture = NULL;
     widget->message = NULL;
+    widget->screen = NULL;
     widget->state = VIDEO_IDLE;
     widget->retry_at = 0U;
+}
+
+/**
+ * The screen is going: take the overlay down *now*, not at the next tick.
+ *
+ * The layer sits above LVGL, so a video left up for the 200 ms until the
+ * timer notices would be painted over the top of the screen that replaced
+ * it. The session goes with it; the widget is reopened from its first frame
+ * if the screen comes back.
+ */
+static void screen_unload_cb(lv_event_t *event)
+{
+    video_widget_t *widget = (video_widget_t *)lv_event_get_user_data(event);
+
+    if ((widget != NULL) && widget->holds_session) {
+        close_session();
+    }
+    board_display_overlay_hide();
 }
 
 void hmi_video_attach(
@@ -647,6 +734,7 @@ void hmi_video_attach(
 
     memset(widget, 0, sizeof(*widget));
     widget->frame = frame;
+    widget->screen = lv_obj_get_screen(frame);
     widget->auto_play = auto_play;
     widget->loop = loop;
     widget->state = VIDEO_IDLE;
@@ -655,16 +743,7 @@ void hmi_video_attach(
         (void)lv_strlcpy(widget->file_name, file_name, HMI_VIDEO_MAX_NAME);
     }
 
-    /* The picture keeps its aspect ratio inside whatever box the widget was
-       given. Sizing the widget to the video's own resolution is the fast path
-       and the one to design for: at 1:1 LVGL blits the frame, and at any other
-       size it scales every frame in software. See docs/video-playback.md §4. */
-    widget->picture = lv_image_create(frame);
-    lv_obj_remove_flag(widget->picture, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_size(widget->picture, lv_pct(100), lv_pct(100));
-    lv_image_set_inner_align(widget->picture, LV_IMAGE_ALIGN_CONTAIN);
-    lv_obj_center(widget->picture);
-    lv_obj_add_flag(widget->picture, LV_OBJ_FLAG_HIDDEN);
+    cycle_counter_start();
 
     /* Inherits the widget's text colour, which is the row the property editor
        calls Text Color — so the message is styled with the widget rather than
@@ -679,6 +758,10 @@ void hmi_video_attach(
     lv_obj_center(widget->message);
 
     lv_obj_add_event_cb(frame, frame_deleted_cb, LV_EVENT_DELETE, widget);
+    if (widget->screen != NULL) {
+        lv_obj_add_event_cb(
+            widget->screen, screen_unload_cb, LV_EVENT_SCREEN_UNLOAD_START, widget);
+    }
 
     if (video_timer == NULL) {
         video_timer = lv_timer_create(

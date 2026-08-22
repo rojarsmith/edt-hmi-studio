@@ -97,17 +97,6 @@ static void clean_dcache_range(const void *address, uint32_t length)
     __DSB();
 }
 
-static void invalidate_dcache_range(const void *address, uint32_t length)
-{
-    const uint32_t start = cache_line_floor((uintptr_t)address);
-    const uint32_t end =
-        (uint32_t)(((uintptr_t)address + length + 31U) & ~((uintptr_t)31U));
-
-    __DSB();
-    SCB_InvalidateDCache_by_Addr((uint32_t *)start, (int32_t)(end - start));
-    __DSB();
-}
-
 void HAL_JPEG_MspInit(JPEG_HandleTypeDef *handle)
 {
     if (handle->Instance == JPEG) {
@@ -210,12 +199,12 @@ static bool sampling_geometry(
     }
 }
 
-hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
+hmi_jpeg_result_t hmi_jpeg_decode_to_rgb565(
     const uint8_t *jpeg,
     uint32_t jpeg_bytes,
     uint8_t *blocks,
     uint32_t blocks_capacity,
-    uint32_t *argb,
+    uint16_t *rgb565,
     uint32_t stride_px,
     uint32_t max_width,
     uint32_t max_height,
@@ -229,7 +218,7 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
     uint32_t bytes_per_pixel;
     uint32_t needed;
 
-    if (!jpeg_ready || (jpeg == NULL) || (blocks == NULL) || (argb == NULL) ||
+    if (!jpeg_ready || (jpeg == NULL) || (blocks == NULL) || (rgb565 == NULL) ||
         (width == NULL) || (height == NULL) || (jpeg_bytes < 4U)) {
         (void)snprintf(jpeg_detail, sizeof(jpeg_detail), "decode: bad arguments");
         return HMI_JPEG_DECODE_FAILED;
@@ -322,14 +311,13 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
 
     hmi_jpeg_dma2d.Instance = DMA2D;
     hmi_jpeg_dma2d.Init.Mode = DMA2D_M2M_PFC;
-    hmi_jpeg_dma2d.Init.ColorMode = DMA2D_OUTPUT_ARGB8888;
+    hmi_jpeg_dma2d.Init.ColorMode = DMA2D_OUTPUT_RGB565;
     hmi_jpeg_dma2d.Init.OutputOffset = stride_px - info.ImageWidth;
     hmi_jpeg_dma2d.Init.AlphaInverted = DMA2D_REGULAR_ALPHA;
     hmi_jpeg_dma2d.Init.RedBlueSwap = DMA2D_RB_REGULAR;
 
-    /* Alpha is replaced rather than carried: a JPEG has none, and the LTDC on
-       this board multiplies the alpha byte into the output, so a frame left at
-       zero would be an invisible frame over the layer's black. */
+    /* No alpha in the output format, so this is moot — kept explicit so the
+       intent survives a change back to an alpha format. */
     hmi_jpeg_dma2d.LayerCfg[1].AlphaMode = DMA2D_REPLACE_ALPHA;
     hmi_jpeg_dma2d.LayerCfg[1].InputAlpha = 0xFFU;
     hmi_jpeg_dma2d.LayerCfg[1].InputColorMode = DMA2D_INPUT_YCBCR;
@@ -349,7 +337,7 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
     if (HAL_DMA2D_Start(
             &hmi_jpeg_dma2d,
             (uint32_t)(uintptr_t)blocks,
-            (uint32_t)(uintptr_t)argb,
+            (uint32_t)(uintptr_t)rgb565,
             info.ImageWidth,
             info.ImageHeight) != HAL_OK) {
         (void)snprintf(jpeg_detail, sizeof(jpeg_detail), "DMA2D start failed");
@@ -363,9 +351,8 @@ hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
         return HMI_JPEG_DECODE_FAILED;
     }
 
-    /* DMA2D wrote SDRAM behind the cache; LVGL reads those pixels through it. */
-    invalidate_dcache_range(argb, stride_px * info.ImageHeight * 4U);
-
+    /* No cache maintenance on the output: DMA2D wrote it and the LTDC will
+       read it, and neither goes through the CPU's cache. */
     jpeg_detail[0] = 0;
     return HMI_JPEG_OK;
 }

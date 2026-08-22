@@ -154,6 +154,116 @@ static void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
     data->point.y = last_y;
 }
 
+/* ------------------------------------------------------------------ */
+/*  The overlay layer                                                  */
+/* ------------------------------------------------------------------ */
+
+#define HMI_OVERLAY_LAYER 1U
+
+static bool overlay_visible;
+
+/* The last geometry configured, so an unchanged frame position costs one
+   address write rather than a full layer reconfiguration. */
+static LTDC_LayerCfgTypeDef overlay_cfg;
+static bool overlay_cfg_valid;
+
+bool board_display_overlay_show(const board_overlay_t *overlay)
+{
+    const bool portrait =
+        hmi_display_config.orientation == HMI_DISPLAY_ORIENTATION_PORTRAIT;
+    const int32_t screen_w = (int32_t)(portrait ? HMI_DISPLAY_HEIGHT : HMI_DISPLAY_WIDTH);
+    const int32_t screen_h = (int32_t)(portrait ? HMI_DISPLAY_WIDTH : HMI_DISPLAY_HEIGHT);
+    int32_t x1;
+    int32_t y1;
+    int32_t x2;
+    int32_t y2;
+    LTDC_LayerCfgTypeDef cfg = {0};
+    const uint16_t *origin;
+
+    if ((overlay == NULL) || (overlay->pixels == NULL) ||
+        (overlay->width == 0U) || (overlay->height == 0U)) {
+        return false;
+    }
+
+    /* The visible part: the picture, within the clip box, within the screen.
+       Inclusive coordinates throughout, as LVGL's areas are. */
+    x1 = overlay->x;
+    y1 = overlay->y;
+    x2 = overlay->x + (int32_t)overlay->width - 1;
+    y2 = overlay->y + (int32_t)overlay->height - 1;
+    if (overlay->clip_x1 > x1) x1 = overlay->clip_x1;
+    if (overlay->clip_y1 > y1) y1 = overlay->clip_y1;
+    if (overlay->clip_x2 < x2) x2 = overlay->clip_x2;
+    if (overlay->clip_y2 < y2) y2 = overlay->clip_y2;
+    if (x1 < 0) x1 = 0;
+    if (y1 < 0) y1 = 0;
+    if (x2 > screen_w - 1) x2 = screen_w - 1;
+    if (y2 > screen_h - 1) y2 = screen_h - 1;
+    if ((x2 < x1) || (y2 < y1)) {
+        /* Entirely off screen or entirely clipped: nothing to scan. */
+        board_display_overlay_hide();
+        return true;
+    }
+
+    /* The layer scans a window of the picture, not the whole picture: its
+       start address is the first visible pixel and its pitch is the picture's
+       full width, which is how a picture wider than its box shows the middle. */
+    origin = overlay->pixels +
+        ((uint32_t)(y1 - overlay->y) * overlay->width) +
+        (uint32_t)(x1 - overlay->x);
+
+    cfg.WindowX0 = (uint32_t)x1;
+    cfg.WindowX1 = (uint32_t)x2 + 1U;
+    cfg.WindowY0 = (uint32_t)y1;
+    cfg.WindowY1 = (uint32_t)y2 + 1U;
+    cfg.PixelFormat = LTDC_PIXEL_FORMAT_RGB565;
+    cfg.Alpha = 255U;
+    cfg.Alpha0 = 0U;
+    /* Constant alpha only. RGB565 carries no alpha of its own, and the
+       per-pixel factors layer 0 uses would read the missing byte as whatever
+       the controller substitutes. Opaque over its window, invisible outside. */
+    cfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_CA;
+    cfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_CA;
+    cfg.FBStartAdress = (uint32_t)(uintptr_t)origin;
+    cfg.ImageWidth = overlay->width;
+    cfg.ImageHeight = (uint32_t)(y2 - y1 + 1);
+    cfg.Backcolor.Blue = 0U;
+    cfg.Backcolor.Green = 0U;
+    cfg.Backcolor.Red = 0U;
+
+    if (overlay_cfg_valid && overlay_visible &&
+        (cfg.WindowX0 == overlay_cfg.WindowX0) && (cfg.WindowX1 == overlay_cfg.WindowX1) &&
+        (cfg.WindowY0 == overlay_cfg.WindowY0) && (cfg.WindowY1 == overlay_cfg.WindowY1) &&
+        (cfg.ImageWidth == overlay_cfg.ImageWidth) && (cfg.ImageHeight == overlay_cfg.ImageHeight)) {
+        /* Same place, new frame: the usual case, 24 times a second. */
+        if (HAL_LTDC_SetAddress_NoReload(&hlcd_ltdc, cfg.FBStartAdress, HMI_OVERLAY_LAYER) != HAL_OK) {
+            return false;
+        }
+    } else {
+        if (HAL_LTDC_ConfigLayer_NoReload(&hlcd_ltdc, &cfg, HMI_OVERLAY_LAYER) != HAL_OK) {
+            return false;
+        }
+        overlay_cfg = cfg;
+        overlay_cfg_valid = true;
+    }
+    overlay_visible = true;
+
+    /* Staged only; vertical blanking commits it. The same call LVGL's flush
+       makes, and if the two coincide one reload carries both. */
+    (void)BSP_LCD_Reload(HMI_LCD_INSTANCE, BSP_LCD_RELOAD_VERTICAL_BLANKING);
+    return true;
+}
+
+void board_display_overlay_hide(void)
+{
+    if (!overlay_visible) {
+        return;
+    }
+    overlay_visible = false;
+    __HAL_LTDC_LAYER_DISABLE(&hlcd_ltdc, HMI_OVERLAY_LAYER);
+    (void)BSP_LCD_Reload(HMI_LCD_INSTANCE, BSP_LCD_RELOAD_VERTICAL_BLANKING);
+}
+
 bool board_display_init(void)
 {
     lv_display_t *display;

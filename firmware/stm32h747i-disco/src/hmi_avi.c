@@ -45,6 +45,9 @@
 #define AVI_MAX_FRAME_PERIOD_US 1000000U   /* 1 fps */
 #define AVI_DEFAULT_FRAME_PERIOD_US 41667U /* 24 fps, the rate this targets */
 
+/** A card sector. The unit reads are aligned to — see hmi_avi_next_frame. */
+#define SECTOR_BYTES 512U
+
 static uint32_t read_u32(const uint8_t *bytes)
 {
     return (uint32_t)bytes[0] |
@@ -387,12 +390,15 @@ hmi_avi_result_t hmi_avi_next_frame(
     hmi_avi_t *avi,
     uint8_t *buffer,
     uint32_t capacity,
+    const uint8_t **frame,
     uint32_t *length)
 {
-    if ((avi == NULL) || !avi->open || (buffer == NULL) || (length == NULL)) {
+    if ((avi == NULL) || !avi->open || (buffer == NULL) || (frame == NULL) ||
+        (length == NULL)) {
         return HMI_AVI_UNREADABLE;
     }
 
+    *frame = NULL;
     *length = 0U;
 
     while ((avi->next_chunk + CHUNK_HEADER_BYTES) <= avi->movi_end) {
@@ -430,18 +436,30 @@ hmi_avi_result_t hmi_avi_next_frame(
                meaning "show the previous frame again". */
             continue;
         }
-        if (size > capacity) {
-            (void)snprintf(
-                avi->detail, sizeof(avi->detail), "frame %lu bytes > buffer",
-                (unsigned long)size);
-            return HMI_AVI_FRAME_TOO_LARGE;
-        }
-        if (!read_exact(&avi->file, buffer, size)) {
-            set_detail_fr(avi, "frame read");
-            return HMI_AVI_UNREADABLE;
-        }
+        {
+            /* Back up to the sector boundary, read from there. */
+            const uint32_t skew = (uint32_t)(body % SECTOR_BYTES);
+            const uint32_t padded = (size + 3U) & ~3U;
+            uint32_t pad;
 
-        *length = size;
+            if ((skew + padded) > capacity) {
+                (void)snprintf(
+                    avi->detail, sizeof(avi->detail), "frame %lu bytes > buffer",
+                    (unsigned long)size);
+                return HMI_AVI_FRAME_TOO_LARGE;
+            }
+            if (!seek_to(&avi->file, body - skew) ||
+                !read_exact(&avi->file, buffer, skew + size)) {
+                set_detail_fr(avi, "frame read");
+                return HMI_AVI_UNREADABLE;
+            }
+            for (pad = size; pad < padded; ++pad) {
+                buffer[skew + pad] = 0U;
+            }
+
+            *frame = &buffer[skew];
+            *length = size;
+        }
         avi->detail[0] = 0;
         return HMI_AVI_OK;
     }

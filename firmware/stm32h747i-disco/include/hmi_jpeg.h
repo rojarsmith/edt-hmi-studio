@@ -34,27 +34,36 @@ bool hmi_jpeg_init(void);
 const char *hmi_jpeg_detail(void);
 
 /**
- * Decode one JPEG frame into ARGB8888, in hardware from end to end.
+ * Decode one JPEG frame into RGB565, in hardware from end to end.
  *
  * `blocks` is scratch: the codec's own output, YCbCr in MCU-block order, which
  * DMA2D then reads directly. It has to be big enough for the picture at its
  * chroma sampling — three bytes per pixel covers every case this accepts.
  *
- * `argb` receives the picture at `stride_px` pixels per row, so a frame can be
- * written into the middle of a larger buffer. Pass 0 to have the rows packed
- * at the frame's own width, which is what a caller wants when the destination
- * holds nothing but this frame — and the only way to be certain the stride
- * matches a width the JPEG header decided rather than the caller.
+ * `rgb565` receives the picture at `stride_px` pixels per row, so a frame can
+ * be written into the middle of a larger buffer. Pass 0 to have the rows
+ * packed at the frame's own width, which is what a caller wants when the
+ * destination holds nothing but this frame — and the only way to be certain
+ * the stride matches a width the JPEG header decided rather than the caller.
+ *
+ * RGB565 rather than the ARGB8888 the rest of the display runs: the picture
+ * goes to an LTDC layer the controller scans sixty times a second, and half
+ * the bytes is half the SDRAM bandwidth that costs — on a bus LVGL's own
+ * frame buffer is already drawing from. Sixteen bits is more than a camera
+ * frame carries after JPEG has been at it.
+ *
+ * Nothing here touches the CPU cache: DMA2D writes the destination and the
+ * LTDC reads it, and the CPU never does either.
  *
  * The frame's own size comes back through `width` and `height`, filled in
  * whenever the codec got far enough to read the header.
  */
-hmi_jpeg_result_t hmi_jpeg_decode_to_argb(
+hmi_jpeg_result_t hmi_jpeg_decode_to_rgb565(
     const uint8_t *jpeg,
     uint32_t jpeg_bytes,
     uint8_t *blocks,
     uint32_t blocks_capacity,
-    uint32_t *argb,
+    uint16_t *rgb565,
     uint32_t stride_px,
     uint32_t max_width,
     uint32_t max_height,

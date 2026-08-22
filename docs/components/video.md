@@ -19,7 +19,8 @@ drawing a user interface. See [docs/video-playback.md](../video-playback.md) for
 the whole design.
 
 Video is not a container (`isContainer = false`) and cannot hold children — the
-runtime puts its own image and message label inside it.
+runtime puts its own message label inside it and shows the picture on a
+hardware layer above it.
 
 ## 2. Type identifier
 
@@ -50,9 +51,9 @@ something the firmware plays.
 > Half of 800×480: the panel's own aspect ratio, at a size that leaves room on
 > the canvas to place something beside it.
 >
-> **Size the widget to the video's own resolution.** At 1:1 LVGL blits each
-> frame; at any other size it resizes every frame in software, on the CPU, at
-> frame rate. See [§12](#12-design-notes).
+> **Size the widget to the video's own resolution.** The picture is shown at
+> its own size on a hardware layer that cannot scale: a larger widget shows
+> black around it, a smaller one shows its middle. See [§12](#12-design-notes).
 
 ## 5. Container?
 
@@ -60,9 +61,10 @@ something the firmware plays.
 isContainer: false
 ```
 
-Nothing can be dropped into it. The runtime creates two children of its own — an
-`lv_image` for the decoded frames and an `lv_label` for whatever the panel has to
-say — and a third child from the editor would land on top of the picture.
+Nothing can be dropped into it. The runtime creates one child of its own — an
+`lv_label` for whatever the panel has to say — and shows the picture on a
+hardware layer above everything LVGL draws, so a child from the editor would be
+under the video rather than on it.
 
 ## 6. Parent/child rules
 
@@ -321,9 +323,8 @@ Declared in `firmware/stm32h747i-disco/include/hmi_video.h`:
 
 | API | Description |
 |---|---|
-| `lv_image_create` / `lv_image_set_src` | The decoded frame, as an `lv_image_dsc_t` over the ARGB8888 buffer |
-| `lv_image_set_inner_align(LV_IMAGE_ALIGN_CONTAIN)` | Keeps the aspect ratio inside the widget's box |
-| `lv_image_cache_drop` | Tells LVGL the pixels behind an unchanged descriptor are different ones |
+| `board_display_overlay_show` / `_hide` | The decoded frame, on the LTDC's second hardware layer — never an LVGL image. See [docs/video-playback.md §4](../video-playback.md#4-how-a-frame-becomes-pixels) |
+| `lv_obj_get_coords` | Where the widget's box is, so the overlay is placed over it |
 | `lv_label_create` / `lv_label_set_text` | The message, inheriting the widget's text colour |
 | `lv_timer_create` / `lv_timer_set_period` | One timer, its period set from the AVI header's frame interval |
 
@@ -333,10 +334,11 @@ Declared in `firmware/stm32h747i-disco/include/hmi_video.h`:
    no browse button, no resource entry, the panel being the thing that reports a
    missing file — follows from it.
 
-2. **Size the widget to the video.** `LV_IMAGE_ALIGN_CONTAIN` means a 800×480
-   video in a 800×480 widget is blitted with no scaling. Any other size resizes
-   every frame in software at frame rate, which is the one way to spend the
-   41 ms frame budget badly.
+2. **Size the widget to the video.** The picture is shown at its own size on
+   a hardware layer the LTDC cannot scale: a larger widget shows black around
+   it, a smaller one shows its middle. And because that layer sits above
+   everything LVGL draws, **nothing can be drawn over a playing video** — a
+   caption goes beside it.
 
 3. **One player at a time.** One codec, one set of buffers. The runtime picks
    the first Video widget on the loaded screen, in registration order — the
