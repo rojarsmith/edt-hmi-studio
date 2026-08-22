@@ -249,6 +249,18 @@ static void ui_qrcode_apply(lv_obj_t *canvas, ui_qrcode_context_t *context)
     lv_draw_buf_t *draw_buf;
     lv_draw_buf_t *previous;
 
+    if (context->text[0] == 0) {
+        /* Nothing to encode: show the widget's background and nothing else.
+           The encoder would gladly make a code out of an empty string, and a
+           phone can do nothing with that code. The image source is cleared
+           rather than the draw buffer: a canvas will not take a NULL buffer,
+           so any previous one stays owned by it until the next real code
+           replaces it. */
+        lv_image_set_src(canvas, NULL);
+        lv_obj_invalidate(canvas);
+        return;
+    }
+
     encoded = qrcodegen_encodeText(
         context->text,
         ui_qrcode_scratch,

@@ -28,6 +28,15 @@ describe('qrcode code generation', () => {
     expect(source).toContain('.text = "https://bitdove.net",');
   });
 
+  it('starts blank: a new widget carries no sample content into the firmware', () => {
+    const source = sourceFor({});
+    expect(source).toContain('.text = "",');
+    // And the renderer leaves an empty context undrawn rather than encoding
+    // the empty string into a code no phone can use.
+    expect(source).toContain('if (context->text[0] == 0) {');
+    expect(source).toContain('lv_image_set_src(canvas, NULL);');
+  });
+
   it('pins version, ecc and scale as configured', () => {
     const source = sourceFor({ source: 'literal', literal: 'x', version: 7, scale: 4, ecc: 'H' });
     expect(source).toContain('.min_version = 7U,');

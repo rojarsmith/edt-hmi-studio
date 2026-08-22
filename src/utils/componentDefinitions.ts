@@ -666,7 +666,7 @@ export const componentDefinitions: ComponentDefinition[] = [
       // A literal by default, so the widget shows something scannable the
       // moment it lands; binding a Texts resource is one dropdown away.
       source: 'literal',
-      literal: 'https://bitdove.net',
+      literal: '',
       textId: '',
       // 0 is "the smallest version the content fits" — the QR standard's own
       // sizing rule, and the right default for anyone not pinning a version.

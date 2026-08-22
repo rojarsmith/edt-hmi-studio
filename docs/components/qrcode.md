@@ -59,7 +59,7 @@ picture computed from its content.
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `source` | `'literal' \| 'text'` | `'literal'` | Where the content comes from. |
-| `literal` | `string` | `'https://bitdove.net'` | The string encoded when `source` is `literal`. |
+| `literal` | `string` | `''` | The string encoded when `source` is `literal`. Empty by default — see below. |
 | `textId` | `string` | `''` | The Texts-library resource encoded when `source` is `text`. |
 | `version` | `number` | `0` | 0 = the smallest version the content fits; 1–40 pins it. |
 | `scale` | `number` | `2` | Pixels per module, 1–8. |
@@ -67,6 +67,16 @@ picture computed from its content.
 
 ### About the properties
 
+- **A new widget is blank, and blank means blank.** There is no sample
+  address to clear out of the way: the literal starts empty, and a widget
+  with nothing to encode draws **nothing but its background colour** — a
+  plain square — on the design canvas, in the Prototype, in the Simulator
+  and on the panel alike. The encoder could make a code out of an empty
+  string, and the first firmware did: a valid, meaningless version-1 code
+  that no phone could do anything with. Now the panel shows the square and
+  waits. This is the state a code that arrives over communication starts in:
+  blank at power-up, filled by the first string the server sends. The
+  property editor says *"Nothing to encode yet"* as a note, not a warning.
 - **Unicode is encoded as UTF-8**, in byte mode — the convention every phone
   scanner decodes. Japanese, Chinese, or any other script works in the
   literal, in a text resource, and over communication alike; capacity is

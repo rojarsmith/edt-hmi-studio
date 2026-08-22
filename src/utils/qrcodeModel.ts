@@ -73,7 +73,13 @@ export interface QrcodeSettings {
   quietZone: boolean;
 }
 
-export const QRCODE_DEFAULT_LITERAL = 'https://bitdove.net';
+/**
+ * A new widget encodes nothing. There is no sample address to clear out of
+ * the way, and — the reason that matters — a panel whose code is meant to
+ * arrive over communication shows a blank square until it does, rather than
+ * a code for a string nobody chose.
+ */
+export const QRCODE_DEFAULT_LITERAL = '';
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : fallback;
@@ -124,6 +130,17 @@ export interface QrcodeRender {
   isDark: (row: number, col: number) => boolean;
 }
 
+export type QrcodeEncoded =
+  | { render: QrcodeRender; error: null; empty: false }
+  | { render: null; error: string; empty: false }
+  /**
+   * No content. Not an error: the widget draws nothing — its own background
+   * shows, a plain square — on every layer, until communication sends a
+   * string. The encoder could make a code out of an empty string, and a
+   * phone can do nothing with that code.
+   */
+  | { render: null; error: null; empty: true };
+
 /**
  * Encode the content, or say why it cannot be.
  *
@@ -134,9 +151,9 @@ export interface QrcodeRender {
 export function encodeQrcode(
   content: string,
   settings: QrcodeSettings,
-): { render: QrcodeRender; error: null } | { render: null; error: string } {
+): QrcodeEncoded {
   if (content === '') {
-    return { render: null, error: 'Nothing to encode yet — the content is empty.' };
+    return { render: null, error: null, empty: true };
   }
   try {
     const qr = qrcode(
@@ -153,10 +170,12 @@ export function encodeQrcode(
         isDark: (row, col) => qr.isDark(row, col),
       },
       error: null,
+      empty: false,
     };
   } catch {
     return {
       render: null,
+      empty: false,
       error: settings.version === QRCODE_VERSION_AUTO
         ? 'The content is too long for a QR code — it holds at most about 2,950 bytes.'
         : `The content does not fit version ${settings.version} at level ${settings.ecc}. Raise the version, lower the correction level, or set the version to Auto.`,

@@ -2811,7 +2811,7 @@ function QrcodeEditor({
           <input
             type="text"
             value={settings.literal}
-            placeholder="https://bitdove.net"
+            placeholder="Text or URL to encode"
             spellCheck={false}
             aria-label="QR literal content"
             onChange={(e) => onChange('literal', e.target.value)}
@@ -2897,6 +2897,13 @@ function QrcodeEditor({
         </p>
       )}
 
+      {encoded.empty && (
+        <p className="video-board-note" role="status">
+          Nothing to encode yet — the widget stays blank, showing only its
+          background colour, until content is set here or a string arrives
+          over communication.
+        </p>
+      )}
       {encoded.error && (
         <p className="shape-warning" role="status">{encoded.error}</p>
       )}

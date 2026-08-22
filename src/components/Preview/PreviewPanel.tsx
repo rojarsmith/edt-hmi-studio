@@ -2111,6 +2111,10 @@ function drawQrcode(
   ctx.fillStyle = opts.light;
   ctx.fillRect(x, y, w, h);
 
+  // No content draws nothing but the background, as the panel does.
+  if (encoded.empty) {
+    return;
+  }
   if (!encoded.render) {
     ctx.fillStyle = '#8a5a00';
     ctx.font = '10px sans-serif';

@@ -1181,6 +1181,14 @@ describe.skipIf(missing.length > 0)('Compile verification', { timeout: 300_000 }
       expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
     });
 
+    it('compiles a QR code with no content — a blank square until communication fills it', { timeout: 30_000 }, () => {
+      const qr = createComponent('qrcode', { name: 'blank_qr', props: {} });
+      const screen = createScreen({ name: 'main', components: [qr] });
+      const result = compileGenerated(generateCode([screen], defaultOptions()));
+      expect(result.success, `emcc failed:
+${result.stderr}`).toBe(true);
+    });
+
     it('compiles with the quiet zone off', { timeout: 30_000 }, () => {
       const qr = createComponent('qrcode', {
         name: 'tight_qr',

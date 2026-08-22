@@ -52,12 +52,20 @@ describe('a QR code on the design canvas', () => {
     expect(container.textContent).toMatch(/does not fit version 1/);
   });
 
-  it('says so when there is nothing to encode', () => {
+  it('draws a blank square when there is nothing to encode — as the panel does', () => {
     const { container } = render(
       <CanvasQrcodeContent props={{ source: 'text', textId: '' }} />,
     );
 
-    expect(container.textContent).toMatch(/Nothing to encode/);
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.textContent).toBe('');
+    expect(container.querySelector('.lvgl-qrcode.empty')).not.toBeNull();
+  });
+
+  it('is blank out of the box: a new widget has no sample content', () => {
+    const { container } = render(<CanvasQrcodeContent props={{}} />);
+
+    expect(container.querySelector('svg')).toBeNull();
   });
 
   it('scales the drawing by pixels per module', () => {

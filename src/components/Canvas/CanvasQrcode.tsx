@@ -38,6 +38,20 @@ export const CanvasQrcodeContent: React.FC<{
   // component is React.memo'd against unchanged props, and a hand-pruned
   // dependency list is a staleness bug waiting for its moment.
   const encoded = encodeQrcode(content, settings);
+
+  // Nothing to encode: the panel shows the widget's background and nothing
+  // else, so the canvas does the same — the property editor is where the
+  // words about it live.
+  if (encoded.empty) {
+    return (
+      <div
+        className="lvgl-qrcode empty"
+        style={{ width: '100%', height: '100%', backgroundColor: light }}
+        aria-label="QR code with no content yet"
+      />
+    );
+  }
+
   let svg: { error: string | null; path: string | null; size: number };
   if (!encoded.render) {
     svg = { error: encoded.error, path: null, size: 0 };

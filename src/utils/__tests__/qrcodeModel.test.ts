@@ -21,10 +21,11 @@ const texts: TextResource[] = [
 ];
 
 describe('reading a widget’s props into QR settings', () => {
-  it('defaults to a literal with the standard knobs at their resting values', () => {
+  it('defaults to an empty literal with the standard knobs at their resting values', () => {
     const settings = normalizeQrcodeProps(undefined);
     expect(settings.source).toBe('literal');
-    expect(settings.literal).toBe('https://bitdove.net');
+    // No sample address: a new widget is blank until someone gives it content.
+    expect(settings.literal).toBe('');
     expect(settings.version).toBe(0);
     expect(settings.scale).toBe(2);
     expect(settings.ecc).toBe('M');
@@ -88,9 +89,11 @@ describe('encoding', () => {
     expect(error).toMatch(/does not fit version 1 at level H/);
   });
 
-  it('says when there is nothing to encode', () => {
-    const { error } = encodeQrcode('', normalizeQrcodeProps({}));
-    expect(error).toMatch(/Nothing to encode/);
+  it('treats no content as blank, not as an error', () => {
+    const encoded = encodeQrcode('', normalizeQrcodeProps({}));
+    expect(encoded.empty).toBe(true);
+    expect(encoded.render).toBeNull();
+    expect(encoded.error).toBeNull();
   });
 
   it('encodes Unicode as UTF-8 bytes, the way every phone scanner reads it', () => {
