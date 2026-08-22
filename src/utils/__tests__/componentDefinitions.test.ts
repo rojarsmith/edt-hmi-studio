@@ -215,18 +215,32 @@ describe('componentDefinitions', () => {
 
   // --- componentCategories ---
   describe('componentCategories', () => {
-    it('should have 6 categories', () => {
-      expect(componentCategories).toHaveLength(6);
+    it('should have 7 categories', () => {
+      expect(componentCategories).toHaveLength(7);
     });
 
-    it('should have basic, input, shape, container, display, misc categories', () => {
+    it('should have basic, input, shape, container, display, image, misc categories', () => {
       const ids = componentCategories.map(c => c.id);
       expect(ids).toContain('basic');
       expect(ids).toContain('input');
       expect(ids).toContain('shape');
       expect(ids).toContain('container');
       expect(ids).toContain('display');
+      expect(ids).toContain('image');
       expect(ids).toContain('misc');
+    });
+
+    it('puts Image between Display and Miscellaneous', () => {
+      const ids = componentCategories.map(c => c.id);
+      expect(ids.indexOf('image')).toBe(ids.indexOf('display') + 1);
+      expect(ids.indexOf('misc')).toBe(ids.indexOf('image') + 1);
+    });
+
+    it('gives QrCode a home in Image', () => {
+      const qrcode = componentDefinitions.find(def => def.type === 'qrcode');
+      expect(qrcode).toBeDefined();
+      expect(qrcode!.category).toBe('image');
+      expect(getComponentsByCategory('image').map(def => def.type)).toEqual(['qrcode']);
     });
 
     it('lists Shapes between Input and Containers, as the palette shows them', () => {

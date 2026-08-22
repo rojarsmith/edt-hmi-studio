@@ -285,7 +285,8 @@
 #define LV_USE_GIF 0
 #define LV_BIN_DECODER_RAM_LOAD 0
 #define LV_USE_RLE 0
-#define LV_USE_QRCODE 0
+/* The QrCode widget: the Emulator draws the same code the panel will. */
+#define LV_USE_QRCODE 1
 #define LV_USE_BARCODE 0
 #define LV_USE_FREETYPE 0
 #define LV_USE_TINY_TTF 0

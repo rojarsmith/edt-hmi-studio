@@ -32,6 +32,14 @@ typedef enum {
     HMI_DATA_UINT32,
     HMI_DATA_INT32,
     HMI_DATA_FLOAT32,
+    /**
+     * ASCII text carried in consecutive holding or input registers, two
+     * characters per register, high byte first, ended by a NUL or by the
+     * end of the block. `string_registers` on the descriptor says how many
+     * registers the block spans. Read-only: nothing in the runtime writes
+     * text back to the server.
+     */
+    HMI_DATA_STRING,
 } hmi_data_type_t;
 
 typedef enum {
@@ -71,6 +79,7 @@ typedef enum {
 
 typedef float (*hmi_widget_value_reader_t)(lv_obj_t *object);
 typedef void (*hmi_widget_value_writer_t)(lv_obj_t *object, float value);
+typedef void (*hmi_widget_text_writer_t)(lv_obj_t *object, const char *text);
 
 typedef struct {
     bool enabled;
@@ -101,6 +110,10 @@ typedef struct {
     float write_value;
     hmi_widget_value_reader_t value_reader;
     hmi_widget_value_writer_t value_writer;
+    /** Receives HMI_DATA_STRING reads. NULL on every numeric binding. */
+    hmi_widget_text_writer_t text_writer;
+    /** Registers an HMI_DATA_STRING block spans. Zero on numeric bindings. */
+    uint16_t string_registers;
 } hmi_binding_descriptor_t;
 
 typedef struct {

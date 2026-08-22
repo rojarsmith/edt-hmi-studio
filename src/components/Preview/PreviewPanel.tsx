@@ -1,5 +1,11 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { describeVideoPlaylist, normalizeVideoProps } from '../../utils/videoPlaylist';
+import {
+  encodeQrcode,
+  normalizeQrcodeProps,
+  qrcodePixelSize,
+  resolveQrcodeContent,
+} from '../../utils/qrcodeModel';
 import { useEditorStore } from '../../store/editorStore';
 import { useResourceStore } from '../../resources/resourceStore';
 import type {
@@ -157,7 +163,7 @@ interface ActiveScreenChange {
 const PreviewPanel: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
-  const { screens, currentScreenId, canvas, animations: projectAnimations } = useEditorStore();
+  const { screens, currentScreenId, canvas, animations: projectAnimations, texts, languages } = useEditorStore();
   const { images } = useResourceStore();
   const [scale, setScale] = useState(1);
   const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
@@ -870,6 +876,17 @@ const PreviewPanel: React.FC = () => {
           });
           break;
 
+        case 'qrcode': {
+          drawQrcode(ctx, x, y, w, h, {
+            props: comp.props,
+            texts,
+            languageCodes: languages.map((language) => language.code),
+            dark: textColor || '#000000',
+            light: bgColorStyle && bgColorStyle !== 'transparent' ? bgColorStyle : '#ffffff',
+          });
+          break;
+        }
+
         case 'video': {
           const playlist = normalizeVideoProps(comp.props);
           drawVideo(ctx, x, y, w, h, {
@@ -1070,6 +1087,8 @@ const PreviewPanel: React.FC = () => {
     }
   }, [
     components,
+    texts,
+    languages,
     screens,
     screenChange,
     canvas,
@@ -2067,6 +2086,63 @@ function drawWindow(
   ctx.font = '14px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('✕', x + w - 18, y + titleH / 2);
+}
+
+/**
+ * The prototype's QR code: the same modules the panel will draw, from the
+ * same content — encoded here because it is derivable, unlike a video's file.
+ */
+function drawQrcode(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  opts: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    props: Record<string, any>;
+    texts: import('../../types').TextResource[];
+    languageCodes: string[];
+    dark: string;
+    light: string;
+  },
+) {
+  const settings = normalizeQrcodeProps(opts.props);
+  const content = resolveQrcodeContent(settings, opts.texts, opts.languageCodes);
+  const encoded = encodeQrcode(content, settings);
+
+  ctx.fillStyle = opts.light;
+  ctx.fillRect(x, y, w, h);
+
+  if (!encoded.render) {
+    ctx.fillStyle = '#8a5a00';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(encoded.error ?? '', x + w / 2, y + h / 2, Math.max(0, w - 8));
+    return;
+  }
+
+  const { moduleCount, isDark } = encoded.render;
+  const px = qrcodePixelSize(moduleCount, settings.scale);
+  const originX = x + Math.floor((w - px) / 2) + 4 * settings.scale;
+  const originY = y + Math.floor((h - px) / 2) + 4 * settings.scale;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.fillStyle = opts.dark;
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (isDark(row, col)) {
+        ctx.fillRect(
+          originX + col * settings.scale,
+          originY + row * settings.scale,
+          settings.scale,
+          settings.scale,
+        );
+      }
+    }
+  }
+  ctx.restore();
 }
 
 /**

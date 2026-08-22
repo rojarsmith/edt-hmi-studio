@@ -622,6 +622,30 @@ export interface VideoProps {
 }
 
 /**
+ * Canonical props for the `qrcode` component.
+ *
+ * The content has two design-time sources — a Texts-library resource, read in
+ * English because a QR code is for the phone pointed at it, or a literal
+ * typed here — and one run-time source on top: a string tag bound over
+ * communication replaces the content while the panel runs. Version, scale
+ * and error correction are the QR standard's own knobs, normalised and
+ * documented in src/utils/qrcodeModel.ts.
+ */
+export interface QrcodeProps {
+  source: 'text' | 'literal';
+  /** The Texts-library resource encoded when `source` is `text`. */
+  textId: string;
+  /** The string encoded when `source` is `literal`. */
+  literal: string;
+  /** 0 = the smallest version the content fits; 1–40 pins it. */
+  version: number;
+  /** Pixels per module. The widget box never stretches the code. */
+  scale: number;
+  /** Error correction level, as the QR standard names them. */
+  ecc: 'L' | 'M' | 'Q' | 'H';
+}
+
+/**
  * The states a style can be written for. `default` is the resting one.
  *
  * `checked` is not decoration: LVGL draws a switch's on colour and a

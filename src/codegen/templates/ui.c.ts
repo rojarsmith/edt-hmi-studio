@@ -4,7 +4,8 @@ import type {
   Screen, LvglComponent, StyleProps, Theme, Animation, AnimationEasing, LvglStyleState,
 } from '../../types';
 import { isArcPart, partSelector, widgetParts } from '../../utils/widgetParts';
-import { screensHaveVideo } from '../../utils/videoWidgets';
+import { screensHaveVideo, screensHaveType } from '../../utils/videoWidgets';
+import { normalizeQrcodeProps } from '../../utils/qrcodeModel';
 import { normalizeVideoProps } from '../../utils/videoPlaylist';
 import type { CodeGenOptions } from '../types';
 import type { ImageResource, FontResource } from '../../resources/types';
@@ -169,6 +170,8 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
     // the image and the message label inside this box. See
     // docs/video-playback.md §5.
     video: 'lv_obj_create',
+    // A QR code is a canvas the generated renderer paints modules into.
+    qrcode: 'lv_canvas_create',
   };
   
   const func = createFuncs[type] || 'lv_obj_create';
@@ -203,6 +206,180 @@ function getCreateFunction(type: string, parentVar: string, options: CodeGenOpti
   }
   
   return `${func}(${parentVar})`;
+}
+
+const QRCODE_SUPPORT_SOURCE = `
+/**
+ * The QrCode widgets' renderer, shared by every one of them.
+ *
+ * Generated rather than shipped in a board runtime because it is pure
+ * software — the same code runs on every board and in the Emulator — and
+ * because it calls the QR encoder LVGL bundles (qrcodegen) directly. LVGL's
+ * own lv_qrcode wrapper is not used: it pins the error-correction level to
+ * MEDIUM and picks the version itself, and both are settings this widget
+ * hands to the user.
+ *
+ * The widget is an lv_canvas. Each render allocates an indexed 1-bit draw
+ * buffer sized to the code plus the standard's 4-module quiet zone, paints
+ * the palette from the widget's own colours, and sets the dark modules bit
+ * by bit. A render happens at startup and again only when communication
+ * replaces the content — never per frame.
+ */
+typedef struct {
+    uint8_t min_version;   /* 1..40; == max_version when the version is pinned */
+    uint8_t max_version;
+    uint8_t ecc;           /* qrcodegen_Ecc_* */
+    uint8_t scale;         /* pixels per module */
+    uint32_t dark;         /* 0xRRGGBB */
+    uint32_t light;
+    char text[129];        /* the longest string a 64-register read carries */
+} ui_qrcode_context_t;
+
+/* Work areas for the encoder, sized for version 40, shared: rendering is
+   synchronous and one at a time. */
+static uint8_t ui_qrcode_modules[qrcodegen_BUFFER_LEN_MAX];
+static uint8_t ui_qrcode_scratch[qrcodegen_BUFFER_LEN_MAX];
+
+static void ui_qrcode_apply(lv_obj_t *canvas, ui_qrcode_context_t *context)
+{
+    bool encoded;
+    int qr_size;
+    int32_t px;
+    lv_draw_buf_t *draw_buf;
+    lv_draw_buf_t *previous;
+
+    encoded = qrcodegen_encodeText(
+        context->text,
+        ui_qrcode_scratch,
+        ui_qrcode_modules,
+        (enum qrcodegen_Ecc)context->ecc,
+        context->min_version,
+        context->max_version,
+        qrcodegen_Mask_AUTO,
+        true);
+    if (!encoded) {
+        /* Content that does not fit the pinned version leaves the last
+           picture up: half a code is worse than yesterday's code. */
+        return;
+    }
+
+    qr_size = qrcodegen_getSize(ui_qrcode_modules);
+    px = (int32_t)(qr_size + 8) * context->scale;
+
+    previous = lv_canvas_get_draw_buf(canvas);
+    draw_buf = lv_draw_buf_create((uint32_t)px, (uint32_t)px, LV_COLOR_FORMAT_I1, LV_STRIDE_AUTO);
+    if (draw_buf == NULL) {
+        return;
+    }
+    lv_draw_buf_clear(draw_buf, NULL);
+    lv_canvas_set_draw_buf(canvas, draw_buf);
+    if (previous != NULL) {
+        lv_draw_buf_destroy(previous);
+    }
+    lv_canvas_set_palette(canvas, 0, lv_color32_make(
+        (uint8_t)(context->light >> 16), (uint8_t)(context->light >> 8), (uint8_t)context->light, 0xFF));
+    lv_canvas_set_palette(canvas, 1, lv_color32_make(
+        (uint8_t)(context->dark >> 16), (uint8_t)(context->dark >> 8), (uint8_t)context->dark, 0xFF));
+
+    /* Dark modules, one bit per pixel, MSB first — the I1 layout. The first
+       8 bytes of the buffer are the palette. */
+    {
+        uint8_t *pixels = draw_buf->data + 8;
+        uint32_t stride = draw_buf->header.stride;
+        int module_y;
+
+        for (module_y = 0; module_y < qr_size; module_y++) {
+            int module_x;
+            for (module_x = 0; module_x < qr_size; module_x++) {
+                int y0;
+                if (!qrcodegen_getModule(ui_qrcode_modules, module_x, module_y)) {
+                    continue;
+                }
+                for (y0 = 0; y0 < context->scale; y0++) {
+                    int32_t y = ((int32_t)module_y + 4) * context->scale + y0;
+                    int x0;
+                    for (x0 = 0; x0 < context->scale; x0++) {
+                        int32_t x = ((int32_t)module_x + 4) * context->scale + x0;
+                        pixels[(uint32_t)y * stride + ((uint32_t)x >> 3)] |=
+                            (uint8_t)(0x80U >> ((uint32_t)x & 7U));
+                    }
+                }
+            }
+        }
+    }
+
+    lv_image_cache_drop(draw_buf);
+    lv_obj_invalidate(canvas);
+}
+
+/**
+ * A new string for one QR code, from communication. Redraws only when the
+ * words actually changed: polls repeat, pictures should not.
+ */
+static void ui_qrcode_set_text(
+    lv_obj_t *canvas, ui_qrcode_context_t *context, const char *text)
+{
+    if ((text == NULL) || (text[0] == 0)) {
+        return;
+    }
+    if (lv_strcmp(context->text, text) == 0) {
+        return;
+    }
+    lv_strlcpy(context->text, text, sizeof(context->text));
+    ui_qrcode_apply(canvas, context);
+}
+`;
+
+const QRCODE_ECC_ENUM: Record<string, string> = {
+  L: 'qrcodegen_Ecc_LOW',
+  M: 'qrcodegen_Ecc_MEDIUM',
+  Q: 'qrcodegen_Ecc_QUARTILE',
+  H: 'qrcodegen_Ecc_HIGH',
+};
+
+/**
+ * One QR code's settings and starting content, resolved at generation time.
+ *
+ * The content is resolved to English on purpose: a QR code is scanned by a
+ * phone, not read by the operator, and the address behind it does not switch
+ * with the panel's language. What can change it at run time is communication,
+ * through the widget's `_qr_set_text` below.
+ */
+function qrcodeContextDeclaration(
+  varName: string,
+  component: LvglComponent,
+  texts: TextResource[],
+  languages: ProjectLanguage[],
+): string {
+  const settings = normalizeQrcodeProps(component.props);
+  let content = settings.literal;
+  if (settings.source === 'text') {
+    const resource = texts.find((text) => text.id === settings.textId);
+    content = resource
+      ? resolveText(resource, 'en', languages.map((language) => language.code))
+      : '';
+  }
+  const minVersion = settings.version === 0 ? 1 : settings.version;
+  const maxVersion = settings.version === 0 ? 40 : settings.version;
+  const dark = (component.styles.default.textColor ?? '#000000').replace('#', '0x');
+  const light = (component.styles.default.bgColor ?? '#ffffff').replace('#', '0x');
+
+  return [
+    `static ui_qrcode_context_t ${varName}_qr = {`,
+    `    .min_version = ${minVersion}U,`,
+    `    .max_version = ${maxVersion}U,`,
+    `    .ecc = ${QRCODE_ECC_ENUM[settings.ecc] ?? 'qrcodegen_Ecc_MEDIUM'},`,
+    `    .scale = ${settings.scale}U,`,
+    `    .dark = ${dark}U,`,
+    `    .light = ${light}U,`,
+    `    .text = "${escapeCString(content)}",`,
+    '};',
+    '',
+    `void ${varName}_qr_set_text(lv_obj_t *object, const char *text)`,
+    '{',
+    `    ui_qrcode_set_text(object, &${varName}_qr, text);`,
+    '}',
+  ].join('\n');
 }
 
 /**
@@ -1227,6 +1404,13 @@ function generatePropsCode(
       }
       break;
       
+    case 'qrcode':
+      // The code draws at its true pixel size; the box centres it. The
+      // context beside the widget's variable carries everything else.
+      lines.push(`${indent}lv_image_set_inner_align(${varName}, LV_IMAGE_ALIGN_CENTER);`);
+      lines.push(`${indent}ui_qrcode_apply(${varName}, &${varName}_qr);`);
+      break;
+
     case 'video': {
       // Nothing to scroll: the runtime's picture fills the box exactly, and a
       // stray drag on a touch panel must not slide it.
@@ -2776,6 +2960,12 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
   if (screensHaveVideo(screens)) {
     lines.push(generateInclude('hmi_video.h'));
   }
+  // The QR encoder LVGL bundles, reached directly — see the QR support block.
+  // lvgl/src is on every include path this project compiles with.
+  if (screensHaveType(screens, 'qrcode')) {
+    lines.push(generateInclude('libs/qrcode/qrcodegen.h'));
+    lines.push(generateInclude('misc/cache/instance/lv_image_cache.h'));
+  }
 
   // Built-in symbols note
   if (useBuiltinSymbols) {
@@ -2994,6 +3184,14 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
     allComponents.push(...entries);
   }
 
+  if (screensHaveType(screens, 'qrcode')) {
+    if (options.generateComments) {
+      lines.push(generateSectionHeader('QR Code Support', options));
+    }
+    lines.push(QRCODE_SUPPORT_SOURCE);
+    lines.push('');
+  }
+
   if (allComponents.length > 0) {
     if (options.generateComments) {
       lines.push(generateSectionHeader('Component Definitions', options));
@@ -3013,6 +3211,11 @@ export function generateUiSource(screens: Screen[], options: CodeGenOptions, the
       // The same for a video's playlist: hmi_video_attach keeps the pointer.
       if (comp.type === 'video') {
         lines.push(videoPlaylistDeclaration(varName, comp));
+      }
+      // A QR code's settings and content, resolved to a plain string here:
+      // the panel re-encodes only when communication changes the words.
+      if (comp.type === 'qrcode') {
+        lines.push(qrcodeContextDeclaration(varName, comp, texts, languages));
       }
     }
     lines.push('');

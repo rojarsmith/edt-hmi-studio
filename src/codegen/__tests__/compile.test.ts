@@ -1158,6 +1158,29 @@ describe.skipIf(missing.length > 0)('Compile verification', { timeout: 300_000 }
     });
   });
 
+  // QR code: self-contained — the generated renderer calls the encoder the
+  // LVGL library bundles, so it compiles and links with no stub at all.
+  describe('QrCode', () => {
+    it('compiles a literal QR at a pinned version and level', { timeout: 30_000 }, () => {
+      const qr = createComponent('qrcode', {
+        name: 'site_qr',
+        props: { source: 'literal', literal: 'https://bitdove.net', version: 5, scale: 3, ecc: 'H' },
+      });
+      const screen = createScreen({ name: 'main', components: [qr] });
+      const result = compileGenerated(generateCode([screen], defaultOptions()));
+      expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
+    });
+
+    it('compiles two QR codes beside other widgets, auto version', { timeout: 30_000 }, () => {
+      const a = createComponent('qrcode', { name: 'qr_a', props: { source: 'literal', literal: 'A' } });
+      const b = createComponent('qrcode', { name: 'qr_b', props: { source: 'literal', literal: 'B', ecc: 'L' } });
+      const label = createComponent('label', { name: 'caption', props: { text: 'Scan me' } });
+      const screen = createScreen({ name: 'main', components: [a, b, label] });
+      const result = compileGenerated(generateCode([screen], defaultOptions()));
+      expect(result.success, `emcc failed:\n${result.stderr}`).toBe(true);
+    });
+  });
+
   // Video: the one widget whose generated code calls into the board's own
   // firmware rather than into LVGL. The runtime is not part of the emulator
   // toolchain, so it is stubbed here from the same prototypes

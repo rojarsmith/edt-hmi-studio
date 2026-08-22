@@ -33,6 +33,7 @@ const SUPPORTED_COMPONENT_TYPES = new Set([
   'bar',
   'arc',
   'image-button',
+  'qrcode',
 ]);
 
 const AREA_OPTIONS: { value: ModbusRegisterArea; label: string }[] = [
@@ -76,6 +77,8 @@ function getPropertyOptions(componentType: string): {
     case 'textarea':
     case 'label':
       return [{ value: 'text', label: 'Text' }];
+    case 'qrcode':
+      return [{ value: 'text', label: 'Encoded Content' }];
     case 'dropdown':
       return [{ value: 'selected', label: 'Selected Option Index' }];
     default:
@@ -84,6 +87,26 @@ function getPropertyOptions(componentType: string): {
 }
 
 function createDefaultBinding(componentType: string): ModbusBinding {
+  if (componentType === 'qrcode') {
+    /*
+     * A string, and read-only: nothing on the panel edits a QR code, so
+     * there is nothing to write back. Sixteen registers is 32 characters —
+     * a short URL — and the field beside the data type stretches it.
+     */
+    return {
+      enabled: false,
+      area: 'holding-register',
+      address: 0,
+      dataType: 'string',
+      access: 'read',
+      property: 'text',
+      scale: 1,
+      pollIntervalMs: 500,
+      writeBehavior: 'widget-value',
+      writeValue: 0,
+      stringRegisters: 16,
+    };
+  }
   if (componentType === 'image-button') {
     return {
       enabled: false,
@@ -136,13 +159,16 @@ const ModbusBindingEditor: React.FC<ModbusBindingEditorProps> = ({
   onChange,
 }) => {
   const isImageButton = componentType === 'image-button';
+  const isQrcode = componentType === 'qrcode';
   const defaults = useMemo(() => createDefaultBinding(componentType), [componentType]);
   const baseValue = binding ?? defaults;
   const availableTags = isImageButton
     ? tags.filter((tag) => (
         tag.area === 'holding-register' && tag.dataType === 'uint16'
       ))
-    : tags;
+    // The Protocol tab's tags are numeric; none of them can back a string
+    // read, so the picker is empty rather than misleading.
+    : isQrcode ? [] : tags;
   const selectedTag = baseValue.tagId
     ? availableTags.find((tag) => tag.id === baseValue.tagId)
     : undefined;
@@ -283,22 +309,42 @@ const ModbusBindingEditor: React.FC<ModbusBindingEditorProps> = ({
             <label>Data type</label>
             <select
               value={value.dataType}
-              disabled={booleanArea || tagBacked || isImageButton}
+              disabled={booleanArea || tagBacked || isImageButton || isQrcode}
               onChange={(event) => update({
                 dataType: event.target.value as ModbusDataType,
               })}
             >
-              {DATA_TYPE_OPTIONS.map((type) => (
+              {(isQrcode ? (['string'] as const) : DATA_TYPE_OPTIONS).map((type) => (
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
           </div>
 
+          {isQrcode && (
+            <div className="property-row">
+              <label>Length (registers)</label>
+              <input
+                type="number"
+                min={1}
+                max={64}
+                value={value.stringRegisters ?? 16}
+                aria-label="String length in registers"
+                onChange={(event) => update({
+                  stringRegisters: Math.min(64, Math.max(1, Number(event.target.value) || 16)),
+                })}
+              />
+              <span className="property-hint">
+                {2 * (value.stringRegisters ?? 16)} characters — two per
+                register, high byte first, ended by a zero.
+              </span>
+            </div>
+          )}
+
           <div className="property-row">
             <label>Access</label>
             <select
               value={value.access}
-              disabled={isReadOnlyArea(value.area) || tagBacked}
+              disabled={isReadOnlyArea(value.area) || tagBacked || isQrcode}
               onChange={(event) => update({
                 access: event.target.value as ModbusAccess,
               })}

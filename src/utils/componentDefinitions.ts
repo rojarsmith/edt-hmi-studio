@@ -7,6 +7,10 @@ export const componentCategories: ComponentCategory[] = [
   { id: 'shape', name: 'Shapes', icon: '🔷', collapsed: false },
   { id: 'container', name: 'Containers', icon: '📁', collapsed: false },
   { id: 'display', name: 'Display', icon: '📊', collapsed: false },
+  // Widgets that *are* a picture, as opposed to Basic's Image, which shows
+  // one the project imported. A QR code is a picture computed from its
+  // content; whatever joins it here should be too.
+  { id: 'image', name: 'Image', icon: '🧿', collapsed: false },
   // Last, and named for what it is: the widgets that belong to no family
   // above. A video is not a control, not a shape and not a chart — it is a
   // panel showing something the firmware plays. See docs/video-playback.md.
@@ -641,6 +645,45 @@ export const componentDefinitions: ComponentDefinition[] = [
         borderWidth: 2,
         borderRadius: 8,
         textColor: '#212121',
+        opacity: 1,
+        padding: 0,
+      },
+    },
+    isContainer: false,
+  },
+
+  // Image
+  {
+    type: 'qrcode',
+    name: 'QrCode',
+    icon: '🔳',
+    category: 'image',
+    // Version 2 at the default scale of 2 is (25+8)*2 = 66 px; 120 leaves the
+    // code room to grow to the content without the widget clipping it.
+    defaultWidth: 120,
+    defaultHeight: 120,
+    defaultProps: {
+      // A literal by default, so the widget shows something scannable the
+      // moment it lands; binding a Texts resource is one dropdown away.
+      source: 'literal',
+      literal: 'https://bitdove.net',
+      textId: '',
+      // 0 is "the smallest version the content fits" — the QR standard's own
+      // sizing rule, and the right default for anyone not pinning a version.
+      version: 0,
+      scale: 2,
+      ecc: 'M',
+    },
+    defaultStyles: {
+      default: {
+        // White behind the code and black modules: the contrast a scanner
+        // expects. bgColor is the light colour, textColor the dark one —
+        // the same rows every widget's Style section already has.
+        bgColor: '#ffffff',
+        borderColor: 'transparent',
+        borderWidth: 0,
+        borderRadius: 0,
+        textColor: '#000000',
         opacity: 1,
         padding: 0,
       },

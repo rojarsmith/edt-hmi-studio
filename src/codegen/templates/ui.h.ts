@@ -139,6 +139,25 @@ export function generateUiHeader(screens: Screen[], options: CodeGenOptions, fon
   lines.push(formatFuncDecl('void', 'ui_init', []));
   lines.push('');
 
+  const qrcodes = allComponents.filter(
+    ({ component }) => component.type === 'qrcode',
+  );
+  if (qrcodes.length > 0) {
+    for (const { component, screenName } of qrcodes) {
+      const varName = needsScreenPrefix.has(component.id)
+        ? getComponentVarName(`${screenName}_${component.name}`, options)
+        : getComponentVarName(component.name, options);
+      // What a string binding calls when communication replaces the content.
+      lines.push(
+        formatFuncDecl('void', `${varName}_qr_set_text`, [
+          'lv_obj_t *object',
+          'const char *text',
+        ]),
+      );
+    }
+    lines.push('');
+  }
+
   const imageButtons = allComponents.filter(
     ({ component }) => component.type === 'image-button',
   );

@@ -151,6 +151,12 @@
 #define LV_USE_BUTTONMATRIX 1
 #define LV_USE_CALENDAR 1
 #define LV_USE_CANVAS 1
+
+/* The QrCode widget's encoder. LV_USE_QRCODE compiles the bundled
+   QR-Code-generator library; generated code calls it directly rather than
+   through LVGL's lv_qrcode wrapper, which pins the error-correction level
+   the widget lets the user choose. */
+#define LV_USE_QRCODE 1
 #define LV_USE_CHART 1
 #define LV_USE_CHECKBOX 1
 #define LV_USE_DROPDOWN 1

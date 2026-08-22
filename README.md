@@ -15,7 +15,7 @@ A full-featured **visual editor for LVGL user interfaces**, with drag-and-drop d
 ## ✨ Features
 
 ### 🎨 Visual design
-- **17 LVGL widgets**: button, label, image, slider, checkbox, switch, progress bar, arc, textarea, dropdown, container, tab view, window, chart, table, calendar, video
+- **18 LVGL widgets**: button, label, image, slider, checkbox, switch, progress bar, arc, textarea, dropdown, container, tab view, window, chart, table, calendar, video, QR code
 - **Drag and drop**: drag from the component panel onto the canvas
 - **Nesting**: place widgets inside containers
 - **Direct manipulation**: drag to move, resize from 8 handles
@@ -252,6 +252,7 @@ src/
 | **Input** | Textarea, Dropdown, Checkbox, Switch, Slider |
 | **Container** | Container (obj), Tab View, Tile View, Window |
 | **Display** | Progress Bar, Arc, Spinner, Chart, Table, Calendar |
+| **Image** | QrCode |
 | **Miscellaneous** | Video |
 
 ## 🔧 Known limitations

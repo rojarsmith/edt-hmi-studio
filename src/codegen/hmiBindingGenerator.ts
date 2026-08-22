@@ -38,6 +38,7 @@ const DATA_TYPE_ENUM: Record<ModbusDataType, string> = {
   uint32: 'HMI_DATA_UINT32',
   int32: 'HMI_DATA_INT32',
   float32: 'HMI_DATA_FLOAT32',
+  string: 'HMI_DATA_STRING',
 };
 
 const ACCESS_ENUM: Record<ModbusAccess, string> = {
@@ -286,6 +287,16 @@ function generateSource(
       `        .write_value = ${cFloat(binding.writeValue, 0)},`,
       `        .value_reader = ${component.type === 'image-button' ? `${variableName}_get_value` : 'NULL'},`,
       `        .value_writer = ${component.type === 'image-button' ? `${variableName}_set_value` : 'NULL'},`,
+      // A string binding routes to the widget's own text writer — for a QR
+      // code, the generated function that re-encodes and redraws it. The
+      // remaining descriptor fields are designated-initialised, so numeric
+      // rows need not name these at all.
+      ...(binding.dataType === 'string'
+        ? [
+          `        .text_writer = ${variableName}_qr_set_text,`,
+          `        .string_registers = ${integerInRange(binding.stringRegisters ?? 16, 1, 64, 16)}U,`,
+        ]
+        : []),
       '    },',
     );
   }

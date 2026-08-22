@@ -13,6 +13,8 @@ const WasmPreview: React.FC = () => {
   const screens = useEditorStore((s) => s.screens);
   const currentScreenId = useEditorStore((s) => s.currentScreenId);
   const canvas = useEditorStore((s) => s.canvas);
+  const texts = useEditorStore((s) => s.texts);
+  const languages = useEditorStore((s) => s.languages);
 
   /*
    * Whether the runtime actually resized itself to the project's canvas.
@@ -34,7 +36,10 @@ const WasmPreview: React.FC = () => {
       { type: 'set-screen-size', width: canvas.width, height: canvas.height },
       '*',
     );
-    const json = editorStateToJson(screens, currentScreenId, canvas);
+    const json = editorStateToJson(
+      screens, currentScreenId, canvas, texts,
+      languages.map((language) => language.code),
+    );
     iframe.contentWindow.postMessage({ type: 'load-ui', json }, '*');
 
     // Measured after the runtime has had the frame it needs to reallocate.
@@ -48,7 +53,7 @@ const WasmPreview: React.FC = () => {
         !el || (el.width === canvas.width && el.height === canvas.height),
       );
     });
-  }, [screens, currentScreenId, canvas, status]);
+  }, [screens, currentScreenId, canvas, texts, languages, status]);
 
   // Listen for lvgl-ready from iframe
   useEffect(() => {

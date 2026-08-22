@@ -11,6 +11,7 @@ import {
 } from '../PropertyEditor/imageButtonModel';
 import { resolveFallbackBackground } from './widgetBackground';
 import { describeVideoPlaylist, normalizeVideoProps } from '../../utils/videoPlaylist';
+import CanvasQrcodeContent from './CanvasQrcode';
 import { partColor, partStyle } from '../../utils/widgetParts';
 import {
   DEFAULT_LINE_WIDTH,
@@ -987,6 +988,15 @@ const CanvasComponent: React.FC<CanvasComponentProps> = ({
           </div>
         );
       
+      case 'qrcode':
+        return (
+          <CanvasQrcodeContent
+            props={props}
+            darkColor={defaultStyle.textColor}
+            lightColor={defaultStyle.bgColor}
+          />
+        );
+
       case 'video': {
         const playlist = normalizeVideoProps(props);
         return (

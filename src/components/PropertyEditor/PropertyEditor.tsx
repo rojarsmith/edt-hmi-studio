@@ -51,6 +51,17 @@ import ModbusBindingEditor from './ModbusBindingEditor';
 import { videoPlaylistWarnings } from './videoModel';
 import { normalizeCardPath, normalizeVideoProps } from '../../utils/videoPlaylist';
 import {
+  QRCODE_ECC_LEVELS,
+  QRCODE_VERSION_AUTO,
+  QRCODE_VERSION_MAX,
+  QRCODE_SCALE_MIN,
+  QRCODE_SCALE_MAX,
+  encodeQrcode,
+  normalizeQrcodeProps,
+  qrcodePixelSize,
+  resolveQrcodeContent,
+} from '../../utils/qrcodeModel';
+import {
   clampImageButtonStateIndex,
   createImageButtonState,
   normalizeImageButtonProps,
@@ -2545,6 +2556,9 @@ function renderComponentProps(
         </div>
       );
 
+    case 'qrcode':
+      return <QrcodeEditor component={component} props={props} onChange={onChange} />;
+
     case 'video':
       return <VideoEditor props={props} onChange={onChange} />;
 
@@ -2733,6 +2747,158 @@ function renderComponentProps(
 }
 
 // Image props editor with resource picker
+/**
+ * Everything a QrCode widget is: what it encodes, and how the code is built.
+ *
+ * The content comes from the Texts library — read in English whatever the
+ * panel speaks, because the code is for the phone pointed at it — or from a
+ * literal typed here. A string tag bound over communication replaces either
+ * at run time; that binding lives in the Communication section below, like
+ * every other widget's.
+ *
+ * Version, scale and error correction are the QR standard's own knobs, under
+ * the standard's own names. The line at the foot does the arithmetic the
+ * designer would otherwise do on paper: which version the content actually
+ * needs, how many pixels that is at this scale, and whether it fits the box.
+ */
+function QrcodeEditor({
+  component,
+  props,
+  onChange,
+}: {
+  component: LvglComponent;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  props: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (key: string, value: any) => void;
+}): React.ReactNode {
+  const texts = useEditorStore((state) => state.texts);
+  const languages = useEditorStore((state) => state.languages);
+
+  const settings = normalizeQrcodeProps(props);
+  const content = resolveQrcodeContent(
+    settings,
+    texts,
+    languages.map((language) => language.code),
+  );
+  const encoded = encodeQrcode(content, settings);
+
+  const fit = encoded.render
+    ? qrcodePixelSize(encoded.render.moduleCount, settings.scale)
+    : null;
+  const clipped = fit !== null && (fit > component.width || fit > component.height);
+
+  return (
+    <div className="property-section">
+      <div className="section-header">QR Code</div>
+      <div className="property-row">
+        <label>Content</label>
+        <select
+          value={settings.source}
+          aria-label="QR content source"
+          onChange={(e) => onChange('source', e.target.value)}
+        >
+          <option value="literal">Text I type here</option>
+          <option value="text">A Texts-library resource</option>
+        </select>
+      </div>
+
+      {settings.source === 'literal' ? (
+        <div className="property-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+          <label>Encoded text</label>
+          <input
+            type="text"
+            value={settings.literal}
+            placeholder="https://bitdove.net"
+            spellCheck={false}
+            aria-label="QR literal content"
+            onChange={(e) => onChange('literal', e.target.value)}
+          />
+        </div>
+      ) : (
+        <div className="property-row">
+          <label>Text resource</label>
+          <select
+            value={settings.textId}
+            aria-label="QR text resource"
+            onChange={(e) => onChange('textId', e.target.value)}
+          >
+            <option value="">(none chosen)</option>
+            {texts.map((text) => (
+              <option key={text.id} value={text.id}>{text.key}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {settings.source === 'text' && (
+        <span className="property-hint">
+          Encoded in English whichever language the panel is showing — the
+          code is for the phone pointed at it, and its address does not
+          translate.
+        </span>
+      )}
+
+      <div className="property-row">
+        <label>Version</label>
+        <select
+          value={settings.version}
+          aria-label="QR version"
+          onChange={(e) => onChange('version', parseInt(e.target.value, 10) || QRCODE_VERSION_AUTO)}
+        >
+          <option value={QRCODE_VERSION_AUTO}>Auto — smallest that fits</option>
+          {Array.from({ length: QRCODE_VERSION_MAX }, (_, i) => i + 1).map((v) => (
+            <option key={v} value={v}>Version {v} · {17 + 4 * v}×{17 + 4 * v} modules</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="property-row">
+        <label>Scale</label>
+        <div className="range-with-value">
+          <input
+            type="range"
+            min={QRCODE_SCALE_MIN}
+            max={QRCODE_SCALE_MAX}
+            value={settings.scale}
+            aria-label="QR scale"
+            onChange={(e) => onChange('scale', parseInt(e.target.value, 10) || 2)}
+          />
+          <span className="property-hint">{settings.scale} px / module</span>
+        </div>
+      </div>
+
+      <div className="property-row">
+        <label>Error correction</label>
+        <select
+          value={settings.ecc}
+          aria-label="QR error correction"
+          onChange={(e) => onChange('ecc', e.target.value)}
+        >
+          {QRCODE_ECC_LEVELS.map((level) => (
+            <option key={level.value} value={level.value}>{level.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {encoded.error && (
+        <p className="shape-warning" role="status">{encoded.error}</p>
+      )}
+      {encoded.render && (
+        <p className={clipped ? 'shape-warning' : 'video-board-note'} role="status">
+          {`Version ${encoded.render.version}, ${encoded.render.moduleCount}×${encoded.render.moduleCount} modules — ${fit}×${fit} px with its quiet zone.`}
+          {clipped
+            ? ` The widget is ${component.width}×${component.height}, so the code will be clipped: enlarge the widget or lower the scale.`
+            : ''}
+        </p>
+      )}
+      <span className="property-hint">
+        A string sent over communication replaces this content while the panel
+        runs — bind one in the Communication section below.
+      </span>
+    </div>
+  );
+}
+
 /**
  * Everything a Video widget is: what it plays, and what to do with it.
  *

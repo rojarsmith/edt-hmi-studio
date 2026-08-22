@@ -4,6 +4,8 @@
  */
 #include "ui_from_json.h"
 #include "cJSON.h"
+#include "libs/qrcode/qrcodegen.h"
+#include "misc/cache/instance/lv_image_cache.h"
 #include "lvgl.h"
 #include <string.h>
 #include <stdlib.h>
@@ -505,6 +507,98 @@ static lv_obj_t *create_video(lv_obj_t *parent, const cJSON *comp) {
     return frame;
 }
 
+
+/*
+ * A QR code, drawn exactly as the generated firmware draws it: the same
+ * encoder, the same version and error-correction settings, the same quiet
+ * zone. The serializer has already resolved the content — a text resource in
+ * English, or the literal — into props.content, so this side encodes a plain
+ * string. See src/codegen/templates/ui.c.ts for the twin of this renderer.
+ */
+static uint8_t qr_modules[qrcodegen_BUFFER_LEN_MAX];
+static uint8_t qr_scratch[qrcodegen_BUFFER_LEN_MAX];
+
+static uint32_t qr_style_color(const cJSON *comp, const char *key, uint32_t fallback) {
+    const cJSON *styles = cJSON_GetObjectItemCaseSensitive(comp, "styles");
+    const cJSON *def = styles ? cJSON_GetObjectItemCaseSensitive(styles, "default") : NULL;
+    const char *hex = def ? cjson_get_string(def, key) : NULL;
+    if (hex && hex[0] == '#') {
+        return (uint32_t)strtoul(hex + 1, NULL, 16);
+    }
+    return fallback;
+}
+
+static lv_obj_t *create_qrcode(lv_obj_t *parent, const cJSON *comp) {
+    lv_obj_t *canvas = lv_canvas_create(parent);
+    const cJSON *props = cJSON_GetObjectItemCaseSensitive(comp, "props");
+    const char *content = props ? cjson_get_string(props, "content") : NULL;
+    int version = props ? cjson_get_int(props, "version", 0) : 0;
+    int scale = props ? cjson_get_int(props, "scale", 2) : 2;
+    const char *ecc_name = props ? cjson_get_string(props, "ecc") : NULL;
+    enum qrcodegen_Ecc ecc = qrcodegen_Ecc_MEDIUM;
+    uint32_t dark = qr_style_color(comp, "textColor", 0x000000);
+    uint32_t light = qr_style_color(comp, "bgColor", 0xFFFFFF);
+    int min_version = (version >= 1 && version <= 40) ? version : 1;
+    int max_version = (version >= 1 && version <= 40) ? version : 40;
+
+    if (ecc_name) {
+        if (ecc_name[0] == 'L') ecc = qrcodegen_Ecc_LOW;
+        else if (ecc_name[0] == 'Q') ecc = qrcodegen_Ecc_QUARTILE;
+        else if (ecc_name[0] == 'H') ecc = qrcodegen_Ecc_HIGH;
+    }
+
+    lv_image_set_inner_align(canvas, LV_IMAGE_ALIGN_CENTER);
+
+    if (!content || content[0] == 0) {
+        return canvas;
+    }
+    if (!qrcodegen_encodeText(content, qr_scratch, qr_modules, ecc,
+                              min_version, max_version, qrcodegen_Mask_AUTO, true)) {
+        return canvas;
+    }
+
+    {
+        int qr_size = qrcodegen_getSize(qr_modules);
+        int32_t px = (int32_t)(qr_size + 8) * scale;
+        lv_draw_buf_t *draw_buf =
+            lv_draw_buf_create((uint32_t)px, (uint32_t)px, LV_COLOR_FORMAT_I1, LV_STRIDE_AUTO);
+        uint8_t *pixels;
+        uint32_t stride;
+        int module_y;
+
+        if (draw_buf == NULL) {
+            return canvas;
+        }
+        lv_draw_buf_clear(draw_buf, NULL);
+        lv_canvas_set_draw_buf(canvas, draw_buf);
+        lv_canvas_set_palette(canvas, 0, lv_color32_make(
+            (uint8_t)(light >> 16), (uint8_t)(light >> 8), (uint8_t)light, 0xFF));
+        lv_canvas_set_palette(canvas, 1, lv_color32_make(
+            (uint8_t)(dark >> 16), (uint8_t)(dark >> 8), (uint8_t)dark, 0xFF));
+
+        pixels = draw_buf->data + 8;
+        stride = draw_buf->header.stride;
+        for (module_y = 0; module_y < qr_size; module_y++) {
+            int module_x;
+            for (module_x = 0; module_x < qr_size; module_x++) {
+                int y0;
+                if (!qrcodegen_getModule(qr_modules, module_x, module_y)) continue;
+                for (y0 = 0; y0 < scale; y0++) {
+                    int32_t y = ((int32_t)module_y + 4) * scale + y0;
+                    int x0;
+                    for (x0 = 0; x0 < scale; x0++) {
+                        int32_t x = ((int32_t)module_x + 4) * scale + x0;
+                        pixels[(uint32_t)y * stride + ((uint32_t)x >> 3)] |=
+                            (uint8_t)(0x80U >> ((uint32_t)x & 7U));
+                    }
+                }
+            }
+        }
+        lv_image_cache_drop(draw_buf);
+    }
+    return canvas;
+}
+
 static lv_obj_t *create_spinner(lv_obj_t *parent, const cJSON *comp) {
     (void)comp;
     return lv_spinner_create(parent);
@@ -794,6 +888,7 @@ static const type_entry_t type_table[] = {
     { "win",       create_win },
     { "spinner",   create_spinner },
     { "video",     create_video },
+    { "qrcode",    create_qrcode },
     { "line",      create_line },
     { "polygon",   create_polygon },
     { "img",       create_img },

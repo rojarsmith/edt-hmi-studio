@@ -1,5 +1,12 @@
 import type { LvglComponent, Screen } from '../types';
 
+/** Whether any screen carries a widget of `type`, walking children too. */
+export function screensHaveType(screens: Screen[], type: string): boolean {
+  const walk = (components: LvglComponent[]): boolean =>
+    components.some((component) => component.type === type || walk(component.children));
+  return screens.some((screen) => walk(screen.components));
+}
+
 /**
  * Whether a project puts a video anywhere on any screen.
  *

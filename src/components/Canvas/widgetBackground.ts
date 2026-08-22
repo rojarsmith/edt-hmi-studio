@@ -31,6 +31,9 @@ export function resolveFallbackBackground(type: string): string | undefined {
     case 'arc': return 'transparent';
     case 'spinner': return 'transparent';
     case 'checkbox': return 'transparent';
+    // A QR code ships with the white a scanner expects behind it; clearing it
+    // is a deliberate choice, so nothing is filled back in.
+    case 'qrcode': return 'transparent';
     // A video ships with a black fill, and black is what an empty frame is —
     // so there is nothing to fall back to, and clearing the fill to
     // transparent is a deliberate choice the canvas must honour.

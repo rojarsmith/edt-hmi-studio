@@ -1,4 +1,5 @@
-import type { Screen, CanvasState, LvglComponent } from '../../types';
+import type { Screen, CanvasState, LvglComponent, TextResource } from '../../types';
+import { normalizeQrcodeProps, resolveQrcodeContent } from '../../utils/qrcodeModel';
 
 interface WasmUIJson {
   screen: {
@@ -133,8 +134,27 @@ export function editorStateToJson(
   screens: Screen[],
   currentScreenId: string,
   canvas: CanvasState,
+  texts: TextResource[] = [],
+  languageCodes: string[] = [],
 ): string {
   const screen = screens.find((p) => p.id === currentScreenId);
+
+  const components = screen ? flattenTree(screen.components, null) : [];
+  // A QR code's content is resolved here — a text resource read in English,
+  // or the literal — so the C side encodes a plain string and needs no
+  // knowledge of the Texts library.
+  for (const component of components) {
+    if (component.type === 'qrcode') {
+      const settings = normalizeQrcodeProps(component.props);
+      component.props = {
+        ...component.props,
+        content: resolveQrcodeContent(settings, texts, languageCodes),
+        version: settings.version,
+        scale: settings.scale,
+        ecc: settings.ecc,
+      };
+    }
+  }
 
   const json: WasmUIJson = {
     screen: {
@@ -142,7 +162,7 @@ export function editorStateToJson(
       height: canvas.height,
       bgColor: screen?.backgroundColor || '#ffffff',
     },
-    components: screen ? flattenTree(screen.components, null) : [],
+    components,
   };
 
   return JSON.stringify(json);

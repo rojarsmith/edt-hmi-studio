@@ -69,13 +69,32 @@ static bool access_is_writable(hmi_access_t access)
     return (access == HMI_ACCESS_WRITE) || (access == HMI_ACCESS_READWRITE);
 }
 
-static uint16_t register_quantity_for_type(hmi_data_type_t data_type)
+/**
+ * The most registers one string block may span. 64 registers is 128
+ * characters — room for any URL a QR code is asked to carry — and one Modbus
+ * read: the protocol allows up to 125 registers per request.
+ */
+#define HMI_STRING_REGISTERS_MAX 64U
+
+static uint16_t register_quantity_for_descriptor(
+    const hmi_binding_descriptor_t *descriptor)
 {
-    switch (data_type) {
+    switch (descriptor->data_type) {
         case HMI_DATA_UINT32:
         case HMI_DATA_INT32:
         case HMI_DATA_FLOAT32:
             return 2U;
+        case HMI_DATA_STRING: {
+            uint16_t count = descriptor->string_registers;
+
+            if (count == 0U) {
+                count = 1U;
+            }
+            if (count > HMI_STRING_REGISTERS_MAX) {
+                count = HMI_STRING_REGISTERS_MAX;
+            }
+            return count;
+        }
         default:
             return 1U;
     }
@@ -136,13 +155,52 @@ static bool start_binding_read(
 
     function_code =
         (descriptor->area == HMI_AREA_HOLDING_REGISTER) ? 0x03U : 0x04U;
-    quantity = register_quantity_for_type(descriptor->data_type);
+    quantity = register_quantity_for_descriptor(descriptor);
     return modbus_rtu_async_start_read_registers(
         &g_modbus_client,
         g_config->unit_id,
         function_code,
         descriptor->address,
         quantity);
+}
+
+/**
+ * A completed HMI_DATA_STRING read, decoded into `out`.
+ *
+ * Two ASCII characters per register, high byte first — the layout every PLC
+ * vendor's "string in registers" convention shares — ended by a NUL or by the
+ * end of the block. Anything unprintable ends the string too: a register
+ * block that was never written reads as zeros or noise, and half a URL is
+ * better than a URL with garbage in the middle.
+ */
+static void completed_read_text(
+    const hmi_binding_descriptor_t *descriptor,
+    char *out,
+    size_t capacity)
+{
+    const uint16_t quantity = register_quantity_for_descriptor(descriptor);
+    size_t used = 0U;
+
+    for (uint16_t index = 0U; index < quantity; ++index) {
+        const uint16_t word =
+            modbus_rtu_async_get_register(&g_modbus_client, index);
+        const char bytes[2] = {
+            (char)((word >> 8U) & 0xFFU),
+            (char)(word & 0xFFU),
+        };
+
+        for (size_t half = 0U; half < 2U; ++half) {
+            const char c = bytes[half];
+
+            if ((c == 0) || (c < 0x20) || (used + 1U >= capacity)) {
+                out[used] = 0;
+                return;
+            }
+            out[used] = c;
+            used++;
+        }
+    }
+    out[used] = 0;
 }
 
 static float completed_read_value(
@@ -569,6 +627,27 @@ static void finish_active_transaction(modbus_client_result_t result)
         if (g_transaction.kind == HMI_TRANSACTION_READ) {
             const hmi_binding_descriptor_t *descriptor =
                 state->descriptor;
+
+            if ((descriptor->data_type == HMI_DATA_STRING) &&
+                (descriptor->text_writer != NULL)) {
+                /*
+                 * Text travels its own path: no scale, no cached float, no
+                 * numeric widget write. The writer is the generated code's
+                 * own function, which also skips re-drawing when the string
+                 * has not changed — polls repeat, and the picture must not
+                 * be rebuilt for a value that is the same.
+                 */
+                char text[2U * HMI_STRING_REGISTERS_MAX + 1U];
+
+                completed_read_text(descriptor, text, sizeof(text));
+                if ((descriptor->object != NULL) &&
+                    (*descriptor->object != NULL)) {
+                    descriptor->text_writer(*descriptor->object, text);
+                }
+                memset(&g_transaction, 0, sizeof(g_transaction));
+                return;
+            }
+
             const float raw_value = completed_read_value(descriptor);
             const float scale =
                 (descriptor->scale == 0.0f) ? 1.0f : descriptor->scale;

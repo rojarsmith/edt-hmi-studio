@@ -10,7 +10,7 @@ This directory holds the detailed design document for every widget in EDT HMI St
 
 ## Overview
 
-The editor supports **22 widgets** in 6 categories:
+The editor supports **23 widgets** in 7 categories:
 
 | Category | Icon | Count | Purpose |
 |------|------|--------|------|
@@ -19,6 +19,7 @@ The editor supports **22 widgets** in 6 categories:
 | Shapes (shape) | 🔷 | 3 | Decorative geometry, drawn rather than operated |
 | Container (container) | 📁 | 4 | Layout containers that hold children |
 | Display (display) | 📊 | 5 | Data display and visualisation |
+| Image (image) | 🧿 | 1 | Widgets that are a computed picture |
 | Miscellaneous (misc) | 🧩 | 1 | What belongs to no family above |
 
 ---
@@ -94,6 +95,17 @@ Code generation and the WASM preview use **virtual ids** to mount children onto 
 | Chart | `chart` | 📈 | 200×150 | ❌ | A chart supporting line and bar plots, multiple series, and configurable axes and grid | [chart.md](chart.md) |
 | Table | `table` | 📋 | 200×150 | ❌ | A table with configurable rows and columns, cell data, column widths and alignment | [table.md](table.md) |
 | Calendar | `calendar` | 📅 | 220×220 | ❌ | A calendar showing a year and month, with a today marker, highlighted dates and range selection | [calendar.md](calendar.md) |
+
+---
+
+## Image widgets
+
+Widgets that *are* a picture, computed from their content — as opposed to
+Basic's Image, which shows one the project imported.
+
+| Widget | Type | Icon | Default size | Container | Description | Document |
+|------|------|------|----------|------|------|------|
+| QrCode | `qrcode` | 🔳 | 120×120 | ❌ | A QR code from a Texts-library resource (read in English) or a literal, replaceable at run time by a string over communication. Version 1–40 or auto, scale, and all four error-correction levels | [qrcode.md](qrcode.md) |
 
 ---
 
@@ -194,5 +206,6 @@ docs/components/
 ├── chart.md           ← Chart
 ├── table.md           ← Table
 ├── calendar.md        ← Calendar
+├── qrcode.md          ← QrCode
 └── video.md           ← Video
 ```

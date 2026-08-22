@@ -421,7 +421,15 @@ export type ModbusDataType =
   | 'int16'
   | 'uint32'
   | 'int32'
-  | 'float32';
+  | 'float32'
+  /**
+   * ASCII text in consecutive registers, two characters per register, high
+   * byte first, NUL-ended — the convention every PLC vendor's "string in
+   * registers" shares. Read-only, and offered only where a widget shows
+   * text a server sets: today, the QR code's content. Not offered in the
+   * Protocol tab's tag table, whose tags feed numeric logic.
+   */
+  | 'string';
 
 /** Shared by every protocol's tag table. */
 export type BusAccess = 'read' | 'write' | 'readwrite';
@@ -570,6 +578,11 @@ export interface ModbusBinding {
   pollIntervalMs: number;
   writeBehavior: ModbusWriteBehavior;
   writeValue: number;
+  /**
+   * How many registers a `string` read spans (2 characters each, 1–64).
+   * Absent on numeric bindings.
+   */
+  stringRegisters?: number;
 }
 
 export function createDefaultCommunicationConfig(): CommunicationConfig {
